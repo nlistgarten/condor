@@ -13,7 +13,7 @@ y2_in = xx[4]
 
 y1_out = z1 ** 2 + z2 + x - 0.2 * y2_in
 y2_out = at.sqrt(y1_in) + z1 + z2
-obj = x ** 2 + z1 + y1_in + at.exp(-y2_in)
+obj = x ** 2 + z2 + y1_in + at.exp(-y2_in)
 
 con1 = y1_in - 3.16
 con2 = 24.0 - y2_out
