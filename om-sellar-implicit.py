@@ -127,17 +127,15 @@ class SymbolicVector(DefaultVector):
         dtype = complex if self._alloc_complex else float
         # return np.zeros(size, dtype=dtype)
 
-        # names = []
-        # breakpoint()
-        # for path, sz in zip(self._names, system._var_sizes[self._typ]):
-        #     if sz == 1:
-        #         names.append(path)
-        #     else:
-        #         names.extend([f"{path}_{i}" for i in range(sz)])
-
-        # return np.array(sym.symbols(names))
-        name = "a" if self._typ == "input" else "b"
-        return np.array(sym.symbols(f"{name}:{size}"))
+        names = []
+        # om uses this and relies on ordering when building views, should be ok
+        for abs_name, meta in system._var_abs2meta[self._typ].items():
+            sz = meta["size"]
+            if sz == 1:
+                names.append(abs_name)
+            else:
+                names.extend([f"{abs_name}_{i}" for i in range(sz)])
+        return np.array(sym.symbols(names))
 
     def set_var(self, name, val, idxs=None, flat=False, var_name=None):
         pass
