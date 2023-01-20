@@ -6,20 +6,6 @@ import os
 
 import numpy as np
 import openmdao.api as om
-import sympy as sym
-from openmdao.vectors.default_vector import DefaultVector
-
-
-def sympify_vec(vec):
-    out = {}
-    for path, val in vec.items():
-        if val.size == 1:
-            out[path] = np.array([sym.symbols(path)])
-        else:
-            out[path] = np.array(
-                sym.symbols(" ".join([f"{path}_{i}" for i in range(val.size)]))
-            )
-    return out
 
 
 class Resid(om.ImplicitComponent):
@@ -68,18 +54,14 @@ class Obj(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         x, z, y1, y2 = inputs.values()
-        symbolic = isinstance(inputs, SymbolicVector)
-        exp = sym.exp if symbolic else np.exp
-        outputs["obj"] = x**2 + z[1] + y1 + exp(-y2)
+        outputs["obj"] = x**2 + z[1] + y1 + np.exp(-y2)
 
     def compute_partials(self, inputs, J):
         x, z, y1, y2 = inputs.values()
-        symbolic = isinstance(inputs, SymbolicVector)
-        exp = sym.exp if symbolic else np.exp
         J["obj", "x"] = 2 * x
         J["obj", "z"] = [0, 1]
         J["obj", "y1"] = 1
-        J["obj", "y2"] = -exp(-y2)
+        J["obj", "y2"] = -np.exp(-y2)
 
 
 class Constr(om.ExplicitComponent):
@@ -120,89 +102,70 @@ class Sellar(om.Group):
         self.linear_solver = om.DirectSolver()
 
 
-class SymbolicVector(DefaultVector):
-    def _create_data(self):
-        system = self._system()
-        size = np.sum(system._var_sizes[self._typ][system.comm.rank, :])
-        dtype = complex if self._alloc_complex else float
-        # return np.zeros(size, dtype=dtype)
+if __name__ == "__main__":
+    from upcycle import SymbolicVector
 
-        names = []
-        # om uses this and relies on ordering when building views, should be ok
-        for abs_name, meta in system._var_abs2meta[self._typ].items():
-            sz = meta["size"]
-            if sz == 1:
-                names.append(abs_name)
-            else:
-                names.extend([f"{abs_name}_{i}" for i in range(sz)])
-        return np.array(sym.symbols(names))
+    # avoid some errors from reports expecting float data
+    os.environ["OPENMDAO_REPORTS"] = "none"
 
-    def set_var(self, name, val, idxs=None, flat=False, var_name=None):
-        pass
+    prob = om.Problem()
+    prob.model = Sellar()
 
+    prob.driver = om.ScipyOptimizeDriver()
+    prob.driver.options["optimizer"] = "SLSQP"
+    prob.driver.options["tol"] = 1e-8
+    # prob.driver.options["debug_print"] = ["objs"]
 
-# avoid some errors from reports expecting float data
-os.environ["OPENMDAO_REPORTS"] = "none"
+    prob.model.add_design_var("x", lower=0, upper=10)
+    prob.model.add_design_var("z", lower=0, upper=10)
+    prob.model.add_objective("obj")
+    prob.model.add_constraint("con1", upper=0)
+    prob.model.add_constraint("con2", upper=0)
 
-prob = om.Problem()
-prob.model = Sellar()
+    prob.setup(local_vector_class=SymbolicVector)
 
-prob.driver = om.ScipyOptimizeDriver()
-prob.driver.options["optimizer"] = "SLSQP"
-prob.driver.options["tol"] = 1e-8
-# prob.driver.options["debug_print"] = ["objs"]
+    prob.set_val("x", 1.0)
+    prob.set_val("z", [5.0, 2.0])
+    prob.set_val("y1", 1.0)
+    prob.set_val("y2", 1.0)
 
-prob.model.add_design_var("x", lower=0, upper=10)
-prob.model.add_design_var("z", lower=0, upper=10)
-prob.model.add_objective("obj")
-prob.model.add_constraint("con1", upper=0)
-prob.model.add_constraint("con2", upper=0)
+    prob.set_solver_print(level=2)
 
-prob.setup(local_vector_class=SymbolicVector)
+    prob.final_setup()
 
-prob.set_val("x", 1.0)
-prob.set_val("z", [5.0, 2.0])
-prob.set_val("y1", 1.0)
-prob.set_val("y2", 1.0)
+    print("residuals")
+    print(40 * "=")
+    print(*list(prob.model._residuals.items()), sep="\n")
 
-prob.set_solver_print(level=2)
+    # prob.model.list_inputs()
+    print(*list(prob.model._inputs.items()), sep="\n")
+    print()
 
-prob.final_setup()
+    # prob.model.list_outputs()
+    print(*list(prob.model._outputs.items()), sep="\n")
+    print()
 
-print("residuals")
-print(40 * "=")
-print(*list(prob.model._residuals.items()), sep="\n")
+    print("apply nonlinear")
+    print(40 * "=")
 
-# prob.model.list_inputs()
-print(*list(prob.model._inputs.items()), sep="\n")
-print()
+    # prob.model._inputs = sympify_vec(prob.model._inputs)
+    # prob.model._outputs = sympify_vec(prob.model._outputs)
+    # prob.model._residuals = sympify_vec(prob.model._residuals)
+    prob.model._apply_nonlinear()
 
-# prob.model.list_outputs()
-print(*list(prob.model._outputs.items()), sep="\n")
-print()
+    # prob.model.list_inputs()
+    # prob.model.list_outputs()
 
+    print(*list(prob.model._residuals.items()), sep="\n")
 
-print("apply nonlinear")
-print(40 * "=")
+    # prob.run_driver()
+    # prob.run_model()
 
-# prob.model._inputs = sympify_vec(prob.model._inputs)
-# prob.model._outputs = sympify_vec(prob.model._outputs)
-# prob.model._residuals = sympify_vec(prob.model._residuals)
-prob.model._apply_nonlinear()
-
-# prob.model.list_inputs()
-# prob.model.list_outputs()
-
-print(*list(prob.model._residuals.items()), sep="\n")
-
-# prob.run_driver()
-# prob.run_model()
-
-# print("minimum found at")
-# print(prob.get_val("x")[0])
-# print(prob.get_val("z"))
-# print(prob.get_val("y1")[0])
-# print(prob.get_val("y2")[0])
-#
-# print("minumum objective")
-# print(prob.get_val("obj")[0])
+    # print("minimum found at")
+    # print(prob.get_val("x")[0])
+    # print(prob.get_val("z"))
+    # print(prob.get_val("y1")[0])
+    # print(prob.get_val("y2")[0])
+    #
+    # print("minumum objective")
+    # print(prob.get_val("obj")[0])
