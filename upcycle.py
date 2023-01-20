@@ -4,9 +4,12 @@ from openmdao.vectors.default_vector import DefaultVector
 
 
 class SymbolicArray(np.ndarray):
+    """ndarray containing sympy symbols, compatible with numpy methods like np.exp"""
+
     def __array_ufunc__(self, ufunc, method, *inputs, out=None, **kwargs):
-        if method != "__call__":
-            return NotImplemented
+        """Replace calls like np.exp with sympy equivalent"""
+        # if method != "__call__":
+        #     return NotImplemented
 
         sym_ufunc = getattr(sym, ufunc.__name__, None)
         if sym_ufunc is not None:
@@ -41,19 +44,23 @@ class SymbolicArray(np.ndarray):
         if result is NotImplemented:
             return NotImplemented
 
-        return result.view(SymbolicArray)  # result[0] if len(result) == 1 else result
+        if not isinstance(result, np.ndarray):
+            result = np.atleast_1d(result)
+
+        return result.view(SymbolicArray)
 
 
 class SymbolicVector(DefaultVector):
+    """OpenMDAO Vector implementation backed by SymbolicArray"""
+
     def __getitem__(self, name):
+        """Ensure accessing items always gives an array (as opposed to a scalar)"""
         return np.atleast_1d(super().__getitem__(name))
 
+    # override
     def _create_data(self):
+        """Replace root Vector's ndarray allocation with SymbolicArray"""
         system = self._system()
-        size = np.sum(system._var_sizes[self._typ][system.comm.rank, :])
-        dtype = complex if self._alloc_complex else float
-        # return np.zeros(size, dtype=dtype)
-
         names = []
         # om uses this and relies on ordering when building views, should be ok
         for abs_name, meta in system._var_abs2meta[self._typ].items():
@@ -62,7 +69,14 @@ class SymbolicVector(DefaultVector):
                 names.append(abs_name)
             else:
                 names.extend([f"{abs_name}_{i}" for i in range(sz)])
-        return np.array(sym.symbols(names)).view(SymbolicArray)
+        return np.array([sym.Symbol(name) for name in names]).view(SymbolicArray)
 
     def set_var(self, name, val, idxs=None, flat=False, var_name=None):
+        """Disable setting values"""
         pass
+
+
+if __name__ == "__main__":
+    xnd = np.array(sym.symbols("x:3"))
+    xs = xnd.view(SymbolicArray)
+    print(xs[0])
