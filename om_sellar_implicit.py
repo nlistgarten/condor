@@ -2,8 +2,6 @@
 
 Prototype for injecting sympy symbols in to get derivatives
 """
-import os
-
 import numpy as np
 import openmdao.api as om
 
@@ -102,12 +100,7 @@ class Sellar(om.Group):
         self.linear_solver = om.DirectSolver()
 
 
-if __name__ == "__main__":
-    from upcycle import SymbolicVector
-
-    # avoid some errors from reports expecting float data
-    os.environ["OPENMDAO_REPORTS"] = "none"
-
+def make_sellar_problem():
     prob = om.Problem()
     prob.model = Sellar()
 
@@ -122,50 +115,11 @@ if __name__ == "__main__":
     prob.model.add_constraint("con1", upper=0)
     prob.model.add_constraint("con2", upper=0)
 
-    prob.setup(local_vector_class=SymbolicVector)
+    prob.setup()
 
     prob.set_val("x", 1.0)
     prob.set_val("z", [5.0, 2.0])
     prob.set_val("y1", 1.0)
     prob.set_val("y2", 1.0)
 
-    prob.set_solver_print(level=2)
-
-    prob.final_setup()
-
-    print("residuals")
-    print(40 * "=")
-    print(*list(prob.model._residuals.items()), sep="\n")
-
-    # prob.model.list_inputs()
-    print(*list(prob.model._inputs.items()), sep="\n")
-    print()
-
-    # prob.model.list_outputs()
-    print(*list(prob.model._outputs.items()), sep="\n")
-    print()
-
-    print("apply nonlinear")
-    print(40 * "=")
-
-    # prob.model._inputs = sympify_vec(prob.model._inputs)
-    # prob.model._outputs = sympify_vec(prob.model._outputs)
-    # prob.model._residuals = sympify_vec(prob.model._residuals)
-    prob.model._apply_nonlinear()
-
-    # prob.model.list_inputs()
-    # prob.model.list_outputs()
-
-    print(*list(prob.model._residuals.items()), sep="\n")
-
-    # prob.run_driver()
-    # prob.run_model()
-
-    # print("minimum found at")
-    # print(prob.get_val("x")[0])
-    # print(prob.get_val("z"))
-    # print(prob.get_val("y1")[0])
-    # print(prob.get_val("y2")[0])
-    #
-    # print("minumum objective")
-    # print(prob.get_val("obj")[0])
+    return prob

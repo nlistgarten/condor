@@ -5,13 +5,11 @@ from openmdao.vectors.default_vector import DefaultVector
 
 class SymbolicArray(np.ndarray):
     def __array_ufunc__(self, ufunc, method, *inputs, out=None, **kwargs):
-        print(ufunc.__name__)
         if method != "__call__":
             return NotImplemented
 
         sym_ufunc = getattr(sym, ufunc.__name__, None)
         if sym_ufunc is not None:
-            print("using sympy ufunc")
             result = np.array([sym_ufunc(inp) for inp in inputs[0]]).view(SymbolicArray)
 
         else:
