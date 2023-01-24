@@ -1,7 +1,7 @@
 import numpy as np
 import sympy as sym
+from openmdao.components.balance_comp import BalanceComp
 from openmdao.vectors.default_vector import DefaultVector
-
 from sympy.core.expr import Expr
 
 
@@ -34,6 +34,18 @@ def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):
 
 
 Expr.__array_ufunc__ = array_ufunc
+
+
+orig_add_balance = BalanceComp.add_balance
+
+
+def add_balance(self, *args, **kwargs):
+    kwargs["normalize"] = False
+    kwargs["use_mult"] = False
+    orig_add_balance(self, *args, **kwargs)
+
+
+BalanceComp.add_balance = add_balance
 
 
 class SymbolicArray(np.ndarray):

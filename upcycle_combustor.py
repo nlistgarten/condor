@@ -1,11 +1,11 @@
+from upcycle import SymbolicVector  # isort: skip
+
 import numpy as np
 from openmdao.api import IndepVarComp, Problem
 from pycycle.elements.combustor import Combustor
 from pycycle.elements.flow_start import FlowStart
 from pycycle.mp_cycle import Cycle
 from pycycle.thermo.cea import species_data
-
-from upcycle import SymbolicVector
 
 header = [
     "Fl_I.W",
