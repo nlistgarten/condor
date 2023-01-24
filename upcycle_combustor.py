@@ -31,7 +31,7 @@ header = [
 
 h_map = dict(((v_name, i) for i, v_name in enumerate(header)))
 
-ref_data = np.array(
+data = np.array(
     [
         38.8,
         158.428,
