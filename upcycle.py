@@ -2,15 +2,45 @@ import numpy as np
 import sympy as sym
 from openmdao.vectors.default_vector import DefaultVector
 
+from sympy.core.expr import Expr
+
+
+def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):
+    sym_ufunc = getattr(sym, ufunc.__name__, None)
+    if sym_ufunc is not None:
+        return sym_ufunc(inputs[0])
+    else:
+        other = inputs[1]
+        prefix = ""
+        if inputs[1] is self:
+            other = inputs[0]
+            prefix = "r"
+
+        ufunc_map = dict(
+            subtract="sub",
+            add="add",
+            true_divide="truediv",
+            divide="truediv",
+            multiply="mul",
+        )
+
+        name = ufunc_map[ufunc.__name__]
+        op = getattr(self, f"__{prefix}{name}__")
+
+        if isinstance(other, np.ndarray):
+            return np.array([op(x) for x in other]).view(other.__class__)
+        else:
+            return op(other)
+
+
+Expr.__array_ufunc__ = array_ufunc
+
 
 class SymbolicArray(np.ndarray):
     """ndarray containing sympy symbols, compatible with numpy methods like np.exp"""
 
     def __array_ufunc__(self, ufunc, method, *inputs, out=None, **kwargs):
         """Replace calls like np.exp with sympy equivalent"""
-        # if method != "__call__":
-        #     return NotImplemented
-
         sym_ufunc = getattr(sym, ufunc.__name__, None)
         if sym_ufunc is not None:
             result = np.array([sym_ufunc(inp) for inp in inputs[0]]).view(SymbolicArray)
@@ -41,9 +71,6 @@ class SymbolicArray(np.ndarray):
             if result is NotImplemented:
                 return NotImplemented
 
-        if result is NotImplemented:
-            return NotImplemented
-
         if not isinstance(result, np.ndarray):
             result = np.atleast_1d(result)
 
@@ -55,7 +82,7 @@ class SymbolicVector(DefaultVector):
 
     def __getitem__(self, name):
         """Ensure accessing items always gives an array (as opposed to a scalar)"""
-        return np.atleast_1d(super().__getitem__(name))
+        return np.atleast_1d(super().__getitem__(name)).view(SymbolicArray)
 
     # override
     def _create_data(self):
