@@ -157,4 +157,14 @@ print(40 * "=")
 
 prob.model._apply_nonlinear()
 
-print(*list(prob.model._residuals.items()), sep="\n")
+# print(*list(prob.model._residuals.items()), sep="\n")
+
+print("eval jacobians")
+print(40 * "=")
+out_syms = prob.model._get_root_vectors()["output"]["nonlinear"].syms
+out_mat = sym.Matrix(out_syms)
+for rname, rarray in prob.model._residuals.items():
+    for rexpr in rarray:
+        # TODO check if zero/all zeros
+        # TODO check if array
+        rexpr.diff(out_mat)

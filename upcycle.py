@@ -56,7 +56,6 @@ class SymbolicArray(np.ndarray):
         sym_ufunc = getattr(sym, ufunc.__name__, None)
         if sym_ufunc is not None:
             result = np.array([sym_ufunc(inp) for inp in inputs[0]]).view(SymbolicArray)
-
         else:
             # convert inputs that are type SymbolicArray to ndarray
             args = []
@@ -108,7 +107,9 @@ class SymbolicVector(DefaultVector):
                 names.append(abs_name)
             else:
                 names.extend([f"{abs_name}_{i}" for i in range(sz)])
-        return np.array([sym.Symbol(name) for name in names]).view(SymbolicArray)
+        syms = np.array([sym.Symbol(name) for name in names]).view(SymbolicArray)
+        self.syms = syms
+        return syms
 
     def set_var(self, name, val, idxs=None, flat=False, var_name=None):
         """Disable setting values"""
