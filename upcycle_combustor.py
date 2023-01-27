@@ -1,4 +1,5 @@
 from upcycle import SymbolicVector  # isort: skip
+import sympy as sym
 
 import numpy as np
 from openmdao.api import IndepVarComp, Problem
@@ -163,8 +164,38 @@ print("eval jacobians")
 print(40 * "=")
 out_syms = prob.model._get_root_vectors()["output"]["nonlinear"].syms
 out_mat = sym.Matrix(out_syms)
+
+in_syms = prob.model._get_root_vectors()["input"]["nonlinear"].syms
+in_mat = sym.Matrix(in_syms)
+
+res_exprs = [rexpr 
+             for rarray in prob.model._residuals.values()
+             for rexpr in sym.flatten(rarray)
+             if not isinstance(rexpr, sym.core.numbers.Zero)]
+res_mat = sym.Matrix(res_exprs)
+res_mat.shape
+
+count = 0
+arrays = 0
+zeros = 0
 for rname, rarray in prob.model._residuals.items():
-    for rexpr in rarray:
+    for rexpr in sym.flatten(rarray):#.flatten():
+        if isinstance(rexpr, np.ndarray):
+            print("array")
+            #print(rexpr.shape, rexpr.size, rexpr)
+            arrays += 1
+
+        elif isinstance(rexpr, sym.core.numbers.Zero):
+            print("zero")
+            zeros += 1
+        else:
+            count += 1
+            print(rexpr, "\n"*3)
         # TODO check if zero/all zeros
         # TODO check if array
-        rexpr.diff(out_mat)
+        # rexpr.diff(out_mat)
+print(res_mat.shape[0] == count)
+
+res_mat.jacobian
+
+
