@@ -1,7 +1,10 @@
 from upcycle import SymbolicVector  # isort: skip
-import sympy as sym
+
+import os
+import warnings
 
 import numpy as np
+import sympy as sym
 from openmdao.api import IndepVarComp, Problem
 from pycycle.elements.combustor import Combustor
 from pycycle.elements.flow_start import FlowStart
@@ -56,6 +59,8 @@ data = np.array(
     ]
 )
 
+os.environ["OPENMDAO_REPORTS"] = "none"
+
 prob = Problem()
 model = prob.model = Cycle()
 model.options["thermo_method"] = "CEA"
@@ -84,9 +89,9 @@ model.set_input_defaults("combustor.MN", 0.5)
 # needed because composition is sized by connection
 # model.connect('ivc.in_composition', ['Fl_I:tot:composition', 'Fl_I:stat:composition', ])
 
-
 prob.set_solver_print(level=-1)
 prob.setup(check=False, force_alloc_complex=True)
+
 
 # input flowstation
 # prob['Fl_I:tot:P'] = data[h_map['Fl_I.Pt']]
@@ -148,7 +153,7 @@ print("")
 #                                    includes=['combustor.*',], excludes=['*.base_thermo.*', '*.mix_fuel.*'])
 # assert_check_partials(partial_data, atol=1e-8, rtol=1e-8)
 
-np.warnings.filterwarnings("error", category=np.VisibleDeprecationWarning)
+warnings.filterwarnings("error", category=np.VisibleDeprecationWarning)
 prob.setup(local_vector_class=SymbolicVector)
 
 prob.final_setup()
@@ -168,10 +173,12 @@ out_mat = sym.Matrix(out_syms)
 in_syms = prob.model._get_root_vectors()["input"]["nonlinear"].syms
 in_mat = sym.Matrix(in_syms)
 
-res_exprs = [rexpr 
-             for rarray in prob.model._residuals.values()
-             for rexpr in sym.flatten(rarray)
-             if not isinstance(rexpr, sym.core.numbers.Zero)]
+res_exprs = [
+    rexpr
+    for rarray in prob.model._residuals.values()
+    for rexpr in sym.flatten(rarray)
+    if not isinstance(rexpr, sym.core.numbers.Zero)
+]
 res_mat = sym.Matrix(res_exprs)
 res_mat.shape
 
@@ -179,10 +186,10 @@ count = 0
 arrays = 0
 zeros = 0
 for rname, rarray in prob.model._residuals.items():
-    for rexpr in sym.flatten(rarray):#.flatten():
+    for rexpr in sym.flatten(rarray):  # .flatten():
         if isinstance(rexpr, np.ndarray):
             print("array")
-            #print(rexpr.shape, rexpr.size, rexpr)
+            # print(rexpr.shape, rexpr.size, rexpr)
             arrays += 1
 
         elif isinstance(rexpr, sym.core.numbers.Zero):
@@ -190,12 +197,10 @@ for rname, rarray in prob.model._residuals.items():
             zeros += 1
         else:
             count += 1
-            print(rexpr, "\n"*3)
+            print(rexpr, "\n" * 3)
         # TODO check if zero/all zeros
         # TODO check if array
         # rexpr.diff(out_mat)
 print(res_mat.shape[0] == count)
 
 res_mat.jacobian
-
-
