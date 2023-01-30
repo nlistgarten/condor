@@ -45,6 +45,49 @@ def upcycle_problem(prob):
     return res_mat, out_syms
 
 
+def extract_problem_data(prob):
+    out_meta = prob.model._var_abs2meta["output"]
+    cons_meta = prob.driver._cons
+    obj_meta = prob.driver._objs
+    dv_meta = prob.driver._designvars
+
+    n = len(prob.model._outputs)
+    x0 = np.zeros(n)
+    lbx = np.full(n, -np.inf)
+    ubx = np.full(n, np.inf)
+    iobj = None
+    count = 0
+    for name, meta in out_meta.items():
+        size = meta["size"]
+
+        x0[count : count + size] = meta["val"].flatten()
+
+        lb = meta["lower"]
+        ub = meta["upper"]
+        if lb is not None:
+            lbx[count : count + size] = lb
+        if ub is not None:
+            ubx[count : count + size] = ub
+
+        if name in cons_meta:
+            lbx[count : count + size] = cons_meta[name]["lower"]
+            ubx[count : count + size] = cons_meta[name]["upper"]
+
+        # TODO make sure explicit indepvarcomp sets this tag
+        if "openmdao:indep_var" in meta["tags"]:
+            for dv_name, dv_meta_loc in dv_meta.items():
+                if name == dv_meta_loc["source"]:
+                    lbx[count : count + size] = dv_meta_loc["lower"]
+                    ubx[count : count + size] = dv_meta_loc["upper"]
+
+        if name in obj_meta:
+            iobj = count
+
+        count += size
+
+    return x0, lbx, ubx, iobj
+
+
 def sympy2casadi(sympy_expr, sympy_var, casadi_var):
     # TODO more/better defensive checks
     assert casadi_var.is_vector()
