@@ -1,8 +1,66 @@
+import casadi
 import numpy as np
 import sympy as sym
 from openmdao.components.balance_comp import BalanceComp
 from openmdao.vectors.default_vector import DefaultVector
 from sympy.core.expr import Expr
+from sympy.utilities.lambdify import lambdify
+
+
+def upcycle_problem(prob):
+    # run with a symbolic vector to get symbolic residual expressions
+    prob.setup(local_vector_class=SymbolicVector)
+    prob.final_setup()
+    prob.model._apply_nonlinear()
+
+    # compute dR/do
+    root_vecs = prob.model._get_root_vectors()
+    out_syms = root_vecs["output"]["nonlinear"].syms
+
+    res_exprs = [
+        rexpr
+        for rarray in prob.model._residuals.values()
+        for rexpr in sym.flatten(rarray)
+        if not isinstance(rexpr, sym.core.numbers.Zero)
+    ]
+    res_mat = sym.Matrix(res_exprs)
+    res_mat.shape
+
+    count = 0
+    arrays = 0
+    zeros = 0
+    for rname, rarray in prob.model._residuals.items():
+        for rexpr in sym.flatten(rarray):
+            if isinstance(rexpr, np.ndarray):
+                arrays += 1
+            elif isinstance(rexpr, sym.core.numbers.Zero):
+                zeros += 1
+            else:
+                count += 1
+            # TODO check if zero/all zeros
+            # TODO check if array
+
+    assert res_mat.shape[0] == count
+
+    return res_mat, out_syms
+
+
+def sympy2casadi(sympy_expr, sympy_var, casadi_var):
+    # TODO more/better defensive checks
+    assert casadi_var.is_vector()
+    if casadi_var.shape[1] > 1:
+        casadi_var = casadi_var.T
+    casadi_var = casadi.vertsplit(casadi_var)
+
+    mapping = {
+        "ImmutableDenseMatrix": casadi.blockcat,
+        "MutableDenseMatrix": casadi.blockcat,
+        "Abs": casadi.fabs,
+    }
+
+    f = lambdify(sympy_var, sympy_expr, modules=[mapping, casadi])
+
+    return f(*casadi_var), casadi_var
 
 
 def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):

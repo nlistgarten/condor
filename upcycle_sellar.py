@@ -1,119 +1,65 @@
-import os
+from upcycle import upcycle_problem, sympy2casadi  # isort: skip
 
-import numpy as np
-import openmdao.api as om
-import sympy as sym
+import os
+import pprint
+
 import casadi
-from sympy.utilities.lambdify import lambdify
+import numpy as np
 
 from om_sellar_implicit import make_sellar_problem
-from upcycle import SymbolicVector
 
 # avoid some errors from reports expecting float data
 os.environ["OPENMDAO_REPORTS"] = "none"
 
-print("checking problem optimization")
-print(40 * "=")
 prob = make_sellar_problem()
-
-# check the problem still works
 prob.run_driver()
+prob.list_problem_vars(print_arrays=True)
 
-print("x = ", prob.model.get_val("x"))
-print("z = ", prob.model.get_val("z"))
-print("obj = ", prob.model.get_val("obj"))
+res_mat, out_syms = upcycle_problem(prob)
 
+out_meta = prob.model._var_abs2meta["output"]
+cons_meta = prob.driver._cons
+obj_meta = prob.driver._objs
+dv_meta = prob.driver._designvars
 
-prob.setup(local_vector_class=SymbolicVector)
-
-prob.final_setup()
-
-
-print("apply nonlinear")
-print(40 * "=")
-
-prob.model._apply_nonlinear()
-
-print(*list(prob.model._residuals.items()), sep="\n")
-
-print("eval jacobians")
-print(40 * "=")
-out_syms = prob.model._get_root_vectors()["output"]["nonlinear"].syms
-out_mat = sym.Matrix(out_syms)
-
-in_syms = prob.model._get_root_vectors()["input"]["nonlinear"].syms
-in_mat = sym.Matrix(in_syms)
-
-res_exprs = [
-    rexpr
-    for rarray in prob.model._residuals.values()
-    for rexpr in sym.flatten(rarray)
-    if not isinstance(rexpr, sym.core.numbers.Zero)
-]
-res_mat = sym.Matrix(res_exprs)
-res_mat.shape
-
+n = len(out_syms)
+x0 = np.zeros(n)
+lbx = np.full(n, -np.inf)
+ubx = np.full(n, np.inf)
 count = 0
-arrays = 0
-zeros = 0
-for rname, rarray in prob.model._residuals.items():
-    for rexpr in sym.flatten(rarray):  # .flatten():
-        if isinstance(rexpr, np.ndarray):
-            print("array")
-            # print(rexpr.shape, rexpr.size, rexpr)
-            arrays += 1
+for name, meta in out_meta.items():
+    size = meta["size"]
 
-        elif isinstance(rexpr, sym.core.numbers.Zero):
-            print("zero")
-            zeros += 1
-        else:
-            count += 1
-            print(rexpr, "\n" * 3)
-        # TODO check if zero/all zeros
-        # TODO check if array
-        # rexpr.diff(out_mat)
-print(res_mat.shape[0] == count)
+    x0[count : count + size] = meta["val"].flatten()
 
-res_mat.jacobian(out_syms)
+    lb = meta["lower"]
+    ub = meta["upper"]
+    if lb is not None:
+        lbx[count : count + size] = lb
+    if ub is not None:
+        ubx[count : count + size] = ub
 
-# end of upcycle
-# ---------------
+    if name in cons_meta:
+        lbx[count : count + size] = cons_meta[name]["lower"]
+        ubx[count : count + size] = cons_meta[name]["upper"]
 
+    # TODO make sure explicit indepvarcomp sets this tag
+    if "openmdao:indep_var" in meta["tags"]:
+        for dv_name, dv_meta_loc in dv_meta.items():
+            if name == dv_meta_loc["source"]:
+                lbx[count : count + size] = dv_meta_loc["lower"]
+                ubx[count : count + size] = dv_meta_loc["upper"]
 
-def sympy2casadi(sympy_expr, sympy_var, casadi_var):
-    # TODO more/better defensive checks
-    assert casadi_var.is_vector()
-    if casadi_var.shape[1] > 1:
-        casadi_var = casadi_var.T
-    casadi_var = casadi.vertsplit(casadi_var)
+    if name in obj_meta:
+        iobj = count
 
-    mapping = {
-        "ImmutableDenseMatrix": casadi.blockcat,
-        "MutableDenseMatrix": casadi.blockcat,
-        "Abs": casadi.fabs,
-    }
+    count += size
 
-    f = lambdify(sympy_var, sympy_expr, modules=[mapping, casadi])
+ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
+ca_res, ca_vars_out = sympy2casadi(res_mat, out_syms, ca_vars)
 
-    return f(*casadi_var), casadi_var
-
-
-ca_vars = casadi.vertcat(*[casadi.MX.sym(lamda_arg.name) for lamda_arg in out_syms])
-f, ca_vars_out = sympy2casadi(res_mat, out_syms, ca_vars)
-
-# condor component construction (with casadi)
-
-# condor optimization problem construction
-
-nlp = {"x": ca_vars, "f": ca_vars[-3], "g": f}
+nlp = {"x": ca_vars, "f": ca_vars[iobj], "g": ca_res}
 S = casadi.nlpsol("S", "ipopt", nlp)
 
-out = S(
-    x0=[1, 5, 2, 1, 1, 3, 0, -10],
-    lbg=0,
-    ubg=0,
-    lbx=[0, 0, 0, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf],
-    ubx=[10, 10, 10, np.inf, np.inf, np.inf, 0, 0],
-)
-import pprint
+out = S(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
 pprint.pprint(out)
