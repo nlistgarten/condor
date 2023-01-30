@@ -119,7 +119,7 @@ def make_sellar_problem():
 
     prob.set_val("x", 1.0)
     prob.set_val("z", [5.0, 2.0])
-    prob.set_val("y1", 1.0)
+    prob.set_val("y1", 2.0)
     prob.set_val("y2", 1.0)
 
     return prob

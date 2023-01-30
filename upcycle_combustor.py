@@ -1,8 +1,10 @@
-from upcycle import SymbolicVector  # isort: skip
+import upcycle  # isort: skip
 
 import os
+import pprint
 import warnings
 
+import casadi
 import numpy as np
 import sympy as sym
 from openmdao.api import IndepVarComp, Problem
@@ -104,6 +106,9 @@ prob.set_val("flow_start.W", data[h_map["Fl_I.W"]], units="lbm/s")
 prob["combustor.Fl_I:FAR"] = data[h_map["FAR"]]
 prob["combustor.MN"] = data[h_map["Fl_O.MN"]]
 
+prob.final_setup()
+x0, lbx, ubx, iobj = upcycle.extract_problem_data(prob)
+
 prob.run_model()
 
 # prob.model.combustor.mix_fuel.list_inputs(print_arrays=True)
@@ -153,54 +158,19 @@ print("")
 #                                    includes=['combustor.*',], excludes=['*.base_thermo.*', '*.mix_fuel.*'])
 # assert_check_partials(partial_data, atol=1e-8, rtol=1e-8)
 
-warnings.filterwarnings("error", category=np.VisibleDeprecationWarning)
-prob.setup(local_vector_class=SymbolicVector)
+# warnings.filterwarnings("error", category=np.VisibleDeprecationWarning)
 
-prob.final_setup()
+print("upcycling...")
+sym_prob, res_mat, out_syms = upcycle.upcycle_problem(prob)
 
-print("apply nonlinear")
-print(40 * "=")
+print("sympy2casdadi")
+ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
+ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
 
-prob.model._apply_nonlinear()
+f = 0 if iobj is None else ca_vars[iobj]
+nlp = {"x": ca_vars, "f": f, "g": ca_res}
+S = casadi.nlpsol("S", "ipopt", nlp)
 
-# print(*list(prob.model._residuals.items()), sep="\n")
-
-print("eval jacobians")
-print(40 * "=")
-out_syms = prob.model._get_root_vectors()["output"]["nonlinear"].syms
-out_mat = sym.Matrix(out_syms)
-
-in_syms = prob.model._get_root_vectors()["input"]["nonlinear"].syms
-in_mat = sym.Matrix(in_syms)
-
-res_exprs = [
-    rexpr
-    for rarray in prob.model._residuals.values()
-    for rexpr in sym.flatten(rarray)
-    if not isinstance(rexpr, sym.core.numbers.Zero)
-]
-res_mat = sym.Matrix(res_exprs)
-res_mat.shape
-
-count = 0
-arrays = 0
-zeros = 0
-for rname, rarray in prob.model._residuals.items():
-    for rexpr in sym.flatten(rarray):  # .flatten():
-        if isinstance(rexpr, np.ndarray):
-            print("array")
-            # print(rexpr.shape, rexpr.size, rexpr)
-            arrays += 1
-
-        elif isinstance(rexpr, sym.core.numbers.Zero):
-            print("zero")
-            zeros += 1
-        else:
-            count += 1
-            print(rexpr, "\n" * 3)
-        # TODO check if zero/all zeros
-        # TODO check if array
-        # rexpr.diff(out_mat)
-print(res_mat.shape[0] == count)
-
-res_mat.jacobian
+print("running...")
+out = S(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
+pprint.pprint(out)

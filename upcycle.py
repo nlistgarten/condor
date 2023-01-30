@@ -1,15 +1,18 @@
 import casadi
 import numpy as np
 import sympy as sym
+from openmdao.core.problem import Problem
 from openmdao.components.balance_comp import BalanceComp
 from openmdao.vectors.default_vector import DefaultVector
 from sympy.core.expr import Expr
 from sympy.utilities.lambdify import lambdify
 
 
-def upcycle_problem(prob):
+def upcycle_problem(num_prob):
     # run with a symbolic vector to get symbolic residual expressions
-    prob.setup(local_vector_class=SymbolicVector)
+    prob = Problem()
+    prob.model = num_prob.model
+    prob.setup(local_vector_class=SymbolicVector, derivatives=False)
     prob.final_setup()
     prob.model._apply_nonlinear()
 
@@ -42,7 +45,7 @@ def upcycle_problem(prob):
 
     assert res_mat.shape[0] == count
 
-    return res_mat, out_syms
+    return prob, res_mat, out_syms
 
 
 def extract_problem_data(prob):
@@ -60,7 +63,8 @@ def extract_problem_data(prob):
     for name, meta in out_meta.items():
         size = meta["size"]
 
-        x0[count : count + size] = meta["val"].flatten()
+        # x0[count : count + size] = meta["val"].flatten()
+        x0[count : count + size] = prob.model._outputs[name].flatten()
 
         lb = meta["lower"]
         ub = meta["upper"]
