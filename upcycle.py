@@ -60,6 +60,8 @@ def extract_problem_data(prob):
     ubx = np.full(n, np.inf)
     iobj = None
     count = 0
+    explicit_idxs = []
+    non_indep_idxs = []
     for name, meta in out_meta.items():
         size = meta["size"]
 
@@ -83,13 +85,19 @@ def extract_problem_data(prob):
                 if name == dv_meta_loc["source"]:
                     lbx[count : count + size] = dv_meta_loc["lower"]
                     ubx[count : count + size] = dv_meta_loc["upper"]
+        else:
+            non_indep_idxs += range(count, count+size)
+
+        if "openmdao:allow_desvar" not in meta["tags"]:
+            #breakpoint()
+            explicit_idxs += range(count, count+size)
 
         if name in obj_meta:
             iobj = count
 
         count += size
 
-    return x0, lbx, ubx, iobj
+    return x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs
 
 
 def sympy2casadi(sympy_expr, sympy_var, casadi_var):

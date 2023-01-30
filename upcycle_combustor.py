@@ -107,7 +107,7 @@ prob["combustor.Fl_I:FAR"] = data[h_map["FAR"]]
 prob["combustor.MN"] = data[h_map["Fl_O.MN"]]
 
 prob.final_setup()
-x0, lbx, ubx, iobj = upcycle.extract_problem_data(prob)
+x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs = upcycle.extract_problem_data(prob)
 
 prob.run_model()
 
@@ -166,6 +166,13 @@ sym_prob, res_mat, out_syms = upcycle.upcycle_problem(prob)
 print("sympy2casdadi")
 ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
 ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
+
+print("updating initial guesses for explicit outputs")
+# update explicit output guesses
+res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
+xz = np.zeros_like(x0)
+xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
+x0[explicit_idxs] += xz[explicit_idxs]
 
 f = 0 if iobj is None else ca_vars[iobj]
 nlp = {"x": ca_vars, "f": f, "g": ca_res}

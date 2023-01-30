@@ -27,7 +27,7 @@ prob = make_sellar_problem()
 # pprint.pprint(list(prob.model._inputs.items()))
 
 prob.final_setup()
-x0, lbx, ubx, iobj = upcycle.extract_problem_data(prob)
+x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs = upcycle.extract_problem_data(prob)
 
 prob.model._apply_nonlinear()
 prob.model.list_outputs()
@@ -43,6 +43,12 @@ ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
 
 nlp = {"x": ca_vars, "f": ca_vars[iobj], "g": ca_res}
 S = casadi.nlpsol("S", "ipopt", nlp)
+
+# update explicit output guesses
+res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
+xz = np.zeros_like(x0)
+xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
+x0[explicit_idxs] += xz[explicit_idxs]
 
 out = S(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
 pprint.pprint(out)
