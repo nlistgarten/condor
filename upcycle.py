@@ -20,6 +20,8 @@ def upcycle_problem(num_prob):
     root_vecs = prob.model._get_root_vectors()
     out_syms = root_vecs["output"]["nonlinear"].syms
 
+    out_meta = prob.model._var_abs2meta["output"]
+
     res_exprs = [
         rexpr
         for rarray in prob.model._residuals.values()
@@ -37,6 +39,9 @@ def upcycle_problem(num_prob):
             if isinstance(rexpr, np.ndarray):
                 arrays += 1
             elif isinstance(rexpr, sym.core.numbers.Zero):
+                meta = out_meta[rname]
+                if "openmdao:indep_var" not in meta["tags"]:
+                    raise ValueError(f"Output has no dependence on inputs: {rname}")
                 zeros += 1
             else:
                 count += 1
@@ -44,6 +49,7 @@ def upcycle_problem(num_prob):
             # TODO check if array
 
     assert res_mat.shape[0] == count
+    assert arrays == 0
 
     return prob, res_mat, out_syms
 
