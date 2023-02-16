@@ -1,8 +1,10 @@
 import casadi
 import numpy as np
 import sympy as sym
-from openmdao.core.problem import Problem
 from openmdao.components.balance_comp import BalanceComp
+from openmdao.components.meta_model_structured_comp import \
+    MetaModelStructuredComp
+from openmdao.core.problem import Problem
 from openmdao.vectors.default_vector import DefaultVector
 from sympy.core.expr import Expr
 from sympy.utilities.lambdify import lambdify
@@ -92,11 +94,11 @@ def extract_problem_data(prob):
                     lbx[count : count + size] = dv_meta_loc["lower"]
                     ubx[count : count + size] = dv_meta_loc["upper"]
         else:
-            non_indep_idxs += range(count, count+size)
+            non_indep_idxs += range(count, count + size)
 
         if "openmdao:allow_desvar" not in meta["tags"]:
-            #breakpoint()
-            explicit_idxs += range(count, count+size)
+            # breakpoint()
+            explicit_idxs += range(count, count + size)
 
         if name in obj_meta:
             iobj = count
@@ -165,6 +167,34 @@ def add_balance(self, *args, **kwargs):
 
 
 BalanceComp.add_balance = add_balance
+
+
+orig_mm_compute = MetaModelStructuredComp.compute
+
+interp_registry = {}
+
+
+def mmsc_compute(self, inputs, outputs):
+    global interp_registry
+
+    if isinstance(inputs, SymbolicVector):
+        for output_name in outputs:
+            name = f"{self.name}_{output_name}"
+            # TODO flatten inputs?
+            f = sym.Function(name)(*inputs.values())
+            ca_interp = casadi.interpolant(
+                name,
+                "bspline",
+                self.inputs,
+                self.training_outputs[output_name].ravel(order="F"),
+            )
+            interp_registry[name] = ca_interp
+            outputs[output_name] = f
+    else:
+        return orig_mm_compute(self, inputs, outputs)
+
+
+MetaModelStructuredComp.compute = mmsc_compute
 
 
 class SymbolicArray(np.ndarray):

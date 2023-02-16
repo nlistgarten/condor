@@ -11,7 +11,8 @@ from openmdao.api import IndepVarComp, Problem
 from pycycle.elements.combustor import Combustor
 from pycycle.elements.flow_start import FlowStart
 from pycycle.mp_cycle import Cycle
-from pycycle.thermo.cea import species_data
+from pycycle.api import AIR_JETA_TAB_SPEC
+# from pycycle.thermo.cea import species_data
 
 header = [
     "Fl_I.W",
@@ -65,8 +66,11 @@ os.environ["OPENMDAO_REPORTS"] = "none"
 
 prob = Problem()
 model = prob.model = Cycle()
-model.options["thermo_method"] = "CEA"
-model.options["thermo_data"] = species_data.janaf
+model.options["thermo_method"] = "TABULAR"
+# model.options["thermo_data"] = species_data.janaf
+# FUEL_TYPE = "Jet-A(g)"
+model.options['thermo_data'] = AIR_JETA_TAB_SPEC
+FUEL_TYPE = "FAR"
 
 model.add_subsystem(
     "ivc",
@@ -77,7 +81,7 @@ model.add_subsystem(
 )
 
 model.add_subsystem("flow_start", FlowStart())
-model.add_subsystem("combustor", Combustor())
+model.add_subsystem("combustor", Combustor(fuel_type=FUEL_TYPE))
 
 model.pyc_connect_flow("flow_start.Fl_O", "combustor.Fl_I")
 
