@@ -119,9 +119,10 @@ def sympy2casadi(sympy_expr, sympy_var, casadi_var):
         "ImmutableDenseMatrix": casadi.blockcat,
         "MutableDenseMatrix": casadi.blockcat,
         "Abs": casadi.fabs,
+        "Array": casadi.MX,
     }
 
-    f = lambdify(sympy_var, sympy_expr, modules=[mapping, casadi])
+    f = lambdify(sympy_var, sympy_expr, modules=[interp_registry, mapping, casadi])
 
     return f(*casadi_var), casadi_var
 
@@ -180,18 +181,29 @@ def mmsc_compute(self, inputs, outputs):
     if isinstance(inputs, SymbolicVector):
         for output_name in outputs:
             name = f"{self.name}_{output_name}"
+
+            if name in interp_registry:
+                ca_interp_wrapped = interp_registry[name]
+            else:
+                ca_interp = casadi.interpolant(
+                    name,
+                    "linear",
+                    self.inputs,
+                    self.training_outputs[output_name].ravel(order="F"),
+                )
+                # ca_interp_wrapped = ca_interp #lambda *x: ca_interp(casadi.vertcat(x))
+                def ca_interp_wrapped(*args):
+                    return ca_interp(casadi.vertcat(*args[0]))
+
+            interp_registry[name] = ca_interp_wrapped
+
+            # breakpoint()
             # TODO flatten inputs?
-            f = sym.Function(name)(*inputs.values())
-            ca_interp = casadi.interpolant(
-                name,
-                "bspline",
-                self.inputs,
-                self.training_outputs[output_name].ravel(order="F"),
-            )
-            interp_registry[name] = ca_interp
+            f = sym.Function(name)(sym.Array(sym.flatten(inputs.values())))
+            # f._imp_ = ca_interp_wrapped
             outputs[output_name] = f
     else:
-        return orig_mm_compute(self, inputs, outputs)
+        orig_mm_compute(self, inputs, outputs)
 
 
 MetaModelStructuredComp.compute = mmsc_compute
