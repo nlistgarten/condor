@@ -144,7 +144,11 @@ def sympy2casadi(sympy_expr, sympy_var, casadi_var):
         sympy_var,
         sympy_expr,
         modules=[interp_registry, mapping, casadi],
-        printer=CodePrinter,
+        printer=CodePrinter(
+            {
+                "fully_qualified_modules": False,
+            }
+        ),
     )
 
     print("casadifying...")

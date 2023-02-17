@@ -3,6 +3,7 @@ import casadi
 import sympy as sym
 from sympy.printing.pycode import PythonCodePrinter
 
+
 class CustomPrinter(PythonCodePrinter):
     def _print_Piecewise(self, expr):
         eargs = expr.args
@@ -17,8 +18,7 @@ class CustomPrinter(PythonCodePrinter):
 
         return recurse(eargs)
 
-    def _print_Pow(self, expr, rational=False):
-        return self._hprint_Pow(expr, rational=rational, sqrt="casadi.sqrt")
+
 
 # sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
 x1, x2 = sympy_var = sym.symbols("x1:3")
@@ -43,7 +43,16 @@ mapping = {
     "Array": casadi.MX,
 }
 
-f = sym.lambdify(sympy_var, sympy_expr, modules=[mapping, casadi])#, printer=CustomPrinter)
+f = sym.lambdify(
+    sympy_var,
+    sympy_expr,
+    modules=[mapping, casadi],
+    printer=CustomPrinter(
+        {
+            "fully_qualified_modules": False,
+        }
+    ),
+)
 
 out = f(*casadi_var)
 cf = casadi.Function("f", casadi.vertsplit(casadi_var_in), casadi.vertsplit(out))
