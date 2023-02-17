@@ -1,4 +1,5 @@
 import upcycle  # isort: skip
+import casadi
 
 import sys
 import os
