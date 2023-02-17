@@ -6,9 +6,25 @@ from openmdao.components.meta_model_structured_comp import \
     MetaModelStructuredComp
 from openmdao.core.problem import Problem
 from openmdao.vectors.default_vector import DefaultVector
-from sympy.core.expr import Expr
-from sympy.utilities.lambdify import lambdify
 from pycycle.elements.US1976 import USatm1976Comp, USatm1976Data
+from sympy.core.expr import Expr
+from sympy.printing.pycode import PythonCodePrinter
+from sympy.utilities.lambdify import lambdify
+
+
+class CodePrinter(PythonCodePrinter):
+    def _print_Piecewise(self, expr):
+        eargs = expr.args
+
+        def recurse(eargs):
+            val, cond = eargs[0]
+            if len(eargs) == 1:
+                return str(val)
+            else:
+                rest = eargs[1:]
+                return f"if_else({cond}, {val}, {recurse(rest)})"
+
+        return recurse(eargs)
 
 
 def upcycle_problem(num_prob):
@@ -123,9 +139,18 @@ def sympy2casadi(sympy_expr, sympy_var, casadi_var):
         "Array": casadi.MX,
     }
 
-    f = lambdify(sympy_var, sympy_expr, modules=[interp_registry, mapping, casadi])
+    print("lambdifying...")
+    f = lambdify(
+        sympy_var,
+        sympy_expr,
+        modules=[interp_registry, mapping, casadi],
+        printer=CodePrinter,
+    )
 
-    return f(*casadi_var), casadi_var
+    print("casadifying...")
+    out = f(*casadi_var)
+
+    return out, casadi_var
 
 
 def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):
@@ -178,6 +203,7 @@ orig_mm_compute = MetaModelStructuredComp.compute
 def make_interp_wrapper(interp):
     def wrapper(*args):
         return interp(casadi.vertcat(*args[0]))
+
     return wrapper
 
 
