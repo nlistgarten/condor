@@ -10,6 +10,7 @@ import sympy as sym
 from openmdao.api import IndepVarComp, Problem
 from pycycle.elements.combustor import Combustor
 from pycycle.elements.flow_start import FlowStart
+from pycycle.elements.ambient import Ambient
 from pycycle.mp_cycle import Cycle
 from pycycle.api import AIR_JETA_TAB_SPEC
 # from pycycle.thermo.cea import species_data
@@ -82,6 +83,7 @@ model.add_subsystem(
 
 model.add_subsystem("flow_start", FlowStart())
 model.add_subsystem("combustor", Combustor(fuel_type=FUEL_TYPE))
+# model.add_subsystem("ambient", Ambient())
 
 model.pyc_connect_flow("flow_start.Fl_O", "combustor.Fl_I")
 

@@ -8,6 +8,7 @@ from openmdao.core.problem import Problem
 from openmdao.vectors.default_vector import DefaultVector
 from sympy.core.expr import Expr
 from sympy.utilities.lambdify import lambdify
+from pycycle.elements.US1976 import USatm1976Comp, USatm1976Data
 
 
 def upcycle_problem(num_prob):
@@ -163,21 +164,24 @@ orig_add_balance = BalanceComp.add_balance
 
 def add_balance(self, *args, **kwargs):
     kwargs["normalize"] = False
-    kwargs["use_mult"] = False
+    # kwargs["use_mult"] = False
     orig_add_balance(self, *args, **kwargs)
 
 
 BalanceComp.add_balance = add_balance
 
 
+interp_registry = {}
 orig_mm_compute = MetaModelStructuredComp.compute
 
-interp_registry = {}
+
+def make_interp_wrapper(interp):
+    def wrapper(*args):
+        return interp(casadi.vertcat(*args[0]))
+    return wrapper
 
 
 def mmsc_compute(self, inputs, outputs):
-    global interp_registry
-
     if isinstance(inputs, SymbolicVector):
         for output_name in outputs:
             name = f"{self.name}_{output_name}"
@@ -191,22 +195,42 @@ def mmsc_compute(self, inputs, outputs):
                     self.inputs,
                     self.training_outputs[output_name].ravel(order="F"),
                 )
-                # ca_interp_wrapped = ca_interp #lambda *x: ca_interp(casadi.vertcat(x))
-                def ca_interp_wrapped(*args):
-                    return ca_interp(casadi.vertcat(*args[0]))
+                ca_interp_wrapped = make_interp_wrapper(ca_interp)
 
             interp_registry[name] = ca_interp_wrapped
 
-            # breakpoint()
             # TODO flatten inputs?
             f = sym.Function(name)(sym.Array(sym.flatten(inputs.values())))
-            # f._imp_ = ca_interp_wrapped
             outputs[output_name] = f
     else:
         orig_mm_compute(self, inputs, outputs)
 
 
 MetaModelStructuredComp.compute = mmsc_compute
+
+orig_usatm1976_compute = USatm1976Comp.compute
+
+
+def usatm1976_compute(self, inputs, outputs):
+    if isinstance(inputs, SymbolicVector):
+        for output_name in outputs:
+            fname = f"{self.name}_{output_name}"
+            attr_name = output_name[:-1]
+            ca_interp = casadi.interpolant(
+                fname,
+                "linear",
+                [USatm1976Data.alt],
+                getattr(USatm1976Data, attr_name),
+            )
+            ca_interp_wrapped = make_interp_wrapper(ca_interp)
+            interp_registry[fname] = ca_interp_wrapped
+            f = sym.Function(fname)(sym.Array(sym.flatten(inputs.values())))
+            outputs[output_name] = f
+    else:
+        orig_usatm1976_compute(self, inputs, outputs)
+
+
+USatm1976Comp.compute = usatm1976_compute
 
 
 class SymbolicArray(np.ndarray):
