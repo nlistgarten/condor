@@ -61,7 +61,7 @@ for idx, row in df.iterrows():
         print(name)
         print(prob.get_val(name))
     except KeyError:
-        match = re.match(r"(*)\[(\d)+\]$", name)
+        match = re.match(r"(.*)\[(\d)+\]$", name)
         base_name = match[1]
         i = int(match[2])
         print(base_name)
