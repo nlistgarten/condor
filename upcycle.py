@@ -29,10 +29,8 @@ class CodePrinter(PythonCodePrinter):
         return recurse(eargs)
 
 
-def upcycle_problem(num_prob):
+def upcycle_problem(prob):
     # run with a symbolic vector to get symbolic residual expressions
-    prob = Problem()
-    prob.model = num_prob.model
     prob.setup(local_vector_class=SymbolicVector, derivatives=False)
     prob.final_setup()
     prob.model._apply_nonlinear()
@@ -41,8 +39,6 @@ def upcycle_problem(num_prob):
     root_vecs = prob.model._get_root_vectors()
     out_syms = root_vecs["output"]["nonlinear"].syms
 
-    out_meta = prob.model._var_abs2meta["output"]
-
     res_exprs = [
         rexpr
         for rarray in prob.model._residuals.values()
@@ -50,27 +46,6 @@ def upcycle_problem(num_prob):
         if not isinstance(rexpr, sym.core.numbers.Zero)
     ]
     res_mat = sym.Matrix(res_exprs)
-    res_mat.shape
-
-    count = 0
-    arrays = 0
-    zeros = 0
-    for rname, rarray in prob.model._residuals.items():
-        for rexpr in sym.flatten(rarray):
-            if isinstance(rexpr, np.ndarray):
-                arrays += 1
-            elif isinstance(rexpr, sym.core.numbers.Zero):
-                meta = out_meta[rname]
-                if "openmdao:indep_var" not in meta["tags"]:
-                    raise ValueError(f"Output has no dependence on inputs: {rname}")
-                zeros += 1
-            else:
-                count += 1
-            # TODO check if zero/all zeros
-            # TODO check if array
-
-    assert res_mat.shape[0] == count
-    assert arrays == 0
 
     return prob, res_mat, out_syms
 
