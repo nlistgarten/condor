@@ -472,12 +472,11 @@ if __name__ == "__main__":
             print(f'## PC = {PC}')
             prob['OD_part_pwr.PC'] = PC
 
+            prob.run_model()
+            viewer(prob, 'DESIGN', file=viewer_file)
 
-            # prob.run_model()
             prob.final_setup()
             x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs = upcycle.extract_problem_data(prob)
-
-            # prob.run_model()
 
             print("upcycling...")
             sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)

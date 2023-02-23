@@ -1,3 +1,4 @@
+import os
 import casadi
 import numpy as np
 import sympy as sym
@@ -11,6 +12,7 @@ from sympy.core.expr import Expr
 from sympy.printing.pycode import PythonCodePrinter
 from sympy.utilities.lambdify import lambdify
 
+os.environ["OPENMDAO_REPORTS"] = "none"
 
 class CodePrinter(PythonCodePrinter):
     def _print_Piecewise(self, expr):
@@ -114,7 +116,6 @@ def extract_problem_data(prob):
             non_indep_idxs += range(count, count + size)
 
         if "openmdao:allow_desvar" not in meta["tags"]:
-            # breakpoint()
             explicit_idxs += range(count, count + size)
 
         if name in obj_meta:
@@ -136,6 +137,7 @@ def sympy2casadi(sympy_expr, sympy_var, casadi_var):
         "ImmutableDenseMatrix": casadi.blockcat,
         "MutableDenseMatrix": casadi.blockcat,
         "Abs": casadi.fabs,
+        "abs": casadi.fabs,
         "Array": casadi.MX,
     }
 
@@ -321,7 +323,7 @@ class SymbolicVector(DefaultVector):
             if sz == 1:
                 names.append(abs_name)
             else:
-                names.extend([f"{abs_name}_{i}" for i in range(sz)])
+                names.extend([f"{abs_name}[{i}]" for i in range(sz)])
         syms = np.array([sym.Symbol(name) for name in names]).view(SymbolicArray)
         self.syms = syms
         return syms

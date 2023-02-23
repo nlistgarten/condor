@@ -1,6 +1,7 @@
 import upcycle  # isort: skip
 import casadi
 import sympy as sym
+import numpy as np
 from sympy.printing.pycode import PythonCodePrinter
 
 
@@ -24,7 +25,7 @@ class CustomPrinter(PythonCodePrinter):
 x1, x2 = sympy_var = sym.symbols("x1:3")
 sympy_expr = sym.Matrix(
     [
-        sym.sqrt(x1 * x2),
+        sym.sqrt(sym.Abs(x1 * x2)),
         # sym.Piecewise((x1, x1 > 1), (x2, x1 < -1), (x1 + x2, True)),
     ],
 )
@@ -40,6 +41,7 @@ mapping = {
     "ImmutableDenseMatrix": casadi.blockcat,
     "MutableDenseMatrix": casadi.blockcat,
     "Abs": casadi.fabs,
+    # "abs": casadi.fabs,
     "Array": casadi.MX,
 }
 
@@ -47,11 +49,11 @@ f = sym.lambdify(
     sympy_var,
     sympy_expr,
     modules=[mapping, casadi],
-    printer=CustomPrinter(
-        {
-            "fully_qualified_modules": False,
-        }
-    ),
+    # printer=CustomPrinter(
+    #     {
+    #         "fully_qualified_modules": False,
+    #     }
+    # ),
 )
 
 out = f(*casadi_var)
