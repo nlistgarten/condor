@@ -3,6 +3,7 @@ import casadi
 
 import sys
 import os
+import re
 
 import numpy as np
 
@@ -476,7 +477,8 @@ if __name__ == "__main__":
             viewer(prob, 'DESIGN', file=viewer_file)
 
             prob.final_setup()
-            x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs = upcycle.extract_problem_data(prob)
+            x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs, const_idxs = \
+                upcycle.extract_problem_data(prob)
 
             print("upcycling...")
             sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
@@ -492,8 +494,10 @@ if __name__ == "__main__":
             xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
             x0[explicit_idxs] += xz[explicit_idxs]
 
+            const_constr = casadi.vertcat(*[ca_vars[i] - x0[i] for i in const_idxs])
+
             f = 0 if iobj is None else ca_vars[iobj]
-            nlp = {"x": ca_vars, "f": f, "g": ca_res}
+            nlp = {"x": ca_vars, "f": f, "g": casadi.vertcat(ca_res, const_constr)}
             S = casadi.nlpsol("S", "ipopt", nlp)
 
             print("running...")
@@ -510,7 +514,34 @@ if __name__ == "__main__":
         #     prob['OD_part_pwr.PC'] = PC
         #     prob.run_model()
 
-    
+    df = pd.DataFrame(
+        {
+            "initial_value": x0,
+            "upper_bound": ubx,
+            "lower_bound": lbx,
+            "solution_value": out["x"].toarray().squeeze(),
+        },
+        index=out_syms,
+    )
+
+    pattern = re.compile(r"(.*)\[(\d)+\]$")
+
+    om_vals = []
+    for idx, row in df.iterrows():
+        name = idx.name
+        try:
+            val = prob.get_val(name)[0]
+        except KeyError:
+            match = pattern.match(name)
+            base_name = match[1]
+            i = int(match[2])
+            val = prob.get_val(base_name)[i]
+
+        om_vals.append(val)
+    df["om_vals"] = om_vals
+
+    pd.set_option("display.max_rows", None)
+    print(df)
 
     print()
     print("Run time", time.time() - st)
