@@ -3,9 +3,11 @@ import casadi
 
 import sys
 import os
+import pprint
 import re
 
 import numpy as np
+import pandas as pd
 
 import openmdao.api as om
 
@@ -502,6 +504,12 @@ if __name__ == "__main__":
 
             print("running...")
             out = S(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
+
+            nlp2 = {"x": ca_vars, "f": f, "g": ca_res}
+            S2 = casadi.nlpsol("S2", "ipopt", nlp2)
+            # out2 = S2(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
+
+
             pprint.pprint(out)
 
             # if first_pass: 
