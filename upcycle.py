@@ -33,7 +33,7 @@ def upcycle_problem(prob):
     # run with a symbolic vector to get symbolic residual expressions
     prob.setup(local_vector_class=SymbolicVector, derivatives=False)
     prob.final_setup()
-    prob.model._apply_nonlinear()
+    prob.model.run_apply_nonlinear()
 
     # compute dR/do
     root_vecs = prob.model._get_root_vectors()
@@ -64,6 +64,7 @@ def extract_problem_data(prob):
     count = 0
     explicit_idxs = []
     non_indep_idxs = []
+    constant_idxs = []
     for name, meta in out_meta.items():
         size = meta["size"]
 
@@ -83,10 +84,15 @@ def extract_problem_data(prob):
 
         # TODO make sure explicit indepvarcomp sets this tag
         if "openmdao:indep_var" in meta["tags"]:
+            found = False
             for dv_name, dv_meta_loc in dv_meta.items():
                 if name == dv_meta_loc["source"]:
+                    found = True
                     lbx[count : count + size] = dv_meta_loc["lower"]
                     ubx[count : count + size] = dv_meta_loc["upper"]
+            if not found:
+                constant_idxs.append(count)
+
         else:
             non_indep_idxs += range(count, count + size)
 
@@ -98,7 +104,7 @@ def extract_problem_data(prob):
 
         count += size
 
-    return x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs
+    return x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs, constant_idxs
 
 
 def sympy2casadi(sympy_expr, sympy_var, casadi_var):
