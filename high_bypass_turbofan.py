@@ -393,8 +393,8 @@ def make_prob():
 if __name__ == "__main__":
     import time
 
-    prob = make_prob()
     up_prob = make_prob()
+    prob = make_prob()
 
     prob.setup()
 
@@ -455,9 +455,27 @@ if __name__ == "__main__":
                   (.001, 1000), (0.2, 1000), (0.4, 1000), (0.6, 1000),
                   (0.6, 0), (0.4, 0), (0.2, 0), (0.001, 0)]
 
+    print("extracting problem data")
+    prob.final_setup()
+    initial_x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs, const_idxs = \
+        upcycle.extract_problem_data(prob)
+    indep_idxs = np.setdiff1d(np.arange(len(initial_x0)), non_indep_idxs)
+    x0 = initial_x0.copy()
+
+    print("upcycling...")
+    sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
+
+    print("sympy2casdadi")
+    ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
+    ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
+    res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
+    f = 0 if iobj is None else ca_vars[iobj]
+
+    pattern = re.compile(r"(.*)\[(\d)+\]$")
+
     viewer_file = open('hbtf_view.out', 'w')
     first_pass = True
-    for MN, alt in flight_env[:1]: 
+    for MN, alt in flight_env:
 
         # NOTE: You never change the MN,alt for the 
         # design point because that is a fixed reference condition.
@@ -471,85 +489,54 @@ if __name__ == "__main__":
         prob['OD_part_pwr.fc.MN'] = MN
         prob['OD_part_pwr.fc.alt'] = alt
 
-        for PC in [1, 0.9, 0.8, .7][:1]: 
+        for PC in [1, 0.9, 0.8, .7]: 
             print(f'## PC = {PC}')
             prob['OD_part_pwr.PC'] = PC
 
-            prob.run_model()
-            viewer(prob, 'DESIGN', file=viewer_file)
-
-            prob.final_setup()
-            x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs, const_idxs = \
-                upcycle.extract_problem_data(prob)
-
-            print("upcycling...")
-            sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
-
-            print("sympy2casdadi")
-            ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
-            ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
+            new_x0 = upcycle.extract_problem_data(prob)[0]
 
             print("updating initial guesses for explicit outputs")
             # update explicit output guesses
-            res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
             xz = np.zeros_like(x0)
             xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
-            x0[explicit_idxs] += xz[explicit_idxs]
+            # x0[explicit_idxs] += xz[explicit_idxs]
+            x0[indep_idxs] = new_x0[indep_idxs]
+
+            prob.run_model()
 
             const_constr = casadi.vertcat(*[ca_vars[i] - x0[i] for i in const_idxs])
 
-            f = 0 if iobj is None else ca_vars[iobj]
             nlp = {"x": ca_vars, "f": f, "g": casadi.vertcat(ca_res, const_constr)}
             S = casadi.nlpsol("S", "ipopt", nlp)
 
             print("running...")
             out = S(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
 
-            nlp2 = {"x": ca_vars, "f": f, "g": ca_res}
-            S2 = casadi.nlpsol("S2", "ipopt", nlp2)
-            # out2 = S2(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
+            x0 = out["x"].toarray().squeeze().copy()
 
+            df = pd.DataFrame(
+                {
+                    "initial_value": x0,
+                    "upper_bound": ubx,
+                    "lower_bound": lbx,
+                    "solution_value": out["x"].toarray().squeeze(),
+                },
+                index=out_syms,
+            )
 
-            pprint.pprint(out)
+            om_vals = []
+            for idx, row in df.iterrows():
+                name = idx.name
+                try:
+                    val = prob.get_val(name)[0]
+                except KeyError:
+                    match = pattern.match(name)
+                    base_name = match[1]
+                    i = int(match[2])
+                    val = prob.get_val(base_name)[i]
 
-            # if first_pass: 
-            #     viewer(prob, 'DESIGN', file=viewer_file)
-            #     first_pass = False 
-            # viewer(prob, 'OD_part_pwr', file=viewer_file)
-
-        # run throttle back up to full power
-        # for PC in [1, 0.85]: 
-        #     prob['OD_part_pwr.PC'] = PC
-        #     prob.run_model()
-
-    df = pd.DataFrame(
-        {
-            "initial_value": x0,
-            "upper_bound": ubx,
-            "lower_bound": lbx,
-            "solution_value": out["x"].toarray().squeeze(),
-        },
-        index=out_syms,
-    )
-
-    pattern = re.compile(r"(.*)\[(\d)+\]$")
-
-    om_vals = []
-    for idx, row in df.iterrows():
-        name = idx.name
-        try:
-            val = prob.get_val(name)[0]
-        except KeyError:
-            match = pattern.match(name)
-            base_name = match[1]
-            i = int(match[2])
-            val = prob.get_val(base_name)[i]
-
-        om_vals.append(val)
-    df["om_vals"] = om_vals
-
-    pd.set_option("display.max_rows", None)
-    print(df)
+                om_vals.append(val)
+            df["om_solution"] = om_vals
 
     print()
     print("Run time", time.time() - st)
