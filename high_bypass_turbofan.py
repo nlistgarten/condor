@@ -498,9 +498,9 @@ if __name__ == "__main__":
             print("updating initial guesses for explicit outputs")
             # update explicit output guesses
             xz = np.zeros_like(x0)
-            xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
-            # x0[explicit_idxs] += xz[explicit_idxs]
             x0[indep_idxs] = new_x0[indep_idxs]
+            xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
+            x0[explicit_idxs] += xz[explicit_idxs]
 
             prob.run_model()
 
