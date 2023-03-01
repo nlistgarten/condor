@@ -454,6 +454,7 @@ if __name__ == "__main__":
                   (0.8, 10000), (0.6, 10000), (0.4, 10000), (0.2, 10000), (0.001, 10000),
                   (.001, 1000), (0.2, 1000), (0.4, 1000), (0.6, 1000),
                   (0.6, 0), (0.4, 0), (0.2, 0), (0.001, 0)]
+    PC_list = [1, 0.9, 0.8, .7]
 
     print("extracting problem data")
     prob.final_setup()
@@ -462,21 +463,39 @@ if __name__ == "__main__":
     indep_idxs = np.setdiff1d(np.arange(len(initial_x0)), non_indep_idxs)
     x0 = initial_x0.copy()
 
-    print("upcycling...")
-    sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
+    datfp = "hbtf.dat"
+    if os.path.exists(datfp):
+        print("loading casadi data")
+        deser = casadi.FileDeserializer(datfp)
+        res = deser.unpack()
+        ca_vars = deser.unpack()
+        ca_res = deser.unpack()
+        deser = None
+    else:
+        print("sympifying...")
+        sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
 
-    print("sympy2casdadi")
-    ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
-    ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
-    res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
-    f = 0 if iobj is None else ca_vars[iobj]
+        print("casadifying...")
+        ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
+        ca_res, _ = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
+        res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
+
+        ser = casadi.FileSerializer(datfp)
+        ser.pack(res)
+        ser.pack(ca_vars)
+        ser.pack(ca_res)
+        ser = None
+
+    fobj = 0 if iobj is None else ca_vars[iobj]
 
     pattern = re.compile(r"(.*)\[(\d)+\]$")
 
+    stats_data = []
+    stats_cols = ["mach", "alt", "pc", "dt_om", "dt_ca", "om_res", "ca_res", "df"]
+
     viewer_file = open('hbtf_view.out', 'w')
     first_pass = True
-    for MN, alt in flight_env:
-
+    for i, (MN, alt) in enumerate(flight_env):
         # NOTE: You never change the MN,alt for the 
         # design point because that is a fixed reference condition.
 
@@ -489,54 +508,75 @@ if __name__ == "__main__":
         prob['OD_part_pwr.fc.MN'] = MN
         prob['OD_part_pwr.fc.alt'] = alt
 
-        for PC in [1, 0.9, 0.8, .7]: 
+        for PC in PC_list:
             print(f'## PC = {PC}')
             prob['OD_part_pwr.PC'] = PC
+
+            if first_pass:
+                print("running om model...")
+                prob.run_model()
+                x0 = upcycle.extract_problem_data(prob)[0]
+                first_pass = False
 
             new_x0 = upcycle.extract_problem_data(prob)[0]
 
             print("updating initial guesses for explicit outputs")
             # update explicit output guesses
-            xz = np.zeros_like(x0)
             x0[indep_idxs] = new_x0[indep_idxs]
-            xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
-            x0[explicit_idxs] += xz[explicit_idxs]
+            xz = np.zeros_like(x0)
+            for i in range(100):
+                xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
+                x0[explicit_idxs] += xz[explicit_idxs]
+                norm = np.linalg.norm(xz[explicit_idxs])
+                # print(norm)
+                if norm < 1e-9:
+                    break
 
+            print("running om model...")
+            t = time.perf_counter()
             prob.run_model()
+            dt_om = time.perf_counter() - t
+            om_res_norm = np.linalg.norm(prob.model._residuals.asarray(), ord=np.inf)
 
             const_constr = casadi.vertcat(*[ca_vars[i] - x0[i] for i in const_idxs])
 
-            nlp = {"x": ca_vars, "f": f, "g": casadi.vertcat(ca_res, const_constr)}
-            S = casadi.nlpsol("S", "ipopt", nlp)
+            nlp = {"x": ca_vars, "f": fobj, "g": casadi.vertcat(ca_res, const_constr)}
+            S = casadi.nlpsol(
+                "S", "ipopt", nlp, {
+                    "print_time": False,
+                    "ipopt": {"print_level": 0, "max_iter": 10000}
+                }
+            )
 
             print("running...")
+            t = time.perf_counter()
             out = S(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
+            dt_ca = time.perf_counter() - t
+            ca_res_norm = np.linalg.norm(out["g"])
 
             x0 = out["x"].toarray().squeeze().copy()
 
+            num_mismatched = np.count_nonzero(
+                ~np.isclose(
+                    prob.model._outputs.asarray(),
+                    out["x"].toarray().squeeze(),
+                    atol=1e-3, rtol=1e-3)
+            )
+
             df = pd.DataFrame(
                 {
-                    "initial_value": x0,
+                    "initial_value": initial_x0,
                     "upper_bound": ubx,
                     "lower_bound": lbx,
                     "solution_value": out["x"].toarray().squeeze(),
+                    "om_value": prob.model._outputs.asarray(),
                 },
-                index=out_syms,
+                index=[ca_vars[i].name() for i in range(len(x0))],
             )
 
-            om_vals = []
-            for idx, row in df.iterrows():
-                name = idx.name
-                try:
-                    val = prob.get_val(name)[0]
-                except KeyError:
-                    match = pattern.match(name)
-                    base_name = match[1]
-                    i = int(match[2])
-                    val = prob.get_val(base_name)[i]
+            stats_data.append([MN, alt, PC, dt_om, dt_ca, om_res_norm, ca_res_norm, df])
+            print(stats_data[-1][:-1])
 
-                om_vals.append(val)
-            df["om_solution"] = om_vals
+        PC_list = PC_list[::-1]
 
-    print()
-    print("Run time", time.time() - st)
+    stats_df = pd.DataFrame(stats_data, columns=stats_cols)
