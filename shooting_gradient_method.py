@@ -7,7 +7,7 @@ class _null_name:
     pass
 
 
-class _base_trajectory_descriptor:
+class _base_condor_descriptor:
     def __set_name__(self, owner, name):
         print("setting", name, "for", owner, "as", self)
         self.name = name
@@ -22,7 +22,7 @@ class _base_trajectory_descriptor:
     def __set__(self, obj, value):
         raise AttributeError(self.resolve_name + " cannot be set as " + self.__class__)
 
-def construct_explicit_matrix(name, n, m, symmetric=False, diagonal=0,
+def construct_explicit_matrix(name, n, m=1, symmetric=False, diagonal=0,
                               dynamic=False, **kwass):
     """
     construct a matrix of symbolic elements
@@ -74,23 +74,8 @@ def construct_explicit_matrix(name, n, m, symmetric=False, diagonal=0,
 
         return matrix
 
-class _deferred_trajectory_symbol(_base_trajectory_descriptor):
-    def __init__(self, generator, **kwargs):
-        self.generator = generator
-        self.kwargs = kwargs
 
-    def __set_name__(self, owner, name):
-        super().__set_name__(owner, name)
-        self.symbol = self.generator.func(name, **self.kwargs)
-
-    def __get__(self, obj, objtype=None):
-        print("getting", self.resolve_name, "as", self,  "for", obj, self.generator,
-              self.shape)
-        return self.symbol
-
-
-
-class _trajectory_symbol_generator(_base_trajectory_descriptor):
+class _condor_symbol_generator(_base_condor_descriptor):
     def __init__(self, func=construct_explicit_matrix, **fixed_kwargs):
         print('init', self)
         self.func = func
@@ -98,24 +83,30 @@ class _trajectory_symbol_generator(_base_trajectory_descriptor):
         self.count = 0
         self.children = []
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, n, **kwargs):
         print("calling for", self)
-        return self.func(*args, **kwargs)
+        pass_kwargs = dict(
+            name="%s%d_" % (self.resolve_name, self.count),
+            n=n,
+            **self.fixed_kwargs,
+            **kwargs
+        )
+        return self.func(**pass_kwargs)
 
 
 
-class _trajectory_computation(_base_trajectory_descriptor):
+class _condor_computation(_base_condor_descriptor):
     def __init__(self, matched_to=None):
         print('init', self)
         pass
 
-    def __set__(self, obj, value):
-        #breakpoint()
+    def __setitem__(self, key, value):
+        print("setting item for", self, ":", key, "=", value)
         pass
 
 
 # not really necessary, place holder in case it is
-class TrajectoryDict(dict):
+class CondorDict(dict):
     def __getitem__(self, *args, **kwargs):
         #breakpoint()
         return super().__getitem__(*args, **kwargs)
@@ -126,22 +117,22 @@ class TrajectoryDict(dict):
 
 from enum import _is_dunder
 
-class TrajectoryModelType(type):
+class CondorModelType(type):
     """
-    Metaclass for trajectory model
+    Metaclass for Condor  model
     """
 
     @classmethod
     def __prepare__(cls, name, bases, **kwds):
         print("preparing for", name)
         sup_dict = super().__prepare__(cls, name, bases, **kwds)
-        cls_dict = TrajectoryDict()
+        cls_dict = CondorDict()
 
         dicts = [sup_dict] + [base.__dict__ for base in bases]
         for _dict in dicts:
             cls_dict.update({
                 k: v for k, v in  _dict.items()
-                if (isinstance(v, _base_trajectory_descriptor) or (_dict is sup_dict))
+                if (isinstance(v, _base_condor_descriptor) or (_dict is sup_dict))
             })
         return cls_dict
 
@@ -150,22 +141,23 @@ class TrajectoryModelType(type):
         new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
         return new_cls
 
-class TrajectoryModel(metaclass=TrajectoryModelType):
-    print("starting user code for TrajectoryModel class")
-    state = _trajectory_symbol_generator(dynamic=True)
-    parameter = _trajectory_symbol_generator(dynamic=False)
-    state_rate = _trajectory_computation(state)
-    output = _trajectory_computation()
+class DynamicsModel(metaclass=CondorModelType):
+    print("starting user code for CondorModel class")
+    state = _condor_symbol_generator()
+    parameter = _condor_symbol_generator()
+    state_rate = _condor_computation(state)
+    output = _condor_computation()
     print("ending user code for TrajectoryModel class")
 
 
-class LTI(TrajectoryModel):
+class LTI(DynamicsModel):
     print("starting user code for LTI class")
     n = 2
     m = 1
     z = n + m
     # p, v = state()
-    y = state(n)
+    x = state(n)
+    C = state(n=n,m=n, symmetric=True)
     A = np.array([
         [0, 1],
         [0, 0],
@@ -175,8 +167,9 @@ class LTI(TrajectoryModel):
     # B = parameter(n,m)
     # K = parameter(m,n)
 
-    #state_rate = (A - B @ K) @ x
-    print(A @ y)
+    print(A @ x)
+    state_rate[x] = A@x #(A - B @ K) @ x
+    state_rate[C] = A@C + C@A.T
     print("ending user code for LTI class")
 
 
