@@ -8,6 +8,9 @@ import warnings
 import casadi
 import numpy as np
 import pandas as pd
+import openmdao.api as om
+from openmdao.solvers.solver import NonlinearSolver
+from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 import sympy as sym
 from openmdao.api import IndepVarComp, Problem
 from pycycle.elements.combustor import Combustor
@@ -130,6 +133,109 @@ om_res = prob.model._residuals.asarray().copy()
 prob.run_model()
 
 x0_after = upcycle.extract_problem_data(prob)[0]
+
+up_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
+
+
+class UpcycleSystem:
+
+    def __init__(self, path, solver):
+        self.path = path
+        self.solver = solver
+
+        self.inputs = []  # external inputs
+        self.outputs = {}  # explicit output name -> RHS expr
+        # self.residuals = {}  # residual output name -> resid expr
+
+        self.solver = solver
+        self.solver.children.append(self)
+
+    def __repr__(self):
+        return self.path
+
+
+class UpcycleExplicitSystem(UpcycleSystem):
+    pass
+
+
+class UpcycleImplicitSystem(UpcycleSystem):
+    pass
+
+
+class UpcycleSolver:
+
+    def __init__(self, path="", parent=None):
+        self.path = path
+        self.parent = parent
+
+        self.inputs = []  # external inputs
+        self.outputs = {}  # explicit output name -> RHS expr
+        self.residuals = {}  # residual output name -> resid expr
+
+        self.children = []
+        if parent is not None:
+            self.parent.children.append(self)
+
+    def __repr__(self):
+        return self.path
+
+    def iter_solvers(self):
+        for child in self.children:
+            if isinstance(child, UpcycleSolver):
+                yield child
+                child.iter_solvers()
+
+    def iter_systems(self):
+        for child in self.children:
+            if isinstance(child, UpcycleSolver):
+                child.iter_systems()
+            else:
+                yield child
+
+
+top_upsolver = UpcycleSolver()
+upsolver = top_upsolver
+vdat = _get_viewer_data(prob)
+conn_df = pd.DataFrame(vdat["connections_list"])
+
+for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
+    path = omsys.pathname
+
+    while not path.startswith(upsolver.path):
+        upsolver = upsolver.parent
+
+    nls = omsys.nonlinear_solver
+    if nls is not None and not isinstance(nls, om.NonlinearRunOnce):
+        upsolver = UpcycleSolver(path=path, parent=upsolver)
+
+    if isinstance(omsys, (om.Group, om.IndepVarComp)):
+        continue
+
+    sys_conns = conn_df[conn_df["tgt"].str.startswith(path)]
+    external_conns = ~sys_conns["src"].str.startswith(upsolver.path)
+
+    # system gets internal + external inputs
+    sys_inputs = sys_conns["tgt"].to_list()
+    # solver gets only external inputs
+    upsolver.inputs.extend(sys_conns["tgt"][external_conns].to_list())
+
+    if isinstance(omsys, om.ExplicitComponent):  # TODO and not unintentionally implicit
+        upsys = UpcycleExplicitSystem(path, upsolver)
+        upsys.inputs = sys_inputs
+
+        for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
+            upsys.outputs[absname] = sym.flatten(symbol + expr)[0]
+
+    else:
+        upsys = UpcycleImplicitSystem(path, upsolver)
+        upsys.inputs = sys_inputs
+
+        for absname, expr in omsys._residuals.items():
+            upsys.outputs[absname] = sym.flatten(expr)[0]
+
+
+import sys
+sys.exit()
 
 om_res_final = prob.model._residuals.asarray().copy()
 prob.model._apply_nonlinear()
