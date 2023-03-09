@@ -18,7 +18,7 @@ up_prob = make_sellar_problem()
 
 
 prob.final_setup()
-x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs = upcycle.extract_problem_data(prob)
+x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs, const_idxs = upcycle.extract_problem_data(prob)
 
 prob.model._apply_nonlinear()
 om_res = prob.model._residuals.asarray().copy()
@@ -26,16 +26,91 @@ om_res = prob.model._residuals.asarray().copy()
 prob.run_driver()
 
 
-sym_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
+sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
 
-ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
-ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
+datfp = "sellar.dat"
+load = os.path.exists(datfp)
+if False:
+    print("loading casadi data")
+    ser = casadi.FileDeserializer(datfp)
+    res = ser.unpack()
+    ca_vars = ser.unpack()
+    ca_res = ser.unpack()
+    ser = None
+else:
+    print("casadifying...")
+    ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
+    ca_res, _ = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
+    res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
+
+    ser = casadi.FileSerializer(datfp)
+    ser.pack(res)
+    ser.pack(ca_vars)
+    ser.pack(ca_res)
+    ser = None
 
 
-nlp = {"x": ca_vars, "f": ca_vars[iobj], "g": ca_res}
-S = casadi.nlpsol("S", "ipopt", nlp, {"ipopt": {"print_level": 5}, "print_time": False})
+def idx_mx(mx, idx):
+    return casadi.vertcat(*[casadi.vertsplit(mx)[i] for i in idx])
 
-res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
+
+indep_idxs = np.setdiff1d(np.arange(len(x0)), non_indep_idxs)
+
+nlp_opts = {
+    "ipopt": {
+        "print_level": 0,
+        "warm_start_init_point": "yes",
+    },
+    "print_time": False,
+}
+subsys_idxs = [0, 1]  # indices in ca_res
+inv_subsys_res_idxs = np.setdiff1d(np.arange(ca_res.size()[0]), subsys_idxs)
+inv_subsys_var_idxs = np.r_[indep_idxs, inv_subsys_res_idxs + len(indep_idxs)]
+subsys_y_prev = casadi.MX.sym("subsys_y_prev", len(subsys_idxs))
+subsys_y_curr = casadi.MX.sym("subsys_y_curr", len(subsys_idxs))
+subsys_x = idx_mx(idx_mx(ca_vars, non_indep_idxs), subsys_idxs)
+subsys_nlp = {
+    "x": subsys_x,
+    "p": idx_mx(ca_vars, indep_idxs),
+    "f": 0,
+    "g": idx_mx(ca_res, subsys_idxs),
+}
+subsys_S = casadi.nlpsol("subsys_S", "ipopt", subsys_nlp, nlp_opts)
+
+subsys_y_out = subsys_S(x0=subsys_y_curr, lbg=0, ubg=0)
+
+# remove subsystem residuals from ca_res (parent)
+# dummy symbol for previous solution (subsys_y_prev)
+# call subsys_S with x0=subsys_y_prev
+# output will be subsys_y_curr
+# substitute guess for y in ca_res with subsys_y_curr
+# delete guess for y from ca_vars
+# (done?) parent problem gets a callback to shift subsys_y_prev => subsys_y_curr
+
+# similar thing for explicit but substituting a Function?
+
+new_ca_vars = idx_mx(ca_vars,  inv_subsys_var_idxs)
+new_ca_res = idx_mx(ca_res, inv_subsys_res_idxs)
+
+new_ca_res_subs = casadi.substitute(new_ca_res, subsys_x, subsys_y_out["x"])
+
+nlp = {"x": new_ca_vars, "f": ca_vars[iobj], "p": subsys_y_curr, "g": new_ca_res_subs}
+S = casadi.nlpsol("S", "ipopt", nlp, nlp_opts)
+
+# res = casadi.Function("res", casadi.vertsplit(new_ca_vars), casadi.vertsplit(new_ca_res_subs))
+
+S(
+    x0=x0[inv_subsys_var_idxs],
+    p=x0[[i+len(indep_idxs) for i in subsys_idxs]],
+    ubx=ubx[inv_subsys_var_idxs],
+    lbx=lbx[inv_subsys_var_idxs],
+    ubg=0,
+    lbg=0,
+)
+
+
+import sys
+sys.exit()
 
 df_res = pd.DataFrame(
     {
@@ -47,8 +122,11 @@ df_res = pd.DataFrame(
 print(df_res)
 
 xz = np.zeros_like(x0)
-xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
-x0[explicit_idxs] += xz[explicit_idxs]
+print(xz[explicit_idxs])
+for i in range(4):
+    xz[non_indep_idxs] = np.array(res(*x0)).squeeze()
+    x0[explicit_idxs] += xz[explicit_idxs]
+    print(xz[explicit_idxs])
 
 out = S(x0=x0, lbx=lbx, ubx=ubx, lbg=0, ubg=0)
 
@@ -78,4 +156,4 @@ for idx, row in df.iterrows():
     om_vals.append(val)
 df["om_vals"] = om_vals
 
-print(df)
+# print(df)

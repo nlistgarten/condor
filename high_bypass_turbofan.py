@@ -447,7 +447,8 @@ if __name__ == "__main__":
     st = time.time()
 
     prob.set_solver_print(level=-1)
-    prob.set_solver_print(level=2, depth=1)
+    #prob.set_solver_print(level=2, depth=1)
+    prob.set_solver_print(level=1, depth=2, type_="NL")
 
     flight_env = [(0.8, 35000), (0.7, 35000), (0.4, 35000),
                   (0.4, 20000), (0.6, 20000), (0.8, 20000), 
@@ -513,7 +514,7 @@ if __name__ == "__main__":
             prob['OD_part_pwr.PC'] = PC
 
             if first_pass:
-                print("running om model...")
+                print("cold start om model...")
                 prob.run_model()
                 x0 = upcycle.extract_problem_data(prob)[0]
                 first_pass = False
@@ -539,8 +540,12 @@ if __name__ == "__main__":
             om_res_norm = np.linalg.norm(prob.model._residuals.asarray(), ord=np.inf)
 
             const_constr = casadi.vertcat(*[ca_vars[i] - x0[i] for i in const_idxs])
-
             nlp = {"x": ca_vars, "f": fobj, "g": casadi.vertcat(ca_res, const_constr)}
+
+            # lbx[const_idxs] = x0[const_idxs]
+            # lbx[const_idxs] = x0[const_idxs]
+            # nlp = {"x": ca_vars, "f": fobj, "g": ca_res}
+
             S = casadi.nlpsol(
                 "S", "ipopt", nlp, {
                     "print_time": False,
@@ -554,14 +559,9 @@ if __name__ == "__main__":
             dt_ca = time.perf_counter() - t
             ca_res_norm = np.linalg.norm(out["g"])
 
-            x0 = out["x"].toarray().squeeze().copy()
+            print(f"IPOPT iter count {S.stats()['iter_count']}")
 
-            num_mismatched = np.count_nonzero(
-                ~np.isclose(
-                    prob.model._outputs.asarray(),
-                    out["x"].toarray().squeeze(),
-                    atol=1e-3, rtol=1e-3)
-            )
+            x0 = out["x"].toarray().squeeze().copy()
 
             df = pd.DataFrame(
                 {
@@ -580,3 +580,4 @@ if __name__ == "__main__":
         PC_list = PC_list[::-1]
 
     stats_df = pd.DataFrame(stats_data, columns=stats_cols)
+    stats_df.to_pick("hbtf_results.pkl")

@@ -38,28 +38,30 @@ class Resid(om.ImplicitComponent):
         partials["y2", "y2"] = 1
 
 
-class Obj(om.ExplicitComponent):
+class ObjPart1(om.ExplicitComponent):
     def setup(self):
         self.add_input("x", val=0.0)
         self.add_input("z", val=np.zeros(2))
-        self.add_input("y1", val=0.0)
-        self.add_input("y2", val=0.0)
+        # self.add_input("y1", val=0.0)
+        # self.add_input("y2", val=0.0)
 
-        self.add_output("obj")
+        self.add_output("a")
 
     def setup_partials(self):
-        self.declare_partials("obj", ["*"])
+        self.declare_partials("a", ["*"])
 
     def compute(self, inputs, outputs):
-        x, z, y1, y2 = inputs.values()
-        outputs["obj"] = x**2 + z[1] + y1 + np.exp(-y2)
+        # x, z, y1, y2 = inputs.values()
+        x, z = inputs.values()
+        outputs["a"] = x**2 + z[1] # + y1 + np.exp(-y2)
 
     def compute_partials(self, inputs, J):
-        x, z, y1, y2 = inputs.values()
-        J["obj", "x"] = 2 * x
-        J["obj", "z"] = [0, 1]
-        J["obj", "y1"] = 1
-        J["obj", "y2"] = -np.exp(-y2)
+        # x, z, y1, y2 = inputs.values()
+        x, z = inputs.values()
+        J["a", "x"] = 2 * x
+        J["a", "z"] = [0, 1]
+        # J["obj", "y1"] = 1
+        # J["obj", "y2"] = -np.exp(-y2)
 
 
 class Constr(om.ExplicitComponent):
@@ -88,7 +90,10 @@ class Constr(om.ExplicitComponent):
 class Sellar(om.Group):
     def setup(self):
         self.add_subsystem("R", Resid(), promotes=["*"])
-        self.add_subsystem("f", Obj(), promotes=["*"])
+        self.add_subsystem("f1", ObjPart1(), promotes=["*"])
+        self.add_subsystem(
+            "obj", om.ExecComp("obj = a + y1 + exp(-y2)"), promotes=["*"]
+        )
         self.add_subsystem("g", Constr(), promotes=["*"])
 
         self.set_input_defaults("x", 1.0)
