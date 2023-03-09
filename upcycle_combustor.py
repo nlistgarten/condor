@@ -143,9 +143,12 @@ class UpcycleSystem:
         self.path = path
         self.solver = solver
 
-        self.inputs = []  # external inputs
-        self.outputs = {}  # explicit output name -> RHS expr
-        # self.residuals = {}  # residual output name -> resid expr
+        # external inputs
+        self.inputs = []
+
+        # explicit: output name -> RHS expr
+        # implicit: output n ame -> resid expr
+        self.outputs = {}
 
         self.solver = solver
         self.solver.children.append(self)
@@ -193,6 +196,12 @@ class UpcycleSolver:
                 yield child
 
 
+def get_inputs(conn_df, sys_path, parent_path):
+    sys_conns = conn_df[conn_df["tgt"].str.startswith(sys_path)]
+    external_conns = ~sys_conns["src"].str.startswith(parent_path)
+    return sys_conns["tgt"], external_conns
+
+
 top_upsolver = UpcycleSolver()
 upsolver = top_upsolver
 vdat = _get_viewer_data(prob)
@@ -202,6 +211,8 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
     path = omsys.pathname
 
     while not path.startswith(upsolver.path):
+        all_inputs, ext_mask = get_inputs(conn_df, upsolver.path, upsolver.parent.path)
+        upsolver.parent.inputs.extend(all_inputs[ext_mask])
         upsolver = upsolver.parent
 
     nls = omsys.nonlinear_solver
@@ -211,24 +222,19 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
     if isinstance(omsys, (om.Group, om.IndepVarComp)):
         continue
 
-    sys_conns = conn_df[conn_df["tgt"].str.startswith(path)]
-    external_conns = ~sys_conns["src"].str.startswith(upsolver.path)
-
-    # system gets internal + external inputs
-    sys_inputs = sys_conns["tgt"].to_list()
-    # solver gets only external inputs
-    upsolver.inputs.extend(sys_conns["tgt"][external_conns].to_list())
+    sys_inputs, ext_mask = get_inputs(conn_df, path, upsolver.path)
+    upsolver.inputs.extend(sys_inputs[ext_mask])
 
     if isinstance(omsys, om.ExplicitComponent):  # TODO and not unintentionally implicit
         upsys = UpcycleExplicitSystem(path, upsolver)
-        upsys.inputs = sys_inputs
+        upsys.inputs.extend(sys_inputs)
 
         for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
             upsys.outputs[absname] = sym.flatten(symbol + expr)[0]
 
     else:
         upsys = UpcycleImplicitSystem(path, upsolver)
-        upsys.inputs = sys_inputs
+        upsys.inputs.extend(sys_inputs)
 
         for absname, expr in omsys._residuals.items():
             upsys.outputs[absname] = sym.flatten(expr)[0]
