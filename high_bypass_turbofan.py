@@ -473,7 +473,7 @@ if __name__ == "__main__":
         deser = None
     else:
         print("sympifying...")
-        sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
+        sym_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
 
         print("casadifying...")
         ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])

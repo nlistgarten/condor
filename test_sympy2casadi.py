@@ -21,7 +21,7 @@ class CustomPrinter(PythonCodePrinter):
 
 
 
-# sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
+# sym_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
 x1, x2 = sympy_var = sym.symbols("x1:3")
 sympy_expr = sym.Matrix(
     [

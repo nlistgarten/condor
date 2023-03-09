@@ -26,7 +26,7 @@ om_res = prob.model._residuals.asarray().copy()
 prob.run_driver()
 
 
-sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
+sym_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
 
 ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
 ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)

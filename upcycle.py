@@ -1,4 +1,5 @@
 import os
+
 import casadi
 import numpy as np
 import sympy as sym
@@ -13,6 +14,7 @@ from sympy.printing.pycode import PythonCodePrinter
 from sympy.utilities.lambdify import lambdify
 
 os.environ["OPENMDAO_REPORTS"] = "none"
+
 
 class CodePrinter(PythonCodePrinter):
     def _print_Piecewise(self, expr):
@@ -29,14 +31,17 @@ class CodePrinter(PythonCodePrinter):
         return recurse(eargs)
 
 
-def upcycle_problem(prob):
-    # run with a symbolic vector to get symbolic residual expressions
+def sympify_problem(prob):
+    """Set up and run `prob` with symbolic inputs
+
+    `prob` should *not* have had ``final_setup`` called.
+    """
     prob.setup(local_vector_class=SymbolicVector, derivatives=False)
     prob.final_setup()
     prob.model.run_apply_nonlinear()
 
-    # compute dR/do
     root_vecs = prob.model._get_root_vectors()
+
     out_syms = root_vecs["output"]["nonlinear"].syms
 
     res_exprs = [
@@ -312,9 +317,3 @@ class SymbolicVector(DefaultVector):
     def set_var(self, name, val, idxs=None, flat=False, var_name=None):
         """Disable setting values"""
         pass
-
-
-if __name__ == "__main__":
-    xnd = np.array(sym.symbols("x:3"))
-    xs = xnd.view(SymbolicArray)
-    print(xs[0])

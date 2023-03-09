@@ -134,7 +134,7 @@ prob.run_model()
 
 x0_after = upcycle.extract_problem_data(prob)[0]
 
-up_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
+up_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
 
 
 class UpcycleSystem:
@@ -292,7 +292,7 @@ print("")
 # warnings.filterwarnings("error", category=np.VisibleDeprecationWarning)
 
 print("upcycling...")
-sym_prob, res_mat, out_syms = upcycle.upcycle_problem(up_prob)
+sym_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
 
 print("sympy2casdadi")
 ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
