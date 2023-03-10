@@ -175,8 +175,6 @@ class UpcycleSolver:
         self.parent = parent
 
         self.inputs = []  # external inputs (actually src names)
-        self.outputs = {}  # explicit output name -> RHS expr
-        self.residuals = {}  # residual output name -> resid expr
         self.solved_outputs = []
 
         self.children = []
@@ -186,7 +184,10 @@ class UpcycleSolver:
     def __repr__(self):
         return self.path
 
-    def iter_solvers(self):
+    def iter_solvers(self, include_self=True):
+        if include_self:
+            yield self
+
         for child in self.children:
             if isinstance(child, UpcycleSolver):
                 yield child
@@ -199,10 +200,19 @@ class UpcycleSolver:
             else:
                 yield child
 
+    def add_inputs(self, inputs):
+        new_inputs = [i for i in inputs if i not in self.inputs]
+        self.inputs.extend(new_inputs)
+
+    @property
+    def outputs(self):
+        return [o for s in self.iter_systems() for o in s.outputs]
+
 
 def get_sources(conn_df, sys_path, parent_path):
     sys_conns = conn_df[conn_df["tgt"].str.startswith(sys_path + ".")]
-    external_conns = ~sys_conns["src"].str.startswith(parent_path + ".")
+    suffix = "." if parent_path else ""
+    external_conns = ~sys_conns["src"].str.startswith(parent_path + suffix)
     return sys_conns["src"], external_conns
 
 
@@ -223,11 +233,18 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
     if nls is not None and not isinstance(nls, om.NonlinearRunOnce):
         upsolver = UpcycleSolver(path=path, parent=upsolver)
 
-    if isinstance(omsys, (om.Group, om.IndepVarComp)):
+    if isinstance(omsys, om.Group):
         continue
 
+    if isinstance(omsys, om.IndepVarComp):
+        if upsolver is top_upsolver:
+            upsolver.inputs.extend([k for k, v in omsys._outputs.items()])
+            continue
+        else:
+            warnings.warn("IVC not under top level model. Can be treated as explicit?")
+
     sys_inputs, ext_mask = get_sources(conn_df, path, upsolver.path)
-    upsolver.inputs.extend(sys_inputs[ext_mask])
+    upsolver.add_inputs(sys_inputs[ext_mask])
 
     if isinstance(omsys, om.ExplicitComponent):  # TODO and not unintentionally implicit
         upsys = UpcycleExplicitSystem(path, upsolver)
