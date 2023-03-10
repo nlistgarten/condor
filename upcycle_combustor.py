@@ -195,7 +195,7 @@ class UpcycleSolver:
     def iter_systems(self):
         for child in self.children:
             if isinstance(child, UpcycleSolver):
-                child.iter_systems()
+                yield from child.iter_systems()
             else:
                 yield child
 
@@ -243,6 +243,26 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
         for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
             upsys.outputs[absname] = sym.flatten(expr)[0]
             upsolver.solved_outputs.append(absname)
+
+        out_meta = omsys._var_abs2meta["output"]
+        upsys.x0 = np.zeros(len(omsys._outputs))
+        upsys.lbx = np.full_like(upsys.x0, -np.inf)
+        upsys.ubx = np.full_like(upsys.x0, np.inf)
+        count = 0
+        for absname, meta in out_meta.items():
+            size = meta["size"]
+
+            upsys.x0[count : count + size] = prob.model._outputs[absname].flatten()
+
+            lb = meta["lower"]
+            ub = meta["upper"]
+            if lb is not None:
+                upsys.lbx[count : count + size] = lb
+            if ub is not None:
+                upsys.ubx[count : count + size] = ub
+
+            count += size
+
 
 # solver dict of all child explicit system output exprs, keys are symbols
 d = {
