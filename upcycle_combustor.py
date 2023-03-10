@@ -150,6 +150,9 @@ class UpcycleSystem:
         # implicit: output n ame -> resid expr
         self.outputs = {}
 
+        # output name -> output symbol
+        self.out_syms = {}
+
         self.solver = solver
         self.solver.children.append(self)
 
@@ -171,9 +174,10 @@ class UpcycleSolver:
         self.path = path
         self.parent = parent
 
-        self.inputs = []  # external inputs
+        self.inputs = []  # external inputs (actually src names)
         self.outputs = {}  # explicit output name -> RHS expr
         self.residuals = {}  # residual output name -> resid expr
+        self.solved_outputs = []
 
         self.children = []
         if parent is not None:
@@ -196,10 +200,10 @@ class UpcycleSolver:
                 yield child
 
 
-def get_inputs(conn_df, sys_path, parent_path):
-    sys_conns = conn_df[conn_df["tgt"].str.startswith(sys_path)]
-    external_conns = ~sys_conns["src"].str.startswith(parent_path)
-    return sys_conns["tgt"], external_conns
+def get_sources(conn_df, sys_path, parent_path):
+    sys_conns = conn_df[conn_df["tgt"].str.startswith(sys_path + ".")]
+    external_conns = ~sys_conns["src"].str.startswith(parent_path + ".")
+    return sys_conns["src"], external_conns
 
 
 top_upsolver = UpcycleSolver()
@@ -211,7 +215,7 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
     path = omsys.pathname
 
     while not path.startswith(upsolver.path):
-        all_inputs, ext_mask = get_inputs(conn_df, upsolver.path, upsolver.parent.path)
+        all_inputs, ext_mask = get_sources(conn_df, upsolver.path, upsolver.parent.path)
         upsolver.parent.inputs.extend(all_inputs[ext_mask])
         upsolver = upsolver.parent
 
@@ -222,7 +226,7 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
     if isinstance(omsys, (om.Group, om.IndepVarComp)):
         continue
 
-    sys_inputs, ext_mask = get_inputs(conn_df, path, upsolver.path)
+    sys_inputs, ext_mask = get_sources(conn_df, path, upsolver.path)
     upsolver.inputs.extend(sys_inputs[ext_mask])
 
     if isinstance(omsys, om.ExplicitComponent):  # TODO and not unintentionally implicit
@@ -230,14 +234,28 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
         upsys.inputs.extend(sys_inputs)
 
         for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
-            upsys.outputs[absname] = sym.flatten(symbol + expr)[0]
+            upsys.outputs[absname] = sym.flatten(symbol + expr)[0].expand()
 
     else:
         upsys = UpcycleImplicitSystem(path, upsolver)
         upsys.inputs.extend(sys_inputs)
 
-        for absname, expr in omsys._residuals.items():
+        for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
             upsys.outputs[absname] = sym.flatten(expr)[0]
+            upsolver.solved_outputs.append(absname)
+
+# solver dict of all child explicit system output exprs, keys are symbols
+d = {
+    sym.Symbol(k): v
+    for s in upsolver.children if isinstance(s, UpcycleExplicitSystem)
+    for k, v in s.outputs.items()
+}
+
+# iterable of every child output
+r = [v.subs(d) for s in upsolver.children for v in s.outputs.values()]
+
+s = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
+
 
 
 import sys
@@ -301,8 +319,7 @@ print("upcycling...")
 sym_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
 
 print("sympy2casdadi")
-ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
-ca_res, ca_vars_out = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
+ca_res, ca_vars = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
 
 print("updating initial guesses for explicit outputs")
 # update explicit output guesses
