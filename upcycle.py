@@ -112,12 +112,10 @@ def extract_problem_data(prob):
     return x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs, constant_idxs
 
 
-def sympy2casadi(sympy_expr, sympy_var, casadi_var):
-    # TODO more/better defensive checks
-    assert casadi_var.is_vector()
-    if casadi_var.shape[1] > 1:
-        casadi_var = casadi_var.T
-    casadi_var = casadi.vertsplit(casadi_var)
+def sympy2casadi(sympy_expr, sympy_vars):
+    ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in sympy_vars])
+
+    ca_vars_split = casadi.vertsplit(ca_vars)
 
     mapping = {
         "ImmutableDenseMatrix": casadi.blockcat,
@@ -129,20 +127,16 @@ def sympy2casadi(sympy_expr, sympy_var, casadi_var):
 
     print("lambdifying...")
     f = lambdify(
-        sympy_var,
+        sympy_vars,
         sympy_expr,
         modules=[interp_registry, mapping, casadi],
-        printer=CodePrinter(
-            {
-                "fully_qualified_modules": False,
-            }
-        ),
+        printer=CodePrinter({"fully_qualified_modules": False}),
     )
 
     print("casadifying...")
-    out = f(*casadi_var)
+    out = f(*ca_vars_split)
 
-    return out, casadi_var
+    return out, ca_vars
 
 
 def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):

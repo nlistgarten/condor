@@ -477,8 +477,7 @@ if __name__ == "__main__":
         sym_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
 
         print("casadifying...")
-        ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in out_syms])
-        ca_res, _ = upcycle.sympy2casadi(res_mat, out_syms, ca_vars)
+        ca_res, ca_vars = upcycle.sympy2casadi(res_mat, out_syms)
         res = casadi.Function("res", casadi.vertsplit(ca_vars), casadi.vertsplit(ca_res))
 
         ser = casadi.FileSerializer(datfp)
