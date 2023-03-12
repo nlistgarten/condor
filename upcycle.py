@@ -16,7 +16,20 @@ from sympy.utilities.lambdify import lambdify
 os.environ["OPENMDAO_REPORTS"] = "none"
 
 
-class CodePrinter(PythonCodePrinter):
+class UpcycleCodePrinter(PythonCodePrinter):
+    def doprint(self, *args, **kwargs):
+        return super().doprint(*args, **kwargs)
+
+    def _print(self, *args, **kwargs):
+        return super()._print(*args, **kwargs)
+
+    def _print_NDimArray(self, expr, **kwargs):
+        #breakpoint()
+        return repr(expr)
+
+    def _print_Function(self, *args, **kwargs):
+        return super()._print_Function(*args, **kwargs)
+
     def _print_Piecewise(self, expr):
         eargs = expr.args
 
@@ -111,8 +124,37 @@ def extract_problem_data(prob):
 
     return x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs, constant_idxs
 
+class assignment_cse:
+    def __init__(self, assignment_dict, return_assignments=True):
+        self.assignment_dict = assignment_dict
+        self.original_arg_to_dummy = {}
+        self.dummified_assignment_list = {}
+        for arg, expr in assignment_dict.items():
+            # sorry Kenny
+            new_arg = self.original_arg_to_dummy[arg] = sym.Dummy()
+            self.dummified_assignment_list[new_arg] = expr.subs(
+                self.original_arg_to_dummy
+            )
+        self.return_assignments = return_assignments
 
-def sympy2casadi(sympy_expr, sympy_vars):
+    def __call__(self, expr):
+        if hasattr(expr, 'subs'):
+            expr_ = expr.subs(self.dummified_assignment_list)
+        else:
+            expr_ = [
+                expr__.subs(self.dummified_assignment_list)
+                for expr__ in expr
+            ]
+        if self.return_assignments:
+            if hasattr(expr_, '__len__'):
+                expr_ = list(expr_)
+            else:
+                expr_ = [expr_]
+            expr_.extend(self.dummified_assignment_list.keys())
+        return self.dummified_assignment_list.items(), expr_
+
+
+def sympy2casadi(sympy_expr, sympy_vars, extra_assignments={}):
     ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in sympy_vars])
 
     ca_vars_split = casadi.vertsplit(ca_vars)
@@ -124,19 +166,32 @@ def sympy2casadi(sympy_expr, sympy_vars):
         "abs": casadi.fabs,
         "Array": casadi.MX,
     }
-
+    # can set allow_unknown_functions=False and pass user_functions dict of
+    # {func_expr: func_str} instead of allow_unknown_function but  it's the
+    # presence in "modules" that adds them to namespace on `exec` line of lambdify so
+    # it's a little redundant. sticking with this version for now
+    printer = UpcycleCodePrinter(dict(
+        fully_qualified_modules=False,
+        allow_unknown_functions=True,
+        #user_functions={k: k for k in interp_registry}
+    ))
     print("lambdifying...")
     f = lambdify(
         sympy_vars,
         sympy_expr,
-        modules=[interp_registry, mapping, casadi],
-        printer=CodePrinter({"fully_qualified_modules": False}),
+        modules=[
+            interp_registry,
+            mapping,
+            casadi
+        ],
+        printer=printer,
+        cse=assignment_cse(extra_assignments),
     )
 
     print("casadifying...")
     out = f(*ca_vars_split)
 
-    return out, ca_vars
+    return out, ca_vars, f
 
 
 def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):

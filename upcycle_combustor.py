@@ -291,12 +291,49 @@ d = {
 # iterable of every child output
 r = [v.subs(d) for s in upsolver.children for v in s.outputs.values()]
 
-s = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
+implicit_residual = [
+    v.subs(d) 
+    for s in upsolver.children 
+    if isinstance(s, UpcycleImplicitSystem)
+    for v in s.outputs.values()
+] + [list(d.values())[0]]
 
 
+
+s = [
+    sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs
+]
+
+cr, cs, f = upcycle.sympy2casadi(implicit_residual, s, d)
+
+print(f.__doc__)
 
 import sys
 sys.exit()
+
+####
+
+x = casadi.SX.sym('x'); y = casadi.SX.sym('y'); z = casadi.SX.sym('z')
+a = casadi.SX.sym('a')
+# these did stay as SX...
+xx = casadi.vertcat(x,y,z) 
+aa = casadi.vertcat(a)
+nlp = {
+    'x':xx,
+    'p':aa,
+    'f':x**2+a*z**2, 
+    'g':z+(1-x)**2-y,
+}
+S = casadi.nlpsol('S', 'ipopt', nlp)
+
+outs = S(x0=casadi.MX.sym('x0',nlp['x'].shape[0]), p=casadi.MX.sym('a', 1))
+# creates lists of MX symbols that are indexed of the nlp solution
+xsolved = casadi.vertsplit(outs["x"])
+gsolved = casadi.vertsplit(outs["g"])
+
+#
+
+###
 
 om_res_final = prob.model._residuals.asarray().copy()
 prob.model._apply_nonlinear()
