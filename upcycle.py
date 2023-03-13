@@ -51,7 +51,8 @@ def sympify_problem(prob):
     """
     prob.setup(local_vector_class=SymbolicVector, derivatives=False)
     prob.final_setup()
-    prob.model.run_apply_nonlinear()
+    # run_apply_nonlinear gives better matching to om but makes 1.0*sym everywhere
+    prob.model._apply_nonlinear()
 
     root_vecs = prob.model._get_root_vectors()
 
@@ -138,13 +139,17 @@ class assignment_cse:
         self.return_assignments = return_assignments
 
     def __call__(self, expr):
+        rev_dummified_assignments = {
+            v: k for k, v in self.dummified_assignment_list.items()
+        }
         if hasattr(expr, 'subs'):
-            expr_ = expr.subs(self.dummified_assignment_list)
+            expr_ = expr.subs(rev_dummified_assignments)
         else:
             expr_ = [
-                expr__.subs(self.dummified_assignment_list)
+                expr__.subs(rev_dummified_assignments)
                 for expr__ in expr
             ]
+            print(expr_)
         if self.return_assignments:
             if hasattr(expr_, '__len__'):
                 expr_ = list(expr_)
