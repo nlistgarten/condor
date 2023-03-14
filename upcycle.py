@@ -149,7 +149,6 @@ class assignment_cse:
                 expr__.subs(rev_dummified_assignments)
                 for expr__ in expr
             ]
-            print(expr_)
         if self.return_assignments:
             if hasattr(expr_, '__len__'):
                 expr_ = list(expr_)

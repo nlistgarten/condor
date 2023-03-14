@@ -124,15 +124,11 @@ def make_problem():
 prob = make_problem()
 up_prob = make_problem()
 prob_after = make_problem()
+
 prob.final_setup()
 x0, lbx, ubx, iobj, non_indep_idxs, explicit_idxs, const_idxs = upcycle.extract_problem_data(prob)
 
-prob.model._apply_nonlinear()
-om_res = prob.model._residuals.asarray().copy()
-
-prob.run_model()
-
-x0_after = upcycle.extract_problem_data(prob)[0]
+# prob.run_model()
 
 up_prob, res_mat, out_syms = upcycle.sympify_problem(up_prob)
 
@@ -243,6 +239,7 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
         else:
             warnings.warn("IVC not under top level model. Can be treated as explicit?")
 
+    # these inputs are absolute paths to openmdao variables (i.e. potentially arrays)
     sys_inputs, ext_mask = get_sources(conn_df, path, upsolver.path)
     upsolver.add_inputs(sys_inputs[ext_mask])
 
@@ -288,6 +285,11 @@ d = {
     for k, v in s.outputs.items()
 }
 
+x0 = np.hstack([prob.get_val(absname) for absname in upsolver.solved_outputs])
+p0 = np.hstack([prob.get_val(absname) for absnmae in upsolver.inputs])
+lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
+ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
+
 # iterable of every child output
 r = [v.subs(d) for s in upsolver.children for v in s.outputs.values()]
 
@@ -307,6 +309,26 @@ s = [
 cr, cs, f = upcycle.sympy2casadi(implicit_residual, s, d)
 
 print(f.__doc__)
+
+cs_split = casadi.vertsplit(cs)
+x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
+p = casadi.vertcat(*cs_split[len(upsolver.solved_outputs):])
+
+n_explicit = len(cr) - x0.size
+lbg = np.hstack([np.zeros_like(lbx), np.full(n_explicit, -np.inf)])
+ubg = np.hstack([np.zeros_like(ubx), np.full(n_explicit, np.inf)])
+
+nlp = {
+    "x": x,
+    "p": p,
+    "f": 0,
+    "g": casadi.vertcat(*cr),
+}
+S = casadi.nlpsol("S", "ipopt", nlp)
+out = S(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
+print(out)
+
+
 
 import sys
 sys.exit()
