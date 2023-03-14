@@ -20,15 +20,37 @@ class UpcycleCodePrinter(PythonCodePrinter):
     def doprint(self, *args, **kwargs):
         return super().doprint(*args, **kwargs)
 
-    def _print(self, *args, **kwargs):
-        return super()._print(*args, **kwargs)
+    def _print(self, expr, **kwargs):
+        # _print_Function did a recursive call for handling the call syntax (args)
+        # and it was being cast as an NDimArray which was nice. I guess re-create that
+        # instead of going straight to the type of function? went ahead and did it
+
+        # so far, we're really doing condor in-memory codeprinting... TableLookup
+        # assumes registry is passed to lambdify modules to add to "namespace"
+        # could be nice to have TableLookup class own the registry, then an
+        # accessor that can be generically passed to lambdify or process other types of
+        # code printing (e.g., one that could be serialized/doesn't need the reference
+        # to the table generated during sympify_problem). Similar behavior may be needed
+        # for the other Ops (optimizer/rootfinder, SGM)
+        if isinstance(expr, UpcycleAppliedFunction):
+            cls = type(type(expr))
+            funcprintmethodname = '_print_' + cls.__name__
+            funcprintmethod = getattr(self, funcprintmethodname, None)
+            if funcprintmethod is None:
+               funcprintmethod = PythonCodePrinter._print
+
+            return "%s(%s)" % (
+                funcprintmethod(expr.func), self.stringify(expr.args, ", ")
+            )
+        else:
+            return super()._print(expr, **kwargs)
+
 
     def _print_NDimArray(self, expr, **kwargs):
-        #breakpoint()
         return repr(expr)
 
-    def _print_Function(self, *args, **kwargs):
-        return super()._print_Function(*args, **kwargs)
+    def _print_TableLookup(self, expr, **kwargs):
+        return repr(expr)
 
     def _print_Piecewise(self, expr):
         eargs = expr.args
@@ -43,6 +65,41 @@ class UpcycleCodePrinter(PythonCodePrinter):
 
         return recurse(eargs)
 
+from sympy.core.function import UndefinedFunction, AppliedUndef
+
+class UpcycleAppliedFunction(AppliedUndef):
+    ApplicationType = {}
+
+    def __new__(cls, *args, **options):
+        #breakpoint()
+        newcls = super().__new__(cls, *args, **options)
+
+        return newcls
+
+
+class UpcycleUndefinedFunction(UndefinedFunction):
+    def __new__(mcl, name, 
+                bases=(UpcycleAppliedFunction,),
+                __dict__=None, **kwargs):
+        # called when an argument is applied, e.g., tab_h(...)
+        # returns the called function expression as subclass of UpcycleAppliedFunction
+        # applied tab_h is what codeprinter sees, without catching it gets processed as
+        # a Function which would be  fine, since don't want to repeat the  print 
+        # function and args logic, but Printer._print has some special Function filter
+        # logic and the CodePrinter._print_Function uses string value of known_functions
+        # dict or delegates if "allow_unknown_functions". I guess it would be reasonable
+        # for _print_TableLookup to just add to known_functions dict?
+        # also, the logic is just 
+        # return "%s(%s)" % (func, self.stringify(expr.args, ", "))
+        # so I could just do that in the UpcycleAppliedFunc print logic...
+
+
+        newcls = super().__new__(mcl, name, bases, __dict__=__dict__, **kwargs)
+        #newcls.__mro__ = (newcls.__mro__[0], mcl,) + newcls.__mro__[1:]
+        return newcls
+
+class TableLookup(UpcycleUndefinedFunction):
+    pass
 
 def sympify_problem(prob):
     """Set up and run `prob` with symbolic inputs
@@ -174,10 +231,9 @@ def sympy2casadi(sympy_expr, sympy_vars, extra_assignments={}):
     # {func_expr: func_str} instead of allow_unknown_function but  it's the
     # presence in "modules" that adds them to namespace on `exec` line of lambdify so
     # it's a little redundant. sticking with this version for now
+    # user_functions gets added to known_functions
     printer = UpcycleCodePrinter(dict(
         fully_qualified_modules=False,
-        allow_unknown_functions=True,
-        #user_functions={k: k for k in interp_registry}
     ))
     print("lambdifying...")
     f = lambdify(
@@ -271,7 +327,7 @@ def mmsc_compute(self, inputs, outputs):
             interp_registry[name] = ca_interp_wrapped
 
             # TODO flatten inputs?
-            f = sym.Function(name)(sym.Array(sym.flatten(inputs.values())))
+            f = TableLookup(name)(sym.Array(sym.flatten(inputs.values())))
             outputs[output_name] = f
     else:
         orig_mm_compute(self, inputs, outputs)
@@ -295,7 +351,7 @@ def usatm1976_compute(self, inputs, outputs):
             )
             ca_interp_wrapped = make_interp_wrapper(ca_interp)
             interp_registry[fname] = ca_interp_wrapped
-            f = sym.Function(fname)(sym.Array(sym.flatten(inputs.values())))
+            f = TableLookup(fname)(sym.Array(sym.flatten(inputs.values())))
             outputs[output_name] = f
     else:
         orig_usatm1976_compute(self, inputs, outputs)
