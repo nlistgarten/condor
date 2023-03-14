@@ -101,6 +101,11 @@ class UpcycleUndefinedFunction(UndefinedFunction):
 class TableLookup(UpcycleUndefinedFunction):
     pass
 
+
+class Solver(UpcycleUndefinedFunction):
+    pass
+
+
 def sympify_problem(prob):
     """Set up and run `prob` with symbolic inputs
 
@@ -241,6 +246,7 @@ def sympy2casadi(sympy_expr, sympy_vars, extra_assignments={}):
         sympy_expr,
         modules=[
             interp_registry,
+            solver_registry,
             mapping,
             casadi
         ],
@@ -313,18 +319,14 @@ def mmsc_compute(self, inputs, outputs):
         for output_name in outputs:
             name = f"{self.name}_{output_name}"
 
-            if name in interp_registry:
-                ca_interp_wrapped = interp_registry[name]
-            else:
+            if name not in interp_registry:
                 ca_interp = casadi.interpolant(
                     name,
                     "linear",
                     self.inputs,
                     self.training_outputs[output_name].ravel(order="F"),
                 )
-                ca_interp_wrapped = make_interp_wrapper(ca_interp)
-
-            interp_registry[name] = ca_interp_wrapped
+                interp_registry[name] = make_interp_wrapper(ca_interp)
 
             # TODO flatten inputs?
             f = TableLookup(name)(sym.Array(sym.flatten(inputs.values())))
@@ -358,6 +360,23 @@ def usatm1976_compute(self, inputs, outputs):
 
 
 USatm1976Comp.compute = usatm1976_compute
+
+
+solver_registry = {}
+
+
+def make_solver_wrapper(solver, solver_kwargs):
+    def wrapper(*args):
+        nx = len(solver_kwargs["ubx"])
+
+        symbolic_kwargs = solver_kwargs.copy()
+        symbolic_kwargs["p"] = casadi.vertcat(*args[0])
+        symbolic_nlp = S(**symbolic_kwargs)
+
+        return casadi.vertcat(symboloic_nlp["x"], symbolic["g"][nx:])
+
+    return wrapper
+
 
 
 class SymbolicArray(np.ndarray):

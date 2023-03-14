@@ -221,8 +221,17 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
     path = omsys.pathname
 
     while not path.startswith(upsolver.path):
+        if len(upsolver.solved_outputs) == 0:
+            upsolver.parent.children.pop(-1)
+
+            for child in upsolver.children:
+                child.parent = upsolver.parent
+                upsolver.parent.children.append(child)
+
+            upsolver.parent.add_inputs(upsolver.inputs)
+
         all_inputs, ext_mask = get_sources(conn_df, upsolver.path, upsolver.parent.path)
-        upsolver.parent.inputs.extend(all_inputs[ext_mask])
+        upsolver.parent.add_inputs(all_inputs[ext_mask])
         upsolver = upsolver.parent
 
     nls = omsys.nonlinear_solver
@@ -284,36 +293,40 @@ def get_nlp_for_solver(upsolver, prob):
     # prob is (root?) problem to get numeric values... can these get put in in the
     # upsolver and its children?
 
-    d = {
-        sym.Symbol(k): v
-        for s in upsolver.children if isinstance(s, UpcycleExplicitSystem)
-        for k, v in s.outputs.items()
-    }
+    output_assignments = {}
+    for child in upsolver.children:
+        if isinstance(child, UpcycleExplicitSystem):
+            output_assignments.update({sym.Symbol(k): v for k, v in child.outputs.items()})
+
+        elif isinstance(child, UpcycleSolver):
+            if child.path not in upcycle.solver_registry:
+                sub_nlp, sub_S, sub_kwargs = get_nlp_for_solver(child, prob)
+                upcycle.solver_registry[child.path] = upcycle.make_solver_wrapper(sub_S, sub_kwargs)
+
+            output_assignments.update({
+                tuple([sym.Symbol(k) for s in child.children for k in s.outputs]):
+                upcycle.Solver(child.path)(sym.Array([sym.Symbol(k) for k in child.inputs]))
+            })
 
     x0 = np.hstack([prob.get_val(absname) for absname in upsolver.solved_outputs])
     p0 = np.hstack([prob.get_val(absname) for absnmae in upsolver.inputs])
     lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
     ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
 
-    # iterable of every child output
-    r = [v.subs(d) for s in upsolver.children for v in s.outputs.values()]
-
     implicit_residual = [
-        v.subs(d) 
+        v.subs(output_assignments) 
         for s in upsolver.children 
         if isinstance(s, UpcycleImplicitSystem)
         for v in s.outputs.values()
-    ] + [list(d.values())[0]]
+    ] + [list(output_assignments.values())[0]]
 
+    # TODO handle array variables
+    s = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
 
-
-    s = [
-        sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs
-    ]
-
-    cr, cs, f = upcycle.sympy2casadi(implicit_residual, s, d)
+    cr, cs, f = upcycle.sympy2casadi(implicit_residual, s, output_assignments)
 
     cs_split = casadi.vertsplit(cs)
+    # TODO handle array variables
     x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
     p = casadi.vertcat(*cs_split[len(upsolver.solved_outputs):])
 
@@ -331,7 +344,7 @@ def get_nlp_for_solver(upsolver, prob):
     kwargs = dict(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
     return nlp, S, kwargs
 
-nlp, S, kwargs = get_nlp_for_solver(upsolver, prob)
+nlp, S, kwargs = get_nlp_for_solver(top_upsolver, prob)
 
 out = S(**kwargs)
 print(out)
