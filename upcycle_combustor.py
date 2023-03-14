@@ -279,54 +279,66 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
 
 
 # solver dict of all child explicit system output exprs, keys are symbols
-d = {
-    sym.Symbol(k): v
-    for s in upsolver.children if isinstance(s, UpcycleExplicitSystem)
-    for k, v in s.outputs.items()
-}
+def get_nlp_for_solver(upsolver, prob):
+    # upsolver is UpcycleSolver instance
+    # prob is (root?) problem to get numeric values... can these get put in in the
+    # upsolver and its children?
 
-x0 = np.hstack([prob.get_val(absname) for absname in upsolver.solved_outputs])
-p0 = np.hstack([prob.get_val(absname) for absnmae in upsolver.inputs])
-lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
-ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
+    d = {
+        sym.Symbol(k): v
+        for s in upsolver.children if isinstance(s, UpcycleExplicitSystem)
+        for k, v in s.outputs.items()
+    }
 
-# iterable of every child output
-r = [v.subs(d) for s in upsolver.children for v in s.outputs.values()]
+    x0 = np.hstack([prob.get_val(absname) for absname in upsolver.solved_outputs])
+    p0 = np.hstack([prob.get_val(absname) for absnmae in upsolver.inputs])
+    lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
+    ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
 
-implicit_residual = [
-    v.subs(d) 
-    for s in upsolver.children 
-    if isinstance(s, UpcycleImplicitSystem)
-    for v in s.outputs.values()
-] + [list(d.values())[0]]
+    # iterable of every child output
+    r = [v.subs(d) for s in upsolver.children for v in s.outputs.values()]
+
+    implicit_residual = [
+        v.subs(d) 
+        for s in upsolver.children 
+        if isinstance(s, UpcycleImplicitSystem)
+        for v in s.outputs.values()
+    ] + [list(d.values())[0]]
 
 
 
-s = [
-    sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs
-]
+    s = [
+        sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs
+    ]
 
-cr, cs, f = upcycle.sympy2casadi(implicit_residual, s, d)
+    cr, cs, f = upcycle.sympy2casadi(implicit_residual, s, d)
 
-print(f.__doc__)
+    cs_split = casadi.vertsplit(cs)
+    x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
+    p = casadi.vertcat(*cs_split[len(upsolver.solved_outputs):])
 
-cs_split = casadi.vertsplit(cs)
-x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
-p = casadi.vertcat(*cs_split[len(upsolver.solved_outputs):])
+    n_explicit = len(cr) - x0.size
+    lbg = np.hstack([np.zeros_like(lbx), np.full(n_explicit, -np.inf)])
+    ubg = np.hstack([np.zeros_like(ubx), np.full(n_explicit, np.inf)])
 
-n_explicit = len(cr) - x0.size
-lbg = np.hstack([np.zeros_like(lbx), np.full(n_explicit, -np.inf)])
-ubg = np.hstack([np.zeros_like(ubx), np.full(n_explicit, np.inf)])
+    nlp = {
+        "x": x,
+        "p": p,
+        "f": 0,
+        "g": casadi.vertcat(*cr),
+    }
+    S = casadi.nlpsol("S", "ipopt", nlp)
+    kwargs = dict(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
+    return nlp, S, kwargs
 
-nlp = {
-    "x": x,
-    "p": p,
-    "f": 0,
-    "g": casadi.vertcat(*cr),
-}
-S = casadi.nlpsol("S", "ipopt", nlp)
-out = S(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
+nlp, S, kwargs = get_nlp_for_solver(upsolver, prob)
+
+out = S(**kwargs)
 print(out)
+
+symbolic_kwargs = kwargs.copy()
+symbolic_kwargs["p"] = nlp["p"]
+symbolic_nlp = S(**symbolic_kwargs)
 
 
 
