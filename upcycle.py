@@ -3,10 +3,14 @@ import os
 import casadi
 import numpy as np
 import sympy as sym
+import pandas as pd
+from openmdao.solvers.solver import NonlinearSolver
+from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.components.balance_comp import BalanceComp
 from openmdao.components.meta_model_structured_comp import \
     MetaModelStructuredComp
 from openmdao.core.problem import Problem
+import openmdao.api as om
 from openmdao.vectors.default_vector import DefaultVector
 from pycycle.elements.US1976 import USatm1976Comp, USatm1976Data
 from sympy.core.expr import Expr
@@ -107,7 +111,6 @@ class TableLookup(UpcycleUndefinedFunction):
 class Solver(UpcycleUndefinedFunction):
     pass
 
-
 def sympify_problem(prob):
     """Set up and run `prob` with symbolic inputs
 
@@ -116,7 +119,7 @@ def sympify_problem(prob):
     prob.setup(local_vector_class=SymbolicVector, derivatives=False)
     prob.final_setup()
     # run_apply_nonlinear gives better matching to om but makes 1.0*sym everywhere
-    prob.model._apply_nonlinear()
+    prob.model.run_apply_nonlinear()
 
     root_vecs = prob.model._get_root_vectors()
 
@@ -272,6 +275,258 @@ def sympy2casadi(sympy_expr, sympy_vars, extra_assignments={}, return_assignment
     out = f(*ca_vars_split)
 
     return out, ca_vars, f
+
+
+class UpcycleSystem:
+
+    def __init__(self, path, solver):
+        self.path = path
+        self.solver = solver
+
+        # external inputs
+        self.inputs = []
+
+        # explicit: output name -> RHS expr
+        # implicit: output n ame -> resid expr
+        self.outputs = {}
+
+        # output name -> output symbol
+        self.out_syms = {}
+
+        self.solver = solver
+        self.solver.children.append(self)
+
+    def __repr__(self):
+        return self.path
+
+
+class UpcycleExplicitSystem(UpcycleSystem):
+    pass
+
+
+class UpcycleImplicitSystem(UpcycleSystem):
+    pass
+
+
+class UpcycleSolver:
+
+    def __init__(self, path="", parent=None):
+        self.path = path
+        self.parent = parent
+
+        self.inputs = []  # external inputs (actually src names)
+        self.solved_outputs = []
+
+        self.children = []
+        if parent is not None:
+            self.parent.children.append(self)
+
+    def __repr__(self):
+        return self.path
+
+    def iter_solvers(self, include_self=True):
+        if include_self:
+            yield self
+
+        for child in self.children:
+            if isinstance(child, UpcycleSolver):
+                yield child
+                child.iter_solvers()
+
+    def iter_systems(self):
+        for child in self.children:
+            if isinstance(child, UpcycleSolver):
+                yield from child.iter_systems()
+            else:
+                yield child
+
+    def add_inputs(self, inputs):
+        new_inputs = [i for i in inputs if i not in self.inputs]
+        self.inputs.extend(new_inputs)
+
+    @property
+    def outputs(self):
+        return [o for s in self.iter_systems() for o in s.outputs]
+
+    def _set_run(self, func):
+        def wrapper(*inputs):
+            return np.array(func(*inputs)).squeeze()
+        self.run = wrapper
+
+
+def get_sources(conn_df, sys_path, parent_path):
+    sys_conns = conn_df[conn_df["tgt"].str.startswith(sys_path + ".")]
+    suffix = "." if parent_path else ""
+    external_conns = ~sys_conns["src"].str.startswith(parent_path + suffix)
+    return sys_conns["src"], external_conns
+
+
+def upcycle_problem(make_problem):
+    prob = make_problem()
+    up_prob = make_problem()
+
+    prob.final_setup()
+    up_prob, _, _ = sympify_problem(up_prob)
+
+    top_upsolver = UpcycleSolver()
+    upsolver = top_upsolver
+
+    vdat = _get_viewer_data(prob)
+    conn_df = pd.DataFrame(vdat["connections_list"])
+
+    for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
+        path = omsys.pathname
+
+        while not path.startswith(upsolver.path):
+            if len(upsolver.solved_outputs) == 0:
+                upsolver.parent.children.pop(-1)
+
+                for child in upsolver.children:
+                    child.parent = upsolver.parent
+                    upsolver.parent.children.append(child)
+
+                upsolver.parent.add_inputs(upsolver.inputs)
+
+            all_inputs, ext_mask = get_sources(conn_df, upsolver.path, upsolver.parent.path)
+            upsolver.parent.add_inputs(all_inputs[ext_mask])
+            upsolver = upsolver.parent
+
+        nls = omsys.nonlinear_solver
+        if nls is not None and not isinstance(nls, om.NonlinearRunOnce):
+            upsolver = UpcycleSolver(path=path, parent=upsolver)
+
+        if isinstance(omsys, om.Group):
+            continue
+
+        if isinstance(omsys, om.IndepVarComp):
+            if upsolver is top_upsolver:
+                upsolver.inputs.extend([k for k, v in omsys._outputs.items()])
+                continue
+            else:
+                warnings.warn("IVC not under top level model. Can be treated as explicit?")
+
+        # these inputs are absolute paths to openmdao variables (i.e. potentially arrays)
+        sys_inputs, ext_mask = get_sources(conn_df, path, upsolver.path)
+        upsolver.add_inputs(sys_inputs[ext_mask])
+
+        if isinstance(omsys, om.ExplicitComponent):  # TODO and not unintentionally implicit
+            upsys = UpcycleExplicitSystem(path, upsolver)
+            upsys.inputs.extend(sys_inputs)
+
+            for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
+                upsys.outputs[absname] = sym.flatten(symbol + expr)[0].expand()
+
+        else:
+            upsys = UpcycleImplicitSystem(path, upsolver)
+            upsys.inputs.extend(sys_inputs)
+
+            for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
+                upsys.outputs[absname] = sym.flatten(expr)[0]
+                upsolver.solved_outputs.append(absname)
+
+            out_meta = omsys._var_abs2meta["output"]
+            upsys.x0 = np.zeros(len(omsys._outputs))
+            upsys.lbx = np.full_like(upsys.x0, -np.inf)
+            upsys.ubx = np.full_like(upsys.x0, np.inf)
+            count = 0
+            for absname, meta in out_meta.items():
+                size = meta["size"]
+
+                upsys.x0[count : count + size] = prob.model._outputs[absname].flatten()
+
+                lb = meta["lower"]
+                ub = meta["upper"]
+                if lb is not None:
+                    upsys.lbx[count : count + size] = lb
+                if ub is not None:
+                    upsys.ubx[count : count + size] = ub
+
+                count += size
+
+    func, f = get_nlp_for_solver(top_upsolver, prob)
+
+    return func, prob
+
+
+def sanitize_solver_name(path):
+    return path.replace(".", "_")
+
+
+# solver dict of all child explicit system output exprs, keys are symbols
+def get_nlp_for_solver(upsolver, prob):
+    # upsolver is UpcycleSolver instance
+    # prob is (root?) problem to get numeric values... can these get put in in the
+    # upsolver and its children?
+
+    # if top solver
+    #   if there are constraints, add to solved_outputs, set appropriate bounds
+    #   if there are design variables, update bounds on those inputs
+    #   inputs that are not dvs need their value
+    #   if any solved outputs or obective, return as nlpsolver
+    #   otherwise return as explicit expression
+
+    output_assignments = {}
+    for child in upsolver.children:
+        if isinstance(child, UpcycleExplicitSystem):
+            output_assignments.update({sym.Symbol(k): v for k, v in child.outputs.items()})
+
+        elif isinstance(child, UpcycleSolver):
+            name = sanitize_solver_name(child.path)
+
+            if name not in solver_registry:
+                sub_nlp, sub_S, sub_kwargs = get_nlp_for_solver(child, prob)
+                solver_registry[name] = make_solver_wrapper(sub_S, sub_kwargs)
+
+            # TODO: fix alignment and vector io
+            output_assignments.update({
+                tuple(
+                    [sym.Symbol(k) for k in child.solved_outputs]
+                    + [sym.Symbol(k) for k in child.outputs if k not in child.solved_outputs]
+                ) :
+                Solver(name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
+            })
+
+    # TODO handle array variables
+    s = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
+
+    if upsolver.path == "" and len(upsolver.solved_outputs) == 0:
+        exprs = [sym.Symbol(outp) for outp in upsolver.outputs]
+        cr, cs, f = sympy2casadi(exprs, s, output_assignments, False)
+        func = casadi.Function("model", casadi.vertsplit(cs), cr)
+        upsolver._set_run(func)
+        return upsolver, prob
+
+    implicit_residuals = [
+        v.subs(output_assignments) 
+        for s in upsolver.children 
+        if isinstance(s, UpcycleImplicitSystem)
+        for v in s.outputs.values()
+    ]
+    cr, cs, f = sympy2casadi(implicit_residuals, s, output_assignments)
+
+    cs_split = casadi.vertsplit(cs)
+    # TODO handle array variables
+    x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
+    p = casadi.vertcat(*cs_split[len(upsolver.solved_outputs):])
+
+    x0 = np.hstack([prob.get_val(absname) for absname in upsolver.solved_outputs])
+    p0 = np.hstack([prob.get_val(absname) for absname in upsolver.inputs])
+    lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
+    ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
+
+    n_explicit = len(cr) - x0.size
+    lbg = np.hstack([np.zeros_like(lbx), np.full(n_explicit, -np.inf)])
+    ubg = np.hstack([np.zeros_like(ubx), np.full(n_explicit, np.inf)])
+
+    nlp = {
+        "x": x,
+        "p": p,
+        "f": 0,
+        "g": casadi.vertcat(*cr),
+    }
+    S = casadi.nlpsol("S", "ipopt", nlp)
+    kwargs = dict(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
+    return nlp, S, kwargs
 
 
 def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):
