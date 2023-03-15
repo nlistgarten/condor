@@ -316,8 +316,12 @@ def get_nlp_for_solver(upsolver, prob):
                 sub_nlp, sub_S, sub_kwargs = get_nlp_for_solver(child, prob)
                 upcycle.solver_registry[name] = upcycle.make_solver_wrapper(sub_S, sub_kwargs)
 
+            # TODO: fix alignment and vector io
             output_assignments.update({
-                tuple([sym.Symbol(k) for s in child.children for k in s.outputs]):
+                tuple(
+                    [sym.Symbol(k) for k in child.solved_outputs]
+                    + [sym.Symbol(k) for k in child.outputs if k not in child.solved_outputs]
+                ) :
                 upcycle.Solver(name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
             })
 
@@ -325,10 +329,10 @@ def get_nlp_for_solver(upsolver, prob):
     s = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
 
     if upsolver.path == "" and len(upsolver.solved_outputs) == 0:
-        exprs = sym.flatten(output_assignments.keys())
-        cr, cs, f = upcycle.sympy2casadi([], s, output_assignments)
+        exprs = [sym.Symbol(outp) for outp in upsolver.outputs]
+        cr, cs, f = upcycle.sympy2casadi(exprs, s, output_assignments, False)
         func = casadi.Function("model", casadi.vertsplit(cs), cr)
-        return func
+        return func, f
 
     implicit_residuals = [
         v.subs(output_assignments) 
@@ -363,7 +367,8 @@ def get_nlp_for_solver(upsolver, prob):
     return nlp, S, kwargs
 
 # nlp, S, kwargs = get_nlp_for_solver(top_upsolver, prob)
-func = get_nlp_for_solver(top_upsolver, prob)
+func, f = get_nlp_for_solver(top_upsolver, prob)
+print(f.__doc__)
 
 inputs = np.hstack([prob.get_val(absname) for absname in top_upsolver.inputs])
 out = func(*inputs[:15])  # TODO figure out how to get all vars in
@@ -379,6 +384,10 @@ for name, dm in zip(top_upsolver.outputs, out):
     vals.append([name, om_val, ca_val])
 
 df = pd.DataFrame(vals, columns=cols)
+
+print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-3, atol=1e-3)])
+
+
 
 import sys
 sys.exit()

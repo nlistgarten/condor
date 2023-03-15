@@ -217,6 +217,7 @@ class assignment_cse:
                 if isinstance(k, tuple) for kk, vv in zip(k, v)
             },
         )
+        rev_dummified_assignments.update(self.original_arg_to_dummy)
         if hasattr(expr, 'subs'):
             expr_ = expr.subs(rev_dummified_assignments)
         else:
@@ -264,7 +265,7 @@ def sympy2casadi(sympy_expr, sympy_vars, extra_assignments={}, return_assignment
             casadi
         ],
         printer=printer,
-        cse=assignment_cse(extra_assignments),
+        cse=assignment_cse(extra_assignments, return_assignments),
     )
 
     print("casadifying...")
