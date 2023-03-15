@@ -369,6 +369,16 @@ inputs = np.hstack([prob.get_val(absname) for absname in top_upsolver.inputs])
 out = func(*inputs[:15])  # TODO figure out how to get all vars in
 print(out)
 
+prob.run_model()
+
+cols = ("name", "om_val", "ca_val")
+vals = []
+for name, dm in zip(top_upsolver.outputs, out):
+    om_val = prob.get_val(name)[0]
+    ca_val = float(dm)
+    vals.append([name, om_val, ca_val])
+
+df = pd.DataFrame(vals, columns=cols)
 
 import sys
 sys.exit()
