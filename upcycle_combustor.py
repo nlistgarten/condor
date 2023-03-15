@@ -287,11 +287,22 @@ for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
             count += size
 
 
+def sanitize_solver_name(path):
+    return path.replace(".", "_")
+
+
 # solver dict of all child explicit system output exprs, keys are symbols
 def get_nlp_for_solver(upsolver, prob):
     # upsolver is UpcycleSolver instance
     # prob is (root?) problem to get numeric values... can these get put in in the
     # upsolver and its children?
+
+    # if top solver
+    #   if there are constraints, add to solved_outputs, set appropriate bounds
+    #   if there are design variables, update bounds on those inputs
+    #   inputs that are not dvs need their value
+    #   if any solved outputs or obective, return as nlpsolver
+    #   otherwise return as explicit expression
 
     output_assignments = {}
     for child in upsolver.children:
@@ -299,36 +310,43 @@ def get_nlp_for_solver(upsolver, prob):
             output_assignments.update({sym.Symbol(k): v for k, v in child.outputs.items()})
 
         elif isinstance(child, UpcycleSolver):
-            if child.path not in upcycle.solver_registry:
+            name = sanitize_solver_name(child.path)
+
+            if name not in upcycle.solver_registry:
                 sub_nlp, sub_S, sub_kwargs = get_nlp_for_solver(child, prob)
-                upcycle.solver_registry[child.path] = upcycle.make_solver_wrapper(sub_S, sub_kwargs)
+                upcycle.solver_registry[name] = upcycle.make_solver_wrapper(sub_S, sub_kwargs)
 
             output_assignments.update({
                 tuple([sym.Symbol(k) for s in child.children for k in s.outputs]):
-                upcycle.Solver(child.path)(sym.Array([sym.Symbol(k) for k in child.inputs]))
+                upcycle.Solver(name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
             })
-
-    x0 = np.hstack([prob.get_val(absname) for absname in upsolver.solved_outputs])
-    p0 = np.hstack([prob.get_val(absname) for absnmae in upsolver.inputs])
-    lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
-    ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
-
-    implicit_residual = [
-        v.subs(output_assignments) 
-        for s in upsolver.children 
-        if isinstance(s, UpcycleImplicitSystem)
-        for v in s.outputs.values()
-    ] + [list(output_assignments.values())[0]]
 
     # TODO handle array variables
     s = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
 
-    cr, cs, f = upcycle.sympy2casadi(implicit_residual, s, output_assignments)
+    if upsolver.path == "" and len(upsolver.solved_outputs) == 0:
+        exprs = sym.flatten(output_assignments.keys())
+        cr, cs, f = upcycle.sympy2casadi([], s, output_assignments)
+        func = casadi.Function("model", cs, cr)
+        return func
+
+    implicit_residuals = [
+        v.subs(output_assignments) 
+        for s in upsolver.children 
+        if isinstance(s, UpcycleImplicitSystem)
+        for v in s.outputs.values()
+    ]
+    cr, cs, f = upcycle.sympy2casadi(implicit_residuals, s, output_assignments)
 
     cs_split = casadi.vertsplit(cs)
     # TODO handle array variables
     x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
     p = casadi.vertcat(*cs_split[len(upsolver.solved_outputs):])
+
+    x0 = np.hstack([prob.get_val(absname) for absname in upsolver.solved_outputs])
+    p0 = np.hstack([prob.get_val(absname) for absname in upsolver.inputs])
+    lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
+    ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
 
     n_explicit = len(cr) - x0.size
     lbg = np.hstack([np.zeros_like(lbx), np.full(n_explicit, -np.inf)])
@@ -344,15 +362,12 @@ def get_nlp_for_solver(upsolver, prob):
     kwargs = dict(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
     return nlp, S, kwargs
 
-nlp, S, kwargs = get_nlp_for_solver(top_upsolver, prob)
+# nlp, S, kwargs = get_nlp_for_solver(top_upsolver, prob)
+func = get_nlp_for_solver(top_upsolver, prob)
 
-out = S(**kwargs)
+inputs = np.hstack([prob.get_val(absname) for absname in top_upsolver.inputs])
+out = func(*inputs)
 print(out)
-
-symbolic_kwargs = kwargs.copy()
-symbolic_kwargs["p"] = nlp["p"]
-symbolic_nlp = S(**symbolic_kwargs)
-
 
 
 import sys

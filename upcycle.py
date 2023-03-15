@@ -52,6 +52,9 @@ class UpcycleCodePrinter(PythonCodePrinter):
     def _print_TableLookup(self, expr, **kwargs):
         return repr(expr)
 
+    def _print_Solver(self, expr, **kwargs):
+        return repr(expr)
+
     def _print_Piecewise(self, expr):
         eargs = expr.args
 
@@ -71,7 +74,6 @@ class UpcycleAppliedFunction(AppliedUndef):
     ApplicationType = {}
 
     def __new__(cls, *args, **options):
-        #breakpoint()
         newcls = super().__new__(cls, *args, **options)
 
         return newcls
@@ -193,8 +195,13 @@ class assignment_cse:
         self.original_arg_to_dummy = {}
         self.dummified_assignment_list = {}
         for arg, expr in assignment_dict.items():
-            # sorry Kenny
-            new_arg = self.original_arg_to_dummy[arg] = sym.Dummy()
+            if hasattr(arg, "__len__"):
+                new_arg = tuple([sym.Dummy() for a in arg])
+                for a, na in zip(arg, new_arg):
+                    self.original_arg_to_dummy[a] = na
+            else:
+                new_arg = sym.Dummy()
+                self.original_arg_to_dummy[arg] = new_arg
             self.dummified_assignment_list[new_arg] = expr.subs(
                 self.original_arg_to_dummy
             )
@@ -204,6 +211,12 @@ class assignment_cse:
         rev_dummified_assignments = {
             v: k for k, v in self.dummified_assignment_list.items()
         }
+        rev_dummified_assignments.update(
+            {
+                kk: vv for k, v in rev_dummified_assignments.items()
+                if isinstance(k, tuple) for kk, vv in zip(k, v)
+            },
+        )
         if hasattr(expr, 'subs'):
             expr_ = expr.subs(rev_dummified_assignments)
         else:
@@ -216,11 +229,11 @@ class assignment_cse:
                 expr_ = list(expr_)
             else:
                 expr_ = [expr_]
-            expr_.extend(self.dummified_assignment_list.keys())
+            expr_.extend(sym.flatten(self.dummified_assignment_list.keys()))
         return self.dummified_assignment_list.items(), expr_
 
 
-def sympy2casadi(sympy_expr, sympy_vars, extra_assignments={}):
+def sympy2casadi(sympy_expr, sympy_vars, extra_assignments={}, return_assignments=True):
     ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in sympy_vars])
 
     ca_vars_split = casadi.vertsplit(ca_vars)
@@ -371,9 +384,9 @@ def make_solver_wrapper(solver, solver_kwargs):
 
         symbolic_kwargs = solver_kwargs.copy()
         symbolic_kwargs["p"] = casadi.vertcat(*args[0])
-        symbolic_nlp = S(**symbolic_kwargs)
+        symbolic_nlp = solver(**symbolic_kwargs)
 
-        return casadi.vertcat(symboloic_nlp["x"], symbolic["g"][nx:])
+        return casadi.vertcat(symbolic_nlp["x"], symbolic_nlp["g"][nx:])
 
     return wrapper
 
