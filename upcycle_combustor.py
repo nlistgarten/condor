@@ -327,7 +327,7 @@ def get_nlp_for_solver(upsolver, prob):
     if upsolver.path == "" and len(upsolver.solved_outputs) == 0:
         exprs = sym.flatten(output_assignments.keys())
         cr, cs, f = upcycle.sympy2casadi([], s, output_assignments)
-        func = casadi.Function("model", cs, cr)
+        func = casadi.Function("model", casadi.vertsplit(cs), cr)
         return func
 
     implicit_residuals = [
@@ -366,7 +366,7 @@ def get_nlp_for_solver(upsolver, prob):
 func = get_nlp_for_solver(top_upsolver, prob)
 
 inputs = np.hstack([prob.get_val(absname) for absname in top_upsolver.inputs])
-out = func(*inputs)
+out = func(*inputs[:15])  # TODO figure out how to get all vars in
 print(out)
 
 

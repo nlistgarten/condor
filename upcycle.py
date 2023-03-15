@@ -386,7 +386,7 @@ def make_solver_wrapper(solver, solver_kwargs):
         symbolic_kwargs["p"] = casadi.vertcat(*args[0])
         symbolic_nlp = solver(**symbolic_kwargs)
 
-        return casadi.vertcat(symbolic_nlp["x"], symbolic_nlp["g"][nx:])
+        return casadi.vertsplit(symbolic_nlp["x"]) + casadi.vertsplit(symbolic_nlp["g"][nx:])
 
     return wrapper
 
