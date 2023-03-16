@@ -148,18 +148,58 @@ class LinCovCW(SGM):
 
 
 class AircraftMission(SGM):
+    # control is ~ time-varying parameter
+    # state is time-varying
+    # output is 
     alpha = control()
     throttle = control()
     weight, drange, altitude, gamma, airspeed  = state()
 
+
+    mode = finite_state()
+    # logic can only depend on finite_state, mode can only be updated by events
+    # can only 
+
+
+    # these states will automatically not matter since they don't directly appear in
+    # output integrand of terminal terms?
     t_rot, t_gear, t_flaps = state()
 
     initial[t_rot, t_gear, t_flaps] = inf
 
-    class rotation(Event):
+    # basically provides a convenience to using symbolic logic operators (casadi
+    # if_else, sympy piecewise, etc). symbolic logic operators in backend are fine
+    # I guess it's just doing piecewise for you for the stated expressions?
+
+    class groundroll(mode):
+        alpha = 0.
+
+    initial[mode] = groundroll
+
+    class rotation(mode):
+        alpha = rot_rate * (t - rot)
+
+    class rotation_trigger(Event):
         function = airspeed - v_rot
         # time and state on RHS of update means at event time
         update[t_rot] = t
+        update[mode] = rotation
+
+    class rotating_ascent(rotation):
+        pass
+
+    class 
+
+    class constrained_ascent(mode):
+        alpha = max(
+            solve(TAS_constraint),
+            solve(xlf_constraint),
+            solve(pitch_constraint)
+        )
+
+
+
+
 
     # similar events for gear and flap retraction time
     # alpha for rotation, aero for gear/flap retraction are easy with this formulation
@@ -174,9 +214,15 @@ class AircraftMission(SGM):
 
 
 
+class trajectory_analysis(model=some_ode_class,):
+    class output1(output):
+        integrand_cost = expression(model.state, control, etc)
+        terminal_cost = expressino(...)
 
-
-
+    input = ....
+    model.p = input
+    # so trajectory analysis distinguishes between parameters (inputs?) and sets
+    # constants, not the ODE!!
 
 
 

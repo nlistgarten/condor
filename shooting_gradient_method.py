@@ -10,17 +10,17 @@ class _null_name:
 class _base_condor_descriptor:
     def __set_name__(self, owner, name):
         print("setting", name, "for", owner, "as", self)
-        self.name = name
-        self.owner = owner
-        self.resolve_name = ".".join([self.owner.__class__.__name__, self.name])
+        self._name = name
+        self._owner = owner
+        self._resolve_name = ".".join([self._owner.__class__.__name__, self._name])
 
     def __get__(self, obj, objtype=None):
-        print("getting", self.resolve_name, "as", self,  "for", obj)
+        print("getting", self._resolve_name, "as", self,  "for", obj)
         pass
         return 
 
     def __set__(self, obj, value):
-        raise AttributeError(self.resolve_name + " cannot be set as " + self.__class__)
+        raise AttributeError(self._resolve_name + " cannot be set as " + self.__class__)
 
 def construct_explicit_matrix(name, n, m=1, symmetric=False, diagonal=0,
                               dynamic=False, **kwass):
@@ -86,7 +86,7 @@ class _condor_symbol_generator(_base_condor_descriptor):
     def __call__(self, n, **kwargs):
         print("calling for", self)
         pass_kwargs = dict(
-            name="%s%d_" % (self.resolve_name, self.count),
+            name="%s%d_" % (self._resolve_name, self.count),
             n=n,
             **self.fixed_kwargs,
             **kwargs
@@ -98,10 +98,18 @@ class _condor_symbol_generator(_base_condor_descriptor):
 class _condor_computation(_base_condor_descriptor):
     def __init__(self, matched_to=None):
         print('init', self)
+        self._matched_to = matched_to
         pass
 
     def __setitem__(self, key, value):
         print("setting item for", self, ":", key, "=", value)
+        pass
+
+    def __setattr__(self, name, value):
+        if name.startswith('_'):
+            super().__setattr__(name, value)
+        else:
+            print("setting item for", self, ".", name, "=", value)
         pass
 
 
@@ -145,7 +153,7 @@ class DynamicsModel(metaclass=CondorModelType):
     print("starting user code for CondorModel class")
     state = _condor_symbol_generator()
     parameter = _condor_symbol_generator()
-    state_rate = _condor_computation(state)
+    dot = _condor_computation(state)
     output = _condor_computation()
     print("ending user code for TrajectoryModel class")
 
@@ -154,8 +162,6 @@ class LTI(DynamicsModel):
     print("starting user code for LTI class")
     n = 2
     m = 1
-    z = n + m
-    # p, v = state()
     x = state(n)
     C = state(n=n,m=n, symmetric=True)
     A = np.array([
@@ -167,9 +173,15 @@ class LTI(DynamicsModel):
     # B = parameter(n,m)
     # K = parameter(m,n)
 
-    print(A @ x)
-    state_rate[x] = A@x #(A - B @ K) @ x
-    state_rate[C] = A@C + C@A.T
+
+    # indexing an output/computation by state
+    dot[x] = A@x #(A - B @ K) @ x
+    dot[C] = A@C + C@A.T
+    # indexing by integer/slice/could probably do advanced if needed
+    dot[0] = A@A.T
+    dot[:5] = A.T@A
+    # dot naming, although have to do more work to minimize other setattr's 
+    output.y = C.T @ C
     print("ending user code for LTI class")
 
 
