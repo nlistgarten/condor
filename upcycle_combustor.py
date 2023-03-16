@@ -121,8 +121,8 @@ def make_problem():
 
 upsolver, prob = upcycle.upcycle_problem(make_problem)
 
-inputs = np.hstack([prob.get_val(absname) for absname in upsolver.inputs])
-out = upsolver.run(*inputs[:15])  # TODO figure out how to get all vars in
+inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
+out = upsolver.run(*inputs)
 print(out)
 
 prob.run_model()
@@ -130,7 +130,7 @@ prob.run_model()
 cols = ("name", "om_val", "ca_val")
 vals = []
 for name, ca_val in zip(upsolver.outputs, out):
-    om_val = prob.get_val(name)[0]
+    om_val = upcycle.get_val(prob, name)
     vals.append([name, om_val, ca_val])
 
 df = pd.DataFrame(vals, columns=cols)

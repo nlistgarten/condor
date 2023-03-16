@@ -1,4 +1,5 @@
 import os
+import re
 
 import casadi
 import numpy as np
@@ -375,9 +376,11 @@ def upcycle_problem(make_problem):
     conn_df = pd.DataFrame(vdat["connections_list"])
 
     for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
-        path = omsys.pathname
+        syspath = omsys.pathname
 
-        while not path.startswith(upsolver.path):
+        while not syspath.startswith(upsolver.path):
+            # special case: solver in the om system has nothing to solve
+            # remove self from parent, re-parent children, propagate up inputs
             if len(upsolver.solved_outputs) == 0:
                 upsolver.parent.children.pop(-1)
 
@@ -387,44 +390,52 @@ def upcycle_problem(make_problem):
 
                 upsolver.parent.add_inputs(upsolver.inputs)
 
+            # propagate inputs external to self up to parent
             all_inputs, ext_mask = get_sources(conn_df, upsolver.path, upsolver.parent.path)
             upsolver.parent.add_inputs(all_inputs[ext_mask])
             upsolver = upsolver.parent
 
         nls = omsys.nonlinear_solver
         if nls is not None and not isinstance(nls, om.NonlinearRunOnce):
-            upsolver = UpcycleSolver(path=path, parent=upsolver)
+            upsolver = UpcycleSolver(path=syspath, parent=upsolver)
 
         if isinstance(omsys, om.Group):
             continue
 
         if isinstance(omsys, om.IndepVarComp):
             if upsolver is top_upsolver:
-                upsolver.inputs.extend([k for k, v in omsys._outputs.items()])
+                upsolver.inputs.extend(flatten_varnames(omsys._var_abs2meta["output"]))
                 continue
             else:
                 warnings.warn("IVC not under top level model. Can be treated as explicit?")
 
-        # these inputs are absolute paths to openmdao variables (i.e. potentially arrays)
-        sys_inputs, ext_mask = get_sources(conn_df, path, upsolver.path)
-        upsolver.add_inputs(sys_inputs[ext_mask])
+        # propagate inputs external to self up to parent solver
+        sys_input_srcs, ext_mask = get_sources(conn_df, syspath, upsolver.path)
+        all_sys_input_srcs = flatten_varnames(prob.model._var_abs2meta["output"], sys_input_srcs)
+        ext_sys_input_srcs = flatten_varnames(prob.model._var_abs2meta["output"], sys_input_srcs[ext_mask])
+        upsolver.add_inputs(ext_sys_input_srcs)
+
+        out_meta = omsys._var_abs2meta["output"]
+        all_outputs = flatten_varnames(out_meta)
 
         if isinstance(omsys, om.ExplicitComponent):  # TODO and not unintentionally implicit
-            upsys = UpcycleExplicitSystem(path, upsolver)
-            upsys.inputs.extend(sys_inputs)
-
-            for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
-                upsys.outputs[absname] = sym.flatten(symbol + expr)[0].expand()
+            upsys = UpcycleExplicitSystem(syspath, upsolver)
+            upsys.inputs.extend(all_sys_input_srcs)
+            for name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):
+                # TODO why does this happen?
+                if isinstance(symbol, SymbolicArray):
+                    symbol, expr = symbol[0], expr[0]
+                upsys.outputs[name] = (symbol + expr).expand()
 
         else:
-            upsys = UpcycleImplicitSystem(path, upsolver)
-            upsys.inputs.extend(sys_inputs)
+            upsys = UpcycleImplicitSystem(syspath, upsolver)
+            upsys.inputs.extend(all_sys_input_srcs)
+            for name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):
+                if isinstance(symbol, SymbolicArray):
+                    symbol, expr = symbol[0], expr[0]
+                upsys.outputs[name] = expr
+                upsolver.solved_outputs.append(name)
 
-            for (absname, symbol), expr in zip(omsys._outputs.items(), omsys._residuals.values()):
-                upsys.outputs[absname] = sym.flatten(expr)[0]
-                upsolver.solved_outputs.append(absname)
-
-            out_meta = omsys._var_abs2meta["output"]
             upsys.x0 = np.zeros(len(omsys._outputs))
             upsys.lbx = np.full_like(upsys.x0, -np.inf)
             upsys.ubx = np.full_like(upsys.x0, np.inf)
@@ -477,7 +488,6 @@ def get_nlp_for_solver(upsolver, prob):
                 sub_nlp, sub_S, sub_kwargs = get_nlp_for_solver(child, prob)
                 solver_registry[name] = make_solver_wrapper(sub_S, sub_kwargs)
 
-            # TODO: fix alignment and vector io
             output_assignments.update({
                 tuple(
                     [sym.Symbol(k) for k in child.solved_outputs]
@@ -486,7 +496,6 @@ def get_nlp_for_solver(upsolver, prob):
                 Solver(name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
             })
 
-    # TODO handle array variables
     s = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
 
     if upsolver.path == "" and len(upsolver.solved_outputs) == 0:
@@ -505,12 +514,11 @@ def get_nlp_for_solver(upsolver, prob):
     cr, cs, f = sympy2casadi(implicit_residuals, s, output_assignments)
 
     cs_split = casadi.vertsplit(cs)
-    # TODO handle array variables
     x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
     p = casadi.vertcat(*cs_split[len(upsolver.solved_outputs):])
 
-    x0 = np.hstack([prob.get_val(absname) for absname in upsolver.solved_outputs])
-    p0 = np.hstack([prob.get_val(absname) for absname in upsolver.inputs])
+    x0 = np.hstack([get_val(prob, absname) for absname in upsolver.solved_outputs])
+    p0 = np.hstack([get_val(prob, absname) for absname in upsolver.inputs])
     lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
     ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
 
@@ -518,12 +526,7 @@ def get_nlp_for_solver(upsolver, prob):
     lbg = np.hstack([np.zeros_like(lbx), np.full(n_explicit, -np.inf)])
     ubg = np.hstack([np.zeros_like(ubx), np.full(n_explicit, np.inf)])
 
-    nlp = {
-        "x": x,
-        "p": p,
-        "f": 0,
-        "g": casadi.vertcat(*cr),
-    }
+    nlp = {"x": x, "p": p, "f": 0, "g": casadi.vertcat(*cr)}
     S = casadi.nlpsol("S", "ipopt", nlp)
     kwargs = dict(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
     return nlp, S, kwargs
@@ -688,6 +691,35 @@ class SymbolicArray(np.ndarray):
         return result.view(SymbolicArray)
 
 
+def flatten_varnames(abs2meta, varpaths=None):
+    names = []
+    if varpaths is None:
+        varpaths = abs2meta.keys()
+    for path in varpaths:
+        names.extend(expand_varname(path, abs2meta[path]["size"]))
+    return names
+
+
+def expand_varname(name, size=1):
+    if size == 1:
+        yield name
+    else:
+        for i in range(size):
+            yield f"{name}[{i}]"
+
+
+_VARNAME_PATTERN = re.compile(r"(.*)\[(\d)+\]$")
+
+
+def get_val(prob, name, **kwargs):
+    try:
+        return prob.get_val(name, **kwargs)[0]
+    except KeyError:
+        match = _VARNAME_PATTERN.match(name)
+        base_name = match[1]
+        idx = int(match[2])
+        return prob.get_val(base_name, **kwargs)[idx]
+
 class SymbolicVector(DefaultVector):
     """OpenMDAO Vector implementation backed by SymbolicArray"""
 
@@ -701,12 +733,7 @@ class SymbolicVector(DefaultVector):
         system = self._system()
         names = []
         # om uses this and relies on ordering when building views, should be ok
-        for abs_name, meta in system._var_abs2meta[self._typ].items():
-            sz = meta["size"]
-            if sz == 1:
-                names.append(abs_name)
-            else:
-                names.extend([f"{abs_name}[{i}]" for i in range(sz)])
+        names = flatten_varnames(system._var_abs2meta[self._typ])
         syms = np.array([sym.Symbol(name) for name in names]).view(SymbolicArray)
         self.syms = syms
         return syms
