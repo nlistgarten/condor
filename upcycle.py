@@ -478,6 +478,7 @@ def get_nlp_for_solver(upsolver, prob):
 
     output_assignments = {}
     for child in upsolver.children:
+
         if isinstance(child, UpcycleExplicitSystem):
             output_assignments.update({sym.Symbol(k): v for k, v in child.outputs.items()})
 
@@ -527,8 +528,14 @@ def get_nlp_for_solver(upsolver, prob):
     ubg = np.hstack([np.zeros_like(ubx), np.full(n_explicit, np.inf)])
 
     nlp = {"x": x, "p": p, "f": 0, "g": casadi.vertcat(*cr)}
-    S = casadi.nlpsol("S", "ipopt", nlp)
+    opts =  {}
+    opts["ipopt.warm_start_init_point"] = "no"
+    S = casadi.nlpsol("S", "ipopt", nlp, opts)
     kwargs = dict(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
+    if upsolver.path == "":
+        upsolver._set_run(make_solver_wrapper(S, kwargs))
+        return upsolver, prob
+
     return nlp, S, kwargs
 
 
@@ -642,7 +649,11 @@ def make_solver_wrapper(solver, solver_kwargs):
         nx = len(solver_kwargs["ubx"])
 
         symbolic_kwargs = solver_kwargs.copy()
-        symbolic_kwargs["p"] = casadi.vertcat(*args[0])
+        if isinstance(args[0], list) and isinstance(args[0][0], (casadi.MX, casadi.SX)):
+            symbolic_kwargs["p"] = casadi.vertcat(*args[0])
+        else:
+            # not just for symbolic
+            symbolic_kwargs["p"] = np.array(args)
         symbolic_nlp = solver(**symbolic_kwargs)
 
         return casadi.vertsplit(symbolic_nlp["x"]) + casadi.vertsplit(symbolic_nlp["g"][nx:])

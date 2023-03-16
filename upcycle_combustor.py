@@ -135,4 +135,9 @@ for name, ca_val in zip(upsolver.outputs, out):
 
 df = pd.DataFrame(vals, columns=cols)
 
-print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-3, atol=1e-3)])
+
+print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=0, atol=5e-3)])
+# without warm start, rtol 1E-4 passes everything but with warm start it doesn't??
+print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1E-4, atol=0.)])
+
+

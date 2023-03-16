@@ -28,4 +28,8 @@ for name, ca_val in zip(upsolver.outputs, out):
 
 df = pd.DataFrame(vals, columns=cols)
 
-print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-3, atol=1e-3)])
+# passes with or without warm start
+print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=0., atol=1e-13)])
+print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-13, atol=0.)])
+
+
