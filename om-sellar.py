@@ -1,3 +1,4 @@
+import upcycle
 import numpy as np
 import openmdao.api as om
 
@@ -76,35 +77,43 @@ class Sellar(om.Group):
         self.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
 
 
-prob = om.Problem()
-prob.model = Sellar()
+def make_prob():
+    prob = om.Problem()
+    prob.model = Sellar()
 
-prob.driver = om.ScipyOptimizeDriver()
-prob.driver.options["optimizer"] = "SLSQP"
-prob.driver.options["tol"] = 1e-8
+    prob.driver = om.ScipyOptimizeDriver()
+    prob.driver.options["optimizer"] = "SLSQP"
+    prob.driver.options["tol"] = 1e-8
 
-prob.model.add_design_var("x", lower=0, upper=10)
-prob.model.add_design_var("z", lower=0, upper=10)
-prob.model.add_objective("obj")
-prob.model.add_constraint("con1", upper=0)
-prob.model.add_constraint("con2", upper=0)
+    prob.model.add_design_var("x", lower=0, upper=10)
+    prob.model.add_design_var("z", lower=0, upper=10)
+    prob.model.add_objective("obj")
+    prob.model.add_constraint("con1", upper=0)
+    prob.model.add_constraint("con2", upper=0)
 
-prob.setup()
+    prob.setup()
 
-prob.set_val("x", 1.0)
-prob.set_val("z", [5.0, 2.0])
-prob.set_val("y1", 1.0)
-prob.set_val("y2", 1.0)
+    prob.set_val("x", 1.0)
+    prob.set_val("z", [5.0, 2.0])
+    prob.set_val("y1", 1.0)
+    prob.set_val("y2", 1.0)
 
-prob.set_solver_print(level=0)
+    prob.set_solver_print(level=0)
 
-prob.run_driver()
+    return prob
 
-print("minimum found at")
-print(prob.get_val("x")[0])
-print(prob.get_val("z"))
-print(prob.get_val("y1")[0])
-print(prob.get_val("y2")[0])
+# prob = make_prob()
+# prob.run_driver()
+#
+# print("minimum found at")
+# print(prob.get_val("x")[0])
+# print(prob.get_val("z"))
+# print(prob.get_val("y1")[0])
+# print(prob.get_val("y2")[0])
+#
+# print("minumum objective")
+# print(prob.get_val("obj")[0])
 
-print("minumum objective")
-print(prob.get_val("obj")[0])
+upsolver, prob = upcycle.upcycle_problem(make_prob)
+inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
+print(upsolver.run(*inputs))
