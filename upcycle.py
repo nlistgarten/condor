@@ -137,12 +137,15 @@ class UpcycleImplicitSystem(UpcycleSystem):
 
 class UpcycleSolver:
 
-    def __init__(self, path="", parent=None):
+    def __init__(self, path="", parent=None, om_equiv=None):
         self.path = path
         self.parent = parent
+        self.om_equiv=om_equiv
 
         self.inputs = []  # external inputs (actually src names)
         self.solved_outputs = []
+
+        self.internal_loop = False
 
         self.children = []
         if parent is not None:
@@ -195,7 +198,7 @@ def upcycle_problem(make_problem):
     prob.final_setup()
     up_prob, _, _ = sympify_problem(up_prob)
 
-    top_upsolver = UpcycleSolver()
+    top_upsolver = UpcycleSolver(om_equiv=prob.model)
     upsolver = top_upsolver
 
     vdat = _get_viewer_data(prob)
@@ -223,7 +226,7 @@ def upcycle_problem(make_problem):
 
         nls = omsys.nonlinear_solver
         if nls is not None and not isinstance(nls, om.NonlinearRunOnce):
-            upsolver = UpcycleSolver(path=syspath, parent=upsolver)
+            upsolver = UpcycleSolver(path=syspath, parent=upsolver, om_equiv=omsys)
 
         if isinstance(omsys, om.Group):
             continue
@@ -244,7 +247,27 @@ def upcycle_problem(make_problem):
         out_meta = omsys._var_abs2meta["output"]
         all_outputs = flatten_varnames(out_meta)
 
-        if isinstance(omsys, om.ExplicitComponent):  # TODO and not unintentionally implicit
+        if not upsolver.internal_loop:
+            possible_loop_inputs = set(all_sys_input_srcs).difference(set(upsolver.inputs) | set(upsolver.outputs))
+            possible_loop_siblings = {input_name.replace(
+                    upsolver.path + '.' if upsolver.path != '' else '', ''
+                ).split('.')[0]
+                for input_name in possible_loop_inputs
+            }
+            for local_sibling_source_name in possible_loop_siblings:
+                om_sibling_source = getattr(
+                    upsolver.om_equiv, local_sibling_source_name
+                )
+                if not isinstance(om_sibling_source, om.ImplicitComponent):
+                    upsolver.internal_loop = True
+                    break
+
+            """
+            with loop check: 26, 3, 27,
+            w/o  loop check: 17, 3, 20
+            """
+
+        if isinstance(omsys, om.ExplicitComponent) and not upsolver.internal_loop:
             upsys = UpcycleExplicitSystem(syspath, upsolver)
             upsys.inputs.extend(all_sys_input_srcs)
             for name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):

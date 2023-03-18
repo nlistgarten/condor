@@ -1,6 +1,8 @@
 import upcycle
 import numpy as np
+import pandas as pd
 import openmdao.api as om
+import upcycle
 
 deriv_method = "exact"  # or "fd"
 
@@ -77,7 +79,7 @@ class Sellar(om.Group):
         self.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
 
 
-def make_prob():
+def make_problem():
     prob = om.Problem()
     prob.model = Sellar()
 
@@ -98,22 +100,43 @@ def make_prob():
     prob.set_val("y1", 1.0)
     prob.set_val("y2", 1.0)
 
-    prob.set_solver_print(level=0)
-
     return prob
 
-# prob = make_prob()
-# prob.run_driver()
-#
-# print("minimum found at")
-# print(prob.get_val("x")[0])
-# print(prob.get_val("z"))
-# print(prob.get_val("y1")[0])
-# print(prob.get_val("y2")[0])
-#
-# print("minumum objective")
-# print(prob.get_val("obj")[0])
+upsolver, prob = upcycle.upcycle_problem(make_problem)
 
-upsolver, prob = upcycle.upcycle_problem(make_prob)
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
-print(upsolver.run(*inputs))
+out = upsolver.run(*inputs)
+print(out)
+
+prob.set_solver_print(-1)
+prob.run_model()
+
+cols = ("name", "om_val", "ca_val")
+vals = []
+for name, ca_val in zip(upsolver.outputs, out):
+    om_val = upcycle.get_val(prob, name)
+    vals.append([name, om_val, ca_val])
+
+df = pd.DataFrame(vals, columns=cols)
+
+# passes with or without warm start
+print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=0., atol=1e-9)])
+print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-10, atol=0.)])
+
+
+
+
+prob.run_model()
+
+prob.set_solver_print(level=0)
+
+#prob.run_driver()
+
+#print("minimum found at")
+#print(prob.get_val("x")[0])
+#print(prob.get_val("z"))
+#print(prob.get_val("y1")[0])
+#print(prob.get_val("y2")[0])
+#
+#print("minumum objective")
+#print(prob.get_val("obj")[0])

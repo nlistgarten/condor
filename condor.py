@@ -402,39 +402,25 @@ class CondorModelType(type):
         new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
         return new_cls
 
-class DynamicsModel(metaclass=CondorModelType):
-    print("starting user code for CondorModel class")
-    state = _condor_symbol_generator()
-    parameter = _condor_symbol_generator()
-    dot = _condor_computation(state)
-    output = _condor_computation()
-    print("ending user code for TrajectoryModel class")
+"""
+do parent systems always write subsystems by getting all their output? I think so
+Groups definitely need some type of naming scheme because all outputs get lifted up as
+outputs (not disciplined/strict system encapsolation). Although my implementation of a
+blockdiagram also does this by default?
+
+get_val is nice for masking only what's needed, I guess we could use masks
+what about multiple calls where some values don't change? need to reference that
+
+in general symbolic and numeric references,
+
+yeah, might need something
+    fuel_flow_rate, thrust = propulsion(flight_condition, throttle)[
+        propulsion.output.fuel_flow_rate,
+        propulsion.output.thrust
+    ]
+
+which is ~ how the output df indexing should work? calls should genreally return the df,
+indexable by number, symbolic object, etc.
 
 
-class LTI(DynamicsModel):
-    print("starting user code for LTI class")
-    n = 2
-    m = 1
-    x = state(n)
-    C = state(n=n,m=n, symmetric=True)
-    A = np.array([
-        [0, 1],
-        [0, 0],
-    ])
-
-    # A = parameter(n,n)
-    # B = parameter(n,m)
-    # K = parameter(m,n)
-
-
-    # indexing an output/computation by state
-    dot[x] = A@x #(A - B @ K) @ x
-    dot[C] = A@C + C@A.T
-    # indexing by integer/slice/could probably do advanced if needed
-    dot[0] = A@A.T
-    dot[:5] = A.T@A
-    # dot naming, although have to do more work to minimize other setattr's 
-    output.y = C.T @ C
-    print("ending user code for LTI class")
-
-
+"""

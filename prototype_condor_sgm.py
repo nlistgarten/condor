@@ -148,18 +148,28 @@ class LinCovCW(SGM):
 
 
 class AircraftMission(SGM):
-    # control is ~ time-varying parameter
+    # control is ~ time-varying parameter? actually, here (and with a feedback
+    # controller?) they're just deferred inputs... interesting.
     # state is time-varying
-    # output is 
     alpha = control()
     throttle = control()
     weight, drange, altitude, gamma, airspeed  = state()
 
 
-    mode = finite_state()
-    # logic can only depend on finite_state, mode can only be updated by events
-    # can only 
+    initial[weight] = parameter()
+    initial[altitude] = parameter() # take-off airport altitude
+    # initial drange, gamma, airspeed = 0. by default
 
+    # generally expressions are point-wise in time
+    # implicitly or explicitly get time? 
+    # aero_model I guess also needs t_gears, t_flaps if they aren't incremented
+    # somewhere else?
+    flight_condition = flight_condition_model(altitude, airspeed)
+    lift, drag = aero_model(flight_condition, alpha)
+    fuel_flow_rate, thrust = propulsion(flight_condition, throttle)
+
+    rate[weight] = -fuel_flow_rate
+    rate[airspeed] = ...
 
     # these states will automatically not matter since they don't directly appear in
     # output integrand of terminal terms?
@@ -167,35 +177,64 @@ class AircraftMission(SGM):
 
     initial[t_rot, t_gear, t_flaps] = inf
 
-    # basically provides a convenience to using symbolic logic operators (casadi
-    # if_else, sympy piecewise, etc). symbolic logic operators in backend are fine
-    # I guess it's just doing piecewise for you for the stated expressions?
+    mode = finite_state()
+    # logic can only depend on finite_state, mode can only be updated by events
+    # can only only take on discrete values. classes inside a dynamic system model that
+    # inherit from mode provide a convenience -- auto number/name like enum,
+    # adds logic operator to any output thats overwritten
+
 
     class groundroll(mode):
         alpha = 0.
+        throttle = propulsion.takeoff
 
     initial[mode] = groundroll
 
     class rotation(mode):
-        alpha = rot_rate * (t - rot)
+        alpha = rot_rate * (t - t_rot)
+        throttle = propulsion.takeoff
 
+    v_rot = parameter()
     class rotation_trigger(Event):
         function = airspeed - v_rot
         # time and state on RHS of update means at event time
         update[t_rot] = t
         update[mode] = rotation
 
+    class liftoff(Event):
+        function = normal_force
+        update[mode] = rotating_ascent
+
     class rotating_ascent(rotation):
         pass
 
-    class 
+    class ascent_constraint_trigger(Event):
+        function = min(
+            TAS_constraint,
+            xlf_constraint,
+            pitch_constraint
+        )
+        update[mode] = rotation
+
+    gear_retraction_altitude = parameter(50*ft) # default value??
+    class gear_retraction(Event):
+        function = altitude - gear_retraction_altitude
+        update[t_gear] = t
+
+    flaps_retraction_altitude = parameter(400*ft) # default value??
+    class gear_retraction(Event):
+        function = altitude - flaps_retraction_altitude
+        update[t_flaps] = t
 
     class constrained_ascent(mode):
-        alpha = max(
+        throttle = propulsion.takeoff
+        alpha = min(
             solve(TAS_constraint),
             solve(xlf_constraint),
             solve(pitch_constraint)
         )
+
+
 
 
 
@@ -206,9 +245,6 @@ class AircraftMission(SGM):
 
     # want fully determined controls? or allow functional space deriv? no, can put
     # spline with finite parameters unless study shows its worse?
-
-    # generally expressions are point-wise in time
-    fuel_flow_rate, thrust = propulsion(flight_condition, throttle)
 
 
 
