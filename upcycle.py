@@ -258,14 +258,17 @@ def upcycle_problem(make_problem):
                 om_sibling_source = getattr(
                     upsolver.om_equiv, local_sibling_source_name
                 )
+                # catch algebraic loops -- not a loop if source is an implicit component
+                # or a group without a solver
+
                 if not isinstance(om_sibling_source, om.ImplicitComponent):
+                    if isinstance(om_sibling_source, om.Group):
+                        nls = om_sibling_source.solver.nonlinear_solver
+                        if nls is None or isinstance(nls, om.NonlinearRunOnce):
+                            continue
                     upsolver.internal_loop = True
                     break
 
-            """
-            with loop check: 26, 3, 27,
-            w/o  loop check: 17, 3, 20
-            """
 
         if isinstance(omsys, om.ExplicitComponent) and not upsolver.internal_loop:
             upsys = UpcycleExplicitSystem(syspath, upsolver)
