@@ -443,7 +443,7 @@ def make_prob():
 
 
 if __name__ == "__main__":
-    upsolver, prob = upcycle.upcycle_problem(make_prob)
+    upsolver, prob = upcycle.upcycle_problem(make_prob, warm_start=True)
 
     prob.set_solver_print(level=-1)
     #prob.set_solver_print(level=2, depth=1)

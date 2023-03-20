@@ -17,10 +17,55 @@ import openmdao.api as om
 from openmdao.vectors.default_vector import DefaultVector
 from pycycle.elements.US1976 import USatm1976Comp, USatm1976Data
 
+import warnings
+
 
 os.environ["OPENMDAO_REPORTS"] = "none"
+# NO_DUMMY -> everything must be pre-sanitized
+NO_DUMMY = True
+#NO_DUMMY = False
+# last attempt with no_dummy had a dummy referenced before assignment
 
 
+
+class dummify_assignment_cse:
+    def __init__(self, assignment_dict, return_assignments=True):
+        self.assignment_dict = assignment_dict
+        self.return_assignments = return_assignments
+        self.original_arg_to_dummy = {}
+        # TODO: 
+        self.dummified_assignment_list = {}
+        for arg, expr in assignment_dict.items():
+            if hasattr(arg, "__len__"):
+                new_arg = tuple([sym.Dummy() for a in arg])
+                for a, na in zip(arg, new_arg):
+                    self.original_arg_to_dummy[a] = na
+            else:
+                new_arg = sym.Dummy()
+                self.original_arg_to_dummy[arg] = new_arg
+            self.dummified_assignment_list[new_arg] = expr.subs(
+                self.original_arg_to_dummy
+            )
+
+    def __call__(self, expr):
+        rev_dummified_assignments = {
+            v: k for k, v in self.dummified_assignment_list.items()
+        }
+        rev_dummified_assignments.update(
+            {
+                kk: vv for k, v in rev_dummified_assignments.items()
+                if isinstance(k, tuple) for kk, vv in zip(k, v)
+            },
+        )
+        rev_dummified_assignments.update(self.original_arg_to_dummy)
+        if hasattr(expr, 'subs'):
+            expr_ = expr.subs(rev_dummified_assignments)
+        else:
+            expr_ = [
+                expr__.subs(rev_dummified_assignments)
+                for expr__ in expr
+            ]
+        return self.assignment_dict.items(), expr
 
 def sympify_problem(prob):
     """Set up and run `prob` with symbolic inputs
@@ -143,7 +188,6 @@ class UpcycleSolver:
         self.om_equiv=om_equiv
 
         self.inputs = []  # external inputs (actually src names)
-        self.solved_outputs = []
 
         self.internal_loop = False
 
@@ -171,12 +215,30 @@ class UpcycleSolver:
                 yield child
 
     def add_inputs(self, inputs):
-        new_inputs = [i for i in inputs if i not in self.inputs]
+        new_inputs = [ i for i in inputs 
+                       if i not in self.inputs and i not in self.solved_outputs]
+        if NO_DUMMY:
+            new_inputs = [ i for i in sanitize_variable_names(inputs)
+                           if i not in self.inputs and i not in self.solved_outputs]
         self.inputs.extend(new_inputs)
+        if len(self.inputs) > len(set(self.inputs)):
+            raise ValueError("duplicate input")
 
     @property
     def outputs(self):
         return [o for s in self.iter_systems() for o in s.outputs]
+
+    @property
+    def solved_outputs(self):
+        return [o for s in self.children
+                if isinstance(s, UpcycleImplicitSystem)
+                for o in s.outputs]
+
+    @property
+    def computed_outputs(self):
+        return [o for s in self.children
+                if not isinstance(s, UpcycleImplicitSystem)
+                for o in s.outputs]
 
     def _set_run(self, func):
         def wrapper(*inputs):
@@ -191,7 +253,7 @@ def get_sources(conn_df, sys_path, parent_path):
     return sys_conns["src"], external_conns
 
 
-def upcycle_problem(make_problem):
+def upcycle_problem(make_problem, warm_start=False):
     prob = make_problem()
     up_prob = make_problem()
 
@@ -210,7 +272,8 @@ def upcycle_problem(make_problem):
         while not syspath.startswith(upsolver.path):
             # special case: solver in the om system has nothing to solve
             # remove self from parent, re-parent children, propagate up inputs
-            if len(upsolver.solved_outputs) == 0:
+            cyclic_io = set(upsolver.inputs) & set(upsolver.outputs)
+            if (len(upsolver.solved_outputs) == 0) or cyclic_io:
                 upsolver.parent.children.pop(-1)
 
                 for child in upsolver.children:
@@ -221,7 +284,7 @@ def upcycle_problem(make_problem):
 
             # propagate inputs external to self up to parent
             all_inputs, ext_mask = get_sources(conn_df, upsolver.path, upsolver.parent.path)
-            upsolver.parent.add_inputs(all_inputs[ext_mask])
+            upsolver.parent.add_inputs(all_inputs[ext_mask].unique())
             upsolver = upsolver.parent
 
         nls = omsys.nonlinear_solver
@@ -232,11 +295,19 @@ def upcycle_problem(make_problem):
             continue
 
         if isinstance(omsys, om.IndepVarComp):
-            if upsolver is top_upsolver:
-                upsolver.inputs.extend(flatten_varnames(omsys._var_abs2meta["output"]))
-                continue
-            else:
-                warnings.warn("IVC not under top level model. Can be treated as explicit?")
+            print("indepvarcomp?")
+
+            flat_varnames = flatten_varnames(omsys._var_abs2meta["output"])
+            if NO_DUMMY:
+                flat_varnames = sanitize_variable_names(flat_varnames)
+
+            if upsolver is not top_upsolver:
+                warnings.warn("IVC not under top level model. Adding " +
+                              "\n".join(flat_varnames) + " to " + upsolver.path 
+                              + " as well as top level.")
+                top_upsolver.add_inputs(flat_varnames)
+            upsolver.add_inputs(flat_varnames)
+            continue
 
         # propagate inputs external to self up to parent solver
         sys_input_srcs, ext_mask = get_sources(conn_df, syspath, upsolver.path)
@@ -247,13 +318,34 @@ def upcycle_problem(make_problem):
         out_meta = omsys._var_abs2meta["output"]
         all_outputs = flatten_varnames(out_meta)
 
+
+        # cleaning variable names here
+        if NO_DUMMY:
+            all_outputs = sanitize_variable_names(all_outputs)
+            clean_all_sys_input_srcs = sanitize_variable_names(all_sys_input_srcs)
+        else:
+            clean_all_sys_input_srcs = all_sys_input_srcs
+
         if not upsolver.internal_loop:
-            possible_loop_inputs = set(all_sys_input_srcs).difference(set(upsolver.inputs) | set(upsolver.outputs))
-            possible_loop_siblings = {input_name.replace(
-                    upsolver.path + '.' if upsolver.path != '' else '', ''
-                ).split('.')[0]
-                for input_name in possible_loop_inputs
-            }
+
+            if NO_DUMMY:
+                possible_loop_inputs = set(clean_all_sys_input_srcs).difference(set(upsolver.inputs) | set(upsolver.outputs))
+                possible_loop_siblings = {input_name.replace(
+                        upsolver.path + '.' if upsolver.path != '' else '', ''
+                    ).split('.')[0]
+
+                    for input_name in all_sys_input_srcs
+                    if sanitize_variable_name(input_name) in possible_loop_inputs
+                }
+            else:
+                possible_loop_inputs = set(all_sys_input_srcs).difference(set(upsolver.inputs) | set(upsolver.outputs))
+                possible_loop_siblings = {input_name.replace(
+                        upsolver.path + '.' if upsolver.path != '' else '', ''
+                    ).split('.')[0]
+
+                    for input_name in possible_loop_inputs
+                }
+
             for local_sibling_source_name in possible_loop_siblings:
                 om_sibling_source = getattr(
                     upsolver.om_equiv, local_sibling_source_name
@@ -263,7 +355,9 @@ def upcycle_problem(make_problem):
 
                 if not isinstance(om_sibling_source, om.ImplicitComponent):
                     if isinstance(om_sibling_source, om.Group):
-                        nls = om_sibling_source.solver.nonlinear_solver
+                        # DESIGN.compressor didn't have a solver?
+                        nls = getattr(om_sibling_source, 'solver', None)
+                        nls = getattr(nls, 'nonlinear_solver', None)
                         if nls is None or isinstance(nls, om.NonlinearRunOnce):
                             continue
                     upsolver.internal_loop = True
@@ -272,21 +366,25 @@ def upcycle_problem(make_problem):
 
         if isinstance(omsys, om.ExplicitComponent) and not upsolver.internal_loop:
             upsys = UpcycleExplicitSystem(syspath, upsolver)
-            upsys.inputs.extend(all_sys_input_srcs)
-            for name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):
+            upsys.inputs.extend(clean_all_sys_input_srcs)
+            for output_name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):
                 # TODO why does this happen?
                 if isinstance(symbol, SymbolicArray):
                     symbol, expr = symbol[0], expr[0]
-                upsys.outputs[name] = (symbol + expr).expand()
+                if expr == 0:
+                    raise ValueError("null explicit system")
+                upsys.outputs[output_name] = (symbol + expr).expand()
 
         else:
             upsys = UpcycleImplicitSystem(syspath, upsolver)
-            upsys.inputs.extend(all_sys_input_srcs)
-            for name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):
+            upsys.inputs.extend(clean_all_sys_input_srcs)
+            for output_name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):
                 if isinstance(symbol, SymbolicArray):
                     symbol, expr = symbol[0], expr[0]
-                upsys.outputs[name] = expr
-                upsolver.solved_outputs.append(name)
+                upsys.outputs[output_name] = expr
+                # TODO: refactor, I think this only needs to happen b/c of reparenting
+                if output_name in upsolver.inputs:
+                    upsolver.inputs.remove(output_name)
 
             upsys.x0 = np.zeros(len(omsys._outputs))
             upsys.lbx = np.full_like(upsys.x0, -np.inf)
@@ -306,17 +404,17 @@ def upcycle_problem(make_problem):
 
                 count += size
 
-    func, f = get_nlp_for_solver(top_upsolver, prob)
+
+
+    func, f = get_nlp_for_solver(top_upsolver, prob, warm_start=warm_start)
 
     return func, prob
 
 
-def sanitize_solver_name(path):
-    return path.replace(".", "_")
 
 
 # solver dict of all child explicit system output exprs, keys are symbols
-def get_nlp_for_solver(upsolver, prob):
+def get_nlp_for_solver(upsolver, prob, warm_start=False):
     # upsolver is UpcycleSolver instance
     # prob is (root?) problem to get numeric values... can these get put in in the
     # upsolver and its children?
@@ -332,28 +430,36 @@ def get_nlp_for_solver(upsolver, prob):
     for child in upsolver.children:
 
         if isinstance(child, UpcycleExplicitSystem):
-            output_assignments.update({sym.Symbol(k): v for k, v in child.outputs.items()})
+            output_assignments.update({
+                sym.Symbol(k): v for k, v in child.outputs.items()
+            })
 
         elif isinstance(child, UpcycleSolver):
-            name = sanitize_solver_name(child.path)
+            # TODO: I'm sanitizing names too early -- can I go back to dummify but
+            # generate names of the form _dummy_<autonum>_<original var name>
+            # or even _z<autonum>_<...>
 
-            if name not in Solver.registry:
-                sub_nlp, sub_S, sub_kwargs = get_nlp_for_solver(child, prob)
-                Solver.registry[name] = make_solver_wrapper(sub_S, sub_kwargs)
+            sub_solver_name = sanitize_variable_name(child.path)
+
+            if sub_solver_name not in Solver.registry:
+                # TODO: this set of calls gets made at least once more? so refactor?
+                sub_nlp_args, sub_solver, sub_kwargs = get_nlp_for_solver(child, prob)
+                Solver.registry[sub_solver_name] = make_solver_wrapper(sub_solver, sub_kwargs)
 
             output_assignments.update({
                 tuple(
                     [sym.Symbol(k) for k in child.solved_outputs]
                     + [sym.Symbol(k) for k in child.outputs if k not in child.solved_outputs]
                 ) :
-                Solver(name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
+                Solver(sub_solver_name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
             })
 
-    s = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
+    residual_args = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
 
+    print(upsolver.path, '...', sep='')
     if upsolver.path == "" and len(upsolver.solved_outputs) == 0:
         exprs = [sym.Symbol(outp) for outp in upsolver.outputs]
-        cr, cs, f = sympy2casadi(exprs, s, output_assignments, False)
+        cr, cs, f = sympy2casadi(exprs, residual_args, output_assignments, False)
         func = casadi.Function("model", casadi.vertsplit(cs), cr)
         upsolver._set_run(func)
         return upsolver, prob
@@ -364,7 +470,7 @@ def get_nlp_for_solver(upsolver, prob):
         if isinstance(s, UpcycleImplicitSystem)
         for v in s.outputs.values()
     ]
-    cr, cs, f = sympy2casadi(implicit_residuals, s, output_assignments)
+    cr, cs, f = sympy2casadi(implicit_residuals, residual_args, output_assignments)
 
     cs_split = casadi.vertsplit(cs)
     x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
@@ -379,16 +485,20 @@ def get_nlp_for_solver(upsolver, prob):
     lbg = np.hstack([np.zeros_like(lbx), np.full(n_explicit, -np.inf)])
     ubg = np.hstack([np.zeros_like(ubx), np.full(n_explicit, np.inf)])
 
-    nlp = {"x": x, "p": p, "f": 0, "g": casadi.vertcat(*cr)}
+    nlp_args = {"x": x, "p": p, "f": 0, "g": casadi.vertcat(*cr)}
     opts =  {}
-    opts["ipopt.warm_start_init_point"] = "no"
-    S = casadi.nlpsol("S", "ipopt", nlp, opts)
+    opts["ipopt.warm_start_init_point"] = "yes" if warm_start else "no"
+    if upsolver.path:
+        solver_name = sanitize_variable_name(upsolver.path)
+    else:
+        solver_name = 'solver'
+    solver = casadi.nlpsol(solver_name, "ipopt", nlp_args, opts)
     kwargs = dict(x0=x0, p=p0, lbx=lbx, ubx=ubx, lbg=lbg, ubg=ubg)
     if upsolver.path == "":
-        upsolver._set_run(make_solver_wrapper(S, kwargs))
+        upsolver._set_run(make_solver_wrapper(solver, kwargs))
         return upsolver, prob
 
-    return nlp, S, kwargs
+    return nlp_args, solver, kwargs
 
 
 
@@ -488,10 +598,10 @@ def flatten_varnames(abs2meta, varpaths=None):
     names = []
     if varpaths is None:
         varpaths = abs2meta.keys()
+    # TODO: I want a list comprehension?
     for path in varpaths:
         names.extend(expand_varname(path, abs2meta[path]["size"]))
     return names
-
 
 def expand_varname(name, size=1):
     if size == 1:
@@ -501,10 +611,22 @@ def expand_varname(name, size=1):
             yield f"{name}[{i}]"
 
 
+def sanitize_variable_name(path):
+    # TODO: replace with regex, ensure no clashes?
+    return path.replace(".", "_dot_").replace(':', '_colon_')
+    return path.replace(".", "_").replace(':', '_')
+
+def sanitize_variable_names(paths):
+    return [ sanitize_variable_name(path) for path in paths ]
+
 _VARNAME_PATTERN = re.compile(r"(.*)\[(\d)+\]$")
 
+def contaminate_variable_name(clean_name):
+    return clean_name.replace('_dot_', '.').replace('_colon_', ':')
 
 def get_val(prob, name, **kwargs):
+    if NO_DUMMY: # re-contaminate variable names to interact with om
+        name = contaminate_variable_name(name)
     try:
         return prob.get_val(name, **kwargs)[0]
     except KeyError:
@@ -524,9 +646,10 @@ class SymbolicVector(DefaultVector):
     def _create_data(self):
         """Replace root Vector's ndarray allocation with SymbolicArray"""
         system = self._system()
-        names = []
         # om uses this and relies on ordering when building views, should be ok
         names = flatten_varnames(system._var_abs2meta[self._typ])
+        if NO_DUMMY:
+            names = sanitize_variable_names(names)
         syms = np.array([sym.Symbol(name) for name in names]).view(SymbolicArray)
         self.syms = syms
         return syms

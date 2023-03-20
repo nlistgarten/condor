@@ -33,3 +33,7 @@ print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=0., atol=1e-13)])
 print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-13, atol=0.)])
 
 
+cons_meta = prob.driver._cons
+obj_meta = prob.driver._objs
+dv_meta = prob.driver._designvars
+

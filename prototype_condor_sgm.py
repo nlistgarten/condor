@@ -217,6 +217,8 @@ class AircraftMission(SGM):
         update[mode] = rotation
 
     gear_retraction_altitude = parameter(50*ft) # default value??
+    # TODO: defaults should get added to input table along with bounds?
+    # this will be helpful for running specific problems
     class gear_retraction(Event):
         function = altitude - gear_retraction_altitude
         update[t_gear] = t
