@@ -216,10 +216,10 @@ class UpcycleSolver:
 
     def add_inputs(self, inputs):
         new_inputs = [ i for i in inputs 
-                       if i not in self.inputs and i not in self.solved_outputs]
+                       if i not in self.inputs and i not in self.implicit_outputs]
         if NO_DUMMY:
             new_inputs = [ i for i in sanitize_variable_names(inputs)
-                           if i not in self.inputs and i not in self.solved_outputs]
+                           if i not in self.inputs and i not in self.implicit_outputs]
         self.inputs.extend(new_inputs)
         if len(self.inputs) > len(set(self.inputs)):
             raise ValueError("duplicate input")
@@ -229,13 +229,13 @@ class UpcycleSolver:
         return [o for s in self.iter_systems() for o in s.outputs]
 
     @property
-    def solved_outputs(self):
+    def implicit_outputs(self):
         return [o for s in self.children
                 if isinstance(s, UpcycleImplicitSystem)
                 for o in s.outputs]
 
     @property
-    def computed_outputs(self):
+    def explicit_outputs(self):
         return [o for s in self.children
                 if not isinstance(s, UpcycleImplicitSystem)
                 for o in s.outputs]
@@ -273,7 +273,7 @@ def upcycle_problem(make_problem, warm_start=False):
             # special case: solver in the om system has nothing to solve
             # remove self from parent, re-parent children, propagate up inputs
             cyclic_io = set(upsolver.inputs) & set(upsolver.outputs)
-            if (len(upsolver.solved_outputs) == 0) or cyclic_io:
+            if (len(upsolver.implicit_outputs) == 0) or cyclic_io:
                 upsolver.parent.children.pop(-1)
 
                 for child in upsolver.children:
@@ -420,7 +420,7 @@ def get_nlp_for_solver(upsolver, prob, warm_start=False):
     # upsolver and its children?
 
     # if top solver
-    #   if there are constraints, add to solved_outputs, set appropriate bounds
+    #   if there are constraints, add to implicit_outputs, set appropriate bounds
     #   if there are design variables, update bounds on those inputs
     #   inputs that are not dvs need their value
     #   if any solved outputs or obective, return as nlpsolver
@@ -448,16 +448,16 @@ def get_nlp_for_solver(upsolver, prob, warm_start=False):
 
             output_assignments.update({
                 tuple(
-                    [sym.Symbol(k) for k in child.solved_outputs]
-                    + [sym.Symbol(k) for k in child.outputs if k not in child.solved_outputs]
+                    [sym.Symbol(k) for k in child.implicit_outputs]
+                    + [sym.Symbol(k) for k in child.outputs if k not in child.implicit_outputs]
                 ) :
                 Solver(sub_solver_name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
             })
 
-    residual_args = [sym.Symbol(s) for s in upsolver.solved_outputs + upsolver.inputs]
+    residual_args = [sym.Symbol(s) for s in upsolver.implicit_outputs + upsolver.inputs]
 
     print(upsolver.path, '...', sep='')
-    if upsolver.path == "" and len(upsolver.solved_outputs) == 0:
+    if upsolver.path == "" and len(upsolver.implicit_outputs) == 0:
         exprs = [sym.Symbol(outp) for outp in upsolver.outputs]
         cr, cs, f = sympy2casadi(exprs, residual_args, output_assignments, False)
         func = casadi.Function("model", casadi.vertsplit(cs), cr)
@@ -473,10 +473,10 @@ def get_nlp_for_solver(upsolver, prob, warm_start=False):
     cr, cs, f = sympy2casadi(implicit_residuals, residual_args, output_assignments)
 
     cs_split = casadi.vertsplit(cs)
-    x = casadi.vertcat(*cs_split[:len(upsolver.solved_outputs)])
-    p = casadi.vertcat(*cs_split[len(upsolver.solved_outputs):])
+    x = casadi.vertcat(*cs_split[:len(upsolver.implicit_outputs)])
+    p = casadi.vertcat(*cs_split[len(upsolver.implicit_outputs):])
 
-    x0 = np.hstack([get_val(prob, absname) for absname in upsolver.solved_outputs])
+    x0 = np.hstack([get_val(prob, absname) for absname in upsolver.implicit_outputs])
     p0 = np.hstack([get_val(prob, absname) for absname in upsolver.inputs])
     lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
     ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
