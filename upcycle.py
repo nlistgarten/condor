@@ -151,9 +151,8 @@ def extract_problem_data(prob):
 
 class UpcycleSystem:
 
-    def __init__(self, path, solver):
+    def __init__(self, path, parent):
         self.path = path
-        self.solver = solver
 
         # external inputs
         self.inputs = []
@@ -164,20 +163,21 @@ class UpcycleSystem:
 
         # output name -> output symbol
         self.out_syms = {}
+        self.parent = parent
 
-        self.solver = solver
-        self.solver.children.append(self)
+        self.output_symbols = {}
 
     def __repr__(self):
         return self.path
 
-
-class UpcycleExplicitSystem(UpcycleSystem):
-    pass
-
-
 class UpcycleImplicitSystem(UpcycleSystem):
     pass
+
+class UpcycleExplicitSystem(UpcycleSystem):
+    def to_implicit(self):
+        self.__class__ =  UpcycleImplicitSystem
+        for output in self.outputs:
+            self.outputs[output] = self.outputs[output] - self.output_symbols[output]
 
 
 class UpcycleSolver:
@@ -192,8 +192,6 @@ class UpcycleSolver:
         self.internal_loop = False
 
         self.children = []
-        if parent is not None:
-            self.parent.children.append(self)
 
     def __repr__(self):
         return self.path
@@ -214,18 +212,56 @@ class UpcycleSolver:
             else:
                 yield child
 
+    def add_child(self, child):
+        child.parent = self
+        # explicit/implicit systems have solvers not parents, unless they get reparented? 
+        # was that causing problems?
+
+        if self.internal_loop and isinstance(child, UpcycleExplicitSystem):
+            child.to_implicit()
+
+        for input_ in child.inputs:
+            if input_ not in self.inputs and input_ not in self.outputs:
+                self.inputs.append(input_)
+
+        for output in child.outputs:
+            if output in self.inputs:
+                if not isinstance(child, UpcycleImplicitSystem):
+                    self.internal_loop = True
+
+                    if isinstance(child, UpcycleExplicitSystem):
+                    # only the last explicit system should get turned into an implicit
+                    # system? or go-back and turn all children into implicit?
+                        child.to_implicit()
+                        for sibling in self.children:
+                            if isinstance(sibling, UpcycleExplicitSystem):
+                                sibling.to_implicit()
+                    else:
+                        # Upsolver -- this shouldn't happen, especially with cyclic io
+                        # check
+                        breakpoint()
+
+                self.inputs.remove(output)
+            if output in self.outputs:
+                breakpoint() # conflicting outputs
+
+        self.children.append(child)
+
     def add_inputs(self, inputs):
-        new_inputs = [ i for i in inputs 
-                       if i not in self.inputs and i not in self.implicit_outputs]
-        if NO_DUMMY:
-            new_inputs = [ i for i in sanitize_variable_names(inputs)
-                           if i not in self.inputs and i not in self.implicit_outputs]
-        self.inputs.extend(new_inputs)
-        if len(self.inputs) > len(set(self.inputs)):
-            raise ValueError("duplicate input")
+        for input_ in inputs:
+            if input_ in self.outputs:
+                # shouldn't happen if this is only getting called for ivcs?
+                breakpoint()
+
+            if input_ not in self.inputs:
+                self.inputs.append(input_)
+
 
     @property
     def outputs(self):
+        # I think since each solver has its childrens output, we dont need to recurse
+        # again
+        return [o for s in self.children for o in s.outputs]
         return [o for s in self.iter_systems() for o in s.outputs]
 
     @property
@@ -237,7 +273,7 @@ class UpcycleSolver:
     @property
     def explicit_outputs(self):
         return [o for s in self.children
-                if not isinstance(s, UpcycleImplicitSystem)
+                if not isinstance(s, UpcycleImplicitSystem) # solvers or explicit
                 for o in s.outputs]
 
     def _set_run(self, func):
@@ -273,18 +309,17 @@ def upcycle_problem(make_problem, warm_start=False):
             # special case: solver in the om system has nothing to solve
             # remove self from parent, re-parent children, propagate up inputs
             cyclic_io = set(upsolver.inputs) & set(upsolver.outputs)
+            #I don't think cyclic_io should happen anymore?
+            if cyclic_io:
+                breakpoint()
             if (len(upsolver.implicit_outputs) == 0) or cyclic_io:
-                upsolver.parent.children.pop(-1)
 
                 for child in upsolver.children:
-                    child.parent = upsolver.parent
-                    upsolver.parent.children.append(child)
+                    upsolver.parent.add_child(child)
 
-                upsolver.parent.add_inputs(upsolver.inputs)
+            else:
+                upsolver.parent.add_child(upsolver)
 
-            # propagate inputs external to self up to parent
-            all_inputs, ext_mask = get_sources(conn_df, upsolver.path, upsolver.parent.path)
-            upsolver.parent.add_inputs(all_inputs[ext_mask].unique())
             upsolver = upsolver.parent
 
         nls = omsys.nonlinear_solver
@@ -313,7 +348,8 @@ def upcycle_problem(make_problem, warm_start=False):
         sys_input_srcs, ext_mask = get_sources(conn_df, syspath, upsolver.path)
         all_sys_input_srcs = flatten_varnames(prob.model._var_abs2meta["output"], sys_input_srcs)
         ext_sys_input_srcs = flatten_varnames(prob.model._var_abs2meta["output"], sys_input_srcs[ext_mask])
-        upsolver.add_inputs(ext_sys_input_srcs)
+
+        #upsolver.add_inputs(ext_sys_input_srcs)
 
         out_meta = omsys._var_abs2meta["output"]
         all_outputs = flatten_varnames(out_meta)
@@ -326,43 +362,6 @@ def upcycle_problem(make_problem, warm_start=False):
         else:
             clean_all_sys_input_srcs = all_sys_input_srcs
 
-        if not upsolver.internal_loop:
-
-            if NO_DUMMY:
-                possible_loop_inputs = set(clean_all_sys_input_srcs).difference(set(upsolver.inputs) | set(upsolver.outputs))
-                possible_loop_siblings = {input_name.replace(
-                        upsolver.path + '.' if upsolver.path != '' else '', ''
-                    ).split('.')[0]
-
-                    for input_name in all_sys_input_srcs
-                    if sanitize_variable_name(input_name) in possible_loop_inputs
-                }
-            else:
-                possible_loop_inputs = set(all_sys_input_srcs).difference(set(upsolver.inputs) | set(upsolver.outputs))
-                possible_loop_siblings = {input_name.replace(
-                        upsolver.path + '.' if upsolver.path != '' else '', ''
-                    ).split('.')[0]
-
-                    for input_name in possible_loop_inputs
-                }
-
-            for local_sibling_source_name in possible_loop_siblings:
-                om_sibling_source = getattr(
-                    upsolver.om_equiv, local_sibling_source_name
-                )
-                # catch algebraic loops -- not a loop if source is an implicit component
-                # or a group without a solver
-
-                if not isinstance(om_sibling_source, om.ImplicitComponent):
-                    if isinstance(om_sibling_source, om.Group):
-                        # DESIGN.compressor didn't have a solver?
-                        nls = getattr(om_sibling_source, 'solver', None)
-                        nls = getattr(nls, 'nonlinear_solver', None)
-                        if nls is None or isinstance(nls, om.NonlinearRunOnce):
-                            continue
-                    upsolver.internal_loop = True
-                    break
-
 
         if isinstance(omsys, om.ExplicitComponent) and not upsolver.internal_loop:
             upsys = UpcycleExplicitSystem(syspath, upsolver)
@@ -373,6 +372,7 @@ def upcycle_problem(make_problem, warm_start=False):
                     symbol, expr = symbol[0], expr[0]
                 if expr == 0:
                     raise ValueError("null explicit system")
+                upsys.output_symbols[output_name] = symbol
                 upsys.outputs[output_name] = (symbol + expr).expand()
 
         else:
@@ -381,28 +381,28 @@ def upcycle_problem(make_problem, warm_start=False):
             for output_name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):
                 if isinstance(symbol, SymbolicArray):
                     symbol, expr = symbol[0], expr[0]
+                upsys.output_symbols[output_name] = symbol
                 upsys.outputs[output_name] = expr
-                # TODO: refactor, I think this only needs to happen b/c of reparenting
-                if output_name in upsolver.inputs:
-                    upsolver.inputs.remove(output_name)
 
-            upsys.x0 = np.zeros(len(omsys._outputs))
-            upsys.lbx = np.full_like(upsys.x0, -np.inf)
-            upsys.ubx = np.full_like(upsys.x0, np.inf)
-            count = 0
-            for absname, meta in out_meta.items():
-                size = meta["size"]
+        upsys.x0 = np.zeros(len(omsys._outputs))
+        upsys.lbx = np.full_like(upsys.x0, -np.inf)
+        upsys.ubx = np.full_like(upsys.x0, np.inf)
+        count = 0
+        for absname, meta in out_meta.items():
+            size = meta["size"]
 
-                upsys.x0[count : count + size] = prob.model._outputs[absname].flatten()
+            upsys.x0[count : count + size] = prob.model._outputs[absname].flatten()
 
-                lb = meta["lower"]
-                ub = meta["upper"]
-                if lb is not None:
-                    upsys.lbx[count : count + size] = lb
-                if ub is not None:
-                    upsys.ubx[count : count + size] = ub
+            lb = meta["lower"]
+            ub = meta["upper"]
+            if lb is not None:
+                upsys.lbx[count : count + size] = lb
+            if ub is not None:
+                upsys.ubx[count : count + size] = ub
 
-                count += size
+            count += size
+
+        upsolver.add_child(upsys)
 
 
 
