@@ -246,6 +246,43 @@ def sympy2casadi(
     return out, ca_vars, f
 
 
+class CasadiFunctionCallback(casadi.Callback):
+    """Base class for wrapping a Function with a Callback"""
+
+    def __init__(self, func, opts={}):
+        casadi.Callback.__init__(self)
+        self.func = func
+        self.construct(func.name(), opts)
+
+    def init(self):
+        pass
+
+    def finalize(self):
+        pass
+
+    def get_n_in(self):
+        return self.func.n_in()
+
+    def get_n_out(self):
+        return self.func.n_out()
+
+    def eval(self, args):
+        out = self.func(*args)
+        return [out] if self.func.n_out() == 1 else out
+
+    def get_sparsity_in(self, i):
+        return self.func.sparsity_in(i)
+
+    def get_sparsity_out(self, i):
+        return self.func.sparsity_out(i)
+
+    def has_jacobian(self):
+        return True
+
+    def get_jacobian(self, name, inames, onames, opts):
+        return self.func.jacobian()
+
+
 def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):
     sym_ufunc = getattr(sym, ufunc.__name__, None)
     if sym_ufunc is not None:
