@@ -251,6 +251,7 @@ def upcycle_problem(make_problem, warm_start=False):
             if cyclic_io:
                 breakpoint()
             if (len(upsolver.implicit_outputs) == 0) or cyclic_io:
+                # TODO: delete cyclic?
 
                 for child in upsolver.children:
                     upsolver.parent.add_child(child)
@@ -278,6 +279,7 @@ def upcycle_problem(make_problem, warm_start=False):
                 warnings.warn("IVC not under top level model. Adding " +
                               "\n".join(flat_varnames) + " to " + upsolver.path 
                               + " as well as top level.")
+                # TODO: maybe don't need this with add_child
                 top_upsolver.add_inputs(flat_varnames)
             upsolver.add_inputs(flat_varnames)
             continue
@@ -400,7 +402,6 @@ def get_nlp_for_solver(upsolver, prob, warm_start=False):
         exprs = [sym.Symbol(outp) for outp in upsolver.outputs]
         cr, cs, f = sympy2casadi(exprs, residual_args, output_assignments, False)
         func = casadi.Function("model", casadi.vertsplit(cs), cr)
-        upsolver._set_run(func)
         upsolver.casadi_imp = func
         return upsolver
 
