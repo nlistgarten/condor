@@ -36,3 +36,16 @@ def test_callback_1to1():
     out = cf(2)
 
     assert out == 4
+
+
+def test_callback():
+    x = casadi.SX.sym("x", 3)
+    f = casadi.Function("f", [x], [x**2])
+    cf = CasadiFunctionCallback(f)
+    print(cf.get_sparsity_in(0))
+
+    out = cf([1, 2, 3])
+
+    assert out[0] == 1
+    assert out[1] == 4
+    assert out[2] == 9

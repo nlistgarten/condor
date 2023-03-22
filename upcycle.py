@@ -189,37 +189,16 @@ class UpcycleSolver:
         self.run = wrapper
 
 
-    def __call__(self, *args):
-        nx = len(self.implicit_outputs)
+    def __call__(self, args):
         if self.implicit_outputs:
-
-
-            kwargs = dict(
-                x0=self.x0, lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
-            )
-            do_cache = False
-            if isinstance(args[0], list) and isinstance(args[0][0], (casadi.MX, casadi.SX)):
-                kwargs["p"] = casadi.vertcat(*args[0])
+            if isinstance(args, list) and isinstance(args[0], (casadi.MX, casadi.SX)):
+                out = self.casadi_imp(casadi.vertcat(*args))
+                return casadi.vertsplit(out)
             else:
-                do_cache = True
-                # not just for symbolic
-                kwargs["p"] = np.array(args)
-
-            nlp_out = self.casadi_imp(**kwargs)
-
-            # TODO: is this cached based on "p"? then x0 in kwargs reads from cache?
-            if do_cache:
-                print("CACHING")
-                self.x0[:] = nlp_out["x"].toarray().squeeze()
-                return np.concatenate([
-                    nlp_out["x"].toarray().squeeze(),
-                    nlp_out["g"].toarray().squeeze()[nx:]
-                ])
-
-            return casadi.vertsplit(nlp_out["x"]) + casadi.vertsplit(nlp_out["g"][nx:])
+                out = self.casadi_imp(args)
+                return np.array(out).squeeze()
         else:
             return np.array(self.casadi_imp(*args)).squeeze()
-
 
 
 def get_sources(conn_df, sys_path, parent_path):
@@ -442,9 +421,69 @@ def get_nlp_for_solver(upsolver, prob, warm_start=False):
         upsolver._set_run(make_solver_wrapper(solver, kwargs))
         return upsolver, prob
 
-    upsolver.casadi_imp = casadi.nlpsol(solver_name, "ipopt", nlp_args, opts)
+    nlp = casadi.nlpsol(solver_name, "ipopt", nlp_args, opts)
+    upsolver.casadi_imp = SolverWithWarmStart(
+        nlp,
+        upsolver.x0,
+        upsolver.p0,
+        upsolver.lbx,
+        upsolver.ubx,
+        upsolver.lbg,
+        upsolver.ubg,
+    )
     return upsolver
 
+
+class SolverWithWarmStart(casadi.Callback):
+
+    def __init__(self, solver, x0, p0, lbx, ubx, lbg, ubg):
+        super().__init__()
+        self.solver = solver
+        self.x0 = x0
+        self.p0 = p0
+        self.lbx = lbx
+        self.ubx = ubx
+        self.lbg = lbg
+        self.ubg = ubg
+        self.construct(solver.name(), {})
+
+    @property
+    def nx(self):
+        return len(self.lbx)
+
+    @property
+    def np(self):
+        return len(self.p0)
+
+    def get_n_in(self):
+        # p
+        return 1
+
+    def get_n_out(self):
+        # stacked implicit out, explicit out
+        return 1
+
+    def get_sparsity_in(self, i):
+        return casadi.Sparsity.dense(self.np, 1)
+
+    def get_sparsity_out(self, i):
+        return casadi.Sparsity.dense(len(self.lbg), 1)
+
+    # def get_jacobian(self, *args):
+    #     out = {f"out_{k}": v for k, v in self.solver_out.items()}
+    #     jac_expr = self.solver.jacobian()(**self.solver_in, **out)
+    #     return casadi.Function("jac", [self.stored_inputs["p"]], [jac_expr])
+
+    def eval(self, args):
+        solver_in = self.solver_in = dict(
+            x0=self.x0, p=args[0], lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
+        )
+        solver_out = self.solver_out = self.solver(**solver_in)
+        self.x0 = solver_out["x"]
+        return [np.concatenate([
+            solver_out["x"].toarray().reshape(-1),
+            solver_out["g"].toarray().reshape(-1)[self.nx:]
+        ])]
 
 
 orig_add_balance = BalanceComp.add_balance

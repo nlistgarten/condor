@@ -122,7 +122,7 @@ def make_problem():
 upsolver, prob = upcycle.upcycle_problem(make_problem, warm_start=True)
 
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
-out = upsolver.run(*inputs)
+out = upsolver(inputs)
 print(out)
 
 prob.run_model()

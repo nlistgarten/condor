@@ -105,7 +105,7 @@ def make_problem():
 upsolver, prob = upcycle.upcycle_problem(make_problem)
 
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
-out = upsolver(*inputs)
+out = upsolver(inputs)
 print(out)
 
 prob.set_solver_print(-1)
