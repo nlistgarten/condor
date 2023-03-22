@@ -11,11 +11,13 @@ from om_sellar_implicit import make_sellar_problem
 
 os.environ["OPENMDAO_REPORTS"] = "none"
 
-upsolver, prob = upcycle.upcycle_problem(make_sellar_problem)
+updriver, prob = upcycle.upcycle_problem(make_sellar_problem)
 
+### Check run_model
+upsolver = updriver.children[0]
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
-out = upsolver(*inputs)
-print(out)
+out = upsolver(inputs)[0]
+
 
 prob.set_solver_print(-1)
 prob.run_model()
@@ -32,6 +34,9 @@ df = pd.DataFrame(vals, columns=cols)
 print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=0., atol=1e-13)])
 print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-13, atol=0.)])
 
+inputs = np.hstack([upcycle.get_val(prob, absname) for absname in updriver.inputs])
+out = updriver(inputs)
+print(out)
 
 cons_meta = prob.driver._cons
 obj_meta = prob.driver._objs

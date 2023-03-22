@@ -192,22 +192,41 @@ class UpcycleSolver:
 
 
     def __call__(self, args):
-        if self.implicit_outputs:
-            solver_out = self.casadi_imp(
-                x0=self.x0, p=args[0], lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
-            )
-            return [np.concatenate([
-                solver_out["x"].toarray().reshape(-1),
-                solver_out["g"].toarray().reshape(-1)[len(self.ubx):]
-            ])]
+        is_casadi_symbolic = isinstance(args, list) and isinstance(args[0], (casadi.MX, casadi.SX))
 
-            if isinstance(args, list) and isinstance(args[0], (casadi.MX, casadi.SX)):
-                out = self.casadi_imp(casadi.vertcat(*args))
-                return casadi.vertsplit(out)
-            else:
-                out = self.casadi_imp(args)
-                return np.array(out).squeeze()
-        else:
+        if str(self.casadi_imp).endswith('IpoptInterface'): # no wrapper
+
+            if self.implicit_outputs: # rootfinder, no wrapper
+                if is_casadi_symbolic:
+                    solver_out = self.casadi_imp(
+                        x0=self.x0, p=casadi.vertcat(*args), lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
+                    )
+                    return casadi.vertsplit(solver_out["x"]) + casadi.vertsplit(solver_out["g"][len(self.ubx):])
+
+                solver_out = self.casadi_imp(
+                    x0=self.x0, p=args, lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
+                )
+                return [np.concatenate([
+                    solver_out["x"].toarray().reshape(-1),
+                    solver_out["g"].toarray().reshape(-1)[len(self.ubx):]
+                ])]
+            else: # optimizer, no wrapper -- always numeric? for now...
+                return self.casadi_imp(
+                    x0=args[self.design_var_indices],
+                    p=args[self.parameter_indices],
+                    lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
+                )
+
+        elif str(self.casadi_imp).endswith('CallbackInternal'): # SolverWithWarmstart
+            if self.implicit_outputs:
+                if is_casadi_symbolic:
+                    out = self.casadi_imp(casadi.vertcat(*args))
+                    return casadi.vertsplit(out)
+                else:
+                    out = self.casadi_imp(args)
+                    return np.array(out).squeeze()
+
+        else: # a function,
             return np.array(self.casadi_imp(*args)).squeeze()
 
 
@@ -334,7 +353,7 @@ def upcycle_problem(make_problem, warm_start=False):
 
     upsolver = get_nlp_for_rootfinder(top_upsolver, prob, warm_start=warm_start)
 
-    if prob.driver._objs:
+    if prob.driver._objs:# and False:
         updriver = UpcycleSolver(path="optimizer")
         updriver.add_child(upsolver)
         updriver = get_nlp_for_optimizer(updriver, prob)
@@ -421,7 +440,7 @@ def get_nlp_for_optimizer(upsolver, prob):
 
     upsolver.casadi_imp = out
 
-    return upsolver, prob
+    return upsolver
 
 
 # solver dict of all child explicit system output exprs, keys are symbols

@@ -102,11 +102,12 @@ def make_problem():
 
     return prob
 
-upsolver, prob = upcycle.upcycle_problem(make_problem)
+updriver, prob = upcycle.upcycle_problem(make_problem)
 
+### Check run_model
+upsolver = updriver.children[0]
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
-out = upsolver(inputs)
-print(out)
+out = upsolver(inputs)[0]
 
 prob.set_solver_print(-1)
 prob.run_model()
@@ -124,9 +125,12 @@ print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=0., atol=1e-9)])
 print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-10, atol=0.)])
 
 
+### check optimizer
 
+inputs = np.hstack([upcycle.get_val(prob, absname) for absname in updriver.inputs])
+out = updriver(inputs)
+print(out)
 
-prob.run_model()
 
 prob.set_solver_print(level=0)
 
