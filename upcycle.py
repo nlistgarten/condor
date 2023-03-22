@@ -103,6 +103,8 @@ class UpcycleSolver:
         self.children = []
 
     def __repr__(self):
+        if self.path == "":
+            return "root"
         return self.path
 
     def iter_solvers(self, include_self=True):
@@ -191,6 +193,14 @@ class UpcycleSolver:
 
     def __call__(self, args):
         if self.implicit_outputs:
+            solver_out = self.casadi_imp(
+                x0=self.x0, p=args[0], lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
+            )
+            return [np.concatenate([
+                solver_out["x"].toarray().reshape(-1),
+                solver_out["g"].toarray().reshape(-1)[len(self.ubx):]
+            ])]
+
             if isinstance(args, list) and isinstance(args[0], (casadi.MX, casadi.SX)):
                 out = self.casadi_imp(casadi.vertcat(*args))
                 return casadi.vertsplit(out)
@@ -322,17 +332,100 @@ def upcycle_problem(make_problem, warm_start=False):
 
         upsolver.add_child(upsys)
 
+    upsolver = get_nlp_for_rootfinder(top_upsolver, prob, warm_start=warm_start)
+
+    if prob.driver._objs:
+        updriver = UpcycleSolver(path="optimizer")
+        updriver.add_child(upsolver)
+        updriver = get_nlp_for_optimizer(updriver, prob)
+        return updriver, prob
+    else:
+        return upsolver, prob
 
 
-    func = get_nlp_for_solver(top_upsolver, prob, warm_start=warm_start)
+def get_nlp_for_optimizer(upsolver, prob):
+    output_assignments = {}
+    for child in upsolver.children:
 
-    return func, prob
+        if isinstance(child, UpcycleExplicitSystem):
+            output_assignments.update({
+                sym.Symbol(k): v for k, v in child.outputs.items()
+            })
 
+        elif isinstance(child, UpcycleSolver):
 
+            sub_solver_name = sanitize_variable_name(repr(child))
+
+            if sub_solver_name not in Solver.registry:
+                # TODO: this set of calls gets made at least once more? so refactor?
+                # TODO: should this get done at the bottom?
+                sub_solver = get_nlp_for_rootfinder(child, prob)
+                Solver.registry[sub_solver_name] = sub_solver
+
+            output_assignments.update({
+                tuple(
+                    [sym.Symbol(k) for k in child.implicit_outputs]
+                    + [sym.Symbol(k) for k in child.outputs if k not in child.implicit_outputs]
+                ) :
+                Solver(sub_solver_name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
+            })
+
+    inputs = [sym.Symbol(s) for s in upsolver.inputs]
+
+    exprs = [sym.Symbol(outp) for outp in upsolver.outputs]
+    cr, cs, f = sympy2casadi(exprs, inputs, output_assignments, False)
+
+    cons_meta = prob.driver._cons
+    obj_meta = prob.driver._objs
+    dv_meta = prob.driver._designvars
+
+    upsolver.lbg = np.full(len(upsolver.outputs), -np.inf)
+    upsolver.ubg = np.full(len(upsolver.outputs), np.inf)
+
+    idx_obj = upsolver.outputs.index(sanitize_variable_name(list(obj_meta.keys())[0]))
+
+    for name, meta in cons_meta.items():
+        if meta["size"] != 1:
+            raise NotImplementedError(f"Constraint {name} has size > 1")
+
+        idx = upsolver.outputs.index(sanitize_variable_name(name))
+        upsolver.lbg[idx] = meta["lower"]
+        upsolver.ubg[idx] = meta["upper"]
+
+    upsolver.lbx = []
+    upsolver.ubx = []
+    upsolver.x0 = []
+    upsolver.design_var_indices = []
+    for tgtname, meta in dv_meta.items():
+        srcname = meta["source"]
+        for srcname_expanded in expand_varname(srcname, meta["size"]):
+            idx = upsolver.inputs.index(sanitize_variable_name(srcname_expanded))
+            upsolver.lbx.append(meta["lower"])
+            upsolver.ubx.append(meta["upper"])
+            upsolver.x0.append(get_val(prob, srcname_expanded, sanitized=False))
+            upsolver.design_var_indices.append(idx)
+
+    upsolver.p0 = []
+    upsolver.parameter_indices = []
+    for i, name in enumerate(upsolver.inputs):
+        if i not in upsolver.design_var_indices:
+            upsolver.p0.append(get_val(prob, name))
+            upsolver.parameter_indices.append(i)
+
+    x = casadi.vertcat(*[cs[i] for i in upsolver.design_var_indices])
+    p = casadi.vertcat(*[cs[i] for i in upsolver.parameter_indices])
+    f = cr[idx_obj]
+    nlp_args = {"x": x, "p": p, "f": f, "g": casadi.vertcat(*cr)}
+    opts = {}
+    out = casadi.nlpsol("optimizer", "ipopt", nlp_args, opts)
+
+    upsolver.casadi_imp = out
+
+    return upsolver, prob
 
 
 # solver dict of all child explicit system output exprs, keys are symbols
-def get_nlp_for_solver(upsolver, prob, warm_start=False):
+def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
     # TODO: this is really a method on UpcycleSolver,
     # this is creating a casadi numerical implementation
 
@@ -363,7 +456,7 @@ def get_nlp_for_solver(upsolver, prob, warm_start=False):
             if sub_solver_name not in Solver.registry:
                 # TODO: this set of calls gets made at least once more? so refactor?
                 # TODO: should this get done at the bottom?
-                sub_solver = get_nlp_for_solver(child, prob)
+                sub_solver = get_nlp_for_rootfinder(child, prob)
                 Solver.registry[sub_solver_name] = sub_solver
 
             output_assignments.update({
@@ -417,10 +510,6 @@ def get_nlp_for_solver(upsolver, prob, warm_start=False):
     else:
         solver_name = 'solver'
 
-    if upsolver.path == "" and False: # TODO: shouldn't be necessary anymore?
-        upsolver._set_run(make_solver_wrapper(solver, kwargs))
-        return upsolver, prob
-
     nlp = casadi.nlpsol(solver_name, "ipopt", nlp_args, opts)
     upsolver.casadi_imp = SolverWithWarmStart(
         nlp,
@@ -431,6 +520,7 @@ def get_nlp_for_solver(upsolver, prob, warm_start=False):
         upsolver.lbg,
         upsolver.ubg,
     )
+    upsolver.casadi_imp = nlp
     return upsolver
 
 
@@ -587,8 +677,8 @@ _VARNAME_PATTERN = re.compile(r"(.*)\[(\d)+\]$")
 def contaminate_variable_name(clean_name):
     return clean_name.replace('_dot_', '.').replace('_colon_', ':')
 
-def get_val(prob, name, **kwargs):
-    if NO_DUMMY: # re-contaminate variable names to interact with om
+def get_val(prob, name, sanitized=True, **kwargs):
+    if sanitized and NO_DUMMY: # re-contaminate variable names to interact with om
         name = contaminate_variable_name(name)
     try:
         return prob.get_val(name, **kwargs)[0]
