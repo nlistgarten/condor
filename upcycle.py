@@ -191,8 +191,8 @@ class UpcycleSolver:
         self.run = wrapper
 
 
-    def __call__(self, args):
-        is_casadi_symbolic = isinstance(args, list) and isinstance(args[0], (casadi.MX, casadi.SX))
+    def __call__(self, *args):
+        is_casadi_symbolic = isinstance(args, (list, tuple)) and isinstance(args[0], (casadi.MX, casadi.SX))
 
         if str(self.casadi_imp).endswith('IpoptInterface') or str(self.casadi_imp).endswith('Qrsqp'): # no wrapper
 
@@ -220,14 +220,15 @@ class UpcycleSolver:
         elif str(self.casadi_imp).endswith('CallbackInternal'): # SolverWithWarmstart
             if self.implicit_outputs:
                 if is_casadi_symbolic:
-                    out = self.casadi_imp(casadi.vertcat(*args))
-                    return casadi.vertsplit(out)
+                    out = self.casadi_imp(*args)
+                    return out
+                    #return casadi.vertsplit(out)
                 else:
-                    out = self.casadi_imp(args)
+                    out = self.casadi_imp(*args)
                     return np.array(out).squeeze()
 
         else: # a function,
-            return np.array(self.casadi_imp(*args)).squeeze()
+            return self.casadi_imp(*args)
 
 
 def get_sources(conn_df, sys_path, parent_path):
@@ -386,7 +387,12 @@ def get_nlp_for_optimizer(upsolver, prob):
                     [sym.Symbol(k) for k in child.implicit_outputs]
                     + [sym.Symbol(k) for k in child.outputs if k not in child.implicit_outputs]
                 ) :
-                Solver(sub_solver_name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
+                Solver(sub_solver_name)(
+                    #sym.Array(
+                    *tuple(
+                        [ sym.Symbol(k) for k in child.inputs]
+                    )
+                )
             })
 
     inputs = [sym.Symbol(s) for s in upsolver.inputs]
@@ -483,8 +489,14 @@ def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
                     [sym.Symbol(k) for k in child.implicit_outputs]
                     + [sym.Symbol(k) for k in child.outputs if k not in child.implicit_outputs]
                 ) :
-                Solver(sub_solver_name)(sym.Array([sym.Symbol(k) for k in child.inputs]))
+                Solver(sub_solver_name)(
+                    #sym.Array(
+                    *tuple(
+                        [ sym.Symbol(k) for k in child.inputs]
+                    )
+                )
             })
+
 
     residual_args = [sym.Symbol(s) for s in upsolver.implicit_outputs + upsolver.inputs]
 
@@ -523,6 +535,7 @@ def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
     nlp_args = {"x": x, "p": p, "f": 0, "g": casadi.vertcat(*cr)}
     opts =  {}
     #opts["qpsol.error_on_fail"] = "False"
+    opts["error_on_fail"] = False
     #opts["ipopt.warm_start_init_point"] = "yes" if warm_start else "no"
     #opts["ipopt.max_iter"] = 100
     if upsolver.path:
@@ -530,17 +543,9 @@ def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
     else:
         solver_name = 'solver'
 
-    nlp = casadi.nlpsol(
+    nlp = upsolver.casadi_imp = SolverWithWarmStart(
         solver_name,
-
-        "qrsqp",
-        #"ipopt",
-
         nlp_args,
-        opts
-    )
-    upsolver.casadi_imp = SolverWithWarmStart(
-        nlp,
         upsolver.x0,
         upsolver.p0,
         upsolver.lbx,
@@ -548,55 +553,104 @@ def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
         upsolver.lbg,
         upsolver.ubg,
     )
-    upsolver.casadi_imp = nlp
     return upsolver
 
+class CasadiFunctionCallbackMixin:
+    def get_n_in(self):
+        return self.func.n_in()
 
-class SolverWithWarmStart(casadi.Callback):
+    def get_n_out(self):
+        return self.func.n_out()
 
-    def __init__(self, solver, x0, p0, lbx, ubx, lbg, ubg):
+    def get_sparsity_in(self, i):
+        return self.func.sparsity_in(i)
+
+    def get_sparsity_out(self, i):
+        return self.func.sparsity_out(i)
+
+
+class SolverWithWarmStartHess(CasadiFunctionCallbackMixin, casadi.Callback):
+    def __init__(self, name, parent):
         super().__init__()
-        self.solver = solver
+        self.name = name
+        self.parent = parent
+        self.func = parent.func.jacobian()
+        self.construct(name, {})
+
+    def eval(self, args):
+        breakpoint()
+
+class SolverWithWarmStartJac(CasadiFunctionCallbackMixin, casadi.Callback):
+    def __init__(self, name, parent):
+        super().__init__()
+        self.name = name
+        self.parent = parent
+        self.func = parent.func.jacobian()
+        self.construct(name, {})
+
+    def has_jacobian(self):
+        return True
+
+    def get_jacobian(self, name, inames, onames, opts):
+        return SolverWithWarmStartHess(name, self)
+
+    def eval(self, args):
+        breakpoint()
+
+class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
+
+    def __init__(self, name, nlp_args, x0, p0, lbx, ubx, lbg, ubg):
+        super().__init__()
+        self.nlp_args = nlp_args
+        self.name = name
+        ipopt_opts = {}
+
+        self.ipopt = casadi.nlpsol(
+            name+'_ipopt',
+            "ipopt",
+            nlp_args,
+            ipopt_opts
+        )
+        qrsqp_opts = {}
+        self.qrsqp = casadi.nlpsol(
+            name+'_qrsqp',
+            "qrsqp",
+            nlp_args,
+            qrsqp_opts
+        )
+
         self.x0 = x0
         self.p0 = p0
         self.lbx = lbx
         self.ubx = ubx
         self.lbg = lbg
         self.ubg = ubg
-        self.construct(solver.name(), {})
+        self.nx = len(x0)
+        self.np = len(p0)
 
-    @property
-    def nx(self):
-        return len(self.lbx)
+        solver_in = self.solver_in = dict(
+            x0=self.x0, p=nlp_args["p"], lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
+        )
+        solver_out = self.ipopt(**solver_in)
+        self.func = casadi.Function(name+"_placeholder",
+            casadi.vertsplit(nlp_args["p"]),
+            casadi.vertsplit(solver_out["x"]) + casadi.vertsplit(solver_out["g"][len(self.ubx):]),
+        )
 
-    @property
-    def np(self):
-        return len(self.p0)
 
-    def get_n_in(self):
-        # p
-        return 1
+        self.construct(name, {})
 
-    def get_n_out(self):
-        # stacked implicit out, explicit out
-        return 1
+    def has_jacobian(self):
+        return True
 
-    def get_sparsity_in(self, i):
-        return casadi.Sparsity.dense(self.np, 1)
-
-    def get_sparsity_out(self, i):
-        return casadi.Sparsity.dense(len(self.lbg), 1)
-
-    # def get_jacobian(self, *args):
-    #     out = {f"out_{k}": v for k, v in self.solver_out.items()}
-    #     jac_expr = self.solver.jacobian()(**self.solver_in, **out)
-    #     return casadi.Function("jac", [self.stored_inputs["p"]], [jac_expr])
+    def get_jacobian(self, name, inames, onames, opts):
+         return SolverWithWarmStartJac(name, self)
 
     def eval(self, args):
         solver_in = self.solver_in = dict(
             x0=self.x0, p=args[0], lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
         )
-        solver_out = self.solver_out = self.solver(**solver_in)
+        solver_out = self.solver_out = self.ipopt(**solver_in)
         self.x0 = solver_out["x"]
         return [np.concatenate([
             solver_out["x"].toarray().reshape(-1),
