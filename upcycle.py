@@ -228,7 +228,7 @@ class UpcycleSolver:
                     return np.array(out).squeeze()
 
         else: # a function,
-            return self.casadi_imp(*args)
+            return np.array(self.casadi_imp(*args)).squeeze()
 
 
 def get_sources(conn_df, sys_path, parent_path):
@@ -648,14 +648,19 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
 
     def eval(self, args):
         solver_in = self.solver_in = dict(
-            x0=self.x0, p=args[0], lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
+            x0=self.x0,
+            p=casadi.vertcat(*args),
+            lbx=self.lbx,
+            ubx=self.ubx,
+            lbg=self.lbg,
+            ubg=self.ubg
         )
         solver_out = self.solver_out = self.ipopt(**solver_in)
         self.x0 = solver_out["x"]
-        return [np.concatenate([
-            solver_out["x"].toarray().reshape(-1),
-            solver_out["g"].toarray().reshape(-1)[self.nx:]
-        ])]
+        return tuple([
+            *solver_out["x"].toarray().reshape(-1),
+            *solver_out["g"].toarray().reshape(-1)[self.nx:]
+        ])
 
 
 orig_add_balance = BalanceComp.add_balance
