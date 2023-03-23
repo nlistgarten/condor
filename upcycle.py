@@ -194,7 +194,7 @@ class UpcycleSolver:
     def __call__(self, args):
         is_casadi_symbolic = isinstance(args, list) and isinstance(args[0], (casadi.MX, casadi.SX))
 
-        if str(self.casadi_imp).endswith('IpoptInterface'): # no wrapper
+        if str(self.casadi_imp).endswith('IpoptInterface') or str(self.casadi_imp).endswith('Qrsqp'): # no wrapper
 
             if self.implicit_outputs: # rootfinder, no wrapper
                 if is_casadi_symbolic:
@@ -435,7 +435,7 @@ def get_nlp_for_optimizer(upsolver, prob):
     p = casadi.vertcat(*[cs[i] for i in upsolver.parameter_indices])
     f = cr[idx_obj]
     nlp_args = {"x": x, "p": p, "f": f, "g": casadi.vertcat(*cr)}
-    opts = {}
+    opts = {"ipopt.tol": 1e-10, "expand": False}
     out = casadi.nlpsol("optimizer", "ipopt", nlp_args, opts)
 
     upsolver.casadi_imp = out
@@ -522,14 +522,23 @@ def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
 
     nlp_args = {"x": x, "p": p, "f": 0, "g": casadi.vertcat(*cr)}
     opts =  {}
+    #opts["qpsol.error_on_fail"] = "False"
     #opts["ipopt.warm_start_init_point"] = "yes" if warm_start else "no"
-    opts["ipopt.max_iter"] = 100
+    #opts["ipopt.max_iter"] = 100
     if upsolver.path:
         solver_name = sanitize_variable_name(upsolver.path)
     else:
         solver_name = 'solver'
 
-    nlp = casadi.nlpsol(solver_name, "ipopt", nlp_args, opts)
+    nlp = casadi.nlpsol(
+        solver_name,
+
+        "qrsqp",
+        #"ipopt",
+
+        nlp_args,
+        opts
+    )
     upsolver.casadi_imp = SolverWithWarmStart(
         nlp,
         upsolver.x0,

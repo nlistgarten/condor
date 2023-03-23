@@ -118,29 +118,34 @@ for name, ca_val in zip(upsolver.outputs, out):
     om_val = upcycle.get_val(prob, name)
     vals.append([name, om_val, ca_val])
 
-df = pd.DataFrame(vals, columns=cols)
+df_root = pd.DataFrame(vals, columns=cols)
 
 # passes with or without warm start
-print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=0., atol=1e-9)])
-print(df[~np.isclose(df["om_val"], df["ca_val"], rtol=1e-10, atol=0.)])
+print(df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=0., atol=1e-9)])
+print(df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=1e-10, atol=0.)])
+
+
+assert df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=0., atol=1e-9)].size == 0
+assert df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=1e-10, atol=0.)].size == 0
 
 
 ### check optimizer
 
+prob.set_solver_print(level=0)
+
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in updriver.inputs])
 out = updriver(inputs)
 print(out)
+prob.run_driver()
 
+vals = []
+for name, ca_val in zip(updriver.outputs, out["g"].toarray().squeeze()):
+    om_val = upcycle.get_val(prob, name)
+    vals.append([name, om_val, ca_val])
+for name, ca_val in zip(updriver.inputs, out["x"].toarray().squeeze()):
+    om_val = upcycle.get_val(prob, name)
+    vals.append([name, om_val, ca_val])
 
-prob.set_solver_print(level=0)
+df_opt = pd.DataFrame(vals, columns=cols)
+assert df_opt[~np.isclose(df_opt["om_val"], df_opt["ca_val"], rtol=0., atol=1e-7)].size == 0
 
-#prob.run_driver()
-
-#print("minimum found at")
-#print(prob.get_val("x")[0])
-#print(prob.get_val("z"))
-#print(prob.get_val("y1")[0])
-#print(prob.get_val("y2")[0])
-#
-#print("minumum objective")
-#print(prob.get_val("obj")[0])
