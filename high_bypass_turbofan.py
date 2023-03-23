@@ -482,7 +482,13 @@ if __name__ == "__main__":
 
             # TODO: only update updated inputs
             inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
+            for solver in upsolver.iter_solvers(include_self=False):
+                solver.casadi_imp.x0 = np.hstack([
+                    upcycle.get_val(prob, absname) for absname in solver.implicit_outputs
+                ])
             out = upsolver(*inputs) 
 
+            break
+        break
 
         PC_list = PC_list[::-1]

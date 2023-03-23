@@ -113,8 +113,7 @@ class UpcycleSolver:
 
         for child in self.children:
             if isinstance(child, UpcycleSolver):
-                yield child
-                child.iter_solvers()
+                yield from child.iter_solvers(include_self=True)
 
     def iter_systems(self):
         for child in self.children:
@@ -442,7 +441,14 @@ def get_nlp_for_optimizer(upsolver, prob):
     f = cr[idx_obj]
 
     nlp_args = {"x": x, "p": p, "f": f, "g": casadi.vertcat(*cr)}
-    opts = {"ipopt.tol": 1e-10, "expand": False}
+
+    opts = {
+        "expand": False,
+        "ipopt": {
+            "tol": 1e-10,
+            "hessian_approximation": "limited-memory",
+        }
+    }
     upsolver.casadi_imp = casadi.nlpsol("optimizer", "ipopt", nlp_args, opts)
 
     return upsolver
@@ -604,7 +610,13 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
         super().__init__()
         self.nlp_args = nlp_args
         self.name = name
-        ipopt_opts = {}
+        ipopt_opts = {
+            "print_time": False,
+            "ipopt": {
+                "hessian_approximation": "limited-memory",
+                "print_level": 5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
+            },
+        }
 
         self.ipopt = casadi.nlpsol(
             name+'_ipopt',
