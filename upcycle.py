@@ -211,6 +211,7 @@ class UpcycleSolver:
                     solver_out["g"].toarray().reshape(-1)[len(self.ubx):]
                 ])]
             else: # optimizer, no wrapper -- always numeric? for now...
+                args = np.array(args)
                 return self.casadi_imp(
                     x0=args[self.design_var_indices],
                     p=args[self.parameter_indices],
@@ -218,14 +219,13 @@ class UpcycleSolver:
                 )
 
         elif str(self.casadi_imp).endswith('CallbackInternal'): # SolverWithWarmstart
-            if self.implicit_outputs:
-                if is_casadi_symbolic:
-                    out = self.casadi_imp(*args)
-                    return out
-                    #return casadi.vertsplit(out)
-                else:
-                    out = self.casadi_imp(*args)
-                    return np.array(out).squeeze()
+            if is_casadi_symbolic:
+                out = self.casadi_imp(*args)
+                return out
+                #return casadi.vertsplit(out)
+            else:
+                out = self.casadi_imp(*args)
+                return np.array(out).squeeze()
 
         else: # a function,
             return np.array(self.casadi_imp(*args)).squeeze()
@@ -440,11 +440,10 @@ def get_nlp_for_optimizer(upsolver, prob):
     x = casadi.vertcat(*[cs[i] for i in upsolver.design_var_indices])
     p = casadi.vertcat(*[cs[i] for i in upsolver.parameter_indices])
     f = cr[idx_obj]
+
     nlp_args = {"x": x, "p": p, "f": f, "g": casadi.vertcat(*cr)}
     opts = {"ipopt.tol": 1e-10, "expand": False}
-    out = casadi.nlpsol("optimizer", "ipopt", nlp_args, opts)
-
-    upsolver.casadi_imp = out
+    upsolver.casadi_imp = casadi.nlpsol("optimizer", "ipopt", nlp_args, opts)
 
     return upsolver
 
@@ -592,9 +591,11 @@ class SolverWithWarmStartJac(CasadiFunctionCallbackMixin, casadi.Callback):
         return True
 
     def get_jacobian(self, name, inames, onames, opts):
-        return SolverWithWarmStartHess(name, self)
+        self.jac = SolverWithWarmStartHess(name, self)
+        return self.jac
 
     def eval(self, args):
+        # TODO check all args[:self.parent.np] == self.parent.solver_in["p"]
         breakpoint()
 
 class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
@@ -631,23 +632,26 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
         solver_in = self.solver_in = dict(
             x0=self.x0, p=nlp_args["p"], lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
         )
-        solver_out = self.ipopt(**solver_in)
-        self.func = casadi.Function(name+"_placeholder",
+        solver_out = self.qrsqp(**solver_in)
+        self.func = casadi.Function(
+            name+"_placeholder",
             casadi.vertsplit(nlp_args["p"]),
             casadi.vertsplit(solver_out["x"]) + casadi.vertsplit(solver_out["g"][len(self.ubx):]),
         )
-
-
         self.construct(name, {})
 
     def has_jacobian(self):
         return True
 
     def get_jacobian(self, name, inames, onames, opts):
-         return SolverWithWarmStartJac(name, self)
+        # self.jac = SolverWithWarmStartJac(name, self)
+        # return self.jac
+        return self.func.jacobian()
 
     def eval(self, args):
-        solver_in = self.solver_in = dict(
+        # run IPOPT to get close, then run QRSQP on IPOPT's solution to get closer
+        # save QRSQP solution
+        ipopt_in = dict(
             x0=self.x0,
             p=casadi.vertcat(*args),
             lbx=self.lbx,
@@ -655,11 +659,20 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
             lbg=self.lbg,
             ubg=self.ubg
         )
-        solver_out = self.solver_out = self.ipopt(**solver_in)
-        self.x0 = solver_out["x"]
+        ipopt_out = self.ipopt(**ipopt_in)
+
+        self.solver_in = ipopt_in.copy()
+
+        qrsqp_in = ipopt_in
+        qrsqp_in["x0"] = ipopt_out["x"]
+        qrsqp_out = self.qrsqp(**qrsqp_in)
+
+        self.solver_out = qrsqp_out
+        self.x0 = qrsqp_out["x"]
+
         return tuple([
-            *solver_out["x"].toarray().reshape(-1),
-            *solver_out["g"].toarray().reshape(-1)[self.nx:]
+            *qrsqp_out["x"].toarray().reshape(-1),
+            *qrsqp_out["g"].toarray().reshape(-1)[self.nx:]
         ])
 
 

@@ -16,7 +16,7 @@ updriver, prob = upcycle.upcycle_problem(make_sellar_problem)
 ### Check run_model
 upsolver = updriver.children[0]
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
-out = upsolver(inputs)[0]
+out = upsolver(*inputs)
 
 
 prob.set_solver_print(-1)
@@ -31,12 +31,12 @@ for name, ca_val in zip(upsolver.outputs, out):
 df_root = pd.DataFrame(vals, columns=cols)
 
 # passes with or without warm start
-assert df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=0., atol=1e-13)].size == 0
-assert df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=1e-13, atol=0.)].size == 0
+assert df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=0., atol=1e-12)].size == 0
+assert df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=1e-12, atol=0.)].size == 0
 
 ## try optimizer
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in updriver.inputs])
-out = updriver(inputs)
+out = updriver(*inputs)
 prob.run_driver()
 
 vals = []

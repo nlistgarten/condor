@@ -107,7 +107,7 @@ updriver, prob = upcycle.upcycle_problem(make_problem)
 ### Check run_model
 upsolver = updriver.children[0]
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
-out = upsolver(inputs)[0]
+out = upsolver(*inputs)
 
 prob.set_solver_print(-1)
 prob.run_model()
@@ -134,7 +134,7 @@ assert df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=1e-10, ato
 prob.set_solver_print(level=0)
 
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in updriver.inputs])
-out = updriver(inputs)
+out = updriver(*inputs)
 print(out)
 prob.run_driver()
 
