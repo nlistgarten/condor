@@ -399,8 +399,8 @@ def get_nlp_for_optimizer(upsolver, prob):
 
             output_assignments.update({
                 tuple(
-                    [sym.Symbol(k) for k in child.implicit_outputs]
-                    + [sym.Symbol(k) for k in child.outputs if k not in child.implicit_outputs]
+                    [sym.Symbol(k) for k in child.outputs]
+
                 ) :
                 Solver(sub_solver_name)(
                     #sym.Array(
@@ -508,8 +508,7 @@ def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
 
             output_assignments.update({
                 tuple(
-                    [sym.Symbol(k) for k in child.implicit_outputs]
-                    + [sym.Symbol(k) for k in child.outputs if k not in child.implicit_outputs]
+                    [sym.Symbol(k) for k in child.outputs]
                 ) :
                 Solver(sub_solver_name)(
                     #sym.Array(
@@ -700,8 +699,6 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
             ubg=self.ubg
         )
         ipopt_out = self.ipopt(**ipopt_in)
-        if not self.ipopt.stats()['success']:
-            raise ValueError(f"ipopt failed to converge for {self.name}")
 
         self.solver_in = ipopt_in.copy()
 
@@ -746,7 +743,8 @@ def make_interp_wrapper(interp):
 def mmsc_compute(self, inputs, outputs):
     if isinstance(inputs, SymbolicVector):
         for output_name in outputs:
-            name = f"{self.name}_{output_name}"
+            name = f"{self.pathname}.{output_name}_table"
+            name = sanitize_variable_name(name)
 
             if name not in TableLookup.registry:
                 ca_interp = casadi.interpolant(

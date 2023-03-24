@@ -479,14 +479,14 @@ if __name__ == "__main__":
                 print("cold start om model...")
                 prob.run_model()
                 first_pass = False
+                for solver in upsolver.iter_solvers(include_self=False):
+                    solver.casadi_imp.x0 = np.hstack([
+                        upcycle.get_val(prob, absname) for absname in solver.implicit_outputs
+                    ])
 
             # TODO: only update updated inputs
             inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
-            for solver in upsolver.iter_solvers(include_self=False):
-                solver.casadi_imp.x0 = np.hstack([
-                    upcycle.get_val(prob, absname) for absname in solver.implicit_outputs
-                ])
-            #out = upsolver(*inputs) 
+            out = upsolver(*inputs) 
 
             break
         break
@@ -494,6 +494,17 @@ if __name__ == "__main__":
         PC_list = PC_list[::-1]
 
 cols = ("name", "om_val", "ca_val")
+vals = []
+for name, ca_val in zip(solver.outputs, out):
+    om_val = upcycle.get_val(prob, name)
+    vals.append([name, om_val, ca_val])
+
+df_root = pd.DataFrame(vals, columns=cols)
+
+print(df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=0., atol=1e-9)])
+import sys
+sys.exit()
+
 solvers = list(upsolver.iter_solvers(include_self=True))[::-1]
 """
 why isn't OD_part_pwr in this?
@@ -509,9 +520,9 @@ for solver in solvers:
         out = solver(*inputs)
     except Exception as e:
         failed_solvers.append((solver, e))
+        break
         continue
 
-    assert solver.casadi_imp.ipopt.stats()['success']
     assert solver.casadi_imp.qrsqp.stats()['success']
 
     vals = []
@@ -525,14 +536,11 @@ for solver in solvers:
 
 
 failed_solver = solver
-
-
-
-
 for solver in failed_solver.iter_solvers(include_self=True):
     solver.casadi_imp.x0 = np.hstack([
         upcycle.get_val(prob, absname) for absname in solver.implicit_outputs
     ])
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in failed_solver.inputs])
-failed_solver(*inputs)
+
+out = failed_solver(*inputs)
 
