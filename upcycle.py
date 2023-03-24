@@ -234,6 +234,27 @@ def get_sources(conn_df, sys_path, parent_path):
     sys_conns = conn_df[conn_df["tgt"].str.startswith(sys_path + ".")]
     return sys_conns["src"]
 
+def pop_upsolver(syspath, upsolver):
+    while not syspath.startswith(upsolver.path):
+        # special case: solver in the om system has nothing to solve
+        # remove self from parent, re-parent children, propagate up inputs
+        cyclic_io = set(upsolver.inputs) & set(upsolver.outputs)
+        #I don't think cyclic_io should happen anymore?
+        if cyclic_io:
+            breakpoint()
+        if (len(upsolver.implicit_outputs) == 0) or cyclic_io:
+            # TODO: delete cyclic?
+
+            for child in upsolver.children:
+                upsolver.parent.add_child(child)
+
+        else:
+            upsolver.parent.add_child(upsolver)
+
+
+        upsolver = upsolver.parent
+    return upsolver
+
 
 def upcycle_problem(make_problem, warm_start=False):
     prob = make_problem()
@@ -248,29 +269,18 @@ def upcycle_problem(make_problem, warm_start=False):
     vdat = _get_viewer_data(prob)
     conn_df = pd.DataFrame(vdat["connections_list"])
 
+    all_om_systems = list(
+            up_prob.model.system_iter(include_self=False, recurse=True),
+    )
+
     for omsys, numeric_omsys in zip(
             up_prob.model.system_iter(include_self=False, recurse=True),
             prob.model.system_iter(include_self=False, recurse=True),
     ):
         syspath = omsys.pathname
 
-        while not syspath.startswith(upsolver.path):
-            # special case: solver in the om system has nothing to solve
-            # remove self from parent, re-parent children, propagate up inputs
-            cyclic_io = set(upsolver.inputs) & set(upsolver.outputs)
-            #I don't think cyclic_io should happen anymore?
-            if cyclic_io:
-                breakpoint()
-            if (len(upsolver.implicit_outputs) == 0) or cyclic_io:
-                # TODO: delete cyclic?
 
-                for child in upsolver.children:
-                    upsolver.parent.add_child(child)
-
-            else:
-                upsolver.parent.add_child(upsolver)
-
-            upsolver = upsolver.parent
+        upsolver = pop_upsolver(syspath, upsolver)
 
         nls = omsys.nonlinear_solver
         if nls is not None and not isinstance(nls, om.NonlinearRunOnce):
@@ -354,6 +364,8 @@ def upcycle_problem(make_problem, warm_start=False):
             count += size
 
         upsolver.add_child(upsys)
+
+    upsolver = pop_upsolver(top_upsolver.path, upsolver)
 
     upsolver = get_nlp_for_rootfinder(top_upsolver, prob, warm_start=warm_start)
 
