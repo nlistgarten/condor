@@ -454,7 +454,7 @@ if __name__ == "__main__":
                   (0.8, 10000), (0.6, 10000), (0.4, 10000), (0.2, 10000), (0.001, 10000),
                   (.001, 1000), (0.2, 1000), (0.4, 1000), (0.6, 1000),
                   (0.6, 0), (0.4, 0), (0.2, 0), (0.001, 0)]
-    PC_list = [1, 0.9, 0.8, .7]
+    PC_list = [1., 0.9, 0.8, .7]
 
     first_pass = True
     inputs = None
@@ -466,10 +466,10 @@ if __name__ == "__main__":
         print(f'* MN: {MN}, alt: {alt}')
         print('***'*10)
         prob['OD_full_pwr.fc.MN'] = MN
-        prob['OD_full_pwr.fc.alt'] = alt
+        prob['OD_full_pwr.fc.alt'] = alt*1.0
         
         prob['OD_part_pwr.fc.MN'] = MN
-        prob['OD_part_pwr.fc.alt'] = alt
+        prob['OD_part_pwr.fc.alt'] = alt*1.0
 
         for PC in PC_list:
             print(f'## PC = {PC}')
@@ -486,9 +486,53 @@ if __name__ == "__main__":
                 solver.casadi_imp.x0 = np.hstack([
                     upcycle.get_val(prob, absname) for absname in solver.implicit_outputs
                 ])
-            out = upsolver(*inputs) 
+            #out = upsolver(*inputs) 
 
             break
         break
 
         PC_list = PC_list[::-1]
+
+cols = ("name", "om_val", "ca_val")
+solvers = list(upsolver.iter_solvers(include_self=True))[::-1]
+"""
+why isn't OD_part_pwr in this?
+"""
+failed_solvers = []
+for solver in solvers:
+    print(solver)
+    inputs = np.hstack([upcycle.get_val(prob, absname) for absname in solver.inputs])
+    solver.casadi_imp.x0 = np.hstack([
+        upcycle.get_val(prob, absname) for absname in solver.implicit_outputs
+    ])
+    try:
+        out = solver(*inputs)
+    except Exception as e:
+        failed_solvers.append((solver, e))
+        continue
+
+    assert solver.casadi_imp.ipopt.stats()['success']
+    assert solver.casadi_imp.qrsqp.stats()['success']
+
+    vals = []
+    for name, ca_val in zip(solver.outputs, out):
+        om_val = upcycle.get_val(prob, name)
+        vals.append([name, om_val, ca_val])
+
+    df_root = pd.DataFrame(vals, columns=cols)
+    assert df_root[~np.isclose(df_root["om_val"], df_root["ca_val"], rtol=1e-12, atol=0.)].size == 0
+
+
+
+failed_solver = solver
+
+
+
+
+for solver in failed_solver.iter_solvers(include_self=True):
+    solver.casadi_imp.x0 = np.hstack([
+        upcycle.get_val(prob, absname) for absname in solver.implicit_outputs
+    ])
+inputs = np.hstack([upcycle.get_val(prob, absname) for absname in failed_solver.inputs])
+failed_solver(*inputs)
+

@@ -169,7 +169,7 @@ class UpcycleSolver:
 
     @property
     def outputs(self):
-        return [o for s in self.children for o in s.outputs]
+        return self.implicit_outputs + self.explicit_outputs
 
     @property
     def implicit_outputs(self):
@@ -248,7 +248,10 @@ def upcycle_problem(make_problem, warm_start=False):
     vdat = _get_viewer_data(prob)
     conn_df = pd.DataFrame(vdat["connections_list"])
 
-    for omsys in up_prob.model.system_iter(include_self=False, recurse=True):
+    for omsys, numeric_omsys in zip(
+            up_prob.model.system_iter(include_self=False, recurse=True),
+            prob.model.system_iter(include_self=False, recurse=True),
+    ):
         syspath = omsys.pathname
 
         while not syspath.startswith(upsolver.path):
@@ -271,7 +274,8 @@ def upcycle_problem(make_problem, warm_start=False):
 
         nls = omsys.nonlinear_solver
         if nls is not None and not isinstance(nls, om.NonlinearRunOnce):
-            upsolver = UpcycleSolver(path=syspath, parent=upsolver, om_equiv=omsys)
+            upsolver = UpcycleSolver(path=syspath, parent=upsolver,
+                                     om_equiv=numeric_omsys)
 
         if isinstance(omsys, om.Group):
             continue
@@ -405,6 +409,7 @@ def get_nlp_for_optimizer(upsolver, prob):
 
     upsolver.lbg = np.full(len(upsolver.outputs), -np.inf)
     upsolver.ubg = np.full(len(upsolver.outputs), np.inf)
+    upsolver.lambda_func = f
 
     idx_obj = upsolver.outputs.index(sanitize_variable_name(list(obj_meta.keys())[0]))
 
@@ -446,7 +451,7 @@ def get_nlp_for_optimizer(upsolver, prob):
         "expand": False,
         "ipopt": {
             "tol": 1e-10,
-            "hessian_approximation": "limited-memory",
+            #"hessian_approximation": "limited-memory",
         }
     }
     upsolver.casadi_imp = casadi.nlpsol("optimizer", "ipopt", nlp_args, opts)
@@ -520,6 +525,7 @@ def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
         for v in s.outputs.values()
     ]
     cr, cs, f = sympy2casadi(implicit_residuals, residual_args, output_assignments)
+    upsolver.lambda_func = f
 
     cs_split = casadi.vertsplit(cs)
     x = casadi.vertcat(*cs_split[:len(upsolver.implicit_outputs)])
@@ -613,8 +619,8 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
         ipopt_opts = {
             "print_time": False,
             "ipopt": {
-                "hessian_approximation": "limited-memory",
-                "print_level": 5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
+                #"hessian_approximation": "limited-memory",
+                "print_level": 0,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
             },
         }
 
@@ -624,10 +630,20 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
             nlp_args,
             ipopt_opts
         )
-        qrsqp_opts = {}
+        qrsqp_opts = dict(
+            qpsol='qrqp',
+            qpsol_options=dict(
+                print_iter=False,
+                error_on_fail=False
+            ),
+            verbose=False,
+            print_iteration=False,
+            print_time=False
+        )
         self.qrsqp = casadi.nlpsol(
             name+'_qrsqp',
-            "qrsqp",
+            #"qrsqp",
+            'sqpmethod',
             nlp_args,
             qrsqp_opts
         )
@@ -672,12 +688,17 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
             ubg=self.ubg
         )
         ipopt_out = self.ipopt(**ipopt_in)
+        if not self.ipopt.stats()['success']:
+            raise ValueError(f"ipopt failed to converge for {self.name}")
 
         self.solver_in = ipopt_in.copy()
 
         qrsqp_in = ipopt_in
         qrsqp_in["x0"] = ipopt_out["x"]
         qrsqp_out = self.qrsqp(**qrsqp_in)
+
+        if not self.qrsqp.stats()['success']:
+            raise ValueError(f"qrsqp failed to converge for {self.name}")
 
         self.solver_out = qrsqp_out
         self.x0 = qrsqp_out["x"]
