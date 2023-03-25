@@ -21,10 +21,6 @@ import warnings
 
 
 os.environ["OPENMDAO_REPORTS"] = "none"
-# NO_DUMMY -> everything must be pre-sanitized
-# TODO: this is better, remove flag soon?
-NO_DUMMY = True
-#NO_DUMMY = False
 
 def sympify_problem(prob):
     """Set up and run `prob` with symbolic inputs
@@ -294,8 +290,7 @@ def upcycle_problem(make_problem, warm_start=False):
             print("indepvarcomp?")
 
             flat_varnames = flatten_varnames(omsys._var_abs2meta["output"])
-            if NO_DUMMY:
-                flat_varnames = sanitize_variable_names(flat_varnames)
+            flat_varnames = sanitize_variable_names(flat_varnames)
 
             if upsolver is not top_upsolver:
                 warnings.warn("IVC not under top level model. Adding " +
@@ -316,11 +311,8 @@ def upcycle_problem(make_problem, warm_start=False):
 
 
         # cleaning variable names here
-        if NO_DUMMY:
-            all_outputs = sanitize_variable_names(all_outputs)
-            clean_all_sys_input_srcs = sanitize_variable_names(all_sys_input_srcs)
-        else:
-            clean_all_sys_input_srcs = all_sys_input_srcs
+        all_outputs = sanitize_variable_names(all_outputs)
+        clean_all_sys_input_srcs = sanitize_variable_names(all_sys_input_srcs)
 
 
         # TODO: can be DRY'd up, 
@@ -821,7 +813,7 @@ def contaminate_variable_name(clean_name):
     return clean_name.replace('_dot_', '.').replace('_colon_', ':')
 
 def get_val(prob, name, sanitized=True, **kwargs):
-    if sanitized and NO_DUMMY: # re-contaminate variable names to interact with om
+    if sanitized: # re-contaminate variable names to interact with om
         name = contaminate_variable_name(name)
     try:
         return prob.get_val(name, **kwargs)[0]
@@ -844,8 +836,7 @@ class SymbolicVector(DefaultVector):
         system = self._system()
         # om uses this and relies on ordering when building views, should be ok
         names = flatten_varnames(system._var_abs2meta[self._typ])
-        if NO_DUMMY:
-            names = sanitize_variable_names(names)
+        names = sanitize_variable_names(names)
         syms = np.array([sym.Symbol(name) for name in names]).view(SymbolicArray)
         self.syms = syms
         return syms

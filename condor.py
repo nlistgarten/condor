@@ -6,9 +6,6 @@ from sympy.printing.pycode import PythonCodePrinter
 from sympy.utilities.lambdify import lambdify
 from sympy.core.expr import Expr
 
-NO_DUMMY = True
-#NO_DUMMY = False
-
 BACKEND_SYMBOL = sym.Symbol
 class _null_name:
     pass
@@ -148,50 +145,6 @@ class assignment_cse:
         return self.assignment_dict.items(), expr
 
 
-class dummy_assignment_cse:
-     def __init__(self, assignment_dict, return_assignments=True):
-        self.assignment_dict = assignment_dict
-        self.original_arg_to_dummy = {}
-        self.dummified_assignment_list = {}
-        for arg, expr in assignment_dict.items():
-            if hasattr(arg, "__len__"):
-                new_arg = tuple([sym.Dummy() for a in arg])
-                for a, na in zip(arg, new_arg):
-                    self.original_arg_to_dummy[a] = na
-            else:
-                new_arg = sym.Dummy()
-                self.original_arg_to_dummy[arg] = new_arg
-
-            self.dummified_assignment_list[new_arg] = expr.subs(
-                self.original_arg_to_dummy
-            )
-        self.return_assignments = return_assignments
-
-     def __call__(self, expr):
-        rev_dummified_assignments = {
-            v: k for k, v in self.dummified_assignment_list.items()
-        }
-        rev_dummified_assignments.update(
-            {
-                kk: vv for k, v in rev_dummified_assignments.items()
-                if isinstance(k, tuple) for kk, vv in zip(k, v)
-            },
-        )
-        rev_dummified_assignments.update(self.original_arg_to_dummy)
-        if hasattr(expr, 'subs'):
-           expr_ = expr.subs(rev_dummified_assignments)
-        else:
-            expr_ = [
-               expr__.subs(rev_dummified_assignments)
-               for expr__ in expr
-            ]
-        if self.return_assignments:
-            if hasattr(expr_, '__len__'):
-               expr_ = list(expr_)
-            else:
-               expr_ = [expr_]
-            expr_.extend(sym.flatten(self.dummified_assignment_list.keys()))
-        return self.dummified_assignment_list.items(), expr_
 
 
 def sympy2casadi(
@@ -232,11 +185,10 @@ def sympy2casadi(
             casadi
         ],
         printer=printer,
-        dummify=not NO_DUMMY,
+        dummify=False,
         #cse=cse_generator(**cse_generator_args),
         cse=(
-            assignment_cse(extra_assignments, return_assignments) if NO_DUMMY
-            else dummy_assignment_cse(extra_assignments, return_assignments)
+            assignment_cse(extra_assignments, return_assignments)
         ),
     )
 
