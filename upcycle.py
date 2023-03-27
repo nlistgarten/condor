@@ -1,7 +1,8 @@
 import os
 import re
 
-from condor import SymbolicArray, sympy2casadi, TableLookup, Solver
+from condor import SymbolicArray, TableLookup, Solver
+from casadi_backend import sympy2casadi, SolverWithWarmStart
 
 import casadi
 import numpy as np
@@ -46,16 +47,17 @@ def sympify_problem(prob):
 
     return prob, res_mat, out_syms
 
-"""
-OM access to optimization objective, constraints, and design variables
-    cons_meta = prob.driver._cons
-    obj_meta = prob.driver._objs
-    dv_meta = prob.driver._designvars
 
+"""
+These three "Upcycle" systems are maps from OpenMDAO constructs
+UpcycleSolver also maps to a generic Rootfinding / Algebraic System of Equations model
+in condor; not a sub-class but provides the same interface:
 """
 
 class UpcycleSystem:
-
+    """
+    Base class for Implicit and Explic
+    """
     def __init__(self, path, parent):
         self.path = path
 
@@ -75,6 +77,7 @@ class UpcycleSystem:
     def __repr__(self):
         return self.path
 
+
 class UpcycleImplicitSystem(UpcycleSystem):
     pass
 
@@ -86,7 +89,6 @@ class UpcycleExplicitSystem(UpcycleSystem):
 
 
 class UpcycleSolver:
-
     def __init__(self, path="", parent=None, om_equiv=None):
         self.path = path
         self.parent = parent
@@ -161,7 +163,6 @@ class UpcycleSolver:
 
             if input_ not in self.inputs:
                 self.inputs.append(input_)
-
 
     @property
     def outputs(self):
@@ -246,7 +247,6 @@ def pop_upsolver(syspath, upsolver):
 
         else:
             upsolver.parent.add_child(upsolver)
-
 
         upsolver = upsolver.parent
     return upsolver
@@ -568,146 +568,6 @@ def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
         upsolver.ubg,
     )
     return upsolver
-
-class CasadiFunctionCallbackMixin:
-    def get_n_in(self):
-        return self.func.n_in()
-
-    def get_n_out(self):
-        return self.func.n_out()
-
-    def get_sparsity_in(self, i):
-        return self.func.sparsity_in(i)
-
-    def get_sparsity_out(self, i):
-        return self.func.sparsity_out(i)
-
-
-class SolverWithWarmStartHess(CasadiFunctionCallbackMixin, casadi.Callback):
-    def __init__(self, name, parent):
-        super().__init__()
-        self.name = name
-        self.parent = parent
-        self.func = parent.func.jacobian()
-        self.construct(name, {})
-
-    def eval(self, args):
-        breakpoint()
-
-class SolverWithWarmStartJac(CasadiFunctionCallbackMixin, casadi.Callback):
-    def __init__(self, name, parent):
-        super().__init__()
-        self.name = name
-        self.parent = parent
-        self.func = parent.func.jacobian()
-        self.construct(name, {})
-
-    def has_jacobian(self):
-        return True
-
-    def get_jacobian(self, name, inames, onames, opts):
-        self.jac = SolverWithWarmStartHess(name, self)
-        return self.jac
-
-    def eval(self, args):
-        # TODO check all args[:self.parent.np] == self.parent.solver_in["p"]
-        breakpoint()
-
-class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
-
-    def __init__(self, name, nlp_args, x0, p0, lbx, ubx, lbg, ubg):
-        super().__init__()
-        self.nlp_args = nlp_args
-        self.name = name
-        ipopt_opts = {
-            "print_time": False,
-            "ipopt": {
-                #"hessian_approximation": "limited-memory",
-                "print_level": 0,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
-            },
-        }
-
-        self.ipopt = casadi.nlpsol(
-            name+'_ipopt',
-            "ipopt",
-            nlp_args,
-            ipopt_opts
-        )
-        qrsqp_opts = dict(
-            qpsol='qrqp',
-            qpsol_options=dict(
-                print_iter=False,
-                error_on_fail=False
-            ),
-            verbose=False,
-            print_iteration=False,
-            print_time=False
-        )
-        self.qrsqp = casadi.nlpsol(
-            name+'_qrsqp',
-            #"qrsqp",
-            'sqpmethod',
-            nlp_args,
-            qrsqp_opts
-        )
-
-        self.x0 = x0
-        self.p0 = p0
-        self.lbx = lbx
-        self.ubx = ubx
-        self.lbg = lbg
-        self.ubg = ubg
-        self.nx = len(x0)
-        self.np = len(p0)
-
-        solver_in = self.solver_in = dict(
-            x0=self.x0, p=nlp_args["p"], lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
-        )
-        solver_out = self.qrsqp(**solver_in)
-        self.func = casadi.Function(
-            name+"_placeholder",
-            casadi.vertsplit(nlp_args["p"]),
-            casadi.vertsplit(solver_out["x"]) + casadi.vertsplit(solver_out["g"][len(self.ubx):]),
-        )
-        self.construct(name, {})
-
-    def has_jacobian(self):
-        return True
-
-    def get_jacobian(self, name, inames, onames, opts):
-        # self.jac = SolverWithWarmStartJac(name, self)
-        # return self.jac
-        return self.func.jacobian()
-
-    def eval(self, args):
-        # run IPOPT to get close, then run QRSQP on IPOPT's solution to get closer
-        # save QRSQP solution
-        ipopt_in = dict(
-            x0=self.x0,
-            p=casadi.vertcat(*args),
-            lbx=self.lbx,
-            ubx=self.ubx,
-            lbg=self.lbg,
-            ubg=self.ubg
-        )
-        ipopt_out = self.ipopt(**ipopt_in)
-
-        self.solver_in = ipopt_in.copy()
-
-        qrsqp_in = ipopt_in
-        qrsqp_in["x0"] = ipopt_out["x"]
-        qrsqp_out = self.qrsqp(**qrsqp_in)
-
-        if not self.qrsqp.stats()['success']:
-            raise ValueError(f"qrsqp failed to converge for {self.name}")
-
-        self.solver_out = qrsqp_out
-        self.x0 = qrsqp_out["x"]
-
-        return tuple([
-            *qrsqp_out["x"].toarray().reshape(-1),
-            *qrsqp_out["g"].toarray().reshape(-1)[self.nx:]
-        ])
 
 
 orig_add_balance = BalanceComp.add_balance

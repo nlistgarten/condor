@@ -1,9 +1,7 @@
 import numpy as np
 import sympy as sym
-import casadi
 from sympy.physics.mechanics import dynamicsymbols
 from sympy.printing.pycode import PythonCodePrinter
-from sympy.utilities.lambdify import lambdify
 from sympy.core.expr import Expr
 
 BACKEND_SYMBOL = sym.Symbol
@@ -91,7 +89,6 @@ class AppliedFunction(symApplied):
 
         return newcls
 
-
 class UndefinedFunction(symUndefined):
     def __new__(mcl, name, 
                 bases=(AppliedFunction,),
@@ -115,7 +112,6 @@ class UndefinedFunction(symUndefined):
 
 class TableLookup(UndefinedFunction):
     registry = {}
-
 
 class Solver(UndefinedFunction):
     registry = {}
@@ -143,97 +139,6 @@ class assignment_cse:
                 expr_ = [expr]
             expr.extend(sym.flatten(self.assignment_dict.keys()))
         return self.assignment_dict.items(), expr
-
-
-
-
-def sympy2casadi(
-        sympy_expr,
-        sympy_vars, # really, arguments/signature
-        #cse_generator=assignment_cse,
-        #cse_generator_args=dict(
-            extra_assignments={}, return_assignments=True
-        #)
-):
-    ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in sympy_vars])
-
-    ca_vars_split = casadi.vertsplit(ca_vars)
-
-    mapping = {
-        "ImmutableDenseMatrix": casadi.blockcat,
-        "MutableDenseMatrix": casadi.blockcat,
-        "Abs": casadi.fabs,
-        "abs": casadi.fabs,
-        "Array": casadi.MX,
-    }
-    # can set allow_unknown_functions=False and pass user_functions dict of
-    # {func_expr: func_str} instead of allow_unknown_function but  it's the
-    # presence in "modules" that adds them to namespace on `exec` line of lambdify so
-    # it's a little redundant. sticking with this version for now
-    # user_functions gets added to known_functions
-    printer = CodePrinter(dict(
-        fully_qualified_modules=False,
-    ))
-    print("lambdifying...")
-    f = lambdify(
-        sympy_vars,
-        sympy_expr,
-        modules=[
-            TableLookup.registry,
-            Solver.registry,
-            mapping,
-            casadi
-        ],
-        printer=printer,
-        dummify=False,
-        #cse=cse_generator(**cse_generator_args),
-        cse=(
-            assignment_cse(extra_assignments, return_assignments)
-        ),
-    )
-
-    print("casadifying...")
-    out = f(*ca_vars_split)
-
-    return out, ca_vars, f
-
-
-class CasadiFunctionCallback(casadi.Callback):
-    """Base class for wrapping a Function with a Callback"""
-
-    def __init__(self, func, opts={}):
-        casadi.Callback.__init__(self)
-        self.func = func
-        self.construct(func.name(), opts)
-
-    def init(self):
-        pass
-
-    def finalize(self):
-        pass
-
-    def get_n_in(self):
-        return self.func.n_in()
-
-    def get_n_out(self):
-        return self.func.n_out()
-
-    def eval(self, args):
-        out = self.func(*args)
-        return [out] if self.func.n_out() == 1 else out
-
-    def get_sparsity_in(self, i):
-        return self.func.sparsity_in(i)
-
-    def get_sparsity_out(self, i):
-        return self.func.sparsity_out(i)
-
-    def has_jacobian(self):
-        return True
-
-    def get_jacobian(self, name, inames, onames, opts):
-        return self.func.jacobian()
-
 
 def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):
     sym_ufunc = getattr(sym, ufunc.__name__, None)
