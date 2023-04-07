@@ -2,6 +2,7 @@
 import sympy as sym
 from sympy.physics.mechanics import dynamicsymbols
 from sympy.printing.pycode import PythonCodePrinter
+from sympy.utilities.lambdify import lambdify
 from sympy.core.expr import Expr
 
 from sympy.core.function import (
@@ -189,3 +190,111 @@ class SymbolicArray(np.ndarray):
             result = np.atleast_1d(result)
 
         return result.view(SymbolicArray)
+
+
+# TODO: can be generalized ? certainly split up -- this lambdify/codeprinter is likely
+# more useful (at least for a "numpy" numerical implementation)
+def sympy2casadi(
+        sympy_expr,
+        sympy_vars, # really, arguments/signature
+        #cse_generator=assignment_cse,
+        #cse_generator_args=dict(
+            extra_assignments={}, return_assignments=True
+        #)
+):
+    import casadi
+
+    ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in sympy_vars])
+
+    ca_vars_split = casadi.vertsplit(ca_vars)
+
+    mapping = {
+        "ImmutableDenseMatrix": casadi.blockcat,
+        "MutableDenseMatrix": casadi.blockcat,
+        "Abs": casadi.fabs,
+        "abs": casadi.fabs,
+        "Array": casadi.MX,
+    }
+    # can set allow_unknown_functions=False and pass user_functions dict of
+    # {func_expr: func_str} instead of allow_unknown_function but  it's the
+    # presence in "modules" that adds them to namespace on `exec` line of lambdify so
+    # it's a little redundant. sticking with this version for now
+    # user_functions gets added to known_functions
+    printer = CodePrinter(dict(
+        fully_qualified_modules=False,
+    ))
+    print("lambdifying...")
+    f = lambdify(
+        sympy_vars,
+        sympy_expr,
+        modules=[
+            TableLookup.registry,
+            Solver.registry,
+            mapping,
+            casadi
+        ],
+        printer=printer,
+        dummify=False,
+        #cse=cse_generator(**cse_generator_args),
+        cse=(
+            assignment_cse(extra_assignments, return_assignments)
+        ),
+    )
+
+    print("casadifying...")
+    out = f(*ca_vars_split)
+
+    return out, ca_vars, f
+
+
+def construct_explicit_matrix(name, n, m=1, symmetric=False, diagonal=0,
+                              dynamic=False, **kwass):
+    """
+    construct a matrix of symbolic elements
+    Parameters
+    ----------
+    name : string
+        Base name for variables; each variable is name_ij, which
+        admitedly only works clearly for n,m < 10
+    n : int
+        Number of rows
+    m : int
+        Number of columns
+    symmetric : bool, optional
+        Use to enforce a symmetric matrix (repeat symbols above/below diagonal)
+    diagonal : bool, optional
+        Zeros out off diagonals. Takes precedence over symmetry.
+    dynamic : bool, optional
+        Whether to use sympy.physics.mechanics dynamicsymbol. If False, use
+        sp.symbols
+    kwargs : dict
+        remaining kwargs passed to symbol function
+    Returns
+    -------
+    matrix : sympy Matrix
+        The Matrix containing explicit symbolic elements
+    """
+    if dynamic:
+        symbol_func = vector.dynamicsymbols
+    else:
+        symbol_func = sym.symbols
+
+    if n != m and (diagonal or symmetric):
+        raise ValueError("Cannot make symmetric or diagonal if n != m")
+
+    if diagonal:
+        return sp.diag(
+            *[symbol_func(
+                name+'_{}{}'.format(i+1, i+1), **kwass) for i in range(m)])
+    else:
+        matrix = sym.Matrix([
+            [symbol_func(name+'_{}_{}'.format(j+1, i+1), **kwass)
+             for i in range(m)] for j in range(n)
+        ])
+
+        if symmetric:
+            for i in range(1, m):
+                for j in range(i):
+                    matrix[j, i] = matrix[i, j]
+
+        return matrix

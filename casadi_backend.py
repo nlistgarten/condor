@@ -1,56 +1,5 @@
 import casadi
-from condor import assignment_cse, CodePrinter, TableLookup, Solver
-from sympy.utilities.lambdify import lambdify
 
-def sympy2casadi(
-        sympy_expr,
-        sympy_vars, # really, arguments/signature
-        #cse_generator=assignment_cse,
-        #cse_generator_args=dict(
-            extra_assignments={}, return_assignments=True
-        #)
-):
-    ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in sympy_vars])
-
-    ca_vars_split = casadi.vertsplit(ca_vars)
-
-    mapping = {
-        "ImmutableDenseMatrix": casadi.blockcat,
-        "MutableDenseMatrix": casadi.blockcat,
-        "Abs": casadi.fabs,
-        "abs": casadi.fabs,
-        "Array": casadi.MX,
-    }
-    # can set allow_unknown_functions=False and pass user_functions dict of
-    # {func_expr: func_str} instead of allow_unknown_function but  it's the
-    # presence in "modules" that adds them to namespace on `exec` line of lambdify so
-    # it's a little redundant. sticking with this version for now
-    # user_functions gets added to known_functions
-    printer = CodePrinter(dict(
-        fully_qualified_modules=False,
-    ))
-    print("lambdifying...")
-    f = lambdify(
-        sympy_vars,
-        sympy_expr,
-        modules=[
-            TableLookup.registry,
-            Solver.registry,
-            mapping,
-            casadi
-        ],
-        printer=printer,
-        dummify=False,
-        #cse=cse_generator(**cse_generator_args),
-        cse=(
-            assignment_cse(extra_assignments, return_assignments)
-        ),
-    )
-
-    print("casadifying...")
-    out = f(*ca_vars_split)
-
-    return out, ca_vars, f
 
 # TODO: update from best results
 

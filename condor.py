@@ -1,6 +1,8 @@
 import numpy as np
 
-# TODO: figure out how to make this an option/setting like django
+
+# TODO: figure out how to make this an option/setting like django?
+import casadi_backend as backend
 BACKEND_SYMBOL = sym.Symbol
 
 
@@ -20,58 +22,6 @@ class _base_condor_descriptor:
         raise AttributeError(self._resolve_name + " cannot be set as " + self.__class__)
 
 
-
-def construct_explicit_matrix(name, n, m=1, symmetric=False, diagonal=0,
-                              dynamic=False, **kwass):
-    """
-    construct a matrix of symbolic elements
-    Parameters
-    ----------
-    name : string
-        Base name for variables; each variable is name_ij, which
-        admitedly only works clearly for n,m < 10
-    n : int
-        Number of rows
-    m : int
-        Number of columns
-    symmetric : bool, optional
-        Use to enforce a symmetric matrix (repeat symbols above/below diagonal)
-    diagonal : bool, optional
-        Zeros out off diagonals. Takes precedence over symmetry.
-    dynamic : bool, optional
-        Whether to use sympy.physics.mechanics dynamicsymbol. If False, use
-        sp.symbols
-    kwargs : dict
-        remaining kwargs passed to symbol function
-    Returns
-    -------
-    matrix : sympy Matrix
-        The Matrix containing explicit symbolic elements
-    """
-    if dynamic:
-        symbol_func = vector.dynamicsymbols
-    else:
-        symbol_func = sym.symbols
-
-    if n != m and (diagonal or symmetric):
-        raise ValueError("Cannot make symmetric or diagonal if n != m")
-
-    if diagonal:
-        return sp.diag(
-            *[symbol_func(
-                name+'_{}{}'.format(i+1, i+1), **kwass) for i in range(m)])
-    else:
-        matrix = sym.Matrix([
-            [symbol_func(name+'_{}_{}'.format(j+1, i+1), **kwass)
-             for i in range(m)] for j in range(n)
-        ])
-
-        if symmetric:
-            for i in range(1, m):
-                for j in range(i):
-                    matrix[j, i] = matrix[i, j]
-
-        return matrix
 
 
 class _condor_symbol_generator(_base_condor_descriptor):
@@ -111,7 +61,7 @@ class _condor_computation(_base_condor_descriptor):
         pass
 
 
-# not really necessary, place holder in case it is
+# may not be  really necessary, place holder in case it is
 class CondorClassDict(dict):
     def __getitem__(self, *args, **kwargs):
         #breakpoint()
@@ -169,3 +119,9 @@ indexable by number, symbolic object, etc.
 
 
 """
+
+class CondorOutputContainer(type):
+    """
+    An output container that allows named dot access and integer indexing
+    """
+
