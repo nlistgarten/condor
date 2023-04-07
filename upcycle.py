@@ -369,6 +369,8 @@ def upcycle_problem(make_problem, warm_start=False):
     else:
         return upsolver, prob
 
+# TODO: generalize get_nlp_for... methods? currently its a mix of sympy and casadi
+# backends.
 
 def get_nlp_for_optimizer(upsolver, prob):
     output_assignments = {}
@@ -683,6 +685,8 @@ def get_val(prob, name, sanitized=True, **kwargs):
         idx = int(match[2])
         return prob.get_val(base_name, **kwargs)[idx]
 
+# SYMPY BACKEND FOR UPCYCLE -- I think casadi backend doesn't need getitem? easiest
+# thing is just build a numpy array of MX objects
 class SymbolicVector(DefaultVector):
     """OpenMDAO Vector implementation backed by SymbolicArray"""
 

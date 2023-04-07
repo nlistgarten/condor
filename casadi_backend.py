@@ -52,6 +52,7 @@ def sympy2casadi(
 
     return out, ca_vars, f
 
+# TODO: update from best results
 
 class CasadiFunctionCallbackMixin:
     """Base class for wrapping a Function with a Callback"""
