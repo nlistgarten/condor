@@ -247,7 +247,7 @@ def sympy2casadi(
     return out, ca_vars, f
 
 
-def construct_explicit_matrix(name, n, m=1, symmetric=False, diagonal=0,
+def symbol_generator(name, n, m=1, symmetric=False, diagonal=0,
                               dynamic=False, **kwass):
     """
     construct a matrix of symbolic elements

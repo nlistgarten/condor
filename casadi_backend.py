@@ -1,7 +1,23 @@
 import casadi
 
 
-# TODO: update from best results
+
+def symbol_generator(name, n=1, m=1, symmetric=False, diagonal=False):
+    print("casadi creating",name, n, m, symmetric, diagonal)
+    sym = casadi.MX.sym(name, (n, m))
+    if symmetric:
+        assert n == m
+        return casadi.tril2symm(casadi.tril(sym))
+    if diagonal:
+        assert m == 1
+        return casadi.diag(sym)
+    return sym
+
+
+
+
+
+# TODO: update from best results (back_track branch)
 
 class CasadiFunctionCallbackMixin:
     """Base class for wrapping a Function with a Callback"""

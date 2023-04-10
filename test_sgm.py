@@ -1,11 +1,15 @@
+import numpy as np
+from condor import _condor_symbol_generator, _condor_computation, CondorModelType, CondorModel
 
-class DynamicsModel(metaclass=CondorModelType):
-    print("starting user code for CondorModel class")
+
+#class DynamicsModel(metaclass=CondorModelType):
+class DynamicsModel(CondorModel):
+    print("starting app code for DynamicsModel class")
     state = _condor_symbol_generator()
     parameter = _condor_symbol_generator()
     dot = _condor_computation(state)
     output = _condor_computation()
-    print("ending user code for TrajectoryModel class")
+    print("ending app code for DynamicsModel class")
 
 
 class LTI(DynamicsModel):

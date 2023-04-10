@@ -3,10 +3,11 @@ import numpy as np
 
 # TODO: figure out how to make this an option/setting like django?
 import casadi_backend as backend
-BACKEND_SYMBOL = sym.Symbol
 
+#class CondorDescriptorType(type):
 
 class _base_condor_descriptor:
+    @classmethod
     def __set_name__(self, owner, name):
         print("setting", name, "for", owner, "as", self)
         self._name = name
@@ -24,22 +25,28 @@ class _base_condor_descriptor:
 
 
 
+
 class _condor_symbol_generator(_base_condor_descriptor):
-    def __init__(self, func=construct_explicit_matrix, **fixed_kwargs):
+    def __init__(self, func=backend.symbol_generator, **fixed_kwargs):
         print('init', self)
         self.func = func
         self.fixed_kwargs = fixed_kwargs
         self.count = 0
         self.children = []
 
-    def __call__(self, n, **kwargs):
-        print("calling for", self)
+    def __call__(self, n=1, m=1, symmetric=False, diagonal=False,  **kwargs):
+        print("calling", self, "with args:", n, m, symmetric, diagonal)
+
         pass_kwargs = dict(
-            name="%s%d_" % (self._resolve_name, self.count),
+            name="%s_%d_" % (self._resolve_name, self.count),
             n=n,
+            m=m,
+            symmetric=symmetric,
+            diagonal=diagonal,
             **self.fixed_kwargs,
             **kwargs
         )
+        self.count += 1
         return self.func(**pass_kwargs)
 
 
@@ -51,6 +58,7 @@ class _condor_computation(_base_condor_descriptor):
 
     def __setitem__(self, key, value):
         print("setting item for", self, ":", key, "=", value)
+        print(f"owner={self._owner}")
         pass
 
     def __setattr__(self, name, value):
@@ -58,6 +66,7 @@ class _condor_computation(_base_condor_descriptor):
             super().__setattr__(name, value)
         else:
             print("setting item for", self, ".", name, "=", value)
+            print(f"owner={self._owner}")
         pass
 
 
@@ -80,7 +89,7 @@ class CondorModelType(type):
 
     @classmethod
     def __prepare__(cls, name, bases, **kwds):
-        print("preparing for", name)
+        print("CondorModelType.__prepare__  for", name)
         sup_dict = super().__prepare__(cls, name, bases, **kwds)
         cls_dict = CondorClassDict()
 
@@ -88,14 +97,32 @@ class CondorModelType(type):
         for _dict in dicts:
             cls_dict.update({
                 k: v for k, v in  _dict.items()
-                if (isinstance(v, _base_condor_descriptor) or (_dict is sup_dict))
+                if (
+                    isinstance(v, _base_condor_descriptor) or
+                    (_dict is sup_dict) or
+                    isinstance(v, _base_condor_descriptor.__class__)
+                )
             })
+        # TODO: need to tell descriptor about inheritance?
+        # or is it always just something like library vs user code?
+        # what about about library that is based on  other library?
+        print("end prepare for", name, cls_dict)
         return cls_dict
 
+    def __call__(cls, *args, **kwargs):
+        print("CondorModelType.__call__ for", cls)
+        return super().__call__(cls, *args, **kwargs)
+
     def __new__(cls, name, bases, attrs, **kwargs):
-        print("__new__ for", name)
+        print("CondorModelType.__new__ for", name)
+        print(attrs)
         new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
         return new_cls
+
+class CondorModel(metaclass=CondorModelType):
+    # should output always be here?
+    pass
+
 
 """
 do parent systems always write subsystems by getting all their output? I think so
