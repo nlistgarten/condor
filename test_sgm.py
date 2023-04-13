@@ -1,10 +1,30 @@
 import numpy as np
-from condor import _condor_symbol_generator, _condor_computation, CondorModelType, CondorModel
+from condor import _condor_symbol_generator, _condor_computation, CondorModel, backend
 
 
 #class DynamicsModel(metaclass=CondorModelType):
 class DynamicsModel(CondorModel):
+    """
+    DynamicsModel
+
+    need input? (e.g., time varying paremeter) -> a parent class pushes input in
+    or skip, assume plant always "pulls" input in
+
+    in this context is "output" always point-wise in time? I think so, and it's a
+    trajectory analysis model's outputs that define overall output
+
+    fundamentally need to decide how different computations play. Maybe "output" is the
+    base on CondorModel, and it is always the one that is returned by calling -- would
+    be consistent way to pull controllers, measurements, etc from the plant model
+
+    then trajectory analysis 
+
+    """
     print("starting app code for DynamicsModel class")
+
+    # TODO: this needs its own descriptor type? OR do we want user classes to do
+    # t = DynamicsModel.independent_variable ? That would allow 
+    independent_variable = backend.symbol_generator('t')
     state = _condor_symbol_generator()
     parameter = _condor_symbol_generator()
     dot = _condor_computation(state)
@@ -12,7 +32,7 @@ class DynamicsModel(CondorModel):
     print("ending app code for DynamicsModel class")
 
 
-class LTI(DynamicsModel):
+class MySystem(DynamicsModel):
     print("starting user code for LTI class")
     n = 2
     m = 1
@@ -37,5 +57,4 @@ class LTI(DynamicsModel):
     # dot naming, although have to do more work to minimize other setattr's 
     output.y = C.T @ C
     print("ending user code for LTI class")
-
 

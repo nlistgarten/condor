@@ -9,6 +9,44 @@ class CondorDescriptorType(object):
 
 
 class BaseDescriptor(CondorDescriptorType):
+    # these don't need to be descriptors, probably just a base class with
+    # _set_resolve_name, called by CondorModelType.__new__
+    # rename this class to CondorVariable? Expression? Something to capture both I and
+
+    # maybe just separate out the matched and unmatched outputs into different
+    # sub-classes?
+
+    # assume all outputs are inherited?, base classes going backwards but within each
+    # base preserve definition order. This allows placement of "output" in CondorModel
+    # which everyone inherits, and it comes out last. Then algebraic system's
+    # implicit_outputs, but I like that being implicit and explicit
+
+    # the instances of variables added to the models may need to be replaced with
+    # descriptor wrapper to allow dot setting of instance variables? if we even do
+    # that... maybe not necessary either but could be an option
+
+    # could use copy infrastructure with the same type of checking for references as
+    # done in this version
+
+    # general idea for handling implementation: during __new__, look up parents in
+    # reverse order. can check backend.implementations (dict/module of model classname
+    # to whatever class?)
+    # I assume a user model could inject an implementation to the backend?
+    # not sure how to assign special numeric stuff, probably an inner class on the model
+    # based on NPSS discussion it's not really needed if it's done right 
+
+    # once imp is found gets attached to class. then __init__ calls with those values
+    # and so is actually an instance of class that has the accessed outputs, very much
+    # like django. neat.
+
+    # implementations can get everything they need based on the model field definitions
+    # (ie. state, parameter, output, dot etc.) which is the point of them
+    # and we could very easily just cache everything to a DB lol
+
+    # can I do all the name clash protection that's needed? from child to parent class I
+    # think definitely, and probably can't protect user model from over-writing self
+
+
     def __set_name__(self, owner, name):
         print("setting", name, "for", owner, "as", self)
         self._name = name
@@ -39,6 +77,7 @@ class BaseDescriptor(CondorDescriptorType):
         self._init_kwargs = {}
 
     def _inherit(self, new_owner_name, **kwargs):
+        # TODO: actually this isn't "inheriting" it's binding?
         if not kwargs:
             kwargs = self._init_kwargs
         new = self.__class__(**kwargs)
@@ -75,7 +114,16 @@ class _condor_symbol_generator(BaseDescriptor):
         )
         self._count += 1
         out = self.func(**pass_kwargs)
+        #out = _condor_symbol_wrapped(out)
         self._container.append(out)
+        # TODO: 
+        # actually, this needs to be a descriptor container for the symbol
+        # this allows dot setting of DynamicsModel parameter by a TrajectoryModel
+        # or does the fact that the symbol generator is keeping a reference mean we can
+        # access it? yes, requires __getattr__ on Model, could be fine
+
+
+
         return out
 
 
@@ -113,6 +161,12 @@ class CondorClassDict(dict):
         return super().__setitem__(*args, **kwargs)
 
 from enum import _is_dunder
+
+class CondorComputationContainer(type):
+    """
+    An output container that allows named dot access and integer indexing
+    """
+
 
 class CondorModelType(type):
     """
@@ -187,8 +241,4 @@ indexable by number, symbolic object, etc.
 
 """
 
-class CondorOutputContainer(type):
-    """
-    An output container that allows named dot access and integer indexing
-    """
 

@@ -236,12 +236,6 @@ class AircraftMission(SGM):
             solve(pitch_constraint)
         )
 
-
-
-
-
-
-
     # similar events for gear and flap retraction time
     # alpha for rotation, aero for gear/flap retraction are easy with this formulation
 
@@ -261,6 +255,154 @@ class trajectory_analysis(model=some_ode_class,):
     model.p = input
     # so trajectory analysis distinguishes between parameters (inputs?) and sets
     # constants, not the ODE!!
+
+
+# wrapping an numeric python method (no solvers)
+class Wrapped(CondorModel):
+    inp1 = input()
+    inp2 = input()
+
+    out = my_function_to_wrap(inp1, inp2)
+
+    output.outname0 = out[0]
+    output.outname1 = out[1]
+    output.outname2 = out[2]
+
+
+# for external "codes" -- depends on backend/imp API
+# I guess also need to define a Model subclass?
+
+
+# some kind of inheritable descriptor?
+# fine for A here, don't know how to deal with x below?
+
+class LTI(DynamicsModel):
+    A = _inheritable_descriptor
+    B = ...
+    x = state(A.shape[0]) ???
+    u = parameter(B.shape[1])
+    dot[x] = A@x + B@u
+
+class double_integrator(LTI):
+    A = ...
+
+# then Aviary becomes
+
+class my_TTBW_analysis(Aviary):
+    propulsion = ...
+
+
+# probably needs to be a function that generate's what's needed?
+# actually, can it be in new? or call? then just need to figure out return container
+def LTI():
+
+    def __call__(A, B=None, C=None):
+        x = LTI.state(A.shape[0])
+        xdot = A@x
+        if B is not None:
+            u = LTI.input(B.shape[1])
+            xdot += B@u
+
+        LTI.dot[x] = xdot
+        if C is not None:
+            output = C @ x
+
+
+# do we want to (optionally) define the IO for sub-systems of a generated model?
+# does it make sense to provide a default?
+class GeneratedTrajectory(GeneratableCondorModel):
+    class propulsion(susbsystem, default=GASPPropulsion):
+        throttle = input()
+        TAS = input()
+        alt = input()
+        # what if a different trajectory model wants a different IO? for example, adding
+        # electric split? or required thrust? just re-type the trajectory? 
+        thrust = output()
+        fuel_rate = output()
+
+    class aero(susbsystem, default=GASPAero):
+        alpha = input()
+        TAS = input()
+        alt = input()
+        CD = output()
+        CL = output()
+
+
+#or is duck-typing sufficient?
+class GASPTrajectory(GeneratableCondorModel):
+    propulsion = CondorSubsystem(GASPPropulsion)
+    aero = CondorSubsystem(GASPAero)
+    weight_initial = parameter()
+
+    dynamics_model = GASPVehicleDynamics(aero=aero, propulsion=propulsion)
+
+    class fuel_burn(TrajectoryOutput):
+        ...
+
+    class range_flown(TrajectoryOutput):
+        ...
+
+# either way, may need to pass down instances like this to the dynamics model
+class GASPVehicleDynamics():
+    propulsion = CondorSubsystem(GASPPropulsion)
+    aero = CondorSubsystem(GASPAero)
+
+    distance = state()
+    alt = state()
+    TAS = state()
+    gamma = state()
+
+    # see dynamics model above with events etc
+
+
+
+
+class CoupledSizingClosure(CondorOptimizationModel):
+
+    # variables can get numeric attributes like initial, bounds, scaling?
+    sls = variable()
+    gtow = variable()
+    cruise_range = variable()
+    target_range = parameter()
+
+    # static analysis
+    # several of thsese return objects that trajectory can use
+    propulsion = RubberizedEngine(some_fixed_deck_ref, sls)
+    fuel_capacity, something_that_feeds_to_aero = GASPWeightsSizing(GTOW)
+    aero= GASPAeroModel(something_that_feeds_to_aero)
+
+    # trajectory has the most important performance metrics
+    trajectory = GASPTrajectory(
+        propulsion=propulsion,
+        aero=aero,
+        initial_weight = gtow
+    )
+
+    # this doesn't even need to be wrapped, I think this can just get duck-typed and
+    # turned into the right kind of expression
+    total_fuel = fuel_burned_with_margin_computation(trajectory.fuel_burn)
+
+    constraint.add(total_fuel == fuel_capcity)
+    constraint.add(target_range == trajectory.range_flown)
+
+closed_vehicle = CoupledSizingClosure(target_range=3500)
+# what kind of stuff gets reported?
+print(
+closed_vehicle.total_fuel,
+)
+plot(
+    closed_vehicle.trajectory.alt,
+    closed_vehicle.trajectory.range,
+    ...
+)
+
+
+
+
+
+
+
+
 
 
 
