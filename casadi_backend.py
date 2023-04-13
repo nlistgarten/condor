@@ -3,8 +3,8 @@ import casadi
 
 def symbol_generator(name, n=1, m=1, symmetric=False, diagonal=False):
     print("casadi creating",name, n, m, symmetric, diagonal)
-    #sym = casadi.MX.sym(name, (n, m))
-    sym = MixedMX.sym(name, (n, m))
+    sym = casadi.MX.sym(name, (n, m))
+    #sym = MixedMX.sym(name, (n, m))
     if symmetric:
         assert n == m
         return casadi.tril2symm(casadi.tril(sym))

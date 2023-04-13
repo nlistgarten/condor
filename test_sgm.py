@@ -1,9 +1,9 @@
 import numpy as np
-from condor import _condor_symbol_generator, _condor_computation, CondorModel, backend
+from condor import Symbol, FreeComputation, MatchedComputation, Model, backend
 
 
 #class DynamicsModel(metaclass=CondorModelType):
-class DynamicsModel(CondorModel):
+class DynamicsModel(Model):
     """
     DynamicsModel
 
@@ -16,8 +16,9 @@ class DynamicsModel(CondorModel):
     fundamentally need to decide how different computations play. Maybe "output" is the
     base on CondorModel, and it is always the one that is returned by calling -- would
     be consistent way to pull controllers, measurements, etc from the plant model
+    need API to specify which of the symbols are used as arguments to call?hkk
 
-    then trajectory analysis 
+    then trajectory analysis model's IMP can 
 
     """
     print("starting app code for DynamicsModel class")
@@ -25,10 +26,10 @@ class DynamicsModel(CondorModel):
     # TODO: this needs its own descriptor type? OR do we want user classes to do
     # t = DynamicsModel.independent_variable ? That would allow 
     independent_variable = backend.symbol_generator('t')
-    state = _condor_symbol_generator()
-    parameter = _condor_symbol_generator()
-    dot = _condor_computation(state)
-    output = _condor_computation()
+    state = Symbol()
+    parameter = Symbol()
+    dot = MatchedComputation(state)
+    output = FreeComputation()
     print("ending app code for DynamicsModel class")
 
 

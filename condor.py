@@ -4,11 +4,7 @@ import numpy as np
 # TODO: figure out how to make this an option/setting like django?
 import casadi_backend as backend
 
-class CondorDescriptorType(object):
-    pass
-
-
-class BaseDescriptor(CondorDescriptorType):
+class Expression:
     # these don't need to be descriptors, probably just a base class with
     # _set_resolve_name, called by CondorModelType.__new__
     # rename this class to CondorVariable? Expression? Something to capture both I and
@@ -46,107 +42,117 @@ class BaseDescriptor(CondorDescriptorType):
     # can I do all the name clash protection that's needed? from child to parent class I
     # think definitely, and probably can't protect user model from over-writing self
 
-
-    def __set_name__(self, owner, name):
-        print("setting", name, "for", owner, "as", self)
-        self._name = name
-        self._owner = owner
-        self._owner_name = self._owner.__class__.__name__
-        self._set_resolve_name()
-
     def _set_resolve_name(self):
-        self._resolve_name = ".".join([self._owner_name, self._name])
+        self._resolve_name = ".".join([self._model_name, self._name])
 
-    def __get__(self, obj, objtype=None):
-        print("getting", self._resolve_name, "as", self,  "for", obj)
-        pass
-        return 
-
-    def __set__(self, obj, value):
-        raise AttributeError(self._resolve_name + " cannot be set as " + self.__class__)
-
-    def __call__(cls, *args, **kwargs):
-        print("BaseDescriptor.__call__", cls, args, kwargs)
-
-    def __init__(self, name='', owner=None):
+    def __init__(self, name=None, model=None):
         print('BaseDescriptor.__init__', self)
-        if name and owner:
-            self.__set_name__(owner, name)
-        self._count = 0 # shortcut for flattned size?
-        self._container = [] # actual storage
-        self._init_kwargs = {}
 
-    def _inherit(self, new_owner_name, **kwargs):
-        # TODO: actually this isn't "inheriting" it's binding?
+        self._name = name
+        self._model = model
+        if model:
+            self._model_name = model.__class__.__name__
+        else:
+            self._model_name = None
+        if model and name:
+            self._set_resolve_name()
+        self._count = 0 # shortcut for flattned size?
+        self._container = []
+        # actual storage -- best type? want name, reference to symbolic, possibly
+        # additional metadata... maybe list of dict? at model instance creation, can
+        # iterate or key values, 
+        self._init_kwargs = {} 
+        # subclasses must provide _init_kwargs for binding to sub-classes
+
+    def bind(self, model_name, expression_type_name, **kwargs):
+        # copy and re-assign name
         if not kwargs:
             kwargs = self._init_kwargs
         new = self.__class__(**kwargs)
-        new._name = self._name
-        new._owner_name = new_owner_name
+        new._name = expression_type_name
+        new._model_name = model_name
         new._set_resolve_name()
         return new
 
 
-    #def __new__(cls, *args, **kwargs):
-    #    print("BaseDescriptor.__new__", cls, args, kwargs)
-    #    return cls()
-
-
-class _condor_symbol_generator(BaseDescriptor):
-    def __init__(self, func=backend.symbol_generator, name='', owner=None, **fixed_kwargs):
+class Symbol(Expression):
+    def __init__(self, name='', model=None, func=backend.symbol_generator, **fixed_kwargs):
         print('_condor_symbol_generator.__init__', self)
-        super().__init__(name, owner)
+        super().__init__(name, model)
         self.func = func
         self.fixed_kwargs = fixed_kwargs
-        self.init_kwargs = dict(func=func, fixed_kwargs=fixed_kwargs)
+        print(fixed_kwargs)
+        self._init_kwargs.update(dict(func=func,))
+        if fixed_kwargs:
+            self._init_kwargs.update(dict(fixed_kwargs=fixed_kwargs,))
 
     def __call__(self, n=1, m=1, symmetric=False, diagonal=False,  **kwargs):
         print("calling", self, "with args:", n, m, symmetric, diagonal)
 
+        if diagonal:
+            assert m == 1
+        elif symmetric:
+            assert n == m
         pass_kwargs = dict(
             name="%s_%d" % (self._resolve_name, self._count),
             n=n,
             m=m,
             symmetric=symmetric,
             diagonal=diagonal,
-            **self.fixed_kwargs,
             **kwargs
         )
-        self._count += 1
+        if self.fixed_kwargs:
+            pass_kwargs.update(**self.fixed_kwargs)
+        print(pass_kwargs)
+        if symmetric:
+            size = int(n*(n+1)/2)
+        else:
+            size = n*m
+        self._count += size
         out = self.func(**pass_kwargs)
-        #out = _condor_symbol_wrapped(out)
-        self._container.append(out)
-        # TODO: 
-        # actually, this needs to be a descriptor container for the symbol
-        # this allows dot setting of DynamicsModel parameter by a TrajectoryModel
-        # or does the fact that the symbol generator is keeping a reference mean we can
-        # access it? yes, requires __getattr__ on Model, could be fine
-
-
-
+        self._container.append(dict(
+            name=None,
+            symbol=out,
+            n=n,
+            m=m,
+            symmetric=symmetric,
+            diagonal=diagonal,
+            size=size,
+            **kwargs,
+        ))
         return out
 
 
-class _condor_computation(BaseDescriptor):
-    def __init__(self, matched_to=None, name='', owner=None, ):
-        print('init', self)
-        super().__init__(name, owner)
-        self._matched_to = matched_to
-        self._init_kwargs = dict(matched_to=matched_to)
-        print("matched to", matched_to)
-        pass
-
-    def __setitem__(self, key, value):
-        print("setting item for", self, ":", key, "=", value)
-        print(f"owner={self._owner_name}")
-        pass
+class FreeComputation(Expression):
+    def __new__(cls, *args, **kwargs):
+        print("init subclass free comp", cls, type(cls), args, kwargs)
+        cls.known_attrs = cls.__dict__.copy()
+        cls = super().__new__(cls, *args, **kwargs)
+        return cls
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
+            print('skipping private _')
+            super().__setattr__(name, value)
+        elif name in self.known_attrs:
+            print('skipping known')
             super().__setattr__(name, value)
         else:
-            print("setting item for", self, ".", name, "=", value)
-            print(f"owner={self._owner_name}")
+            print("setting special for", self, ".", name, "=", value)
+            print(f"owner={self._model_name}")
+
+
+class MatchedComputation(Expression):
+    def __init__(self, name='', model=None, matched_to=None):
+        print('init', self)
+        super().__init__(name, model)
+        self._matched_to = matched_to
+        self._init_kwargs = dict(matched_to=matched_to)
+        print("matched to", matched_to)
+
+    def __setitem__(self, key, value):
+        print("setting item for", self, ":", key, "=", value)
+        print(f"owner={self._model_name}")
         pass
 
 
@@ -160,47 +166,32 @@ class CondorClassDict(dict):
         #breakpoint()
         return super().__setitem__(*args, **kwargs)
 
-from enum import _is_dunder
 
-class CondorComputationContainer(type):
-    """
-    An output container that allows named dot access and integer indexing
-    """
-
-
-class CondorModelType(type):
+class ModelType(type):
     """
     Metaclass for Condor  model
     """
 
     @classmethod
-    def __prepare__(cls, name, bases, **kwds):
-        print("CondorModelType.__prepare__  for", name)
-        sup_dict = super().__prepare__(cls, name, bases, **kwds)
+    def __prepare__(cls, model_name, bases, **kwds):
+        print("CondorModelType.__prepare__  for", model_name)
+        sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
         cls_dict = CondorClassDict(**sup_dict)
 
         dicts = [base.__dict__ for base in bases]
 
         for _dict in dicts:
             for k, v in _dict.items():
-                if (
-                    isinstance(v, BaseDescriptor) or
-                    isinstance(v, BaseDescriptor.__class__)
-                ):
+                if isinstance(v, Expression):
                     v_class = v.__class__
                     v_init_kwargs = v._init_kwargs.copy()
                     for init_k, init_v  in v._init_kwargs.items():
-                        if isinstance(init_v, BaseDescriptor):
+                        if isinstance(init_v, Expression):
                             v_init_kwargs[init_k] = cls_dict[init_v._name]
-                    cls_dict[k] = v._inherit(name, **v_init_kwargs)
-
-        # TODO: don't love the level of coupling between CondorModel and descriptor
-        # inheritance, but perhaps that's unavoidable. don't love the use of
-        # _set_resolve_name, is it safe to assume name here will always match the
-        # __set_name__ thae new descriptor sees? It should be, but slightly worried
-        # assumption will break.
-
-        print("end prepare for", name, cls_dict)
+                    cls_dict[k] = v.bind(
+                        model_name, expression_type_name=k, **v_init_kwargs
+                    )
+        print("end prepare for", model_name, cls_dict)
         return cls_dict
 
     def __call__(cls, *args, **kwargs):
@@ -211,9 +202,11 @@ class CondorModelType(type):
         print("CondorModelType.__new__ for", name)
         print(attrs)
         new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
+
+
         return new_cls
 
-class CondorModel(metaclass=CondorModelType):
+class Model(metaclass=ModelType):
     # should output always be here?
     pass
 
