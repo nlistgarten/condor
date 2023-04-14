@@ -6,22 +6,8 @@ from dataclasses import dataclass
 import casadi_backend as backend
 
 
-class ExpressionContainers(list):
-    def get(self, **kwargs):
-        """
-        return the first item in this list of dataclasses where every field matches
-        kwargs, else None
-        """
-        for item in self:
-            this_item = True
-            for field_name, field_value in kwargs.items():
-                this_item = this_item & (getattr(item, field_name) is field_value)
-                if not this_item:
-                    break
-            if this_item:
-                return item
-        return None
-
+class BaseContainer:
+    pass
 
 class Expression:
     # these don't need to be descriptors, probably just a base class with
@@ -76,7 +62,7 @@ class Expression:
         if model and name:
             self._set_resolve_name()
         self._count = 0 # shortcut for flattned size?
-        self._containers = ExpressionContainers()
+        self._containers = []
         self._symbol_container = symbol_container
         # actual storage -- best type? want name, reference to symbolic, possibly
         # additional metadata... maybe list of dict? at model instance creation, can
@@ -95,8 +81,27 @@ class Expression:
         new._set_resolve_name()
         return new
 
+    def get(self, **kwargs):
+        """
+        return list of expression containers  where every field matches kwargs
+        """
+        # TODO: what's the lightest-weight way to be able query? these should get called
+        # very few times, so hopefully don't need to stress too much
+        items = []
+        for item in self._containers:
+            this_item = True
+            for field_name, field_value in kwargs.items():
+                this_item = this_item & (getattr(item, field_name) is field_value)
+                if not this_item:
+                    break
+            if this_item:
+                items.append(item)
+        if len(items) == 1:
+            return items[0]
+        return items
+
 @dataclass
-class SymbolContainer:
+class SymbolContainer(BaseContainer):
     # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
     # symbol_generator. It should be dry-able
     name: str
@@ -171,7 +176,7 @@ class Symbol(Expression):
         return out
 
 @dataclass
-class FreeComputationContainer:
+class FreeComputationContainer(BaseContainer):
     name: str
     symbol: backend.symbol_class
 
@@ -196,7 +201,7 @@ class FreeComputation(Expression):
             ))
 
 @dataclass
-class MatchedComputationContainer:
+class MatchedComputationContainer(BaseContainer):
     match: backend.symbol_class
     symbol: backend.symbol_class
 
@@ -284,9 +289,8 @@ class ModelType(type):
                 symbol_instances.append(attr_val)
             if isinstance(attr_val, backend.symbol_class):
                 for symbol_instance in symbol_instances:
-                    container = symbol_instance._containers.get(symbol=attr_val)
-                    if container is not None:
-                        # This should only occur once
+                    container = symbol_instance.get(symbol=attr_val)
+                    if isinstance(container, BaseContainer):
                         container.name = attr_name
                 # add intermediate computations?
                 # create fields on self?
