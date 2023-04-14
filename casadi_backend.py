@@ -1,5 +1,6 @@
 import casadi
 
+symbol_class = casadi.MX
 
 def symbol_generator(name, n=1, m=1, symmetric=False, diagonal=False):
     print("casadi creating",name, n, m, symmetric, diagonal)

@@ -1,8 +1,27 @@
 import numpy as np
+from dataclasses import dataclass
 
 
 # TODO: figure out how to make this an option/setting like django?
 import casadi_backend as backend
+
+
+class ExpressionContainers(list):
+    def get(self, **kwargs):
+        """
+        return the first item in this list of dataclasses where every field matches
+        kwargs, else None
+        """
+        for item in self:
+            this_item = True
+            for field_name, field_value in kwargs.items():
+                this_item = this_item & (getattr(item, field_name) is field_value)
+                if not this_item:
+                    break
+            if this_item:
+                return item
+        return None
+
 
 class Expression:
     # these don't need to be descriptors, probably just a base class with
@@ -45,7 +64,7 @@ class Expression:
     def _set_resolve_name(self):
         self._resolve_name = ".".join([self._model_name, self._name])
 
-    def __init__(self, name=None, model=None):
+    def __init__(self, name=None, model=None, symbol_container=None):
         print('BaseDescriptor.__init__', self)
 
         self._name = name
@@ -57,12 +76,14 @@ class Expression:
         if model and name:
             self._set_resolve_name()
         self._count = 0 # shortcut for flattned size?
-        self._container = []
+        self._containers = ExpressionContainers()
+        self._symbol_container = symbol_container
         # actual storage -- best type? want name, reference to symbolic, possibly
         # additional metadata... maybe list of dict? at model instance creation, can
         # iterate or key values, 
-        self._init_kwargs = {} 
+        self._init_kwargs = dict()
         # subclasses must provide _init_kwargs for binding to sub-classes
+        # TODO: can this just be taken from __init__ kwargs easily?
 
     def bind(self, model_name, expression_type_name, **kwargs):
         # copy and re-assign name
@@ -74,19 +95,47 @@ class Expression:
         new._set_resolve_name()
         return new
 
+@dataclass
+class SymbolContainer:
+    # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
+    # symbol_generator. It should be dry-able
+    name: str
+    symbol: backend.symbol_class
+    n: int
+    m: int
+    symmetric: bool
+    diagonal: bool
+    size: int
 
 class Symbol(Expression):
-    def __init__(self, name='', model=None, func=backend.symbol_generator, **fixed_kwargs):
+    # TODO: is it possible to inherit the kwargs name, model, symbol_container?
+    # repeated... I guess kwargs only? but like name as optional positional. maybe
+    # additional only kwargs? how about update default? Should the default be done by
+    # name? e.g., ExpressionSubclass.__name__ + 'Container'? See FreeComputation below
+    def __init__(
+        self, name='', model=None,
+        func=backend.symbol_generator,
+    ):
         print('_condor_symbol_generator.__init__', self)
-        super().__init__(name, model)
+        # TODO: should model types define the extra fields here?
+        # I guess these could be metaclasses, and things like DynamicsModel are really
+        # model types? could define state by creating inner class definition that
+        # subclasses this to define extra fields (e.g., optimization variable or
+        # implicit outputs getting ref, scaling, etc)
+        # this defaults with n, m, symmetric, etc.
+        # but actually do need to return just symbol from user code. so maybe libraries
+        # define symbolcontainer subclasses, __call__ takes the fields as args?
+        # they can just be dataclasses.
+        # having DynamicModelType be a metaclass (or, allowing/encouraging library
+        # Model(Types) to write a metaclass might allow useful hooks?j
+        super().__init__(name, model, symbol_container=SymbolContainer)
         self.func = func
-        self.fixed_kwargs = fixed_kwargs
-        print(fixed_kwargs)
-        self._init_kwargs.update(dict(func=func,))
-        if fixed_kwargs:
-            self._init_kwargs.update(dict(fixed_kwargs=fixed_kwargs,))
+        self._init_kwargs.update(dict(func=func))
+        #self.fixed_kwargs = fixed_kwargs
+        #if fixed_kwargs:
+        #    self._init_kwargs.update(dict(fixed_kwargs=fixed_kwargs,))
 
-    def __call__(self, n=1, m=1, symmetric=False, diagonal=False,  **kwargs):
+    def __call__(self, n=1, m=1, symmetric=False, diagonal=False,):
         print("calling", self, "with args:", n, m, symmetric, diagonal)
 
         if diagonal:
@@ -94,23 +143,23 @@ class Symbol(Expression):
         elif symmetric:
             assert n == m
         pass_kwargs = dict(
-            name="%s_%d" % (self._resolve_name, self._count),
+            name="%s_%d" % (self._resolve_name, len(self._containers)),
             n=n,
             m=m,
             symmetric=symmetric,
             diagonal=diagonal,
-            **kwargs
+            #**kwargs
         )
-        if self.fixed_kwargs:
-            pass_kwargs.update(**self.fixed_kwargs)
-        print(pass_kwargs)
+        #if self.fixed_kwargs:
+        #    pass_kwargs.update(**self.fixed_kwargs)
+        #print(pass_kwargs)
         if symmetric:
             size = int(n*(n+1)/2)
         else:
             size = n*m
         self._count += size
         out = self.func(**pass_kwargs)
-        self._container.append(dict(
+        self._containers.append(self._symbol_container(
             name=None,
             symbol=out,
             n=n,
@@ -118,34 +167,43 @@ class Symbol(Expression):
             symmetric=symmetric,
             diagonal=diagonal,
             size=size,
-            **kwargs,
         ))
         return out
 
+@dataclass
+class FreeComputationContainer:
+    name: str
+    symbol: backend.symbol_class
 
 class FreeComputation(Expression):
-    def __new__(cls, *args, **kwargs):
-        print("init subclass free comp", cls, type(cls), args, kwargs)
-        cls.known_attrs = cls.__dict__.copy()
-        cls = super().__new__(cls, *args, **kwargs)
-        return cls
+    def __init__(name='', model=None,):
+        super().__init__(name='', model=None, symbol_container=FreeComputationContainer)
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
+            # I would like it if I could DRY-ly check for "known" class attributes to
+            # skip/raise clash, but can't tell the difference between user code and
+            # library code, latter does need to set them, also not clear when/where to
+            # collect. So all core variable names on Expression must be prefixed by _
             print('skipping private _')
-            super().__setattr__(name, value)
-        elif name in self.known_attrs:
-            print('skipping known')
             super().__setattr__(name, value)
         else:
             print("setting special for", self, ".", name, "=", value)
             print(f"owner={self._model_name}")
+            self._containers.append(self._symbol_container(
+                name=name,
+                symbol=value,
+            ))
 
+@dataclass
+class MatchedComputationContainer:
+    match: backend.symbol_class
+    symbol: backend.symbol_class
 
 class MatchedComputation(Expression):
     def __init__(self, name='', model=None, matched_to=None):
         print('init', self)
-        super().__init__(name, model)
+        super().__init__(name, model, symbol_container=MatchedComputationContainer)
         self._matched_to = matched_to
         self._init_kwargs = dict(matched_to=matched_to)
         print("matched to", matched_to)
@@ -153,6 +211,10 @@ class MatchedComputation(Expression):
     def __setitem__(self, key, value):
         print("setting item for", self, ":", key, "=", value)
         print(f"owner={self._model_name}")
+        self._containers.append(self._symbol_container(
+            match=key,
+            symbol=value,
+        ))
         pass
 
 
@@ -201,7 +263,37 @@ class ModelType(type):
     def __new__(cls, name, bases, attrs, **kwargs):
         print("CondorModelType.__new__ for", name)
         print(attrs)
+        # what gets manipulated on attrs before new_cls?
         new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
+
+        # find implementation from backend/bases, create and assign (called by Model.__init__)
+        for base in bases:
+            break
+
+        symbol_instances = []
+        for attr_name, attr_val in attrs.items():
+            # process name clahees on attr_name? can't protect against internal
+            # over-write (maybe user intends to do that) but can raise error for
+            # over-writing parent, e.g., creating a "state" variable in a DynamicModel
+            # subclass
+            if isinstance(attr_val, Expression):
+                attr_val.model = new_cls
+                # possibly don't want to directly access state? just re-direct to
+                # _containers? and have back-up ref to parent class
+            if isinstance(attr_val, Symbol):
+                symbol_instances.append(attr_val)
+            if isinstance(attr_val, backend.symbol_class):
+                for symbol_instance in symbol_instances:
+                    container = symbol_instance._containers.get(symbol=attr_val)
+                    if container is not None:
+                        # This should only occur once
+                        container.name = attr_name
+                # add intermediate computations?
+                # create fields on self?
+
+            # process/default options?
+
+
 
 
         return new_cls
