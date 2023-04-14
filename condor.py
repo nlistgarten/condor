@@ -81,6 +81,9 @@ class Expression:
         new._set_resolve_name()
         return new
 
+    def list_of(self, field_name):
+        return [getattr(container, field_name) for container in self._containers]
+
     def get(self, **kwargs):
         """
         return list of expression containers  where every field matches kwargs
