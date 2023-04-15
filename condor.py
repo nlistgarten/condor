@@ -136,7 +136,19 @@ class SymbolContainer(BaseContainer):
     diagonal: bool
     size: int
 
-class Symbol(Expression):
+class IndependentExpression(Expression):
+    """
+    Expressions that are arguments to implementation:
+    Symbol, deferred subsystems
+    others?
+
+    DependentExpressions instead of ComputedExpressions
+    free, matched
+    Maybe something that just creates data structure? Could be useful for inheriting
+    Aviary cleanly. Might need equivalent indepenentexpression. 
+    """
+
+class Symbol(IndependentExpression):
     # TODO: is it possible to inherit the kwargs name, model, symbol_container?
     # repeated... I guess kwargs only? but like name as optional positional. maybe
     # additional only kwargs? how about update default? Should the default be done by
@@ -255,6 +267,11 @@ class CondorClassDict(dict):
         #breakpoint()
         return super().__setitem__(*args, **kwargs)
 
+class Options:
+    """
+    Class mix-in to flag back-end options
+    """
+
 
 class ModelType(type):
     """
@@ -291,11 +308,64 @@ class ModelType(type):
         print("CondorModelType.__new__ for", name)
         print(attrs)
         # what gets manipulated on attrs before new_cls?
-        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
 
-        # find implementation from backend/bases, create and assign (called by Model.__init__)
+        super_attrs = {}
+
+        # look for inner classes that subclass backend
+        # does this need to be done before creating the class? I guess we want to move
+        # this to a regular name, add backend name as attribute to option itself? no
+        # need to clutter model namespace with Casadi
+
+        backend_options = {
+            attr_name: attr_val
+            for attr_name, attr_val in attrs.items()
+            if isinstance(attr_val, type) and issubclass(attr_val, Options)
+        }
+        if len(backend_options):
+            print("\n"*10, *list(backend_options.items()), "\n"*10, sep="\n")
+            # TODO: actually, this is only expected on user models; defaults etc come
+            # from implementation, should only ever expect 1
+            # inheritance example:
+            """
+            class UpcycleSolverOptions(Options):
+                warm_start = True
+                bound_behavior = backend.algebraicsystem.bound_behavior_options.L2
+                exact_hessian = False
+
+
+            class Upsolver(AlgebraicSystem):
+
+                class Casadi(UpcycleSolverOptions):
+                    pass
+
+            class MostUpsolvers(Upsolver):
+                ... (define model)
+                # automatically inherit UpcycleSolverOptions settings for Casadi backend
+
+            class ParicularUpsolver(Upsolver):
+                ... (define model)
+
+                class Casadi(UpcycleSolverOptions):
+                    # over write specific settings, everything else should be inherited
+                    exact_hessian = True
+
+            """
+
         for base in bases:
-            break
+            # TODO: make sure it's the right resolution order
+            if (
+                isinstance(base, ModelType) and 
+                (base.__name__ in backend.implementations.__dict__)
+            ):
+                # TODO: or are these directly on backend along with symbol_Class,
+                # symbol_generator, and other things are in a utils submodule?
+                cls.implementation = getattr(
+                    backend.implementations,
+                    base.__name__
+                )
+
+
+        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
 
         symbol_instances = []
         for attr_name, attr_val in attrs.items():
@@ -308,8 +378,10 @@ class ModelType(type):
                 # need hook to define which Expression types form args of imp.call and in
                 # what order? Or __init__ just take kwargs and it's up to the
                 # implementation/backend to validate?
+                # this one definitely needs to be done after super new since we're
+                # binding the class object
                 attr_val.bind(attr_name, new_cls)
-            if isinstance(attr_val, Symbol):
+            if isinstance(attr_val, IndependentExpression):
                 # TODO: assumes Symbol is the base of all inputs to the model functions?
                 # is there a better way to declare that?
                 # create fields on self?
@@ -320,6 +392,8 @@ class ModelType(type):
                     # not a list (empty or len > 1)
                     if isinstance(container, BaseContainer):
                         container.name = attr_name
+                    # replace attr_val with container? then this should be done before
+                    # calling super_new
                 # add intermediate computations?
             # TODO: add hook so e.g., DynamicModel (or consumer) can deal with inner
             # class for events. Not sure if that's the same as a deferred
@@ -328,42 +402,47 @@ class ModelType(type):
             # TODO: process/inherit options for backend -- similar to django Meta
             # processing
 
-
-
-
+            # TODO: add output fields? they'll have to be constructed so implementation
+            # data can be unpacked to represent model (chain dot accessors)
 
         return new_cls
 
 class Model(metaclass=ModelType):
-    # should output always be here?
-    pass
+    _intermediate_computation = FreeComputation()
+
+    def __init__(self, *args, **kwargs):
+        cls = self.__class__
+        # call cls.imp, fill datastructure
 
 
-"""
-do parent systems always write subsystems by getting all their output? I think so
-Groups definitely need some type of naming scheme because all outputs get lifted up as
-outputs (not disciplined/strict system encapsolation). Although my implementation of a
-blockdiagram also does this by default?
-
-get_val is nice for masking only what's needed, I guess we could use masks
-what about multiple calls where some values don't change? need to reference that
-
-in general symbolic and numeric references,
-
-yeah, might need something
-    fuel_flow_rate, thrust = propulsion(flight_condition, throttle)[
-        propulsion.output.fuel_flow_rate,
-        propulsion.output.thrust
-    ]
-
-which is ~ how the output df indexing should work? calls should genreally return the df,
-indexable by number, symbolic object, etc.
+class Function(Model):
+    input = Symbol()
+    output = FreeComputation()
 
 
-"""
+class AlgebraicSystem(Model):
+    input = Symbol()
+    #implicit_output = BoundedSymbol() # TODO: need one with bound data
+    implicit_output = Symbol() # TODO: need one with bound data
+    residual = FreeComputation() 
+    # unmatched, but maybe a subclass or imp might check lengths of residuals and
+    # implicit_outputs to ensure enough DOF?
+    explicit_output = FreeComputation()
+    initializer = MatchedComputation(implicit_output)
+
+#class OptimizationProblem(Model):
+#    variable = Symbol()
+#    objective = SingleSymbol()
+#    # I guess this one is a descriptor? so user code `objetive = ...`
+#    # or it's just a contract in the API that user writes one? feasibility problem if
+#    # not?
+#    constraint = Relational()
+#    # Can provide syntax candy for constraint. Requires backend supports symbolic
+#    # relations.
 
 
 class DynamicsModel(Model):
+    # 
     """
     DynamicsModel
 

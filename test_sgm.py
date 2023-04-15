@@ -1,8 +1,7 @@
 import numpy as np
-from condor import DynamicsModel
+import condor as co
 
-
-class MySystem(DynamicsModel):
+class MySystem(co.DynamicsModel):
     print("starting user code for LTI class")
     n = 2
     m = 1
@@ -25,3 +24,13 @@ class MySystem(DynamicsModel):
     output.y = C.T @ C
     print("ending user code for LTI class")
 
+class Sys2(co.Function):
+    x = input()
+    y = input()
+    output.z = x**2 + y
+
+class MySolver(co.AlgebraicSystem):
+    x = input()
+    z = input(n=2)
+    y2 = implicit_output()
+    y1 = implicit_output()

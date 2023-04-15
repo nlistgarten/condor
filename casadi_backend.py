@@ -1,4 +1,5 @@
 import casadi
+import casadi_implementations as implementations
 
 symbol_class = casadi.MX
 
