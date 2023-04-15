@@ -6,8 +6,6 @@ from dataclasses import dataclass
 import casadi_backend as backend
 
 
-class BaseContainer:
-    pass
 
 class Expression:
     # these don't need to be descriptors, probably just a base class with
@@ -50,29 +48,37 @@ class Expression:
     def _set_resolve_name(self):
         self._resolve_name = ".".join([self._model_name, self._name])
 
-    def __init__(self, name=None, model=None, symbol_container=None):
-        print('BaseDescriptor.__init__', self)
-
+    def __init__(self, name='', model=None, symbol_container=None):
         self._name = name
         self._model = model
         if model:
             self._model_name = model.__class__.__name__
         else:
-            self._model_name = None
-        if model and name:
-            self._set_resolve_name()
+            self._model_name = ''
+        self._set_resolve_name()
         self._count = 0 # shortcut for flattned size?
         self._containers = []
         self._symbol_container = symbol_container
-        # actual storage -- best type? want name, reference to symbolic, possibly
-        # additional metadata... maybe list of dict? at model instance creation, can
-        # iterate or key values, 
         self._init_kwargs = dict()
         # subclasses must provide _init_kwargs for binding to sub-classes
         # TODO: can this just be taken from __init__ kwargs easily?
+        # or __init_subclass__ hook?
 
-    def bind(self, model_name, expression_type_name, **kwargs):
-        # copy and re-assign name
+
+    def bind(self, name, model,):
+        # bind an existing expression class to a model
+        self._name = name
+        self._model = model
+        if self._model_name:
+            if self._model_name != model.__name__:
+                raise ValueError("attempting to bind to a class that wasn't inherited")
+        else:
+            self._model_name = model.__name__
+        self._set_resolve_name()
+
+    def inherit(self, model_name, expression_type_name, **kwargs):
+        # copy and re-assign name -- used in ModelType.__prepare__ before model is
+        # available
         if not kwargs:
             kwargs = self._init_kwargs
         new = self.__class__(**kwargs)
@@ -81,15 +87,22 @@ class Expression:
         new._set_resolve_name()
         return new
 
+    # TODO: replace with a descriptor that can be dot accessed?
     def list_of(self, field_name):
         return [getattr(container, field_name) for container in self._containers]
 
+    def __repr__(self):
+        if self._resolve_name:
+            return self._resolve_name
+
     def get(self, **kwargs):
         """
-        return list of expression containers  where every field matches kwargs
+        return list of expression containers where every field matches kwargs
         """
         # TODO: what's the lightest-weight way to be able query? these should get called
-        # very few times, so hopefully don't need to stress too much
+        # very few times, so hopefully don't need to stress too much about
+        # implementation
+        # would be nice to be able to follow references, etc. can match be used?
         items = []
         for item in self._containers:
             this_item = True
@@ -103,10 +116,18 @@ class Expression:
             return items[0]
         return items
 
+    def create_container(self, **kwargs):
+        kwargs.update(dict(expression_type=self))
+        self._containers.append(self._symbol_container(**kwargs))
+
+@dataclass
+class BaseContainer:
+    expression_type: Expression
+
 @dataclass
 class SymbolContainer(BaseContainer):
     # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
-    # symbol_generator. It should be dry-able
+    # symbol_generator. It should be dry-able, but validation is complicated..
     name: str
     symbol: backend.symbol_class
     n: int
@@ -124,7 +145,6 @@ class Symbol(Expression):
         self, name='', model=None,
         func=backend.symbol_generator,
     ):
-        print('_condor_symbol_generator.__init__', self)
         # TODO: should model types define the extra fields here?
         # I guess these could be metaclasses, and things like DynamicsModel are really
         # model types? could define state by creating inner class definition that
@@ -139,9 +159,6 @@ class Symbol(Expression):
         super().__init__(name, model, symbol_container=SymbolContainer)
         self.func = func
         self._init_kwargs.update(dict(func=func))
-        #self.fixed_kwargs = fixed_kwargs
-        #if fixed_kwargs:
-        #    self._init_kwargs.update(dict(fixed_kwargs=fixed_kwargs,))
 
     def __call__(self, n=1, m=1, symmetric=False, diagonal=False,):
         print("calling", self, "with args:", n, m, symmetric, diagonal)
@@ -167,7 +184,7 @@ class Symbol(Expression):
             size = n*m
         self._count += size
         out = self.func(**pass_kwargs)
-        self._containers.append(self._symbol_container(
+        self.create_container(
             name=None,
             symbol=out,
             n=n,
@@ -175,7 +192,7 @@ class Symbol(Expression):
             symmetric=symmetric,
             diagonal=diagonal,
             size=size,
-        ))
+        )
         return out
 
 @dataclass
@@ -184,8 +201,8 @@ class FreeComputationContainer(BaseContainer):
     symbol: backend.symbol_class
 
 class FreeComputation(Expression):
-    def __init__(name='', model=None,):
-        super().__init__(name='', model=None, symbol_container=FreeComputationContainer)
+    def __init__(self, name='', model=None,):
+        super().__init__(name=name, model=model, symbol_container=FreeComputationContainer)
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
@@ -198,10 +215,10 @@ class FreeComputation(Expression):
         else:
             print("setting special for", self, ".", name, "=", value)
             print(f"owner={self._model_name}")
-            self._containers.append(self._symbol_container(
+            self.create_container(
                 name=name,
                 symbol=value,
-            ))
+            )
 
 @dataclass
 class MatchedComputationContainer(BaseContainer):
@@ -209,21 +226,23 @@ class MatchedComputationContainer(BaseContainer):
     symbol: backend.symbol_class
 
 class MatchedComputation(Expression):
-    def __init__(self, name='', model=None, matched_to=None):
-        print('init', self)
+    def __init__(self, matched_to=None, model=None, name=''):
         super().__init__(name, model, symbol_container=MatchedComputationContainer)
         self._matched_to = matched_to
-        self._init_kwargs = dict(matched_to=matched_to)
+        self._init_kwargs.update(dict(matched_to=matched_to))
         print("matched to", matched_to)
 
     def __setitem__(self, key, value):
         print("setting item for", self, ":", key, "=", value)
         print(f"owner={self._model_name}")
-        self._containers.append(self._symbol_container(
-            match=key,
-            symbol=value,
-        ))
-        pass
+        if isinstance(key, backend.symbol_class):
+            match = self._matched_to.get(symbol=key)
+            if isinstance(match, list):
+                raise ValueError
+            self.create_container(
+                match=match,
+                symbol=value,
+            )
 
 
 # may not be  really necessary, place holder in case it is
@@ -258,7 +277,7 @@ class ModelType(type):
                     for init_k, init_v  in v._init_kwargs.items():
                         if isinstance(init_v, Expression):
                             v_init_kwargs[init_k] = cls_dict[init_v._name]
-                    cls_dict[k] = v.bind(
+                    cls_dict[k] = v.inherit(
                         model_name, expression_type_name=k, **v_init_kwargs
                     )
         print("end prepare for", model_name, cls_dict)
@@ -284,21 +303,31 @@ class ModelType(type):
             # over-write (maybe user intends to do that) but can raise error for
             # over-writing parent, e.g., creating a "state" variable in a DynamicModel
             # subclass
+            # TODO: replace ifs with match?
             if isinstance(attr_val, Expression):
-                attr_val.model = new_cls
-                # possibly don't want to directly access state? just re-direct to
-                # _containers? and have back-up ref to parent class
+                # need hook to define which Expression types form args of imp.call and in
+                # what order? Or __init__ just take kwargs and it's up to the
+                # implementation/backend to validate?
+                attr_val.bind(attr_name, new_cls)
             if isinstance(attr_val, Symbol):
+                # TODO: assumes Symbol is the base of all inputs to the model functions?
+                # is there a better way to declare that?
+                # create fields on self?
                 symbol_instances.append(attr_val)
             if isinstance(attr_val, backend.symbol_class):
                 for symbol_instance in symbol_instances:
                     container = symbol_instance.get(symbol=attr_val)
+                    # not a list (empty or len > 1)
                     if isinstance(container, BaseContainer):
                         container.name = attr_name
                 # add intermediate computations?
-                # create fields on self?
+            # TODO: add hook so e.g., DynamicModel (or consumer) can deal with inner
+            # class for events. Not sure if that's the same as a deferred
+            # subsystem -- 
 
-            # process/default options?
+            # TODO: process/inherit options for backend -- similar to django Meta
+            # processing
+
 
 
 
@@ -332,5 +361,35 @@ indexable by number, symbolic object, etc.
 
 
 """
+
+
+class DynamicsModel(Model):
+    """
+    DynamicsModel
+
+    need input? (e.g., time varying paremeter) -> a parent class pushes input in
+    or skip, assume plant always "pulls" input in
+
+    in this context is "output" always point-wise in time? I think so, and it's a
+    trajectory analysis model's outputs that define overall output
+
+    fundamentally need to decide how different computations play. Maybe "output" is the
+    base on CondorModel, and it is always the one that is returned by calling -- would
+    be consistent way to pull controllers, measurements, etc from the plant model
+    need API to specify which of the symbols are used as arguments to call?hkk
+
+    then trajectory analysis model's IMP can 
+
+    """
+    print("starting app code for DynamicsModel class")
+
+    # TODO: this needs its own descriptor type? OR do we want user classes to do
+    # t = DynamicsModel.independent_variable ? That would allow 
+    independent_variable = backend.symbol_generator('t')
+    state = Symbol()
+    parameter = Symbol()
+    dot = MatchedComputation(state)
+    output = FreeComputation()
+    print("ending app code for DynamicsModel class")
 
 
