@@ -40,6 +40,7 @@ class Expression:
         # of checking name? Anyway, really don't like needing to prefix all Expression
         # attributes with _ because of FreeComputation... 
 
+
         self._name = name
         self._model = model
         if model:
@@ -117,6 +118,7 @@ class Expression:
     def create_container(self, **kwargs):
         kwargs.update(dict(expression_type=self))
         self._containers.append(self._symbol_container(**kwargs))
+
 
 @dataclass
 class BaseContainer:
@@ -225,7 +227,11 @@ class Symbol(IndependentExpression):
 class FreeComputationContainer(BaseContainer):
     name: str
 
-class FreeComputation(Expression):
+
+class DependentExpression(Expression):
+    pass
+
+class FreeComputation(DependentExpression):
     def __init__(self, name='', model=None,):
         super().__init__(name=name, model=model, symbol_container=FreeComputationContainer)
 
@@ -245,7 +251,7 @@ class FreeComputation(Expression):
 class MatchedComputationContainer(BaseContainer):
     match: BaseContainer
 
-class MatchedComputation(Expression):
+class MatchedComputation(DependentExpression):
     def __init__(self, matched_to=None, model=None, name=''):
         super().__init__(name, model, symbol_container=MatchedComputationContainer)
         self._matched_to = matched_to
@@ -360,24 +366,24 @@ class ModelType(type):
         return super().__call__(cls, *args, **kwargs)
 
     def __new__(cls, name, bases, attrs, **kwargs):
+        # TODO: replace if tree with match cases?
+
+        # TODO: add hooks so e.g., DynamicModel (or consumer) can deal with inner
+        # class for events. Not sure if that's the same as a deferred subsystem -- 
+        # can hooks be classmethods on the Model subclass? I suspect at least post_new
+        # hook will be dot callable, pre_new hook can be taken from attrs?
+        # need to return a status (defined by enum?) of continue rest of if-tree or
+        # continue to next attr
+        pre_super_new_hook = attrs.pop('pre_super_new_attr_hook', None)
+        # pre_new_attr_hook(super_attrs, attr_name, attr_val)
+        post_super_new_hook = attrs.pop('post_super_new_attr_hook', None)
+        # pre_new_attr_hook(new_cls, attr_name, attr_val)
+
         print("CondorModelType.__new__ for", name)
         print(attrs)
         # what gets manipulated on attrs before new_cls?
 
         super_attrs = {}
-
-        # look for inner classes that subclass backend
-        # does this need to be done before creating the class? I guess we want to move
-        # this to a regular name, add backend name as attribute to option itself? no
-        # need to clutter model namespace with Casadi
-
-        backend_options = {
-            attr_name: attr_val
-            for attr_name, attr_val in attrs.items()
-            if isinstance(attr_val, type) and issubclass(attr_val, Options)
-        }
-        if len(backend_options):
-            print("\n"*10, *list(backend_options.items()), "\n"*10, sep="\n")
 
         for base in bases:
             # TODO: make sure it's the right resolution order
@@ -387,21 +393,67 @@ class ModelType(type):
             ):
                 # TODO: or are these directly on backend along with symbol_Class,
                 # symbol_generator, and other things are in a utils submodule?
-                cls.implementation = getattr(
+                super_attrs['implementation'] = getattr(
                     backend.implementations,
                     base.__name__
                 )
+            # TODO: also collect base's dicts for clash protection
 
-
-        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
-
+        backend_options = {}
         symbol_instances = []
+
+
         for attr_name, attr_val in attrs.items():
             # TODO: process name clahees on attr_name? can't protect against internal
             # over-write (maybe user intends to do that) but can raise error for
             # over-writing parent, e.g., creating a "state" variable in a DynamicModel
             # subclass
-            # TODO: replace if tree with match cases?
+
+            # TODO: hook for pre- super_new call
+
+            pass_attr = True
+
+            if isinstance(attr_val, type) and issubclass(attr_val, Options):
+                backend_options[attr_name] =  attr_val
+                pass_attr = False
+                continue
+            if isinstance(attr_val, IndependentExpression):
+                symbol_instances.append(attr_val)
+            if isinstance(attr_val, Expression):
+                # TODO: may need to deal with both cases that might occur: 
+                # ModelType defining field OR user calling a model? Or should output
+                # datastructure not be a subclass of BaseContainer? Probably not!
+                # and probably don't even need to handle them especially
+                # can differentiate model definition by logic on bases -- can probably
+                # add helper attributes to Expression and/or flag from bases
+                pass
+            if isinstance(attr_val, backend.symbol_class):
+                known_symbol_type = False
+                for symbol_instance in symbol_instances:
+                    container = symbol_instance.get(symbol=attr_val)
+                    # not a list (empty or len > 1)
+                    if isinstance(container, BaseContainer):
+                        known_symbol_type = True
+                        container.name = attr_name
+                        super_attrs[attr_name] = container
+                        pass_attr = False
+                        break
+                if not known_symbol_type:
+                    print("unknown symbol type", attr_name, attr_val)
+                    # Hit by DynamicModel.independent_variable
+                    # TODO: add intermediate computations?
+
+            if pass_attr:
+                super_attrs[attr_name] = attr_val
+
+
+        # TODO: validate backend_options and add to super_attrs
+
+
+        new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
+
+        for attr_name, attr_val in attrs.items():
+            # TODO: hook for post-- super_new call
             if isinstance(attr_val, Expression):
                 # need hook to define which Expression types form args of imp.call and in
                 # what order? Or __init__ just take kwargs and it's up to the
@@ -409,34 +461,21 @@ class ModelType(type):
                 # this one definitely needs to be done after super new since we're
                 # binding the class object
                 attr_val.bind(attr_name, new_cls)
-            if isinstance(attr_val, IndependentExpression):
-                # TODO: assumes Symbol is the base of all inputs to the model functions?
-                # is there a better way to declare that?
-                # create fields on self?
-                symbol_instances.append(attr_val)
-            if isinstance(attr_val, backend.symbol_class):
-                for symbol_instance in symbol_instances:
-                    container = symbol_instance.get(symbol=attr_val)
-                    # not a list (empty or len > 1)
-                    if isinstance(container, BaseContainer):
-                        container.name = attr_name
-                    # replace attr_val with container? then this should be done before
-                    # calling super_new?
-                # add intermediate computations?
 
-            # TODO: add hook so e.g., DynamicModel (or consumer) can deal with inner
-            # class for events. Not sure if that's the same as a deferred
-            # subsystem -- 
 
             # TODO: add dependent variable data structure? they'll have to be constructed so implementation
             # data can be unpacked to represent model (chain dot accessors)
-            
+            # Solver type systems have solver variables that are "Symbol" like but
+            # outputs?
 
 
         return new_cls
 
 class Model(metaclass=ModelType):
     _intermediate_computation = FreeComputation()
+    deferred_systems = None 
+    # TODO: all model types can get deferred systems, probably define IO using an inner
+    # class. 
 
     def __init__(self, *args, **kwargs):
         cls = self.__class__
@@ -461,7 +500,9 @@ class AlgebraicSystem(Model):
     """
     parameter = Symbol()
     #implicit_output = BoundedSymbol() # TODO: need one with bound data
-    implicit_output = Symbol() # TODO: need one with bound data
+    # TODO: or does this need its own expression type? Or really the
+    # dependent/independent is unneccessary
+    implicit_output = Symbol() 
     residual = FreeComputation() 
     # unmatched, but maybe a subclass or imp might check lengths of residuals and
     # implicit_outputs to ensure enough DOF?

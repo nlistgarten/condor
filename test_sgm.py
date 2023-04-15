@@ -16,6 +16,7 @@ class MySystem(co.DynamicsModel):
     # B = parameter(n,m)
     # K = parameter(m,n)
 
+    W = C.T @ C
 
     # indexing an output/computation by state
     dot[x] = A@x #(A - B @ K) @ x
