@@ -5,50 +5,41 @@ from dataclasses import dataclass
 # TODO: figure out how to make this an option/setting like django?
 import casadi_backend as backend
 
+"""
+Figure out how to add DB storage -- maybe expect that to be a user choice (a decorator
+or something)? Then user defined initializer could use it. Yeah, and ORM aspect just
+takes advantage of model attributes just like backend implementation
+
+
+I assume a user model/library code could inject an implementation to the backend?
+not sure how to assign special numeric stuff, probably an inner class on the model
+based on NPSS discussion it's not really needed if it's done right 
+
+
+"""
 
 
 class Expression:
-    # these don't need to be descriptors, probably just a base class with
-    # _set_resolve_name, called by CondorModelType.__new__
-    # rename this class to CondorVariable? Expression? Something to capture both I and
+    """
+    """
+    # TODO: reconsider name. Inheritence tree as "Indepenent" and "Dependent" according
+    # to whether they are generally inputs to the core function. implicit outputs are
+    # independent, but sorta confusing. Possibly "Variable" instead of "Expression"?
+    # since DependentVariables have a name and that is what is being defined; the RHS
+    # is the expression. 
 
-    # maybe just separate out the matched and unmatched outputs into different
-    # sub-classes?
-
-    # assume all outputs are inherited?, base classes going backwards but within each
-    # base preserve definition order. This allows placement of "output" in CondorModel
-    # which everyone inherits, and it comes out last. Then algebraic system's
-    # implicit_outputs, but I like that being implicit and explicit
-
-    # the instances of variables added to the models may need to be replaced with
-    # descriptor wrapper to allow dot setting of instance variables? if we even do
-    # that... maybe not necessary either but could be an option
-
-    # could use copy infrastructure with the same type of checking for references as
-    # done in this version
-
-    # general idea for handling implementation: during __new__, look up parents in
-    # reverse order. can check backend.implementations (dict/module of model classname
-    # to whatever class?)
-    # I assume a user model could inject an implementation to the backend?
-    # not sure how to assign special numeric stuff, probably an inner class on the model
-    # based on NPSS discussion it's not really needed if it's done right 
-
-    # once imp is found gets attached to class. then __init__ calls with those values
-    # and so is actually an instance of class that has the accessed outputs, very much
-    # like django. neat.
-
-    # implementations can get everything they need based on the model field definitions
-    # (ie. state, parameter, output, dot etc.) which is the point of them
-    # and we could very easily just cache everything to a DB lol
-
-    # can I do all the name clash protection that's needed? from child to parent class I
-    # think definitely, and probably can't protect user model from over-writing self
 
     def _set_resolve_name(self):
         self._resolve_name = ".".join([self._model_name, self._name])
 
     def __init__(self, name='', model=None, symbol_container=None):
+        # TODO: currently, FreeComputation types are defined using setattr, which needs
+        # to know what already exists. The attributes here, like name, model, count,
+        # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
+        # not-a-computation, but I guess I could just use symbol_class on value instead
+        # of checking name? Anyway, really don't like needing to prefix all Expression
+        # attributes with _ because of FreeComputation... 
+
         self._name = name
         self._model = model
         if model:
@@ -61,12 +52,14 @@ class Expression:
         self._symbol_container = symbol_container
         self._init_kwargs = dict()
         # subclasses must provide _init_kwargs for binding to sub-classes
-        # TODO: can this just be taken from __init__ kwargs easily?
-        # or __init_subclass__ hook?
+        # TODO: can this just be taken from __init__ kwargs easily?  or
+        # __init_subclass__ hook? definitely neds to be DRY'd up 
 
 
     def bind(self, name, model,):
-        # bind an existing expression class to a model
+        """
+        bind an existing Expression instance to a model
+        """
         self._name = name
         self._model = model
         if self._model_name:
@@ -77,8 +70,13 @@ class Expression:
         self._set_resolve_name()
 
     def inherit(self, model_name, expression_type_name, **kwargs):
-        # copy and re-assign name -- used in ModelType.__prepare__ before model is
-        # available
+        """
+        copy and re-assign name -- used in ModelType.__prepare__ before model is
+        available
+        """
+
+        # TODO: could use copy infrastructure with the same reference checking Model is
+        # currently doing
         if not kwargs:
             kwargs = self._init_kwargs
         new = self.__class__(**kwargs)
@@ -123,30 +121,51 @@ class Expression:
 @dataclass
 class BaseContainer:
     expression_type: Expression
+    # TODO: Should it be renamed to something related to "backend" since it's really the
+    # representation of backend.symbol_class? Should we support multiple back-end 
+    # representations simultaneously?
+    symbol: backend.symbol_class
+
+# TODO: IndependentInputContainer and Depdendent? Or is this okay?
 
 @dataclass
 class SymbolContainer(BaseContainer):
     # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
     # symbol_generator. It should be dry-able, but validation is complicated..
+    # one idea: where containers gets instantiated, use **kwargs to try constructing,
+    # Container class will at least validate field name assignment. Then Expression
+    # subclass does model-level validation.
+    # or can the container itself perform validation? It has expression_type back
+    # referene, so it could do it...
     name: str
-    symbol: backend.symbol_class
     n: int
     m: int
+    # TODO: convert to shape? Then Symbol __call__ does one set of validation to ensure
+    # consistency of model, backend can do addiitonal validation (e.g., casadi doesn't
+    # support more than 2D due to matlab). Then again, symmetric and diagonal become
+    # less clear, maybe Symbols are also no more than 2D.
     symmetric: bool
     diagonal: bool
     size: int
+    # TODO: mark size as computed? or replace with @property? can that be trivially cached?
+
 
 class IndependentExpression(Expression):
     """
-    Expressions that are arguments to implementation:
+    Expressions that are arguments to implementation function:
     Symbol, deferred subsystems
     others?
+    boundedsymbol adds upper and lower attribute
+    or just always have bounds and validate them for Functions but pass on to solvers,
+    etc? default bounds can be +/- inf
 
     DependentExpressions instead of ComputedExpressions
     free, matched
     Maybe something that just creates data structure? Could be useful for inheriting
-    Aviary cleanly. Might need equivalent indepenentexpression. 
+    Aviary cleanly. Might need matching subclass of Indep.
     """
+    pass
+
 
 class Symbol(IndependentExpression):
     # TODO: is it possible to inherit the kwargs name, model, symbol_container?
@@ -173,8 +192,6 @@ class Symbol(IndependentExpression):
         self._init_kwargs.update(dict(func=func))
 
     def __call__(self, n=1, m=1, symmetric=False, diagonal=False,):
-        print("calling", self, "with args:", n, m, symmetric, diagonal)
-
         if diagonal:
             assert m == 1
         elif symmetric:
@@ -187,9 +204,6 @@ class Symbol(IndependentExpression):
             diagonal=diagonal,
             #**kwargs
         )
-        #if self.fixed_kwargs:
-        #    pass_kwargs.update(**self.fixed_kwargs)
-        #print(pass_kwargs)
         if symmetric:
             size = int(n*(n+1)/2)
         else:
@@ -210,7 +224,6 @@ class Symbol(IndependentExpression):
 @dataclass
 class FreeComputationContainer(BaseContainer):
     name: str
-    symbol: backend.symbol_class
 
 class FreeComputation(Expression):
     def __init__(self, name='', model=None,):
@@ -218,10 +231,6 @@ class FreeComputation(Expression):
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
-            # I would like it if I could DRY-ly check for "known" class attributes to
-            # skip/raise clash, but can't tell the difference between user code and
-            # library code, latter does need to set them, also not clear when/where to
-            # collect. So all core variable names on Expression must be prefixed by _
             print('skipping private _')
             super().__setattr__(name, value)
         else:
@@ -234,8 +243,7 @@ class FreeComputation(Expression):
 
 @dataclass
 class MatchedComputationContainer(BaseContainer):
-    match: backend.symbol_class
-    symbol: backend.symbol_class
+    match: BaseContainer
 
 class MatchedComputation(Expression):
     def __init__(self, matched_to=None, model=None, name=''):
@@ -269,14 +277,61 @@ class CondorClassDict(dict):
 
 class Options:
     """
-    Class mix-in to flag back-end options
+    Class mix-in to flag back-end options. Define an inner class on the model that
+    inherits from Options that over-writes options for the backend's implementation
+    (which generates a callable). Model will transparently pass attributes of Options
+    subclass. Possibly only convention, but name the subclass according to the backend.
+    Multiple option sub-classes provide options depending on project's default backend. 
+    Single option sub-class forces back end for this model?
+    OR flag, if tihs backend then these options, otherwise no options (rely on defaults)
+
+    All backends must ship with reasonable defaults.
+
+    Example for inheritance to keep configuration DRY
+
+    class UpcycleSolverOptions(Options):
+        warm_start = True
+        bound_behavior = backend.algebraicsystem.bound_behavior_options.L2
+        exact_hessian = False
+
+
+    class Upsolver(AlgebraicSystem):
+
+        class Casadi(UpcycleSolverOptions):
+            pass
+
+    class MostUpsolvers(Upsolver):
+        ... (define model)
+        # automatically inherit UpcycleSolverOptions settings for Casadi backend
+
+    class ParicularUpsolver(Upsolver):
+        ... (define model)
+
+        class Casadi(UpcycleSolverOptions):
+            # over write specific settings, everything else should be inherited
+            exact_hessian = True
+
     """
+    pass
 
 
 class ModelType(type):
     """
     Metaclass for Condor  model
     """
+
+    # No dot setting, use func tool `partial` (or just define a dict that gets **passed
+    # in). Dot accessing done by instance datastructure.
+    # Do we want to provide magic for repeatedly passed-down variables? No. Keeps it
+    # explicit, and there's enough convenience it shouldn't be a problem.
+
+    # once imp is found gets attached to class. then __init__ calls with those values
+    # and so is actually an instance of class that has the accessed outputs, very much
+    # like django. neat.
+
+    # can I do all the name clash protection that's needed? from child to parent class I
+    # think definitely, and probably can't protect user model from over-writing self
+
 
     @classmethod
     def __prepare__(cls, model_name, bases, **kwds):
@@ -323,33 +378,6 @@ class ModelType(type):
         }
         if len(backend_options):
             print("\n"*10, *list(backend_options.items()), "\n"*10, sep="\n")
-            # TODO: actually, this is only expected on user models; defaults etc come
-            # from implementation, should only ever expect 1
-            # inheritance example:
-            """
-            class UpcycleSolverOptions(Options):
-                warm_start = True
-                bound_behavior = backend.algebraicsystem.bound_behavior_options.L2
-                exact_hessian = False
-
-
-            class Upsolver(AlgebraicSystem):
-
-                class Casadi(UpcycleSolverOptions):
-                    pass
-
-            class MostUpsolvers(Upsolver):
-                ... (define model)
-                # automatically inherit UpcycleSolverOptions settings for Casadi backend
-
-            class ParicularUpsolver(Upsolver):
-                ... (define model)
-
-                class Casadi(UpcycleSolverOptions):
-                    # over write specific settings, everything else should be inherited
-                    exact_hessian = True
-
-            """
 
         for base in bases:
             # TODO: make sure it's the right resolution order
@@ -369,11 +397,11 @@ class ModelType(type):
 
         symbol_instances = []
         for attr_name, attr_val in attrs.items():
-            # process name clahees on attr_name? can't protect against internal
+            # TODO: process name clahees on attr_name? can't protect against internal
             # over-write (maybe user intends to do that) but can raise error for
             # over-writing parent, e.g., creating a "state" variable in a DynamicModel
             # subclass
-            # TODO: replace ifs with match?
+            # TODO: replace if tree with match cases?
             if isinstance(attr_val, Expression):
                 # need hook to define which Expression types form args of imp.call and in
                 # what order? Or __init__ just take kwargs and it's up to the
@@ -393,17 +421,17 @@ class ModelType(type):
                     if isinstance(container, BaseContainer):
                         container.name = attr_name
                     # replace attr_val with container? then this should be done before
-                    # calling super_new
+                    # calling super_new?
                 # add intermediate computations?
+
             # TODO: add hook so e.g., DynamicModel (or consumer) can deal with inner
             # class for events. Not sure if that's the same as a deferred
             # subsystem -- 
 
-            # TODO: process/inherit options for backend -- similar to django Meta
-            # processing
-
-            # TODO: add output fields? they'll have to be constructed so implementation
+            # TODO: add dependent variable data structure? they'll have to be constructed so implementation
             # data can be unpacked to represent model (chain dot accessors)
+            
+
 
         return new_cls
 
@@ -412,16 +440,26 @@ class Model(metaclass=ModelType):
 
     def __init__(self, *args, **kwargs):
         cls = self.__class__
-        # call cls.imp, fill datastructure
+        # call cls.imp, fill datastructures for both inputs and outputs
 
 
 class Function(Model):
+    """
+    output is an explicit function of input
+    """
     input = Symbol()
     output = FreeComputation()
 
 
 class AlgebraicSystem(Model):
-    input = Symbol()
+    """
+    implicit_output are variables that drive residual to 0
+    parameters are additional variables parameterizing system's explicit_output and
+    residuals
+    explicit_output are additional expressions that depend on (solved) value of
+    implicit_output and parameters
+    """
+    parameter = Symbol()
     #implicit_output = BoundedSymbol() # TODO: need one with bound data
     implicit_output = Symbol() # TODO: need one with bound data
     residual = FreeComputation() 
@@ -430,45 +468,82 @@ class AlgebraicSystem(Model):
     explicit_output = FreeComputation()
     initializer = MatchedComputation(implicit_output)
 
-#class OptimizationProblem(Model):
-#    variable = Symbol()
-#    objective = SingleSymbol()
-#    # I guess this one is a descriptor? so user code `objetive = ...`
-#    # or it's just a contract in the API that user writes one? feasibility problem if
-#    # not?
-#    constraint = Relational()
-#    # Can provide syntax candy for constraint. Requires backend supports symbolic
-#    # relations.
+
+class OptimizationProblem(Model):
+    """
+    variable are what the optimizer moves to solve problem
+    parameter are fixed wrt optimization
+    constraints get assigned as relationals -- additional processing? Or should
+    implementation deal with that?
+
+    user provides objective to minimize -- if None
+
+
+    """
+    variable = Symbol()
+    parameter = Symbol()
+    initializer = MatchedComputation(variable)
+    # TODO: add objective descriptor? so user code `objetive = ...` can get intercepted and
+    # handled?  or it's just a contract in the API that user writes one? feasibility
+    # problem if not? Add hook for metaclass to handle it?
+    # needs validation for size == 1
+    constraint = FreeComputation()
+    # Can replace with "Relational" to do more validation, clear syntax candy. 
+    # Requires backend supports symbolic relations, but casadi and sympy do.
+    # THena gain, maybe only implementation needs to deal with it
+
 
 
 class DynamicsModel(Model):
-    # 
     """
-    DynamicsModel
+    independent_variable - indepdendent variable of ODE, notionally time but can be used
+    for anything. Used directly by subclasses (e.g., user code may use
+    `t=DynamicsModel.independent_variable`, implementations will use this symbol
+    directly for expressions)
 
-    need input? (e.g., time varying paremeter) -> a parent class pushes input in
-    or skip, assume plant always "pulls" input in
+    parameter - auxilary variables (constant-in-time) that determine system behavior
 
-    in this context is "output" always point-wise in time? I think so, and it's a
-    trajectory analysis model's outputs that define overall output
+    state - fully defines evolution of system driven by ODEs
 
-    fundamentally need to decide how different computations play. Maybe "output" is the
-    base on CondorModel, and it is always the one that is returned by calling -- would
-    be consistent way to pull controllers, measurements, etc from the plant model
-    need API to specify which of the symbols are used as arguments to call?hkk
+    dot - derivative of state with respect to indepdnent variable, purely a function of
+    state, independent_variable, parameters
+    [DAE version will have a residual associated with state differential]
 
-    then trajectory analysis model's IMP can 
+    output - dynamic output at particular state and value of independent variable
+    (point-wise in independent variable)
+
+    note: no time-varying input. Assume dynamicsmodels "pull" what they need from other
+    models. Need to augment state with "pulled" dynamicsmodels.
+
+    inner classes of "Event" subclass
+
+
+    inner classes of "Mode" subclass
+
+
 
     """
-    print("starting app code for DynamicsModel class")
 
-    # TODO: this needs its own descriptor type? OR do we want user classes to do
-    # t = DynamicsModel.independent_variable ? That would allow 
+    # TODO: indepdent var  needs its own descriptor type? OR do we want user classes to do
+    # t = DynamicsModel.independent_variable ? That would allow leaving it like this and
+    # consumers still know what it is
+
+    # TODO: Are initial conditions an attribute of the dynamicsmodel or the trajectory 
+    # analysis that consumes it?
+
+    # TODO: mode and corresponding FiniteState type?
+
+
     independent_variable = backend.symbol_generator('t')
     state = Symbol()
     parameter = Symbol()
     dot = MatchedComputation(state)
     output = FreeComputation()
-    print("ending app code for DynamicsModel class")
 
+    class Event(Model, ):
+        # TODO: how to match to parent state? special __prepare__ hook on Event that DynamicsModel
+        # sets up
+        # update = MatchedComputation(state)
+        # TODO: singleton event function is very similar to optimization problem objective.
+        pass
 

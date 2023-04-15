@@ -30,7 +30,7 @@ class Sys2(co.Function):
     output.z = x**2 + y
 
 class MySolver(co.AlgebraicSystem):
-    x = input()
-    z = input(n=2)
+    x = parameter()
+    z = parameter(n=2)
     y2 = implicit_output()
     y1 = implicit_output()
