@@ -1,5 +1,6 @@
 import numpy as np
 from dataclasses import dataclass
+from enum import Enum
 
 
 # TODO: figure out how to make this an option/setting like django?
@@ -19,6 +20,7 @@ based on NPSS discussion it's not really needed if it's done right
 """
 
 
+
 class Expression:
     """
     """
@@ -26,13 +28,17 @@ class Expression:
     # to whether they are generally inputs to the core function. implicit outputs are
     # independent, but sorta confusing. Possibly "Variable" instead of "Expression"?
     # since DependentVariables have a name and that is what is being defined; the RHS
-    # is the expression. 
+    # is the expression. Even just "field"? 
 
 
     def _set_resolve_name(self):
         self._resolve_name = ".".join([self._model_name, self._name])
 
-    def __init__(self, name='', model=None, symbol_container=None):
+    def __init_subclass__(cls, symbol_container=None, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.symbol_container = symbol_container
+
+    def __init__(self, name='', model=None,):
         # TODO: currently, FreeComputation types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
         # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
@@ -50,7 +56,6 @@ class Expression:
         self._set_resolve_name()
         self._count = 0 # shortcut for flattned size?
         self._containers = []
-        self._symbol_container = symbol_container
         self._init_kwargs = dict()
         # subclasses must provide _init_kwargs for binding to sub-classes
         # TODO: can this just be taken from __init__ kwargs easily?  or
@@ -117,7 +122,7 @@ class Expression:
 
     def create_container(self, **kwargs):
         kwargs.update(dict(expression_type=self))
-        self._containers.append(self._symbol_container(**kwargs))
+        self._containers.append(self.symbol_container(**kwargs))
 
 
 @dataclass
@@ -155,28 +160,39 @@ class SymbolContainer(BaseContainer):
 class IndependentExpression(Expression):
     """
     Expressions that are arguments to implementation function:
+    Better: used to define expressions? Free?
     Symbol, deferred subsystems
     others?
     boundedsymbol adds upper and lower attribute
     or just always have bounds and validate them for Functions but pass on to solvers,
     etc? default bounds can be +/- inf
 
+
     DependentExpressions instead of ComputedExpressions
+    These have things (Actual expressions) assigned to them 
     free, matched
     Maybe something that just creates data structure? Could be useful for inheriting
     Aviary cleanly. Might need matching subclass of Indep.
     """
     pass
 
+class Direction(Enum):
+    """
+    Used to indicate the direction of a Symbol relative to a model
+    MatchedComputation may need to become MatchedSymbol and also use direction -- will
+    be useful for DAE models, etc.
+    """
+    output = -1
+    internal = 0
+    input = 1
 
-class Symbol(IndependentExpression):
+class Symbol(IndependentExpression, symbol_container=SymbolContainer):
     # TODO: is it possible to inherit the kwargs name, model, symbol_container?
     # repeated... I guess kwargs only? but like name as optional positional. maybe
     # additional only kwargs? how about update default? Should the default be done by
     # name? e.g., ExpressionSubclass.__name__ + 'Container'? See FreeComputation below
     def __init__(
-        self, name='', model=None,
-        func=backend.symbol_generator,
+        self, direction=Direction.input, name='', model=None,
     ):
         # TODO: should model types define the extra fields here?
         # I guess these could be metaclasses, and things like DynamicsModel are really
@@ -189,9 +205,9 @@ class Symbol(IndependentExpression):
         # they can just be dataclasses.
         # having DynamicModelType be a metaclass (or, allowing/encouraging library
         # Model(Types) to write a metaclass might allow useful hooks?j
-        super().__init__(name, model, symbol_container=SymbolContainer)
-        self.func = func
-        self._init_kwargs.update(dict(func=func))
+        super().__init__(name, model,)
+        self.direction = direction
+        self._init_kwargs.update(dict(direction=direction))
 
     def __call__(self, n=1, m=1, symmetric=False, diagonal=False,):
         if diagonal:
@@ -211,7 +227,7 @@ class Symbol(IndependentExpression):
         else:
             size = n*m
         self._count += size
-        out = self.func(**pass_kwargs)
+        out = backend.symbol_generator(**pass_kwargs)
         self.create_container(
             name=None,
             symbol=out,
@@ -231,9 +247,9 @@ class FreeComputationContainer(BaseContainer):
 class DependentExpression(Expression):
     pass
 
-class FreeComputation(DependentExpression):
+class FreeComputation(DependentExpression, symbol_container=FreeComputationContainer):
     def __init__(self, name='', model=None,):
-        super().__init__(name=name, model=model, symbol_container=FreeComputationContainer)
+        super().__init__(name=name, model=model)
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
@@ -246,14 +262,18 @@ class FreeComputation(DependentExpression):
                 name=name,
                 symbol=value,
             )
+            super().__setattr__(name, self._containers[-1])
 
 @dataclass
 class MatchedComputationContainer(BaseContainer):
-    match: BaseContainer
+    match: BaseContainer # match to the container instance
 
-class MatchedComputation(DependentExpression):
+class MatchedComputation(DependentExpression, symbol_container=MatchedComputationContainer):
     def __init__(self, matched_to=None, model=None, name=''):
-        super().__init__(name, model, symbol_container=MatchedComputationContainer)
+        """
+        matched_to is Expression instance that this MatchedComputation is matched to.
+        """
+        super().__init__(name, model)
         self._matched_to = matched_to
         self._init_kwargs.update(dict(matched_to=matched_to))
         print("matched to", matched_to)
@@ -269,6 +289,25 @@ class MatchedComputation(DependentExpression):
                 match=match,
                 symbol=value,
             )
+
+    def __getitem__(self, key):
+        """
+        get the computation component by name, backend symbol, or container
+        """
+        if isinstance(key, backend.symbol_class):
+            match = self._matched_to.get(symbol=key)
+        elif isinstance(key, str):
+            match = self._matched_to.get(name=key)
+        elif isinstance(key, BaseContainer):
+            match = key
+        else:
+            raise ValueError
+
+        item = self.get(match=match)
+        if isinstance(item, list):
+            raise ValueError
+        return item
+
 
 
 # may not be  really necessary, place holder in case it is
@@ -502,8 +541,8 @@ class AlgebraicSystem(Model):
     #implicit_output = BoundedSymbol() # TODO: need one with bound data
     # TODO: or does this need its own expression type? Or really the
     # dependent/independent is unneccessary
-    implicit_output = Symbol() 
-    residual = FreeComputation() 
+    implicit_output = Symbol(Direction.output)
+    residual = FreeComputation()
     # unmatched, but maybe a subclass or imp might check lengths of residuals and
     # implicit_outputs to ensure enough DOF?
     explicit_output = FreeComputation()
@@ -521,7 +560,7 @@ class OptimizationProblem(Model):
 
 
     """
-    variable = Symbol()
+    variable = Symbol(Direction.output)
     parameter = Symbol()
     initializer = MatchedComputation(variable)
     # TODO: add objective descriptor? so user code `objetive = ...` can get intercepted and
