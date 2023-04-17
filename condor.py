@@ -287,6 +287,8 @@ class FreeComputation(DependentExpression, symbol_container=FreeComputationConta
             self.create_container(
                 name=name,
                 symbol=value,
+                # TODO: I guess if this accepts model instances, it becomes recursive to
+                # allow dot access to sub systems?
             )
             super().__setattr__(name, self._containers[-1])
 
@@ -430,6 +432,12 @@ class ModelType(type):
         print("CondorModelType.__call__ for", cls)
         return super().__call__(cls, *args, **kwargs)
 
+    def __repr__(cls):
+        if cls._parent_name:
+            return f"<{cls._parent_name}: {cls.__name__}>"
+        else:
+            return f"<{cls.__name__}>"
+
     def __new__(cls, name, bases, attrs, **kwargs):
         # TODO: replace if tree with match cases?
 
@@ -449,6 +457,7 @@ class ModelType(type):
         # what gets manipulated on attrs before new_cls?
 
         super_attrs = {}
+        implementation = None
 
         for base in bases:
             # TODO: make sure it's the right resolution order
@@ -458,11 +467,16 @@ class ModelType(type):
             ):
                 # TODO: or are these directly on backend along with symbol_Class,
                 # symbol_generator, and other things are in a utils submodule?
-                super_attrs['implementation'] = getattr(
+                implementation = getattr(
                     backend.implementations,
                     base.__name__
                 )
+                break
             # TODO: also collect base's dicts for clash protection
+        if bases:
+            super_attrs['_parent_name'] = bases[0].__name__
+        else:
+            super_attrs['_parent_name'] = ''
 
         backend_options = {}
         symbol_instances = [] # used to find free Symbols and replace with container
@@ -519,6 +533,9 @@ class ModelType(type):
                 if attr_val._direction == Direction.output:
                     output_expressions.append(attr_val)
 
+            # TODO: OR don't add directly, just use to update name? Then add all
+            # inputs/outputs together? what about unkowns? leave?
+            # together
             if isinstance(attr_val, backend.symbol_class):
                 # from a Symbol expression
                 known_symbol_type = False
@@ -559,10 +576,16 @@ class ModelType(type):
             for in_name in input_expression.list_of('name'):
                 input_names.append(in_name)
 
+
+
+
         # TODO: validate backend_options and add to super_attrs
 
-
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
+
+        # TODO: apply options to implementation call
+        if implementation is not None:
+            new_cls.implementation = implementation(new_cls)
 
         for attr_name, attr_val in attrs.items():
             # TODO: hook for post-- super_new call
@@ -660,6 +683,7 @@ class Function(Model):
     """
     output is an explicit function of input
     """
+    # TODO: rename?
     input = Symbol()
     output = FreeComputation()
 

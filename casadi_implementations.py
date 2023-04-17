@@ -1,21 +1,24 @@
 import casadi
 
+def flatten(symbol):
+    return [
+        elem
+        for col in casadi.horzsplit(symbol)
+        for elem in casadi.vertsplit(col)
+    ]
+
 class Function:
     def __init__(self, model):
         symbol_inputs = [
-            flatten(inp) for inp in  model.input.list_of('symbol')
+            elem for inp in model.input.list_of('symbol') for elem in flatten(inp)
         ]
         symbol_outputs = [
-            flatten(out) for out in model.output.list_of('symbol')
+            elem for out in model.output.list_of('symbol') for elem in flatten(out)
         ]
-        name_inputs = [
-            flatten(inp) for inp in  model.input.list_of('name')
-        ]
-        name_outputs = [
-            flatten(out) for out in model.output.list_of('name')
-        ]
+        name_inputs = model.input.list_of('name')
+        name_outputs = model.output.list_of('name')
         doc = f"{tuple(name_outputs)} = {model}{tuple(name_outputs)}"
-        self.func =  casadi.Function(symbol_inputs, symbol_outputs)
+        self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
 
     def __call__(self, *args, **kwargs):
@@ -37,8 +40,9 @@ class AlgebraicSystem:
     #)
     #
     def __init__(
-        model, atol, rtol, warm_start, exact_hessian
+        model, atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True,
     ):
+        return
         rootfinder_options = dict(
         )
         self.x = casadi.vertcat(*[
