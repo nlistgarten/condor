@@ -19,6 +19,15 @@ based on NPSS discussion it's not really needed if it's done right
 
 """
 
+class Direction(Enum):
+    """
+    Used to indicate the direction of a Symbol relative to a model
+    MatchedComputation may need to become MatchedSymbol and also use direction -- will
+    be useful for DAE models, etc.
+    """
+    output = -1
+    internal = 0
+    input = 1
 
 
 class Expression:
@@ -31,6 +40,7 @@ class Expression:
     # is the expression. Even just "field"? 
 
 
+
     def _set_resolve_name(self):
         self._resolve_name = ".".join([self._model_name, self._name])
 
@@ -38,7 +48,7 @@ class Expression:
         super().__init_subclass__(**kwargs)
         cls.symbol_container = symbol_container
 
-    def __init__(self, name='', model=None,):
+    def __init__(self, name='', model=None, direction=Direction.internal):
         # TODO: currently, FreeComputation types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
         # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
@@ -49,6 +59,7 @@ class Expression:
 
         self._name = name
         self._model = model
+        self._direction = direction
         if model:
             self._model_name = model.__class__.__name__
         else:
@@ -56,7 +67,7 @@ class Expression:
         self._set_resolve_name()
         self._count = 0 # shortcut for flattned size?
         self._containers = []
-        self._init_kwargs = dict()
+        self._init_kwargs = dict(direction=direction)
         # subclasses must provide _init_kwargs for binding to sub-classes
         # TODO: can this just be taken from __init__ kwargs easily?  or
         # __init_subclass__ hook? definitely neds to be DRY'd up 
@@ -132,11 +143,16 @@ class BaseContainer:
     # representation of backend.symbol_class? Should we support multiple back-end 
     # representations simultaneously?
     symbol: backend.symbol_class
+    # TODO: should backend extract expression data like shape, etc that all containers
+    # have? 
 
 # TODO: IndependentInputContainer and Depdendent? Or is this okay?
 
+class IndependentContainer(BaseContainer):
+    pass
+
 @dataclass
-class SymbolContainer(BaseContainer):
+class SymbolContainer(IndependentContainer):
     # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
     # symbol_generator. It should be dry-able, but validation is complicated..
     # one idea: where containers gets instantiated, use **kwargs to try constructing,
@@ -151,6 +167,13 @@ class SymbolContainer(BaseContainer):
     # consistency of model, backend can do addiitonal validation (e.g., casadi doesn't
     # support more than 2D due to matlab). Then again, symmetric and diagonal become
     # less clear, maybe Symbols are also no more than 2D.
+    # but will eventually want N-D table lookup, knots and coefficients as parameters
+    # for table lookups that fed from a model, use partial to fix them for models that
+    # fed ? Use None for any dimension to follow broadcasting rules? Could even allow
+    # ellipse
+
+    # Then if bounds are here, must follow broadcasting rules
+
     symmetric: bool
     diagonal: bool
     size: int
@@ -167,24 +190,29 @@ class IndependentExpression(Expression):
     or just always have bounds and validate them for Functions but pass on to solvers,
     etc? default bounds can be +/- inf
 
+    No, really it's expressions that are generated e.g., x = state()
+    vs things that are assigned eg output.z = ...
+    Then again, getattr and getitem can also be used to "generate" a symbol by name
+
 
     DependentExpressions instead of ComputedExpressions
     These have things (Actual expressions) assigned to them 
     free, matched
     Maybe something that just creates data structure? Could be useful for inheriting
     Aviary cleanly. Might need matching subclass of Indep.
+
+
+    I also kind of think the three we have are the only three that will be developed,
+    especially if "matched" can be any generalized to patterns? oh but also deferred
+    symbol, eventually events, modes. But are those really special types of
+    sub-models?
+
+    And (especially with advanced setattr) Free can be used create a dotable data
+    structure heirarchy?
+
     """
     pass
 
-class Direction(Enum):
-    """
-    Used to indicate the direction of a Symbol relative to a model
-    MatchedComputation may need to become MatchedSymbol and also use direction -- will
-    be useful for DAE models, etc.
-    """
-    output = -1
-    internal = 0
-    input = 1
 
 class Symbol(IndependentExpression, symbol_container=SymbolContainer):
     # TODO: is it possible to inherit the kwargs name, model, symbol_container?
@@ -205,9 +233,7 @@ class Symbol(IndependentExpression, symbol_container=SymbolContainer):
         # they can just be dataclasses.
         # having DynamicModelType be a metaclass (or, allowing/encouraging library
         # Model(Types) to write a metaclass might allow useful hooks?j
-        super().__init__(name, model,)
-        self.direction = direction
-        self._init_kwargs.update(dict(direction=direction))
+        super().__init__(name=name, model=model, direction=direction)
 
     def __call__(self, n=1, m=1, symmetric=False, diagonal=False,):
         if diagonal:
@@ -248,8 +274,8 @@ class DependentExpression(Expression):
     pass
 
 class FreeComputation(DependentExpression, symbol_container=FreeComputationContainer):
-    def __init__(self, name='', model=None,):
-        super().__init__(name=name, model=model)
+    def __init__(self, direction=Direction.output, name='', model=None,):
+        super().__init__(name=name, model=model, direction=direction)
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
@@ -269,11 +295,11 @@ class MatchedComputationContainer(BaseContainer):
     match: BaseContainer # match to the container instance
 
 class MatchedComputation(DependentExpression, symbol_container=MatchedComputationContainer):
-    def __init__(self, matched_to=None, model=None, name=''):
+    def __init__(self, matched_to=None, model=None, name='', direction=Direction.internal):
         """
         matched_to is Expression instance that this MatchedComputation is matched to.
         """
-        super().__init__(name, model)
+        super().__init__(name=name, model=model, direction=direction)
         self._matched_to = matched_to
         self._init_kwargs.update(dict(matched_to=matched_to))
         print("matched to", matched_to)
@@ -304,7 +330,7 @@ class MatchedComputation(DependentExpression, symbol_container=MatchedComputatio
             raise ValueError
 
         item = self.get(match=match)
-        if isinstance(item, list):
+        if isinstance(item, list) and self._direction != Direction.input:
             raise ValueError
         return item
 
@@ -439,7 +465,27 @@ class ModelType(type):
             # TODO: also collect base's dicts for clash protection
 
         backend_options = {}
-        symbol_instances = []
+        symbol_instances = [] # used to find free Symbols and replace with container
+
+        # will be used to pack arguments in (inputs) and unpack results (output)
+        input_expressions = []
+        output_expressions = []
+        input_names = []
+        output_names = []
+
+        super_attrs.update(dict(
+            input_expressions = input_expressions,
+            output_expressions = output_expressions,
+            input_names = input_names,
+            output_names = output_names,
+        ))
+        # TODO: create dataclass for each output type, assign as class attribute?
+        # actually, does the implementation get this? It stuffs and returns on call
+        # well, moel instance still needs to assign result to attr on self
+
+        # can similar structure be used for inputs? Don't want to make it hard to
+        # instantiate -- and most Symbol inputs have a convenient name that's free.
+        # What about matched symbol inputs like dot for DAE? 
 
 
         for attr_name, attr_val in attrs.items():
@@ -447,10 +493,13 @@ class ModelType(type):
             # over-write (maybe user intends to do that) but can raise error for
             # over-writing parent, e.g., creating a "state" variable in a DynamicModel
             # subclass
+            # need to have protected names? I guess whatever we're doing for Options and
+            # convenience fields like input_fields, input_expressions, etc?
+
 
             # TODO: hook for pre- super_new call
 
-            pass_attr = True
+            pass_attr = True # Can just "continue" loop instead...
 
             if isinstance(attr_val, type) and issubclass(attr_val, Options):
                 backend_options[attr_name] =  attr_val
@@ -465,26 +514,51 @@ class ModelType(type):
                 # and probably don't even need to handle them especially
                 # can differentiate model definition by logic on bases -- can probably
                 # add helper attributes to Expression and/or flag from bases
-                pass
+                if attr_val._direction == Direction.input:
+                    input_expressions.append(attr_val)
+                if attr_val._direction == Direction.output:
+                    output_expressions.append(attr_val)
+
             if isinstance(attr_val, backend.symbol_class):
+                # from a Symbol expression
                 known_symbol_type = False
                 for symbol_instance in symbol_instances:
                     container = symbol_instance.get(symbol=attr_val)
                     # not a list (empty or len > 1)
                     if isinstance(container, BaseContainer):
                         known_symbol_type = True
+                        if container.name and container.name != attr_name:
+                            raise NameError
                         container.name = attr_name
-                        super_attrs[attr_name] = container
-                        pass_attr = False
+                        attr_val = container
                         break
                 if not known_symbol_type:
                     print("unknown symbol type", attr_name, attr_val)
                     # Hit by DynamicModel.independent_variable
                     # TODO: add intermediate computations?
+            if isinstance(attr_val, BaseContainer):
+                # TODO: from a sub-model (or deferred model?) call
+                pass
 
             if pass_attr:
+                if attr_name in super_attrs:
+                    raise NameError
                 super_attrs[attr_name] = attr_val
 
+
+        for output_expression in output_expressions:
+            for out_container in output_expression._containers:
+                out_name = out_container.name
+                output_names.append(out_name)
+                if not isinstance(out_container, IndependentContainer):
+                    # this container was not already attached to model
+                    if out_name in super_attrs:
+                        raise NameError
+                    super_attrs[out_name] = out_container
+
+        for input_expression in input_expressions:
+            for in_name in input_expression.list_of('name'):
+                input_names.append(in_name)
 
         # TODO: validate backend_options and add to super_attrs
 
@@ -510,15 +584,28 @@ class ModelType(type):
 
         return new_cls
 
+
+
 class Model(metaclass=ModelType):
-    _intermediate_computation = FreeComputation()
-    deferred_systems = None 
-    # TODO: all model types can get deferred systems, probably define IO using an inner
-    # class. 
+    _intermediate_computation = FreeComputation(Direction.internal)
+    # TODO: all model types can get deferred systems, assume a special model (I guess it
+    # wouldn't have a deferred system...) that is the only init_kwarg for 
+    # DeferredSystemExpression. DeferredSystemModel defines IO, generally outside of
+    # this model. Maybe seprately define an "InnerModel" expression for 
+    # I Think it actually has to be a mixin or decorator, special check so normal model
+    # construction doesn't happen until binding the deferred subsystems
 
     def __init__(self, *args, **kwargs):
         cls = self.__class__
+        # bind *args and **kwargs to to appropriate signature
+        # pack into dot-able storage
         # call cls.imp, fill datastructures for both inputs and outputs
+        # unpack into 
+
+class DeferredModel():
+    """
+    A decorator or mixin 
+    """
 
 
 class Function(Model):
@@ -542,7 +629,7 @@ class AlgebraicSystem(Model):
     # TODO: or does this need its own expression type? Or really the
     # dependent/independent is unneccessary
     implicit_output = Symbol(Direction.output)
-    residual = FreeComputation()
+    residual = FreeComputation(Direction.internal)
     # unmatched, but maybe a subclass or imp might check lengths of residuals and
     # implicit_outputs to ensure enough DOF?
     explicit_output = FreeComputation()
@@ -567,10 +654,15 @@ class OptimizationProblem(Model):
     # handled?  or it's just a contract in the API that user writes one? feasibility
     # problem if not? Add hook for metaclass to handle it?
     # needs validation for size == 1
-    constraint = FreeComputation()
+    constraint = FreeComputation(Direction.internal)
     # Can replace with "Relational" to do more validation, clear syntax candy. 
+    # creaet condor type relational classes? not as pretty as using backend
     # Requires backend supports symbolic relations, but casadi and sympy do.
     # THena gain, maybe only implementation needs to deal with it
+    # Does this need an "add" method, since we don't care about names, usually? Or an
+    # "auto" type attrname?
+    # Should we enforce that bounds on constraints are constants? probably 
+    # Are constraints internal? I think so
 
 
 
