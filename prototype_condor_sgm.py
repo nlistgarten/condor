@@ -308,30 +308,31 @@ def LTI():
             output = C @ x
 
 
-# do we want to (optionally) define the IO for sub-systems of a generated model?
-# does it make sense to provide a default?
-class GeneratedTrajectory(GeneratableCondorModel):
-    class propulsion(susbsystem, default=GASPPropulsion):
-        throttle = input()
-        TAS = input()
-        alt = input()
-        # what if a different trajectory model wants a different IO? for example, adding
-        # electric split? or required thrust? just re-type the trajectory? 
-        thrust = output()
-        fuel_rate = output()
+"""
+How deferred subsystems work
+"""
 
-    class aero(susbsystem, default=GASPAero):
-        alpha = input()
-        TAS = input()
-        alt = input()
-        CD = output()
-        CL = output()
+class propulsion_interface(Deferred):
+    throttle = input()
+    TAS = input()
+    alt = input()
+    # what if a different trajectory model wants a different IO? for example, adding
+    # electric split? or required thrust? just re-type the trajectory? 
+    thrust = output()
+    fuel_rate = output()
+
+class aero_interface(Deferred):
+    alpha = input()
+    TAS = input()
+    alt = input()
+    CD = output()
+    CL = output()
 
 
-#or is duck-typing sufficient?
+@WithDeferredSubSystems
 class GASPTrajectory(GeneratableCondorModel):
-    propulsion = CondorSubsystem(GASPPropulsion)
-    aero = CondorSubsystem(GASPAero)
+    propulsion = subsystem(propulsion_interface)
+    aero = subsystem(aero_interface)
     weight_initial = parameter()
 
     dynamics_model = GASPVehicleDynamics(aero=aero, propulsion=propulsion)
@@ -342,10 +343,10 @@ class GASPTrajectory(GeneratableCondorModel):
     class range_flown(TrajectoryOutput):
         ...
 
-# either way, may need to pass down instances like this to the dynamics model
-class GASPVehicleDynamics():
-    propulsion = CondorSubsystem(GASPPropulsion)
-    aero = CondorSubsystem(GASPAero)
+@WithDeferredSubSystems
+class GASPVehicleDynamics(DynamicsModel):
+    propulsion = subsystem(propulsion_interface)
+    aero = subsystem(aero_interface)
 
     distance = state()
     alt = state()
@@ -353,8 +354,6 @@ class GASPVehicleDynamics():
     gamma = state()
 
     # see dynamics model above with events etc
-
-
 
 
 class CoupledSizingClosure(CondorOptimizationModel):
@@ -367,14 +366,14 @@ class CoupledSizingClosure(CondorOptimizationModel):
 
     # static analysis
     # several of thsese return objects that trajectory can use
-    propulsion = RubberizedEngine(some_fixed_deck_ref, sls)
+    static_prop = RubberizedEngineStatic(some_fixed_deck_ref, sls)
     fuel_capacity, something_that_feeds_to_aero = GASPWeightsSizing(GTOW)
-    aero= GASPAeroModel(something_that_feeds_to_aero)
+    static_aero = GASPAeroModelStatic(something_that_feeds_to_aero)
 
     # trajectory has the most important performance metrics
     trajectory = GASPTrajectory(
-        propulsion=propulsion,
-        aero=aero,
+        propulsion=partial(RubberizedEngineDynamic, **static_prop.parameters_to_dynamic),
+        aero=partial(GASPAeroModelDynamic, **static_aero.parameters_to_static),
         initial_weight = gtow
     )
 

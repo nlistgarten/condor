@@ -536,9 +536,8 @@ class ModelType(type):
                     print("unknown symbol type", attr_name, attr_val)
                     # Hit by DynamicModel.independent_variable
                     # TODO: add intermediate computations?
-            if isinstance(attr_val, BaseContainer):
-                # TODO: from a sub-model (or deferred model?) call
-                pass
+            #if isinstance(attr_val, Model):
+            # TODO: from a sub-model (or deferred model?) call
 
             if pass_attr:
                 if attr_name in super_attrs:
@@ -588,12 +587,6 @@ class ModelType(type):
 
 class Model(metaclass=ModelType):
     _intermediate_computation = FreeComputation(Direction.internal)
-    # TODO: all model types can get deferred systems, assume a special model (I guess it
-    # wouldn't have a deferred system...) that is the only init_kwarg for 
-    # DeferredSystemExpression. DeferredSystemModel defines IO, generally outside of
-    # this model. Maybe seprately define an "InnerModel" expression for 
-    # I Think it actually has to be a mixin or decorator, special check so normal model
-    # construction doesn't happen until binding the deferred subsystems
 
     def __init__(self, *args, **kwargs):
         cls = self.__class__
@@ -602,10 +595,65 @@ class Model(metaclass=ModelType):
         # call cls.imp, fill datastructures for both inputs and outputs
         # unpack into 
 
-class DeferredModel():
+class DeferredType(ModelType):
+    pass
+
+class Deferred(metaclass=DeferredType):
+    input = Symbol()
+    output = Symbol(Direction.output)
+
+class SubsystemContainer(IndependentContainer):
+    # TODO: or is there a better way to check? ModelType and issubclass(Deferred)?
+    model_type = DeferredType
+
+class Subsystem(IndependentExpression, symbol_container=SubsystemContainer):
+    # TODO: how to mark as a singleton?
+    pass
+
+class WithDeferredSubsystems():
     """
-    A decorator or mixin 
+    A decorator or mixin to mark a modelas containing a deferred subsystem
+
+    class propulsion_interface(Deferred):
+        throttle = input()
+        airspeed = input()
+        altitude = input()
+
+        fuel_flow = output()
+        thrust = output()
+
+
+    @WithDeferredSubSystems
+    class DeferredAircraft(Model):
+        ...
+        prop_out = propulsion_interface(throttle, airspeed, altitude)
+        # prop_out.fuel_flow and prop_out.thrust are now available
+
+
+    class MyEngineStatic(Model):
+        paramaters_to_dynamic = ...
+
+    class MyEngineDynamic(Model):
+        parameters_from_static = ...
+        throttle = ...
+        airspeed = ...
+        altitude = ...
+
+    class SpecificAircraftOptimization(OptimizationProblem):
+        
+        static_engine = MyEngineStatic(
+
     """
+    deferred_subsystem = Subsystem()
+
+
+    # TODO: all model types can get deferred systems, assume a special model (I guess it
+    # wouldn't have a deferred system...) that is the only init_kwarg for 
+    # DeferredSystemExpression. DeferredSystemModel defines IO, generally outside of
+    # this model. Maybe seprately define an "InnerModel" expression for 
+    # I Think it actually has to be a mixin or decorator, special check so normal model
+    # construction doesn't happen until binding the deferred subsystems
+
 
 
 class Function(Model):
