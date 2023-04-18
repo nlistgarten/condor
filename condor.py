@@ -271,10 +271,10 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
         return out
 
 @dataclass(repr=False)
-class AssignedFieldSymbol(BaseSymbol):
+class AssignedField(BaseSymbol):
     name: str
 
-class AssignedField(Field, symbol_class=AssignedFieldSymbol):
+class AssignedField(Field, symbol_class=AssignedField):
     def __init__(self, direction=Direction.output, name='', model=None,):
         super().__init__(name=name, model=model, direction=direction)
 
@@ -297,13 +297,13 @@ class AssignedField(Field, symbol_class=AssignedFieldSymbol):
             super().__setattr__(name, self._symbols[-1])
 
 @dataclass(repr=False)
-class MatchedFieldSymbol(BaseSymbol):
+class MatchedField(BaseSymbol):
     match: BaseSymbol # match to the Symbol instance
 
     def update_name(self):
         self.name = '__'.join([self.field_type._name, self.match.name])
 
-class MatchedField(Field, symbol_class=MatchedFieldSymbol):
+class MatchedField(Field, symbol_class=MatchedField):
     def __init__(self, matched_to=None, model=None, name='', direction=Direction.internal):
         """
         matched_to is Field instance that this MatchedField is matched to.
