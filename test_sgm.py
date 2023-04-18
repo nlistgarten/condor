@@ -1,7 +1,7 @@
 import numpy as np
 import condor as co
 
-class MySystem(co.DynamicsModel):
+class MySystem(co.ODESystem):
     print("starting user code for LTI class")
     n = 2
     m = 1

@@ -137,7 +137,10 @@ class BaseSymbol:
     # representations simultaneously?
     backend_repr: backend.symbol_class
     # TODO: should backend extract field data like shape, etc that all symbols
-    # have? 
+    # have? matches ones probably take the the metadata of their match, no need to
+    # repeat. For general assigned field, probably lose them anyway -- can probably
+    # figure out size, but not if diagonal/symetric is preserved; are those ever
+    # expected to preserved except when matched?
 
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
@@ -593,8 +596,7 @@ class ModelType(type):
 
         # TODO: apply options to implementation call
         if implementation is not None:
-            #new_cls.implementation = implementation(new_cls)
-            pass
+            new_cls.implementation = implementation(new_cls)
 
         for attr_name, attr_val in attrs.items():
             # TODO: hook for post-- super_new call
@@ -624,7 +626,11 @@ class Model(metaclass=ModelType):
         # bind *args and **kwargs to to appropriate signature
         # pack into dot-able storage
         # call cls.imp, fill datastructures for both inputs and outputs
-        # unpack into 
+        # unpack into instance attrs
+
+        # so all inputs and outputs will be dot-accessible by name
+        # iterable unpacking should also give outputs
+        # can assign outputs using zip(model_instance, ModelClass.output_names) ?
 
 class DeferredType(ModelType):
     pass
@@ -746,7 +752,7 @@ class OptimizationProblem(Model):
 
 
 
-class DynamicsModel(Model):
+class ODESystem(Model):
     """
     independent_variable - indepdendent variable of ODE, notionally time but can be used
     for anything. Used directly by subclasses (e.g., user code may use
@@ -787,7 +793,8 @@ class DynamicsModel(Model):
 
 
     independent_variable = backend.symbol_generator('t')
-    state = FreeField()
+    state = FreeField(Direction.internal)
+    # TODO: should internal free field symbolss NOT be dot accessible on the models?
     parameter = FreeField()
     dot = MatchedField(state)
     output = AssignedField()

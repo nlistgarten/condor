@@ -1,25 +1,26 @@
 import casadi
+import condor as co
 
 def flatten(symbol):
-    if symbol.diagonal or symbol.symmetric:
+    if isinstance(symbol, co.FreeSymbol) and (symbol.diagonal or symbol.symmetric):
         raise NotImplemented
     return [
         elem
-        for col in casadi.horzsplit(symbol.symbol)
+        for col in casadi.horzsplit(symbol.backend_repr)
         for elem in casadi.vertsplit(col)
     ]
 
 def wrap(symbol, values):
     pass
 
-class Function:
+class ExplicitSystem:
     def __init__(self, model):
         symbol_inputs = [
-            elem for inp in model.input._containers for elem in flatten(inp)
+            elem for inp in model.input._symbols for elem in flatten(inp)
         ]
-        #symbol_outputs = [
-        #    elem for out in model.output._containers for elem in flatten(out)
-        #]
+        symbol_outputs = [
+            elem for out in model.output._symbols for elem in flatten(out)
+        ]
         name_inputs = model.input.list_of('name')
         name_outputs = model.output.list_of('name')
         doc = f"{tuple(name_outputs)} = {model}{tuple(name_outputs)}"
