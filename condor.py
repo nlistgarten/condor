@@ -171,6 +171,9 @@ class SymbolContainer(IndependentContainer):
     # for table lookups that fed from a model, use partial to fix them for models that
     # fed ? Use None for any dimension to follow broadcasting rules? Could even allow
     # ellipse
+    # maybe have tables take knots and coeffs as an assigned input? Could similarly have
+    # LTI system generator take matrices as assigned inputs? Special AssignmentField
+    # that takes data instead of symbol. For fixed tables, not models that get optimized
 
     # Then if bounds are here, must follow broadcasting rules
 
@@ -288,7 +291,10 @@ class FreeComputation(DependentExpression, symbol_container=FreeComputationConta
                 name=name,
                 symbol=value,
                 # TODO: I guess if this accepts model instances, it becomes recursive to
-                # allow dot access to sub systems?
+                # allow dot access to sub systems? Actually, this breaks the idea of
+                # both system encapsolation and implementations. So don't do it, but
+                # doument it. Can programatically add sub-system outputs though. For
+                # these reasons, ditch intermediate stuff.
             )
             super().__setattr__(name, self._containers[-1])
 
@@ -552,7 +558,6 @@ class ModelType(type):
                 if not known_symbol_type:
                     print("unknown symbol type", attr_name, attr_val)
                     # Hit by DynamicModel.independent_variable
-                    # TODO: add intermediate computations?
             #if isinstance(attr_val, Model):
             # TODO: from a sub-model (or deferred model?) call
 
@@ -585,7 +590,8 @@ class ModelType(type):
 
         # TODO: apply options to implementation call
         if implementation is not None:
-            new_cls.implementation = implementation(new_cls)
+            #new_cls.implementation = implementation(new_cls)
+            pass
 
         for attr_name, attr_val in attrs.items():
             # TODO: hook for post-- super_new call
@@ -609,7 +615,6 @@ class ModelType(type):
 
 
 class Model(metaclass=ModelType):
-    _intermediate_computation = FreeComputation(Direction.internal)
 
     def __init__(self, *args, **kwargs):
         cls = self.__class__
