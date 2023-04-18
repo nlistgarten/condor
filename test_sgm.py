@@ -25,7 +25,7 @@ class MySystem(co.DynamicsModel):
     output.y = C.T @ C
     print("ending user code for LTI class")
 
-class Sys2(co.Function):
+class Sys2(co.ExplicitSystem):
     x = input()
     y = input()
     output.z = x**2 + y
@@ -35,3 +35,8 @@ class MySolver(co.AlgebraicSystem):
     z = parameter(n=2)
     y2 = implicit_output()
     y1 = implicit_output()
+
+    residual.y1 = y2 + x**2
+    residual.y2 = y1 - x+z
+
+    initializer[y2] = 1.

@@ -22,7 +22,7 @@ based on NPSS discussion it's not really needed if it's done right
 class Direction(Enum):
     """
     Used to indicate the direction of a Symbol relative to a model
-    MatchedComputation may need to become MatchedSymbol and also use direction -- will
+    MatchedField may need to become MatchedSymbol and also use direction -- will
     be useful for DAE models, etc.
     """
     output = -1
@@ -30,31 +30,24 @@ class Direction(Enum):
     input = 1
 
 
-class Expression:
+class Field:
     """
     """
-    # TODO: reconsider name. Inheritence tree as "Indepenent" and "Dependent" according
-    # to whether they are generally inputs to the core function. implicit outputs are
-    # independent, but sorta confusing. Possibly "Variable" instead of "Expression"?
-    # since DependentVariables have a name and that is what is being defined; the RHS
-    # is the expression. Even just "field"? 
-
-
 
     def _set_resolve_name(self):
         self._resolve_name = ".".join([self._model_name, self._name])
 
-    def __init_subclass__(cls, symbol_container=None, **kwargs):
+    def __init_subclass__(cls, symbol_class=None, **kwargs):
         super().__init_subclass__(**kwargs)
-        cls.symbol_container = symbol_container
+        cls.symbol_class = symbol_class
 
     def __init__(self, name='', model=None, direction=Direction.internal):
-        # TODO: currently, FreeComputation types are defined using setattr, which needs
+        # TODO: currently, AssignedField types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
         # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
         # not-a-computation, but I guess I could just use symbol_class on value instead
-        # of checking name? Anyway, really don't like needing to prefix all Expression
-        # attributes with _ because of FreeComputation... 
+        # of checking name? Anyway, really don't like needing to prefix all Field
+        # attributes with _ because of AssignedField... 
 
 
         self._name = name
@@ -66,7 +59,7 @@ class Expression:
             self._model_name = ''
         self._set_resolve_name()
         self._count = 0 # shortcut for flattned size?
-        self._containers = []
+        self._symbols = []
         self._init_kwargs = dict(direction=direction)
         # subclasses must provide _init_kwargs for binding to sub-classes
         # TODO: can this just be taken from __init__ kwargs easily?  or
@@ -75,7 +68,7 @@ class Expression:
 
     def bind(self, name, model,):
         """
-        bind an existing Expression instance to a model
+        bind an existing Field instance to a model
         """
         self._name = name
         self._model = model
@@ -86,7 +79,7 @@ class Expression:
             self._model_name = model.__name__
         self._set_resolve_name()
 
-    def inherit(self, model_name, expression_type_name, **kwargs):
+    def inherit(self, model_name, field_type_name, **kwargs):
         """
         copy and re-assign name -- used in ModelType.__prepare__ before model is
         available
@@ -97,29 +90,29 @@ class Expression:
         if not kwargs:
             kwargs = self._init_kwargs
         new = self.__class__(**kwargs)
-        new._name = expression_type_name
+        new._name = field_type_name
         new._model_name = model_name
         new._set_resolve_name()
         return new
 
     # TODO: replace with a descriptor that can be dot accessed?
     def list_of(self, field_name):
-        return [getattr(container, field_name) for container in self._containers]
+        return [getattr(symbol, field_name) for symbol in self._symbols]
 
     def __repr__(self):
         if self._resolve_name:
-            return self._resolve_name
+            return f"<{self.__class__.__name__}: {self._resolve_name}>"
 
     def get(self, **kwargs):
         """
-        return list of expression containers where every field matches kwargs
+        return list of field symbols where every field matches kwargs
         """
         # TODO: what's the lightest-weight way to be able query? these should get called
         # very few times, so hopefully don't need to stress too much about
         # implementation
         # would be nice to be able to follow references, etc. can match be used?
         items = []
-        for item in self._containers:
+        for item in self._symbols:
             this_item = True
             for field_name, field_value in kwargs.items():
                 this_item = this_item & (getattr(item, field_name) is field_value)
@@ -131,34 +124,37 @@ class Expression:
             return items[0]
         return items
 
-    def create_container(self, **kwargs):
-        kwargs.update(dict(expression_type=self))
-        self._containers.append(self.symbol_container(**kwargs))
+    def create_symbol(self, **kwargs):
+        kwargs.update(dict(field_type=self))
+        self._symbols.append(self.symbol_class(**kwargs))
 
 
 @dataclass
-class BaseContainer:
-    expression_type: Expression
+class BaseSymbol:
+    field_type: Field
     # TODO: Should it be renamed to something related to "backend" since it's really the
     # representation of backend.symbol_class? Should we support multiple back-end 
     # representations simultaneously?
-    symbol: backend.symbol_class
-    # TODO: should backend extract expression data like shape, etc that all containers
+    backend_repr: backend.symbol_class
+    # TODO: should backend extract field data like shape, etc that all symbols
     # have? 
 
-# TODO: IndependentInputContainer and Depdendent? Or is this okay?
+    def __repr__(self):
+        return f"<{self.field_type._resolve_name}: {self.name}>"
 
-class IndependentContainer(BaseContainer):
+# TODO: IndependentInputSymbol and Depdendent? Or is this okay?
+
+class IndependentSymbol(BaseSymbol):
     pass
 
-@dataclass
-class SymbolContainer(IndependentContainer):
+@dataclass(repr=False)
+class FreeSymbol(IndependentSymbol):
     # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
     # symbol_generator. It should be dry-able, but validation is complicated..
-    # one idea: where containers gets instantiated, use **kwargs to try constructing,
-    # Container class will at least validate field name assignment. Then Expression
+    # one idea: where symbols gets instantiated, use **kwargs to try constructing,
+    # Symbol class will at least validate field name assignment. Then Field
     # subclass does model-level validation.
-    # or can the container itself perform validation? It has expression_type back
+    # or can the symbol itself perform validation? It has field_type back
     # referene, so it could do it...
     name: str
     n: int
@@ -174,6 +170,9 @@ class SymbolContainer(IndependentContainer):
     # maybe have tables take knots and coeffs as an assigned input? Could similarly have
     # LTI system generator take matrices as assigned inputs? Special AssignmentField
     # that takes data instead of symbol. For fixed tables, not models that get optimized
+    # Actually, table knots match to inputs and coefficients match to outputs.
+    # so only LTI needs an assigned subclass for data/matrices that has fixed
+    # attributes?
 
     # Then if bounds are here, must follow broadcasting rules
 
@@ -183,23 +182,23 @@ class SymbolContainer(IndependentContainer):
     # TODO: mark size as computed? or replace with @property? can that be trivially cached?
 
 
-class IndependentExpression(Expression):
+class IndependentField(Field):
     """
-    Expressions that are arguments to implementation function:
-    Better: used to define expressions? Free?
+    Fields that are arguments to implementation function:
+    Better: used to define fields? Free?
     Symbol, deferred subsystems
     others?
     boundedsymbol adds upper and lower attribute
     or just always have bounds and validate them for Functions but pass on to solvers,
     etc? default bounds can be +/- inf
 
-    No, really it's expressions that are generated e.g., x = state()
+    No, really it's fields that are generated e.g., x = state()
     vs things that are assigned eg output.z = ...
     Then again, getattr and getitem can also be used to "generate" a symbol by name
 
 
-    DependentExpressions instead of ComputedExpressions
-    These have things (Actual expressions) assigned to them 
+    DependentFields instead of ComputedFields
+    These have things (Actual Fields) assigned to them 
     free, matched
     Maybe something that just creates data structure? Could be useful for inheriting
     Aviary cleanly. Might need matching subclass of Indep.
@@ -217,11 +216,11 @@ class IndependentExpression(Expression):
     pass
 
 
-class Symbol(IndependentExpression, symbol_container=SymbolContainer):
-    # TODO: is it possible to inherit the kwargs name, model, symbol_container?
+class FreeField(IndependentField, symbol_class=FreeSymbol):
+    # TODO: is it possible to inherit the kwargs name, model, symbol_class?
     # repeated... I guess kwargs only? but like name as optional positional. maybe
     # additional only kwargs? how about update default? Should the default be done by
-    # name? e.g., ExpressionSubclass.__name__ + 'Container'? See FreeComputation below
+    # name? e.g., FieldSubclass.__name__ + 'Symbol'? See AssignedField below
     def __init__(
         self, direction=Direction.input, name='', model=None,
     ):
@@ -232,7 +231,7 @@ class Symbol(IndependentExpression, symbol_container=SymbolContainer):
         # implicit outputs getting ref, scaling, etc)
         # this defaults with n, m, symmetric, etc.
         # but actually do need to return just symbol from user code. so maybe libraries
-        # define symbolcontainer subclasses, __call__ takes the fields as args?
+        # define symbol subclasses, __call__ takes the fields as args?
         # they can just be dataclasses.
         # having DynamicModelType be a metaclass (or, allowing/encouraging library
         # Model(Types) to write a metaclass might allow useful hooks?j
@@ -244,7 +243,7 @@ class Symbol(IndependentExpression, symbol_container=SymbolContainer):
         elif symmetric:
             assert n == m
         pass_kwargs = dict(
-            name="%s_%d" % (self._resolve_name, len(self._containers)),
+            name="%s_%d" % (self._resolve_name, len(self._symbols)),
             n=n,
             m=m,
             symmetric=symmetric,
@@ -257,9 +256,9 @@ class Symbol(IndependentExpression, symbol_container=SymbolContainer):
             size = n*m
         self._count += size
         out = backend.symbol_generator(**pass_kwargs)
-        self.create_container(
+        self.create_symbol(
             name=None,
-            symbol=out,
+            backend_repr=out,
             n=n,
             m=m,
             symmetric=symmetric,
@@ -268,15 +267,11 @@ class Symbol(IndependentExpression, symbol_container=SymbolContainer):
         )
         return out
 
-@dataclass
-class FreeComputationContainer(BaseContainer):
+@dataclass(repr=False)
+class AssignedFieldSymbol(BaseSymbol):
     name: str
 
-
-class DependentExpression(Expression):
-    pass
-
-class FreeComputation(DependentExpression, symbol_container=FreeComputationContainer):
+class AssignedField(Field, symbol_class=AssignedFieldSymbol):
     def __init__(self, direction=Direction.output, name='', model=None,):
         super().__init__(name=name, model=model, direction=direction)
 
@@ -287,25 +282,28 @@ class FreeComputation(DependentExpression, symbol_container=FreeComputationConta
         else:
             print("setting special for", self, ".", name, "=", value)
             print(f"owner={self._model_name}")
-            self.create_container(
+            self.create_symbol(
                 name=name,
-                symbol=value,
+                backend_repr=value,
                 # TODO: I guess if this accepts model instances, it becomes recursive to
                 # allow dot access to sub systems? Actually, this breaks the idea of
                 # both system encapsolation and implementations. So don't do it, but
                 # doument it. Can programatically add sub-system outputs though. For
                 # these reasons, ditch intermediate stuff.
             )
-            super().__setattr__(name, self._containers[-1])
+            super().__setattr__(name, self._symbols[-1])
 
-@dataclass
-class MatchedComputationContainer(BaseContainer):
-    match: BaseContainer # match to the container instance
+@dataclass(repr=False)
+class MatchedFieldSymbol(BaseSymbol):
+    match: BaseSymbol # match to the Symbol instance
 
-class MatchedComputation(DependentExpression, symbol_container=MatchedComputationContainer):
+    def update_name(self):
+        self.name = '__'.join([self.field_type._name, self.match.name])
+
+class MatchedField(Field, symbol_class=MatchedFieldSymbol):
     def __init__(self, matched_to=None, model=None, name='', direction=Direction.internal):
         """
-        matched_to is Expression instance that this MatchedComputation is matched to.
+        matched_to is Field instance that this MatchedField is matched to.
         """
         super().__init__(name=name, model=model, direction=direction)
         self._matched_to = matched_to
@@ -316,23 +314,23 @@ class MatchedComputation(DependentExpression, symbol_container=MatchedComputatio
         print("setting item for", self, ":", key, "=", value)
         print(f"owner={self._model_name}")
         if isinstance(key, backend.symbol_class):
-            match = self._matched_to.get(symbol=key)
+            match = self._matched_to.get(backend_repr=key)
             if isinstance(match, list):
                 raise ValueError
-            self.create_container(
+            self.create_symbol(
                 match=match,
-                symbol=value,
+                backend_repr=value,
             )
 
     def __getitem__(self, key):
         """
-        get the computation component by name, backend symbol, or container
+        get the matched symbol by the matche's name, backend symbol, or symbol
         """
         if isinstance(key, backend.symbol_class):
-            match = self._matched_to.get(symbol=key)
+            match = self._matched_to.get(backend_repr=key)
         elif isinstance(key, str):
             match = self._matched_to.get(name=key)
-        elif isinstance(key, BaseContainer):
+        elif isinstance(key, BaseSymbol):
             match = key
         else:
             raise ValueError
@@ -422,14 +420,14 @@ class ModelType(type):
 
         for _dict in dicts:
             for k, v in _dict.items():
-                if isinstance(v, Expression):
+                if isinstance(v, Field):
                     v_class = v.__class__
                     v_init_kwargs = v._init_kwargs.copy()
                     for init_k, init_v  in v._init_kwargs.items():
-                        if isinstance(init_v, Expression):
+                        if isinstance(init_v, Field):
                             v_init_kwargs[init_k] = cls_dict[init_v._name]
                     cls_dict[k] = v.inherit(
-                        model_name, expression_type_name=k, **v_init_kwargs
+                        model_name, field_type_name=k, **v_init_kwargs
                     )
         print("end prepare for", model_name, cls_dict)
         return cls_dict
@@ -485,17 +483,18 @@ class ModelType(type):
             super_attrs['_parent_name'] = ''
 
         backend_options = {}
-        symbol_instances = [] # used to find free Symbols and replace with container
+        free_field_instances = [] # used to find free symbols and replace with symbol
+        matched_field_instances = []
 
         # will be used to pack arguments in (inputs) and unpack results (output)
-        input_expressions = []
-        output_expressions = []
+        input_fields = []
+        output_fields = []
         input_names = []
         output_names = []
 
         super_attrs.update(dict(
-            input_expressions = input_expressions,
-            output_expressions = output_expressions,
+            input_fields = input_fields,
+            output_fields = output_fields,
             input_names = input_names,
             output_names = output_names,
         ))
@@ -514,7 +513,7 @@ class ModelType(type):
             # over-writing parent, e.g., creating a "state" variable in a DynamicModel
             # subclass
             # need to have protected names? I guess whatever we're doing for Options and
-            # convenience fields like input_fields, input_expressions, etc?
+            # convenience fields like input_fields, input_fields, etc?
 
 
             # TODO: hook for pre- super_new call
@@ -525,35 +524,37 @@ class ModelType(type):
                 backend_options[attr_name] =  attr_val
                 pass_attr = False
                 continue
-            if isinstance(attr_val, IndependentExpression):
-                symbol_instances.append(attr_val)
-            if isinstance(attr_val, Expression):
+            if isinstance(attr_val, FreeField):
+                free_field_instances.append(attr_val)
+            if isinstance(attr_val, MatchedField):
+                matched_field_instances.append(attr_val)
+            if isinstance(attr_val, Field):
                 # TODO: may need to deal with both cases that might occur: 
                 # ModelType defining field OR user calling a model? Or should output
-                # datastructure not be a subclass of BaseContainer? Probably not!
+                # datastructure not be a subclass of BaseSymbol? Probably not!
                 # and probably don't even need to handle them especially
                 # can differentiate model definition by logic on bases -- can probably
-                # add helper attributes to Expression and/or flag from bases
+                # add helper attributes to Field and/or flag from bases
                 if attr_val._direction == Direction.input:
-                    input_expressions.append(attr_val)
+                    input_fields.append(attr_val)
                 if attr_val._direction == Direction.output:
-                    output_expressions.append(attr_val)
+                    output_fields.append(attr_val)
 
             # TODO: OR don't add directly, just use to update name? Then add all
             # inputs/outputs together? what about unkowns? leave?
             # together
             if isinstance(attr_val, backend.symbol_class):
-                # from a Symbol expression
+                # from a FreeField
                 known_symbol_type = False
-                for symbol_instance in symbol_instances:
-                    container = symbol_instance.get(symbol=attr_val)
+                for free_field_instance in free_field_instances:
+                    symbol = free_field_instance.get(backend_repr=attr_val)
                     # not a list (empty or len > 1)
-                    if isinstance(container, BaseContainer):
+                    if isinstance(symbol, BaseSymbol):
                         known_symbol_type = True
-                        if container.name and container.name != attr_name:
+                        if symbol.name and symbol.name != attr_name:
                             raise NameError
-                        container.name = attr_name
-                        attr_val = container
+                        symbol.name = attr_name
+                        attr_val = symbol
                         break
                 if not known_symbol_type:
                     print("unknown symbol type", attr_name, attr_val)
@@ -567,21 +568,23 @@ class ModelType(type):
                 super_attrs[attr_name] = attr_val
 
 
-        for output_expression in output_expressions:
-            for out_container in output_expression._containers:
-                out_name = out_container.name
+        for output_field in output_fields:
+            for out_symbol in output_field._symbols:
+                out_name = out_symbol.name
                 output_names.append(out_name)
-                if not isinstance(out_container, IndependentContainer):
-                    # this container was not already attached to model
+                if not isinstance(out_symbol, IndependentSymbol):
+                    # this symbol was not already attached to model
                     if out_name in super_attrs:
                         raise NameError
-                    super_attrs[out_name] = out_container
+                    super_attrs[out_name] = out_symbol
 
-        for input_expression in input_expressions:
-            for in_name in input_expression.list_of('name'):
+        for input_field in input_fields:
+            for in_name in input_field.list_of('name'):
                 input_names.append(in_name)
 
-
+        for matched_field in matched_field_instances:
+            for matched_symbol in matched_field._symbols:
+                matched_symbol.update_name()
 
 
         # TODO: validate backend_options and add to super_attrs
@@ -595,8 +598,8 @@ class ModelType(type):
 
         for attr_name, attr_val in attrs.items():
             # TODO: hook for post-- super_new call
-            if isinstance(attr_val, Expression):
-                # need hook to define which Expression types form args of imp.call and in
+            if isinstance(attr_val, Field):
+                # need hook to define which Field types form args of imp.call and in
                 # what order? Or __init__ just take kwargs and it's up to the
                 # implementation/backend to validate?
                 # this one definitely needs to be done after super new since we're
@@ -606,7 +609,7 @@ class ModelType(type):
 
             # TODO: add dependent variable data structure? they'll have to be constructed so implementation
             # data can be unpacked to represent model (chain dot accessors)
-            # Solver type systems have solver variables that are "Symbol" like but
+            # Solver type systems have solver variables that are "FreeField" like but
             # outputs?
 
 
@@ -627,14 +630,14 @@ class DeferredType(ModelType):
     pass
 
 class Deferred(metaclass=DeferredType):
-    input = Symbol()
-    output = Symbol(Direction.output)
+    input = FreeField()
+    output = FreeField(Direction.output)
 
-class SubsystemContainer(IndependentContainer):
+class SubsystemSymbol(IndependentSymbol):
     # TODO: or is there a better way to check? ModelType and issubclass(Deferred)?
     model_type = DeferredType
 
-class Subsystem(IndependentExpression, symbol_container=SubsystemContainer):
+class Subsystem(IndependentField, symbol_class=SubsystemSymbol):
     # TODO: how to mark as a singleton?
     pass
 
@@ -677,20 +680,20 @@ class WithDeferredSubsystems():
 
     # TODO: all model types can get deferred systems, assume a special model (I guess it
     # wouldn't have a deferred system...) that is the only init_kwarg for 
-    # DeferredSystemExpression. DeferredSystemModel defines IO, generally outside of
-    # this model. Maybe seprately define an "InnerModel" expression for 
+    # DeferredSystemField. DeferredSystemModel defines IO, generally outside of
+    # this model. Maybe seprately define an "InnerModel" Field for 
     # I Think it actually has to be a mixin or decorator, special check so normal model
     # construction doesn't happen until binding the deferred subsystems
 
 
 
-class Function(Model):
+class ExplicitSystem(Model):
     """
     output is an explicit function of input
     """
     # TODO: rename?
-    input = Symbol()
-    output = FreeComputation()
+    input = FreeField()
+    output = AssignedField()
 
 
 class AlgebraicSystem(Model):
@@ -698,19 +701,19 @@ class AlgebraicSystem(Model):
     implicit_output are variables that drive residual to 0
     parameters are additional variables parameterizing system's explicit_output and
     residuals
-    explicit_output are additional expressions that depend on (solved) value of
+    explicit_output are additional fields that depend on (solved) value of
     implicit_output and parameters
     """
-    parameter = Symbol()
+    parameter = FreeField()
     #implicit_output = BoundedSymbol() # TODO: need one with bound data
-    # TODO: or does this need its own expression type? Or really the
+    # TODO: or does this need its own field type? Or really the
     # dependent/independent is unneccessary
-    implicit_output = Symbol(Direction.output)
-    residual = FreeComputation(Direction.internal)
+    implicit_output = FreeField(Direction.output)
+    residual = AssignedField(Direction.internal)
     # unmatched, but maybe a subclass or imp might check lengths of residuals and
     # implicit_outputs to ensure enough DOF?
-    explicit_output = FreeComputation()
-    initializer = MatchedComputation(implicit_output)
+    explicit_output = AssignedField()
+    initializer = MatchedField(implicit_output)
 
 
 class OptimizationProblem(Model):
@@ -724,14 +727,14 @@ class OptimizationProblem(Model):
 
 
     """
-    variable = Symbol(Direction.output)
-    parameter = Symbol()
-    initializer = MatchedComputation(variable)
+    variable = FreeField(Direction.output)
+    parameter = FreeField()
+    initializer = MatchedField(variable)
     # TODO: add objective descriptor? so user code `objetive = ...` can get intercepted and
     # handled?  or it's just a contract in the API that user writes one? feasibility
     # problem if not? Add hook for metaclass to handle it?
     # needs validation for size == 1
-    constraint = FreeComputation(Direction.internal)
+    constraint = AssignedField(Direction.internal)
     # Can replace with "Relational" to do more validation, clear syntax candy. 
     # creaet condor type relational classes? not as pretty as using backend
     # Requires backend supports symbolic relations, but casadi and sympy do.
@@ -748,7 +751,7 @@ class DynamicsModel(Model):
     independent_variable - indepdendent variable of ODE, notionally time but can be used
     for anything. Used directly by subclasses (e.g., user code may use
     `t=DynamicsModel.independent_variable`, implementations will use this symbol
-    directly for expressions)
+    directly for fields)
 
     parameter - auxilary variables (constant-in-time) that determine system behavior
 
@@ -784,15 +787,15 @@ class DynamicsModel(Model):
 
 
     independent_variable = backend.symbol_generator('t')
-    state = Symbol()
-    parameter = Symbol()
-    dot = MatchedComputation(state)
-    output = FreeComputation()
+    state = FreeField()
+    parameter = FreeField()
+    dot = MatchedField(state)
+    output = AssignedField()
 
     class Event(Model, ):
         # TODO: how to match to parent state? special __prepare__ hook on Event that DynamicsModel
         # sets up
-        # update = MatchedComputation(state)
+        # update = MatchedField(state)
         # TODO: singleton event function is very similar to optimization problem objective.
         pass
 
