@@ -41,8 +41,13 @@ class MySolver(co.AlgebraicSystem):
 
     initializer[y2] = 1.
 
+    class Casadi(co.Options):
+        warm_start = False
+
 
 """
+class Solve(co.AlgebraicSystem):
+
 class FailedSolver1(co.ExplicitSystem):
     x = input()
     y = input()

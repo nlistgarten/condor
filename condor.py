@@ -9,7 +9,10 @@ import casadi_backend as backend
 Backend:
 [x] provide symbol_generator for creating backend symbol repr
 [x] symbol_class for isinstance(model_attr, backend.symbol_class
+[x] name which is how backend options on model is identified
 Do we allow more complicated datastructures? like models, etc.
+
+optional implementations which has a __dict__ that allows assignment
 
 
 Backend Implementations
@@ -62,6 +65,8 @@ class Direction(Enum):
     internal = 0
     input = 1
 
+class FieldValues:
+    pass
 
 class Field:
     """
@@ -171,6 +176,7 @@ class Field:
         self._dataclass = make_dataclass(
             name,
             fields,
+            bases=(FieldValues,),
         )
 
     def __iter__(self):
@@ -429,8 +435,13 @@ class Options:
     Multiple option sub-classes provide options depending on project's default backend. 
     Single option sub-class forces back end for this model?
     OR flag, if tihs backend then these options, otherwise no options (rely on defaults)
+    
+    implementation, if provided, should be a callable that takes a model and possible
+    options and returns a callable that evaluates the model
 
-    All backends must ship with reasonable defaults.
+    All backend implementations must ship with reasonable defaults.
+
+    options should not start with __
 
     Example for inheritance to keep configuration DRY
 
@@ -455,6 +466,7 @@ class Options:
         class Casadi(UpcycleSolverOptions):
             # over write specific settings, everything else should be inherited
             exact_hessian = True
+
 
     """
     pass
@@ -529,22 +541,7 @@ class ModelType(type):
         # what gets manipulated on attrs before new_cls?
 
         super_attrs = {}
-        implementation = None
 
-        for base in bases:
-            # TODO: make sure it's the right resolution order
-            if (
-                isinstance(base, ModelType) and 
-                (base.__name__ in backend.implementations.__dict__)
-            ):
-                # TODO: or are these directly on backend along with symbol_Class,
-                # symbol_generator, and other things are in a utils submodule?
-                implementation = getattr(
-                    backend.implementations,
-                    base.__name__
-                )
-                break
-            # TODO: also collect base's dicts for clash protection
         if bases:
             super_attrs['_parent_name'] = bases[0].__name__
         else:
@@ -587,11 +584,10 @@ class ModelType(type):
 
             # TODO: hook for pre- super_new call
 
-            pass_attr = True # Can just "continue" loop instead...
+            pass_attr = True
 
             if isinstance(attr_val, type) and issubclass(attr_val, Options):
                 backend_options[attr_name] =  attr_val
-                pass_attr = False
                 continue
             if isinstance(attr_val, FreeField):
                 free_fields.append(attr_val)
@@ -620,7 +616,7 @@ class ModelType(type):
                     if isinstance(symbol, BaseSymbol):
                         known_symbol_type = True
                         if symbol.name and symbol.name != attr_name:
-                            raise NameError(f"Symbol on {free_field}  has name {symbo.name} but assigned to {attr_name}")
+                            raise NameError(f"Symbol on {free_field} has name {symbo.name} but assigned to {attr_name}")
                         symbol.name = attr_name
                         attr_val = symbol
                         pass_attr = False
@@ -667,9 +663,41 @@ class ModelType(type):
         # inheritance works properly, can easily over-write per project, etc.
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
 
-        # TODO: apply options to implementation call
+        implementation = None
+
+        if backend_options and backend.name in backend_options:
+            backend_option = {
+                k: v 
+                for k, v in backend_options[backend.name].__dict__.items()
+                if not k.startswith('__')
+            }
+            implementation = backend_option.pop('implementation', None)
+            if implementation is not None:
+                # inject so subclasses get this implementation
+                # TODO: a better way? registration? etc?
+                backend.implementation.__dict__[name] = implementation
+
+            # TODO: other validation?
+            # TODO: inherit options? No, defaults come from implementation itself
+        else:
+            backend_option = {}
+
+        if implementation is None:
+            for base in bases:
+                if (
+                    isinstance(base, ModelType) and 
+                    (base.__name__ in backend.implementations.__dict__)
+                ):
+                    # TODO: or are these directly on backend along with symbol_Class,
+                    # symbol_generator, and other things are in a utils submodule?
+                    implementation = getattr(
+                        backend.implementations,
+                        base.__name__
+                    )
+                    break
+
         if implementation is not None:
-            new_cls.implementation = implementation(new_cls)
+            new_cls.implementation = implementation(new_cls, **backend_option)
 
         for attr_name, attr_val in attrs.items():
             # TODO: hook for post-- super_new call
@@ -708,6 +736,7 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
 
     in_bases = False
     for base in bases:
+        # TODO: only need to check the parent, not all bases?
         if (
             attr_name in base.__dict__ and
             not getattr(attr_val, '_inherits_from', None) == getattr(base, attr_name)
