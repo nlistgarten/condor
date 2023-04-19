@@ -40,3 +40,22 @@ class MySolver(co.AlgebraicSystem):
     residual.y2 = y1 - x+z
 
     initializer[y2] = 1.
+
+
+"""
+class FailedSolver1(co.ExplicitSystem):
+    x = input()
+    y = input()
+    output.x = x**2 + y**2
+
+class FailedSolver2(co.ExplicitSystem):
+    x = input()
+    y = input()
+    output = x**2 + y**2
+
+class FailedSolver3(co.ExplicitSystem):
+    x = input()
+    y = input()
+    output.input = x**2 + y**2
+
+"""

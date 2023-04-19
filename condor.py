@@ -1,10 +1,33 @@
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, make_dataclass
 from enum import Enum
 
 
 # TODO: figure out how to make this an option/setting like django?
 import casadi_backend as backend
+"""
+Backend:
+[x] provide symbol_generator for creating backend symbol repr
+[x] symbol_class for isinstance(model_attr, backend.symbol_class
+Do we allow more complicated datastructures? like models, etc.
+
+
+Backend Implementations
+[x] must be able to flatten model symbols to backend arrays,
+[ ] wrap backend arrays to model symbol, matching shape -- 
+[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics (if
+different, eg casadi DM) and backend symbols
+[ ] ideally, handle special case symmetric and dynamic flags for FreeSymbol and
+[ ] MatchedSymbol if matched to symmetric/diagonal FreeSymbol
+setting the values for outputs and intermediates
+
+Couples to Model types -- knows all fields
+
+who is responsible for:
+filling in fields/._dataclass?
+filling in model input/output attrs?
+
+"""
 
 """
 Figure out how to add DB storage -- maybe expect that to be a user choice (a decorator
@@ -16,6 +39,16 @@ I assume a user model/library code could inject an implementation to the backend
 not sure how to assign special numeric stuff, probably an inner class on the model
 based on NPSS discussion it's not really needed if it's done right 
 
+For injecting a default implementation (e.g., new backend) this does work:
+
+import casadi_implementations
+casadi_implementations.ODESystem = 'a reference to check exists'
+
+import condor as co
+
+but probably should just figure out hooks to do that? Could create local dict of backend
+that gets updated with backend.implementations at the top of this file, then libary/user
+code could update it (add/overwrite)
 
 """
 
@@ -41,7 +74,9 @@ class Field:
         super().__init_subclass__(**kwargs)
         cls.symbol_class = symbol_class
 
-    def __init__(self, name='', model=None, direction=Direction.internal):
+    def __init__(
+        self, name='', model=None, direction=Direction.internal, inherit_from=None
+    ):
         # TODO: currently, AssignedField types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
         # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
@@ -61,6 +96,7 @@ class Field:
         self._count = 0 # shortcut for flattned size?
         self._symbols = []
         self._init_kwargs = dict(direction=direction)
+        self._inherits_from = inherit_from
         # subclasses must provide _init_kwargs for binding to sub-classes
         # TODO: can this just be taken from __init__ kwargs easily?  or
         # __init_subclass__ hook? definitely neds to be DRY'd up 
@@ -89,7 +125,7 @@ class Field:
         # currently doing
         if not kwargs:
             kwargs = self._init_kwargs
-        new = self.__class__(**kwargs)
+        new = self.__class__(**kwargs, inherit_from=self)
         new._name = field_type_name
         new._model_name = model_name
         new._set_resolve_name()
@@ -128,6 +164,23 @@ class Field:
         kwargs.update(dict(field_type=self))
         self._symbols.append(self.symbol_class(**kwargs))
 
+    def create_dataclass(self):
+        # TODO: do processing to handle different field types
+        fields = [(symbol.name, float) for symbol in self._symbols]
+        name = make_class_name([self._model_name, self._name])
+        self._dataclass = make_dataclass(
+            name,
+            fields,
+        )
+
+    def __iter__(self):
+        for symbol in self._symbols:
+            yield symbol
+
+def make_class_name(components):
+    separate_words = ' '.join([comp.replace('_', ' ') for comp in components])
+    # use pascal case from https://stackoverflow.com/a/8347192
+    return ''.join(word for word in separate_words.title() if not word.isspace())
 
 @dataclass
 class BaseSymbol:
@@ -225,7 +278,7 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
     # additional only kwargs? how about update default? Should the default be done by
     # name? e.g., FieldSubclass.__name__ + 'Symbol'? See AssignedField below
     def __init__(
-        self, direction=Direction.input, name='', model=None,
+        self, direction=Direction.input, name='', model=None, inherit_from=None,
     ):
         # TODO: should model types define the extra fields here?
         # I guess these could be metaclasses, and things like DynamicsModel are really
@@ -238,7 +291,9 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
         # they can just be dataclasses.
         # having DynamicModelType be a metaclass (or, allowing/encouraging library
         # Model(Types) to write a metaclass might allow useful hooks?j
-        super().__init__(name=name, model=model, direction=direction)
+        super().__init__(
+            name=name, model=model, direction=direction, inherit_from=inherit_from
+        )
 
     def __call__(self, n=1, m=1, symmetric=False, diagonal=False,):
         if diagonal:
@@ -270,13 +325,19 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
         )
         return out
 
+
+
 @dataclass(repr=False)
 class AssignedField(BaseSymbol):
     name: str
 
 class AssignedField(Field, symbol_class=AssignedField):
-    def __init__(self, direction=Direction.output, name='', model=None,):
-        super().__init__(name=name, model=model, direction=direction)
+    def __init__(
+        self, direction=Direction.output, name='', model=None, inherit_from=None
+    ):
+        super().__init__(
+            name=name, model=model, direction=direction, inherit_from=inherit_from
+        )
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
@@ -304,11 +365,15 @@ class MatchedField(BaseSymbol):
         self.name = '__'.join([self.field_type._name, self.match.name])
 
 class MatchedField(Field, symbol_class=MatchedField):
-    def __init__(self, matched_to=None, model=None, name='', direction=Direction.internal):
+    def __init__(
+        self, matched_to=None, direction=Direction.output, name='', model=None, inherit_from=None
+    ):
         """
         matched_to is Field instance that this MatchedField is matched to.
         """
-        super().__init__(name=name, model=model, direction=direction)
+        super().__init__(
+            name=name, model=model, direction=direction, inherit_from=inherit_from
+        )
         self._matched_to = matched_to
         self._init_kwargs.update(dict(matched_to=matched_to))
         print("matched to", matched_to)
@@ -486,12 +551,13 @@ class ModelType(type):
             super_attrs['_parent_name'] = ''
 
         backend_options = {}
-        free_field_instances = [] # used to find free symbols and replace with symbol
-        matched_field_instances = []
+        free_fields = [] # used to find free symbols and replace with symbol
+        matched_fields = []
 
         # will be used to pack arguments in (inputs) and unpack results (output)
         input_fields = []
         output_fields = []
+        internal_fields = []
         input_names = []
         output_names = []
 
@@ -528,9 +594,9 @@ class ModelType(type):
                 pass_attr = False
                 continue
             if isinstance(attr_val, FreeField):
-                free_field_instances.append(attr_val)
+                free_fields.append(attr_val)
             if isinstance(attr_val, MatchedField):
-                matched_field_instances.append(attr_val)
+                matched_fields.append(attr_val)
             if isinstance(attr_val, Field):
                 # TODO: may need to deal with both cases that might occur: 
                 # ModelType defining field OR user calling a model? Or should output
@@ -542,22 +608,22 @@ class ModelType(type):
                     input_fields.append(attr_val)
                 if attr_val._direction == Direction.output:
                     output_fields.append(attr_val)
+                if attr_val._direction == Direction.internal:
+                    internal_fields.append(attr_val)
 
-            # TODO: OR don't add directly, just use to update name? Then add all
-            # inputs/outputs together? what about unkowns? leave?
-            # together
             if isinstance(attr_val, backend.symbol_class):
                 # from a FreeField
                 known_symbol_type = False
-                for free_field_instance in free_field_instances:
-                    symbol = free_field_instance.get(backend_repr=attr_val)
+                for free_field in free_fields:
+                    symbol = free_field.get(backend_repr=attr_val)
                     # not a list (empty or len > 1)
                     if isinstance(symbol, BaseSymbol):
                         known_symbol_type = True
                         if symbol.name and symbol.name != attr_name:
-                            raise NameError
+                            raise NameError(f"Symbol on {free_field}  has name {symbo.name} but assigned to {attr_name}")
                         symbol.name = attr_name
                         attr_val = symbol
+                        pass_attr = False
                         break
                 if not known_symbol_type:
                     print("unknown symbol type", attr_name, attr_val)
@@ -566,32 +632,39 @@ class ModelType(type):
             # TODO: from a sub-model (or deferred model?) call
 
             if pass_attr:
-                if attr_name in super_attrs:
-                    raise NameError
+                check_attr_name(attr_name, attr_val, super_attrs, bases)
                 super_attrs[attr_name] = attr_val
 
+        for matched_field in matched_fields:
+            for matched_symbol in matched_field:
+                matched_symbol.update_name()
+
+        for input_field in input_fields:
+            for in_symbol in input_field:
+                in_name = in_symbol.name
+                check_attr_name(in_name, in_symbol, super_attrs, bases)
+                super_attrs[in_name] = in_symbol
+                input_names.append(in_name)
+            input_field.create_dataclass()
+
+        for internal_field in internal_fields:
+            internal_field.create_dataclass()
 
         for output_field in output_fields:
-            for out_symbol in output_field._symbols:
+            for out_symbol in output_field:
                 out_name = out_symbol.name
                 output_names.append(out_name)
                 if not isinstance(out_symbol, IndependentSymbol):
                     # this symbol was not already attached to model
-                    if out_name in super_attrs:
-                        raise NameError
+                    check_attr_name(out_name, out_symbol, super_attrs, bases)
                     super_attrs[out_name] = out_symbol
-
-        for input_field in input_fields:
-            for in_name in input_field.list_of('name'):
-                input_names.append(in_name)
-
-        for matched_field in matched_field_instances:
-            for matched_symbol in matched_field._symbols:
-                matched_symbol.update_name()
-
+            output_field.create_dataclass()
 
         # TODO: validate backend_options and add to super_attrs
-
+        # could have a reserved keyword "implementation" on options that defaults to
+        # None, reference to an implementation to allow user provided ones? Maybe that's
+        # the best way to do it, even for model types that condor ships with? if
+        # inheritance works properly, can easily over-write per project, etc.
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
 
         # TODO: apply options to implementation call
@@ -618,6 +691,41 @@ class ModelType(type):
         return new_cls
 
 
+def check_attr_name(attr_name, attr_val, super_attrs, bases):
+    # TODO: this needs to also be called to check on bases dict to prevent creating a
+    # symbol with the name of state? I think?
+
+    if attr_name in ['__module__', '__qualname__']:
+        return
+
+    if len(bases) == 1 and bases[0] == Model:
+        # Skip model types
+        # TODO: is there a better way to capture it's a model type? No symbols, but
+        # fields?
+        return
+
+    # TODO: if user-defined field starts with _, raise value error?
+
+    in_bases = False
+    for base in bases:
+        if (
+            attr_name in base.__dict__ and
+            not getattr(attr_val, '_inherits_from', None) == getattr(base, attr_name)
+        ):
+            in_bases = True
+            break
+
+    if (attr_name in super_attrs) or in_bases:
+        clash_source = None
+        if in_bases:
+            clash_source = base
+        elif hasattr(super_attrs[attr_name], 'inherits_from'):
+            clash_source = super_attrs[attr_name].inherits_from
+        if clash_source:
+            clash_string = f" on {clash_source}"
+        else:
+            clash_string = ""
+        raise NameError(f"Attempting to assign attribute {attr_name} which already exists{clash_string}")
 
 class Model(metaclass=ModelType):
 
