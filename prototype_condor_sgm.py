@@ -330,11 +330,12 @@ class aero_interface(Deferred):
 
 
 @WithDeferredSubSystems
-class GASPTrajectory(GeneratableCondorModel):
+class GASPTrajectory(TrajectoryModel):
     propulsion = subsystem(propulsion_interface)
     aero = subsystem(aero_interface)
     weight_initial = parameter()
 
+    # realize the dynamics model
     dynamics_model = GASPVehicleDynamics(aero=aero, propulsion=propulsion)
 
     class fuel_burn(TrajectoryOutput):
@@ -344,7 +345,7 @@ class GASPTrajectory(GeneratableCondorModel):
         ...
 
 @WithDeferredSubSystems
-class GASPVehicleDynamics(DynamicsModel):
+class GASPVehicleDynamics(ODESystem):
     propulsion = subsystem(propulsion_interface)
     aero = subsystem(aero_interface)
 
@@ -356,7 +357,7 @@ class GASPVehicleDynamics(DynamicsModel):
     # see dynamics model above with events etc
 
 
-class CoupledSizingClosure(CondorOptimizationModel):
+class CoupledSizingClosure(OptimizationModel):
 
     # variables can get numeric attributes like initial, bounds, scaling?
     sls = variable()
@@ -371,6 +372,7 @@ class CoupledSizingClosure(CondorOptimizationModel):
     static_aero = GASPAeroModelStatic(something_that_feeds_to_aero)
 
     # trajectory has the most important performance metrics
+    # realize the trajectory model
     trajectory = GASPTrajectory(
         propulsion=partial(RubberizedEngineDynamic, **static_prop.parameters_to_dynamic),
         aero=partial(GASPAeroModelDynamic, **static_aero.parameters_to_static),

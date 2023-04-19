@@ -709,6 +709,9 @@ class ModelType(type):
                 # binding the class object
                 attr_val.bind(attr_name, new_cls)
 
+                # TODO: is it helpful to collect the fields? maybe not since
+                # implemntations know what fields exist
+
 
             # TODO: add dependent variable data structure? they'll have to be constructed so implementation
             # data can be unpacked to represent model (chain dot accessors)
@@ -780,9 +783,10 @@ class SubsystemSymbol(IndependentSymbol):
     # TODO: or is there a better way to check? ModelType and issubclass(Deferred)?
     model_type = DeferredType
 
-class Subsystem(IndependentField, symbol_class=SubsystemSymbol):
+class SubsystemField(IndependentField, symbol_class=SubsystemSymbol):
     # TODO: how to mark as a singleton?
-    pass
+    def __call__(self, **kwargs): # model_type
+        pass
 
 class WithDeferredSubsystems():
     """
@@ -814,11 +818,10 @@ class WithDeferredSubsystems():
         altitude = ...
 
     class SpecificAircraftOptimization(OptimizationProblem):
-        
         static_engine = MyEngineStatic(
 
     """
-    deferred_subsystem = Subsystem()
+    subsystem = SubsystemField()
 
 
     # TODO: all model types can get deferred systems, assume a special model (I guess it
