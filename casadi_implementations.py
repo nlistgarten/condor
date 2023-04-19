@@ -16,13 +16,13 @@ def flatten(symbols):
         return [
             elem
             for symbol in symbols
-            for elem in symbol.reshape(-1)
+            for elem in np.atleast_1d(symbol).reshape(-1)
         ]
 
 def wrap(field, values):
     size_cum_sum = np.cumsum([0] + field.list_of('size'))
     # TODO: need to make sure 
-    values = np.array(values)
+    values = np.atleast_1d(values).reshape(-1)
     return tuple([
         values[start_idx:end_idx]
         for start_idx, end_idx in zip(size_cum_sum, size_cum_sum[1:])
@@ -35,11 +35,14 @@ class ExplicitSystem:
         symbol_outputs = flatten(model.output)
         name_inputs = model.input.list_of('name')
         name_outputs = model.output.list_of('name')
+        self.model = model
         doc = f"{tuple(name_outputs)} = {model}{tuple(name_outputs)}"
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
     def __call__(self, *args):
         out = self.func(*flatten(args))
+        wrapped = wrap(self.model.output, out)
+        return wrapped
 
 
 class AlgebraicSystem:

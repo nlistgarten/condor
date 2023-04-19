@@ -188,29 +188,33 @@ def make_class_name(components):
     # use pascal case from https://stackoverflow.com/a/8347192
     return ''.join(word for word in separate_words.title() if not word.isspace())
 
-@dataclass
-class BaseSymbol:
-    field_type: Field
-    # TODO: Should it be renamed to something related to "backend" since it's really the
-    # representation of backend.symbol_class? Should we support multiple back-end 
-    # representations simultaneously?
-    backend_repr: backend.symbol_class
-    # TODO: should backend extract field data like shape, etc that all symbols
-    # have? matches ones probably take the the metadata of their match, no need to
-    # repeat. For general assigned field, probably lose them anyway -- can probably
-    # figure out size, but not if diagonal/symetric is preserved; are those ever
-    # expected to preserved except when matched?
 
+@dataclass
+class BackendSymbolData:
+    shape: tuple # TODO: tuple of ints
+    symmetric: bool
+    diagonal: bool
+    size: int
+
+@dataclass
+class FrontendSymbolData:
+    field_type: Field
+    name: str
+    backend_repr: backend.symbol_class
+
+@dataclass
+class BaseSymbol(BackendSymbolData, FrontendSymbolData):
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
-
 # TODO: IndependentInputSymbol and Depdendent? Or is this okay?
 
 class IndependentSymbol(BaseSymbol):
     pass
 
+
 @dataclass(repr=False)
 class FreeSymbol(IndependentSymbol):
+    pass
     # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
     # symbol_generator. It should be dry-able, but validation is complicated..
     # one idea: where symbols gets instantiated, use **kwargs to try constructing,
@@ -218,9 +222,6 @@ class FreeSymbol(IndependentSymbol):
     # subclass does model-level validation.
     # or can the symbol itself perform validation? It has field_type back
     # referene, so it could do it...
-    name: str
-    n: int
-    m: int
     # TODO: convert to shape? Then Symbol __call__ does one set of validation to ensure
     # consistency of model, backend can do addiitonal validation (e.g., casadi doesn't
     # support more than 2D due to matlab). Then again, symmetric and diagonal become
@@ -238,9 +239,6 @@ class FreeSymbol(IndependentSymbol):
 
     # Then if bounds are here, must follow broadcasting rules
 
-    symmetric: bool
-    diagonal: bool
-    size: int
     # TODO: mark size as computed? or replace with @property? can that be trivially cached?
 
 
@@ -301,31 +299,37 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
             name=name, model=model, direction=direction, inherit_from=inherit_from
         )
 
-    def __call__(self, n=1, m=1, symmetric=False, diagonal=False,):
+    def __call__(self, shape=(1,), symmetric=False, diagonal=False,):
+        if symmetric:
+            raise NotImplemented
         if diagonal:
-            assert m == 1
+            raise NotImplemented
+
+        if isinstance(shape, int):
+            shape = (shape,)
+
+        size = np.prod(shape)
+
+        if diagonal:
+            assert size == shape[0]
         elif symmetric:
-            assert n == m
+            assert len(shape) == 2
+            assert shape[0] == shape[1]
         pass_kwargs = dict(
             name="%s_%d" % (self._resolve_name, len(self._symbols)),
-            n=n,
-            m=m,
+            shape=shape,
             symmetric=symmetric,
             diagonal=diagonal,
-            #**kwargs
         )
-        # TODO: deal with symmetric/diagonal cases
-        #if symmetric:
-        #    size = int(n*(n+1)/2)
-        #else:
-        size = n*m
+        if symmetric:
+            n = shape[0]
+            size = int(n*(n+1)/2)
         self._count += size
         out = backend.symbol_generator(**pass_kwargs)
         self.create_symbol(
             name=None,
             backend_repr=out,
-            n=n,
-            m=m,
+            shape=shape,
             symmetric=symmetric,
             diagonal=diagonal,
             size=size,
@@ -336,7 +340,7 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
 
 @dataclass(repr=False)
 class AssignedField(BaseSymbol):
-    name: str
+    pass
 
 class AssignedField(Field, symbol_class=AssignedField):
     def __init__(
@@ -353,6 +357,8 @@ class AssignedField(Field, symbol_class=AssignedField):
         else:
             print("setting special for", self, ".", name, "=", value)
             print(f"owner={self._model_name}")
+            # TODO: resolve circular imports so we can use dataclass
+            shape, symmetric, diagonal, size = backend.get_symbol_data(value)
             self.create_symbol(
                 name=name,
                 backend_repr=value,
@@ -361,6 +367,10 @@ class AssignedField(Field, symbol_class=AssignedField):
                 # both system encapsolation and implementations. So don't do it, but
                 # doument it. Can programatically add sub-system outputs though. For
                 # these reasons, ditch intermediate stuff.
+                shape=shape,
+                symmetric=symmetric,
+                diagonal=diagonal,
+                size=size,
             )
             super().__setattr__(name, self._symbols[-1])
 
@@ -392,14 +402,20 @@ class MatchedField(Field, symbol_class=MatchedField):
             match = self._matched_to.get(backend_repr=key)
             if isinstance(match, list):
                 raise ValueError
+            shape, symmetric, diagonal, size = backend.get_symbol_data(value)
             self.create_symbol(
+                name=None,
                 match=match,
                 backend_repr=value,
+                shape=shape,
+                symmetric=symmetric,
+                diagonal=diagonal,
+                size=size,
             )
 
     def __getitem__(self, key):
         """
-        get the matched symbol by the matche's name, backend symbol, or symbol
+        get the matched symbodl by the matche's name, backend symbol, or symbol
         """
         if isinstance(key, backend.symbol_class):
             match = self._matched_to.get(backend_repr=key)
@@ -408,10 +424,13 @@ class MatchedField(Field, symbol_class=MatchedField):
         elif isinstance(key, BaseSymbol):
             match = key
         else:
-            raise ValueError
+            raise ValueError 
 
         item = self.get(match=match)
         if isinstance(item, list) and self._direction != Direction.input:
+            # TODO: could easily create a new symbol related to match; should it depend
+            # on direction? Does matched need two other direction options for internal
+            # get vs set? or is that a separate type of matchedfield?
             raise ValueError
         return item
 
@@ -772,6 +791,7 @@ class Model(metaclass=ModelType):
                 raise ValueError
             input_kwargs[input_name] = input_val
         input_kwargs.update(kwargs)
+        self.input_kwargs = input_kwargs
 
         # pack into dot-able storage, over-writting fields and symbols
         for input_field in cls.input_fields:
@@ -783,7 +803,7 @@ class Model(metaclass=ModelType):
 
         imp_out = cls.implementation(*list(input_kwargs.values()))
 
-        output_kwargs = {
+        self.output_kwargs = output_kwargs = {
             out_name: val for out_name, val in zip(cls.output_names, imp_out)
         }
 
@@ -799,6 +819,9 @@ class Model(metaclass=ModelType):
         cls = self.__class__
         for output_name in cls.output_names:
             yield getattr(self, output_name)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
 
 class DeferredType(ModelType):
     pass

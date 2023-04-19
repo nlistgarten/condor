@@ -6,7 +6,7 @@ class MySystem(co.ODESystem):
     n = 2
     m = 1
     x = state(n)
-    C = state(n=n,m=n, symmetric=True)
+    C = state((n,n),)# symmetric=True)
     A = np.array([
         [0, 1],
         [0, 0],
@@ -25,14 +25,20 @@ class MySystem(co.ODESystem):
     output.y = C.T @ C
     print("ending user code for LTI class")
 
-class Sys2(co.ExplicitSystem):
+class Sys1out(co.ExplicitSystem):
     x = input()
     y = input()
     output.z = x**2 + y
 
+class Sys2out(co.ExplicitSystem):
+    x = input()
+    y = input()
+    output.w = x**2 + y**2
+    output.z = x**2 + y
+
 class MySolver(co.AlgebraicSystem):
     x = parameter()
-    z = parameter(n=2)
+    z = parameter(2)
     y2 = implicit_output()
     y1 = implicit_output()
 
