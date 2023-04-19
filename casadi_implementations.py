@@ -1,34 +1,45 @@
 import casadi
 import condor as co
+import numpy as np
 
-def flatten(symbol):
-    if isinstance(symbol, co.FreeSymbol) and (symbol.diagonal or symbol.symmetric):
-        raise NotImplemented
-    return [
-        elem
-        for col in casadi.horzsplit(symbol.backend_repr)
-        for elem in casadi.vertsplit(col)
-    ]
+def flatten(symbols):
+    if isinstance(symbols, co.Field) or isinstance(symbols[0], casadi.MX):
+        # imp construction or symbolic
+        return [
+            elem
+            for symbol in symbols
+            for col in casadi.horzsplit(symbol.backend_repr)
+            for elem in casadi.vertsplit(col)
+        ]
+    else:
+        # TODO: confirm that this reshape is the same
+        return [
+            elem
+            for symbol in symbols
+            for elem in symbol.reshape(-1)
+        ]
 
-def wrap(symbol, values):
-    pass
+def wrap(field, values):
+    size_cum_sum = np.cumsum([0] + field.list_of('size'))
+    # TODO: need to make sure 
+    values = np.array(values)
+    return tuple([
+        values[start_idx:end_idx]
+        for start_idx, end_idx in zip(size_cum_sum, size_cum_sum[1:])
+    ])
+
 
 class ExplicitSystem:
     def __init__(self, model):
-        symbol_inputs = [
-            elem for inp in model.input._symbols for elem in flatten(inp)
-        ]
-        symbol_outputs = [
-            elem for out in model.output._symbols for elem in flatten(out)
-        ]
+        symbol_inputs = flatten(model.input)
+        symbol_outputs = flatten(model.output)
         name_inputs = model.input.list_of('name')
         name_outputs = model.output.list_of('name')
         doc = f"{tuple(name_outputs)} = {model}{tuple(name_outputs)}"
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
-
-    def __call__(self, *args, **kwargs):
-        pass
+    def __call__(self, *args):
+        out = self.func(*flatten(args))
 
 
 class AlgebraicSystem:
@@ -67,7 +78,7 @@ class AlgebraicSystem:
         self.model = model
         self.rootfinder = casadi.Rootfinder()
 
-    def __call__(self, *args):
+    def __call__(self, **kwargs):
         p_arg = casadi.vertcat(args)
 
 

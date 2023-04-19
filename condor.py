@@ -314,10 +314,11 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
             diagonal=diagonal,
             #**kwargs
         )
-        if symmetric:
-            size = int(n*(n+1)/2)
-        else:
-            size = n*m
+        # TODO: deal with symmetric/diagonal cases
+        #if symmetric:
+        #    size = int(n*(n+1)/2)
+        #else:
+        size = n*m
         self._count += size
         out = backend.symbol_generator(**pass_kwargs)
         self.create_symbol(
@@ -514,7 +515,7 @@ class ModelType(type):
 
     def __call__(cls, *args, **kwargs):
         print("CondorModelType.__call__ for", cls)
-        return super().__call__(cls, *args, **kwargs)
+        return super().__call__(*args, **kwargs)
 
     def __repr__(cls):
         if cls._parent_name:
@@ -764,13 +765,40 @@ class Model(metaclass=ModelType):
     def __init__(self, *args, **kwargs):
         cls = self.__class__
         # bind *args and **kwargs to to appropriate signature
-        # pack into dot-able storage
-        # call cls.imp, fill datastructures for both inputs and outputs
-        # unpack into instance attrs
+        # TODO: is there a better way to do this?
+        input_kwargs = {}
+        for input_name, input_val in zip(cls.input_names, args):
+            if input_name in kwargs:
+                raise ValueError
+            input_kwargs[input_name] = input_val
+        input_kwargs.update(kwargs)
 
-        # so all inputs and outputs will be dot-accessible by name
-        # iterable unpacking should also give outputs
-        # can assign outputs using zip(model_instance, ModelClass.output_names) ?
+        # pack into dot-able storage, over-writting fields and symbols
+        for input_field in cls.input_fields:
+            dataclass_kwarg = {}
+            for input_name in input_field.list_of('name'):
+                dataclass_kwarg[input_name] = input_kwargs[input_name]
+                setattr(self, input_name, input_kwargs[input_name])
+            setattr(self, input_field._name, input_field._dataclass(**dataclass_kwarg))
+
+        imp_out = cls.implementation(*list(input_kwargs.values()))
+
+        output_kwargs = {
+            out_name: val for out_name, val in zip(cls.output_names, imp_out)
+        }
+
+        # pack into dot-able storage, over-writting fields and symbols
+        for output_field in cls.output_fields:
+            dataclass_kwarg = {}
+            for output_name in output_field.list_of('name'):
+                dataclass_kwarg[output_name] = output_kwargs[output_name]
+                setattr(self, output_name, output_kwargs[output_name])
+            setattr(self, output_field._name, output_field._dataclass(**dataclass_kwarg))
+
+    def __iter__(self):
+        cls = self.__class__
+        for output_name in cls.output_names:
+            yield getattr(self, output_name)
 
 class DeferredType(ModelType):
     pass
