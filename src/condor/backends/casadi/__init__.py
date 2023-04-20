@@ -25,6 +25,11 @@ def symbol_generator(name, shape=(1,1), symmetric=False, diagonal=False):
     # TODO: symmetric and diagonal, 
 
     if symmetric:
+        raise NotImplemented
+    if diagonal:
+        raise NotImplemented
+
+    if symmetric:
         assert n == m
         return casadi.tril2symm(casadi.tril(sym))
     if diagonal:
@@ -38,9 +43,16 @@ def get_symbol_data(symbol):
     shape = symbol.shape
     n, m = shape_to_nm(shape)
     size = n*m
+
     # TODO: actually check these
     diagonal = False
     symmetric = False
+
+    if symmetric:
+        size = int(n*(n+1)/2)
+    if diagonal:
+        size = n
+
     return BackendSymbolData(
         shape=shape, symmetric=symmetric, diagonal=diagonal, size=size
     )

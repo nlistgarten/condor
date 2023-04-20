@@ -1,11 +1,11 @@
 import numpy as np
 # TODO: figure out how to make this an option/setting like django?
 #from condor.backends import default as backend
-from condor.backends.default import backend
 from condor.fields import (
     Direction, Field, BaseSymbol, IndependentSymbol, FreeSymbol,
     IndependentField, FreeField, AssignedField, MatchedField
 )
+from condor.backends.default import backend
 """
 Backend:
 [x] provide symbol_generator for creating backend symbol repr
@@ -14,6 +14,7 @@ Backend:
 Do we allow more complicated datastructures? like models, etc.
 
 optional implementations which has a __dict__ that allows assignment
+Or, should the implementations just live in the main backend?
 
 
 Backend Implementations
@@ -78,7 +79,7 @@ class Options:
     Multiple option sub-classes provide options depending on project's default backend. 
     Single option sub-class forces back end for this model?
     OR flag, if tihs backend then these options, otherwise no options (rely on defaults)
-    
+
     implementation, if provided, should be a callable that takes a model and possible
     options and returns a callable that evaluates the model
 
@@ -113,6 +114,9 @@ class Options:
 
     """
     pass
+    # TODO: do meta programming so implementation enums are available without import?
+
+
 
 
 class ModelType(type):
@@ -308,6 +312,7 @@ class ModelType(type):
         # None, reference to an implementation to allow user provided ones? Maybe that's
         # the best way to do it, even for model types that condor ships with? if
         # inheritance works properly, can easily over-write per project, etc.
+
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
 
         implementation = None
@@ -532,9 +537,6 @@ class AlgebraicSystem(Model):
     implicit_output and parameters
     """
     parameter = FreeField()
-    #implicit_output = BoundedSymbol() # TODO: need one with bound data
-    # TODO: or does this need its own field type? Or really the
-    # dependent/independent is unneccessary
     implicit_output = FreeField(Direction.output)
     residual = AssignedField(Direction.internal)
     # unmatched, but maybe a subclass or imp might check lengths of residuals and

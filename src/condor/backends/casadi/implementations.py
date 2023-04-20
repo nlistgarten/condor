@@ -1,6 +1,7 @@
 import casadi
 import condor as co
 import numpy as np
+from enum import Enum, auto
 import condor.backends.casadi.algebraic_solver as algebraic_solver
 
 def flatten(symbols):
@@ -44,23 +45,29 @@ class ExplicitSystem:
         wrapped = wrap(self.model.output, out)
         return wrapped
 
-
 class AlgebraicSystem:
-    #  actually most of these should be classes? at least attach model
 
-    #bound_behavior = enum(
-    #    ignore,
-    #    # I think backtracking behavior can be referred to as L2 for "vector" and L1 for
-    #    # "scalar"  
-    #)
-    #
-    #line_search_criteria = enum(
-    ## wolf,?
-    #    # or just true or false? 
-    #)
-    #
+    class BoundBehavior(Enum):
+        p1 = auto() # enforce in a p1 sense ("scalar")
+        p2 = auto() # enforce in a p2 sense ("vector")
+        p1_hold = auto() # enforce in a p1 sense, modify search direction to hold enforced ("wall")
+        ignore = auto()
+
+    class LineSearchCriteria(Enum):
+        armijo = auto()
+
+
     def __init__(
-        self, model, atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True,
+        self, model,
+        # standard options
+        atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True, max_iters=100,
+        # new options
+        re_initialize=slice(None), # slice for re-initializing at every call
+        default_initializer=0.,
+        bound_behavior=AlgebraicSystem.BoundBehavior.p1,
+        line_search_contraction = 0.5, # 1.0 -> no line search?
+        line_search_criteria=AlgebraicSystem.LineSearchCriteria.armijo,
+        eror_on_failure=False,
     ):
         rootfinder_options = dict(
         )
@@ -68,6 +75,13 @@ class AlgebraicSystem:
         self.g0 = casadi.vertcat(*flatten(model.residual))
         self.g1 = casadi.vertcat(*flatten(model.explicit_output))
         self.p = casadi.vertcat(*flatten(model.parameter))
+
+        defined_initializers = model.initializer.list_of('match')
+        x0_list = []
+        for solver_var in model.implicit_output:
+            if solver_var in defined_initializers:
+                pass # check if it's an expression or a constant
+
 
         self.model = model
         self.rootfinder_func = casadi.Function(

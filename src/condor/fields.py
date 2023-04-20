@@ -255,10 +255,6 @@ class FreeField(IndependentField,):
         self, shape=(1,), symmetric=False, diagonal=False,
             upper_bound=np.inf, lower_bound=np.inf
     ):
-        if symmetric:
-            raise NotImplemented
-        if diagonal:
-            raise NotImplemented
 
         if isinstance(shape, int):
             shape = (shape,)
@@ -340,6 +336,14 @@ class MatchedField(Field,):
         """
         matched_to is Field instance that this MatchedField is matched to.
         """
+        # TODO: add matches_required flag? e.g. for initializer
+        # TODO: a flag for application direction? Field._diretion is relative to model;
+        # matched (especially for model internal) could be used as a free or assigned
+        # field (eg,dot for  DAE vs ODE), maybe "usage" and it can directly refer to
+        # FreeField or AssignedField instead of a separate enum?
+        # TODO: should FreeField instance __call__ get a kwarg for all matched fields
+        # that reference it and are assigned? -> two ways of assigning the match...
+
         super().__init__(
             name=name, model=model, direction=direction, inherit_from=inherit_from
         )
