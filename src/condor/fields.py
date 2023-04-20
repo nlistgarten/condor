@@ -147,7 +147,7 @@ class FrontendSymbolData:
     field_type: Field
     name: str
     backend_repr: backend.symbol_class
-    # TODO: bounds
+
 
 @dataclass
 class BaseSymbol(BackendSymbolData, FrontendSymbolData):
@@ -160,7 +160,8 @@ class IndependentSymbol(BaseSymbol):
 
 @dataclass(repr=False)
 class FreeSymbol(IndependentSymbol):
-    pass
+    upper_bound: float
+    lower_bound: float
     # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
     # symbol_generator. It should be dry-able, but validation is complicated..
     # one idea: where symbols gets instantiated, use **kwargs to try constructing,
@@ -245,7 +246,10 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
             name=name, model=model, direction=direction, inherit_from=inherit_from
         )
 
-    def __call__(self, shape=(1,), symmetric=False, diagonal=False,):
+    def __call__(
+        self, shape=(1,), symmetric=False, diagonal=False,
+            upper_bound=np.inf, lower_bound=np.inf
+    ):
         if symmetric:
             raise NotImplemented
         if diagonal:
@@ -276,6 +280,8 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
         self.create_symbol(
             name=None,
             backend_repr=out,
+            upper_bound=upper_bound,
+            lower_bound=lower_bound,
             **asdict(symbol_data)
         )
         return out
@@ -324,7 +330,7 @@ class MatchedSymbol(BaseSymbol):
 
 class MatchedField(Field, symbol_class=MatchedSymbol):
     def __init__(
-        self, matched_to=None, direction=Direction.output, name='', model=None, inherit_from=None
+        self, matched_to=None, direction=Direction.internal, name='', model=None, inherit_from=None
     ):
         """
         matched_to is Field instance that this MatchedField is matched to.

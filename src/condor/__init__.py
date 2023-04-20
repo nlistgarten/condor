@@ -292,11 +292,9 @@ class ModelType(type):
         for output_field in output_fields:
             for out_symbol in output_field:
                 out_name = out_symbol.name
+                check_attr_name(out_name, out_symbol, super_attrs, bases)
+                super_attrs[out_name] = out_symbol
                 output_names.append(out_name)
-                if not isinstance(out_symbol, IndependentSymbol):
-                    # this symbol was not already attached to model
-                    check_attr_name(out_name, out_symbol, super_attrs, bases)
-                    super_attrs[out_name] = out_symbol
             output_field.create_dataclass()
 
         # process docstring

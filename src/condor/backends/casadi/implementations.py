@@ -36,7 +36,6 @@ class ExplicitSystem:
         name_inputs = model.input.list_of('name')
         name_outputs = model.output.list_of('name')
         self.model = model
-        doc = f"{tuple(name_outputs)} = {model}{tuple(name_outputs)}"
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
     def __call__(self, *args):

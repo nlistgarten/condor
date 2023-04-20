@@ -42,8 +42,8 @@ class Sys2out(co.ExplicitSystem):
 class MySolver(co.AlgebraicSystem):
     x = parameter()
     z = parameter()
-    y2 = implicit_output()
-    y1 = implicit_output()
+    y2 = implicit_output(lower_bound=0.)
+    y1 = implicit_output(lower_bound=0.)
 
     residual.y1 = y2 + x**2
     residual.y2 = y1 - x+z
