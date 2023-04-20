@@ -1,11 +1,16 @@
 
 # TODO: figure out python version minimum
 
-from dataclasses import dataclass, make_dataclass, asdict
+from dataclasses import dataclass, make_dataclass, fields
 import numpy as np
 from enum import Enum
 from condor.backends.default import backend
 from condor.backends import BackendSymbolData
+
+def asdict(obj):
+    return dict(
+        (field.name, getattr(obj, field.name)) for field in fields(obj) if field.init
+    )
 
 class Direction(Enum):
     """
@@ -43,7 +48,7 @@ class Field:
         # TODO: currently, AssignedField types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
         # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
-        # not-a-computation, but I guess I could just use symbol_class on value instead
+        # not-an-assignment, but I guess I could just use symbol_class on value instead
         # of checking name? Anyway, really don't like needing to prefix all Field
         # attributes with _ because of AssignedField... 
 
@@ -191,7 +196,6 @@ class FreeSymbol(IndependentSymbol):
 
     # Then if bounds are here, must follow broadcasting rules
 
-    # TODO: mark size as computed? or replace with @property? can that be trivially cached?
 
 
 class IndependentField(Field):
@@ -259,23 +263,12 @@ class FreeField(IndependentField,):
         if isinstance(shape, int):
             shape = (shape,)
 
-        size = np.prod(shape)
-
-        if diagonal:
-            assert size == shape[0]
-        elif symmetric:
-            assert len(shape) == 2
-            assert shape[0] == shape[1]
         pass_kwargs = dict(
             name="%s_%d" % (self._resolve_name, len(self._symbols)),
             shape=shape,
             symmetric=symmetric,
             diagonal=diagonal,
         )
-        if symmetric:
-            n = shape[0]
-            size = int(n*(n+1)/2)
-        self._count += size
         out = backend.symbol_generator(**pass_kwargs)
         symbol_data = backend.get_symbol_data(out)
         self.create_symbol(
@@ -285,6 +278,7 @@ class FreeField(IndependentField,):
             lower_bound=lower_bound,
             **asdict(symbol_data)
         )
+        self._count += self._symbols[-1].size
         return out
 
 

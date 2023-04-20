@@ -48,12 +48,8 @@ def get_symbol_data(symbol):
     diagonal = False
     symmetric = False
 
-    if symmetric:
-        size = int(n*(n+1)/2)
-    if diagonal:
-        size = n
 
     return BackendSymbolData(
-        shape=shape, symmetric=symmetric, diagonal=diagonal, size=size
+        shape=shape, symmetric=symmetric, diagonal=diagonal,
     )
 

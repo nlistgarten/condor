@@ -62,11 +62,11 @@ class AlgebraicSystem:
         # standard options
         atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True, max_iters=100,
         # new options
-        re_initialize=slice(None), # slice for re-initializing at every call
+        re_initialize=slice(None), # slice for re-initializing at every call. will support indexing 
         default_initializer=0.,
-        bound_behavior=AlgebraicSystem.BoundBehavior.p1,
+        bound_behavior=BoundBehavior.p1,
         line_search_contraction = 0.5, # 1.0 -> no line search?
-        line_search_criteria=AlgebraicSystem.LineSearchCriteria.armijo,
+        line_search_criteria=LineSearchCriteria.armijo,
         eror_on_failure=False,
     ):
         rootfinder_options = dict(
