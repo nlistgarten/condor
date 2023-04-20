@@ -420,6 +420,8 @@ class Model(metaclass=ModelType):
         input_kwargs.update(kwargs)
         self.input_kwargs = input_kwargs
 
+        # TODO: check bounds on model inputs?
+
         # pack into dot-able storage, over-writting fields and symbols
         for input_field in cls.input_fields:
             dataclass_kwarg = {}

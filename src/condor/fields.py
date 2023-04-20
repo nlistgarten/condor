@@ -30,6 +30,11 @@ class Field:
     def __init_subclass__(cls, symbol_class=None, **kwargs):
         # TODO: make sure python version is correct
         super().__init_subclass__(**kwargs)
+        if symbol_class is None:
+            # TODO: ensure this works for different file organizations? e.g., will it
+            # find a symbol defined in another file that the field subclass has access
+            # to?
+            symbol_class = globals().get(cls.__name__.replace('Field', 'Symbol'))
         cls.symbol_class = symbol_class
 
     def __init__(
@@ -223,7 +228,7 @@ class IndependentField(Field):
     pass
 
 
-class FreeField(IndependentField, symbol_class=FreeSymbol):
+class FreeField(IndependentField,):
     # TODO: is it possible to inherit the kwargs name, model, symbol_class?
     # repeated... I guess kwargs only? but like name as optional positional. maybe
     # additional only kwargs? how about update default? Should the default be done by
@@ -292,7 +297,7 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
 class AssignedSymbol(BaseSymbol):
     pass
 
-class AssignedField(Field, symbol_class=AssignedSymbol):
+class AssignedField(Field,):
     def __init__(
         self, direction=Direction.output, name='', model=None, inherit_from=None
     ):
@@ -328,7 +333,7 @@ class MatchedSymbol(BaseSymbol):
     def update_name(self):
         self.name = '__'.join([self.field_type._name, self.match.name])
 
-class MatchedField(Field, symbol_class=MatchedSymbol):
+class MatchedField(Field,):
     def __init__(
         self, matched_to=None, direction=Direction.internal, name='', model=None, inherit_from=None
     ):

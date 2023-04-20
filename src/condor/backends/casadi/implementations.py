@@ -1,6 +1,7 @@
 import casadi
 import condor as co
 import numpy as np
+import condor.backends.casadi.algebraic_solver as algebraic_solver
 
 def flatten(symbols):
     if isinstance(symbols, co.Field) or isinstance(symbols[0], casadi.MX):
@@ -74,7 +75,12 @@ class AlgebraicSystem:
             [self.x, self.p],
             [self.g0, self.g1],
         )
-        self.rootfinder = casadi.rootfinder(model.__name__, "newton", self.rootfinder_func)
+        #algebraic_solver.SolverWithWarmStart(
+        #    dict(x=self.x, p=self.p),
+        #    g_impl = self.g0,
+        #    g_expl = self.g1,
+        #)
+
 
     def __call__(self, **kwargs):
         p_arg = casadi.vertcat(args)
