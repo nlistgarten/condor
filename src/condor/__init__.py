@@ -195,6 +195,7 @@ class FrontendSymbolData:
     field_type: Field
     name: str
     backend_repr: backend.symbol_class
+    # TODO: bounds
 
 @dataclass
 class BaseSymbol(BackendSymbolData, FrontendSymbolData):
@@ -203,6 +204,7 @@ class BaseSymbol(BackendSymbolData, FrontendSymbolData):
 
 class IndependentSymbol(BaseSymbol):
     pass
+    # TODO: long description?
 
 @dataclass(repr=False)
 class FreeSymbol(IndependentSymbol):
@@ -318,13 +320,11 @@ class FreeField(IndependentField, symbol_class=FreeSymbol):
             size = int(n*(n+1)/2)
         self._count += size
         out = backend.symbol_generator(**pass_kwargs)
+        symbol_data = backend.get_symbol_data(out)
         self.create_symbol(
             name=None,
             backend_repr=out,
-            shape=shape,
-            symmetric=symmetric,
-            diagonal=diagonal,
-            size=size,
+            **asdict(symbol_data)
         )
         return out
 
@@ -661,9 +661,10 @@ class ModelType(type):
                     check_attr_name(out_name, out_symbol, super_attrs, bases)
                     super_attrs[out_name] = out_symbol
             output_field.create_dataclass()
+
+        # process docstring
         lhs_doc = ', '.join([out_name for out_name in output_names])
         arg_doc = ', '.join([arg_name for arg_name in input_names])
-
         orig_doc = attrs.get("__doc__", "")
         super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
