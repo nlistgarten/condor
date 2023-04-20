@@ -1,5 +1,6 @@
 import casadi
 from condor.backends.casadi import implementations
+from condor.symbol import BackendSymbolData
 import numpy as np
 
 name = 'Casadi'
@@ -40,8 +41,9 @@ def get_symbol_data(symbol):
     # TODO: actually check these
     diagonal = False
     symmetric = False
-    # TODO: resolve circular imports so we can use dataclass
-    return shape, symmetric, diagonal, size
+    return BackendSymbolData(
+        shape=shape, symmetric=symmetric, diagonal=diagonal, size=size
+    )
 
 
 # TODO: update from best results (back_track branch)

@@ -1,5 +1,6 @@
 import numpy as np
-from dataclasses import dataclass, make_dataclass
+from condor.symbol import BackendSymbolData
+from dataclasses import dataclass, make_dataclass, asdict
 from enum import Enum
 
 
@@ -190,13 +191,6 @@ def make_class_name(components):
 
 
 @dataclass
-class BackendSymbolData:
-    shape: tuple # TODO: tuple of ints
-    symmetric: bool
-    diagonal: bool
-    size: int
-
-@dataclass
 class FrontendSymbolData:
     field_type: Field
     name: str
@@ -206,11 +200,9 @@ class FrontendSymbolData:
 class BaseSymbol(BackendSymbolData, FrontendSymbolData):
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
-# TODO: IndependentInputSymbol and Depdendent? Or is this okay?
 
 class IndependentSymbol(BaseSymbol):
     pass
-
 
 @dataclass(repr=False)
 class FreeSymbol(IndependentSymbol):
@@ -358,7 +350,7 @@ class AssignedField(Field, symbol_class=AssignedField):
             print("setting special for", self, ".", name, "=", value)
             print(f"owner={self._model_name}")
             # TODO: resolve circular imports so we can use dataclass
-            shape, symmetric, diagonal, size = backend.get_symbol_data(value)
+            symbol_data = backend.get_symbol_data(value)
             self.create_symbol(
                 name=name,
                 backend_repr=value,
@@ -367,10 +359,7 @@ class AssignedField(Field, symbol_class=AssignedField):
                 # both system encapsolation and implementations. So don't do it, but
                 # doument it. Can programatically add sub-system outputs though. For
                 # these reasons, ditch intermediate stuff.
-                shape=shape,
-                symmetric=symmetric,
-                diagonal=diagonal,
-                size=size,
+                **asdict(symbol_data)
             )
             super().__setattr__(name, self._symbols[-1])
 
@@ -402,15 +391,12 @@ class MatchedField(Field, symbol_class=MatchedField):
             match = self._matched_to.get(backend_repr=key)
             if isinstance(match, list):
                 raise ValueError
-            shape, symmetric, diagonal, size = backend.get_symbol_data(value)
+            symbol_data = backend.get_symbol_data(value)
             self.create_symbol(
                 name=None,
                 match=match,
                 backend_repr=value,
-                shape=shape,
-                symmetric=symmetric,
-                diagonal=diagonal,
-                size=size,
+                **asdict(symbol_data)
             )
 
     def __getitem__(self, key):
