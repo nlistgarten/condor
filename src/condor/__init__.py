@@ -4,7 +4,7 @@ from enum import Enum
 
 
 # TODO: figure out how to make this an option/setting like django?
-import casadi_backend as backend
+import condor.backends.casadi as backend
 """
 Backend:
 [x] provide symbol_generator for creating backend symbol repr

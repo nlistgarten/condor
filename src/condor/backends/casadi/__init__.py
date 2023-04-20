@@ -1,5 +1,5 @@
 import casadi
-import casadi_implementations as implementations
+from condor.backends.casadi import implementations
 import numpy as np
 
 name = 'Casadi'

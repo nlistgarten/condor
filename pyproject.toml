@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "condor"
+version = "0.0.1"
+authors = [
+  { name="Benjamin W. L. Margolis", email="benjamin.margolis@nasa.gov" },
+  { name="Kenneth R. Lyons", email="kenneth.r.lyons@nasa.gov" },
+]
+description = "A package for disciplined systems modeling on a deadline"
+readme = "README.rst"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
