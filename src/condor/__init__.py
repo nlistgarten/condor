@@ -661,6 +661,11 @@ class ModelType(type):
                     check_attr_name(out_name, out_symbol, super_attrs, bases)
                     super_attrs[out_name] = out_symbol
             output_field.create_dataclass()
+        lhs_doc = ', '.join([out_name for out_name in output_names])
+        arg_doc = ', '.join([arg_name for arg_name in input_names])
+
+        orig_doc = attrs.get("__doc__", "")
+        super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
         # TODO: validate backend_options and add to super_attrs
         # could have a reserved keyword "implementation" on options that defaults to
@@ -732,7 +737,7 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
     # TODO: this needs to also be called to check on bases dict to prevent creating a
     # symbol with the name of state? I think?
 
-    if attr_name in ['__module__', '__qualname__']:
+    if attr_name in ['__module__', '__qualname__', '__doc__']:
         return
 
     if len(bases) == 1 and bases[0] == Model:

@@ -31,6 +31,9 @@ class Sys1out(co.ExplicitSystem):
     output.z = x**2 + y
 
 class Sys2out(co.ExplicitSystem):
+    """
+    A test explicit system with two outputs
+    """
     x = input()
     y = input()
     output.w = x**2 + y**2
@@ -38,7 +41,7 @@ class Sys2out(co.ExplicitSystem):
 
 class MySolver(co.AlgebraicSystem):
     x = parameter()
-    z = parameter(2)
+    z = parameter()
     y2 = implicit_output()
     y1 = implicit_output()
 

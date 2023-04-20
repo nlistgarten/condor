@@ -60,26 +60,22 @@ class AlgebraicSystem:
     #)
     #
     def __init__(
-        model, atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True,
+        self, model, atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True,
     ):
-        return
         rootfinder_options = dict(
         )
-        self.x = casadi.vertcat(*[
-            flatten(out) for out in model.implicit_output.list_of('symbol')
-        ])
-        self.g0 = casadi.vertcat(*[
-            flatten(out) for out in model.residual.list_of('symbol')
-        ])
-        self.g1 = casadi.vertcat(*[
-            flatten(out) for out in model.explicit_output.list_of('symbol')
-        ])
-        self.p = casadi.vertcat(*[
-            flatten(out) for out in model.input.list_of('symbol')
-        ])
+        self.x = casadi.vertcat(*flatten(model.implicit_output))
+        self.g0 = casadi.vertcat(*flatten(model.residual))
+        self.g1 = casadi.vertcat(*flatten(model.explicit_output))
+        self.p = casadi.vertcat(*flatten(model.parameter))
 
         self.model = model
-        self.rootfinder = casadi.Rootfinder()
+        self.rootfinder_func = casadi.Function(
+            f"{model.__name__}_rootfunc",
+            [self.x, self.p],
+            [self.g0, self.g1],
+        )
+        self.rootfinder = casadi.rootfinder(model.__name__, "newton", self.rootfinder_func)
 
     def __call__(self, **kwargs):
         p_arg = casadi.vertcat(args)
