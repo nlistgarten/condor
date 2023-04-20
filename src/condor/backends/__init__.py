@@ -6,5 +6,3 @@ class BackendSymbolData:
     symmetric: bool
     diagonal: bool
     size: int
-
-
