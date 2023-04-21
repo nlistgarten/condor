@@ -20,7 +20,7 @@ class BackendSymbolData:
 
         if self.diagonal:
             assert size == self.shape[0]
-        elif symmetric:
+        elif self.symmetric:
             assert len(shape) == 2
             assert self.shape[0] == self.shape[1]
         self.size = size

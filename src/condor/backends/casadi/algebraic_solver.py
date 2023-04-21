@@ -1,3 +1,5 @@
+import numpy as np
+from scipy import linalg
 import casadi
 from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
 
@@ -177,6 +179,7 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # u += change
     # du += change / alpha
     return u + change, du + change / alpha
+
 
 class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
 

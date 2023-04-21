@@ -197,6 +197,11 @@ class FreeSymbol(IndependentSymbol):
     # Then if bounds are here, must follow broadcasting rules
 
 
+@dataclass(repr=False)
+class InitializedSymbol(FreeSymbol):
+    initializer: float  # TODO union[numeric, expression]
+    warm_start: bool = True
+
 
 class IndependentField(Field):
     """
@@ -281,6 +286,35 @@ class FreeField(IndependentField,):
         self._count += self._symbols[-1].size
         return out
 
+
+class InitializedField(FreeField):
+    def __call__(
+        self, shape=(1,), symmetric=False, diagonal=False,
+            upper_bound=np.inf, lower_bound=np.inf, initializer=0, warm_start=True,
+    ):
+
+        if isinstance(shape, int):
+            shape = (shape,)
+
+        pass_kwargs = dict(
+            name="%s_%d" % (self._resolve_name, len(self._symbols)),
+            shape=shape,
+            symmetric=symmetric,
+            diagonal=diagonal,
+        )
+        out = backend.symbol_generator(**pass_kwargs)
+        symbol_data = backend.get_symbol_data(out)
+        self.create_symbol(
+            name=None,
+            backend_repr=out,
+            upper_bound=upper_bound,
+            lower_bound=lower_bound,
+            initializer=initializer,
+            warm_start=warm_start,
+            **asdict(symbol_data)
+        )
+        self._count += self._symbols[-1].size
+        return out
 
 
 @dataclass(repr=False)

@@ -3,7 +3,7 @@ import numpy as np
 #from condor.backends import default as backend
 from condor.fields import (
     Direction, Field, BaseSymbol, IndependentSymbol, FreeSymbol,
-    IndependentField, FreeField, AssignedField, MatchedField
+    IndependentField, FreeField, AssignedField, MatchedField, InitializedField
 )
 from condor.backends.default import backend
 """
@@ -537,12 +537,11 @@ class AlgebraicSystem(Model):
     implicit_output and parameters
     """
     parameter = FreeField()
-    implicit_output = FreeField(Direction.output)
+    implicit_output = InitializedField(Direction.output)
     residual = AssignedField(Direction.internal)
     # unmatched, but maybe a subclass or imp might check lengths of residuals and
     # implicit_outputs to ensure enough DOF?
     explicit_output = AssignedField()
-    initializer = MatchedField(implicit_output)
 
 
 class OptimizationProblem(Model):
@@ -556,9 +555,8 @@ class OptimizationProblem(Model):
 
 
     """
-    variable = FreeField(Direction.output)
+    variable = InitializedField(Direction.output)
     parameter = FreeField()
-    initializer = MatchedField(variable)
     # TODO: add objective descriptor? so user code `objetive = ...` can get intercepted and
     # handled?  or it's just a contract in the API that user writes one? feasibility
     # problem if not? Add hook for metaclass to handle it?

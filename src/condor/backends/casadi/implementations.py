@@ -2,15 +2,21 @@ import casadi
 import condor as co
 import numpy as np
 from enum import Enum, auto
-import condor.backends.casadi.algebraic_solver as algebraic_solver
+from condor.backends.casadi import utils, algebraic_solver
 
 def flatten(symbols):
-    if isinstance(symbols, co.Field) or isinstance(symbols[0], casadi.MX):
+    if isinstance(symbols, co.Field):
+        symbols = symbols.list_of("backend_repr")
+
+    if not symbols:
+        return symbols
+
+    if isinstance(symbols[0], casadi.MX):
         # imp construction or symbolic
         return [
             elem
             for symbol in symbols
-            for col in casadi.horzsplit(symbol.backend_repr)
+            for col in casadi.horzsplit(symbol)
             for elem in casadi.vertsplit(col)
         ]
     else:
@@ -33,17 +39,16 @@ def wrap(field, values):
 
 class ExplicitSystem:
     def __init__(self, model):
-        symbol_inputs = flatten(model.input)
-        symbol_outputs = flatten(model.output)
+        symbol_inputs = model.input.list_of("backend_repr")
+        symbol_outputs = model.output.list_of("backend_repr")
         name_inputs = model.input.list_of('name')
         name_outputs = model.output.list_of('name')
         self.model = model
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
     def __call__(self, *args):
-        out = self.func(*flatten(args))
-        wrapped = wrap(self.model.output, out)
-        return wrapped
+        return self.func(*args)
+
 
 class AlgebraicSystem:
 
@@ -76,27 +81,100 @@ class AlgebraicSystem:
         self.g1 = casadi.vertcat(*flatten(model.explicit_output))
         self.p = casadi.vertcat(*flatten(model.parameter))
 
-        defined_initializers = model.initializer.list_of('match')
-        x0_list = []
+        defined_initializers = model.implicit_output.list_of("initializer")
+        x0_at_construction = []
+        initializer_exprs = []
         for solver_var in model.implicit_output:
-            if solver_var in defined_initializers:
-                pass # check if it's an expression or a constant
-
+            if isinstance(solver_var.initializer, casadi.MX):
+                x0_at_construction.append(np.zeros(solver_var.shape))
+                initializer_exprs.append(solver_var.initializer)
+            elif solver_var.warm_start:
+                x0_at_construction.append(solver_var.initializer)
+                initializer_exprs.append(solver_var.backend_repr)
+            else:
+                x0_at_construction.append(solver_var.initializer)
+                initializer_exprs.append(solver_var.initializer)
+        self.x0_at_construction = flatten(x0_at_construction)
+        initializer_exprs = flatten(initializer_exprs)
+        self.initializer_func = casadi.Function(
+            f"{model.__name__}_initializer",
+            [self.x, self.p],
+            initializer_exprs,
+        )
 
         self.model = model
-        self.rootfinder_func = casadi.Function(
-            f"{model.__name__}_rootfunc",
-            [self.x, self.p],
-            [self.g0, self.g1],
+
+        self.callback = SolverWithWarmStart(
+            model.__name__,
+            self.x,
+            self.p,
+            self.g0,
+            self.g1,
+            flatten(model.implicit_output.list_of("lower_bound")),
+            flatten(model.implicit_output.list_of("upper_bound")),
+            self.x0_at_construction,
+            rootfinder_options,
+            self.initializer_func,
         )
-        #algebraic_solver.SolverWithWarmStart(
-        #    dict(x=self.x, p=self.p),
-        #    g_impl = self.g0,
-        #    g_expl = self.g1,
-        #)
+
+    def __call__(self, *args, **kwargs):
+        return self.callback(*args)
 
 
-    def __call__(self, **kwargs):
-        p_arg = casadi.vertcat(args)
+class SolverWithWarmStart(utils.CasadiFunctionCallbackMixin, casadi.Callback):
 
+    def __init__(self, name, x, p, g0, g1, lbx, ubx, x0, rootfinder_options, initializer):
+        casadi.Callback.__init__(self)
+        self.name = name
+        self.initializer = initializer
+        self.x0 = x0
+        self.lbx = np.array(lbx)
+        self.ubx = np.array(ubx)
+
+        self.newton = algebraic_solver.Newton(
+            x,
+            p,
+            g0,
+            lbx=lbx,
+            ubx=ubx,
+            tol=1e-10,
+            ls_type=None,
+            max_iter=100,
+        )
+
+        self.resid_func = casadi.Function(f"{name}_resid_func", [x, p], [g0, g1])
+
+        self.rootfinder = casadi.rootfinder(
+            f"{name}_rootfinder",
+            "newton",
+            self.resid_func,
+            rootfinder_options,
+        )
+        out_imp, out_exp = self.rootfinder(self.x0, p)
+
+        self.func = casadi.Function(
+            f"{name}_rootfinder_func",
+            casadi.vertsplit(p),
+            casadi.vertsplit(out_imp) + casadi.vertsplit(out_exp),
+        )
+
+        self.construct(name, {})
+
+    def eval(self, args):
+        p = casadi.vertcat(*args)
+        self.x0 = self.initializer(self.x0, p)
+
+        self.x0 = np.array(self.x0).reshape(-1)
+        p = p.toarray().reshape(-1)
+
+        lbx_violations = np.where(self.x0 < self.lbx)[0]
+        ubx_violations = np.where(self.x0 > self.ubx)[0]
+        self.x0[lbx_violations] = self.lbx[lbx_violations]
+        self.x0[ubx_violations] = self.ubx[ubx_violations]
+
+        self.x0 = self.newton(self.x0, p)
+        resid, out_exp = self.resid_func(self.x0, p)
+        out_exp = out_exp.toarray().reshape(-1)
+
+        return tuple([*self.x0, *out_exp])
 

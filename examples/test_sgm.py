@@ -42,13 +42,11 @@ class Sys2out(co.ExplicitSystem):
 class MySolver(co.AlgebraicSystem):
     x = parameter()
     z = parameter()
-    y2 = implicit_output(lower_bound=0.)
+    y2 = implicit_output(lower_bound=0., initializer=1.)
     y1 = implicit_output(lower_bound=0.)
 
     residual.y1 = y2 + x**2
     residual.y2 = y1 - x+z
-
-    initializer[y2] = 1.
 
     class Casadi(co.Options):
         warm_start = False
