@@ -338,11 +338,12 @@ class GASPTrajectory(TrajectoryModel):
     # realize the dynamics model
     dynamics_model = GASPVehicleDynamics(aero=aero, propulsion=propulsion)
 
-    class fuel_burn(TrajectoryOutput):
-        ...
+class fuel_burn(GASPTrajectory.output):
+    final = dynamics_model.state.weight - weight_intial
+    # integral defaults to 0.
 
-    class range_flown(TrajectoryOutput):
-        ...
+class range_flown(GASPTrajectory.output):
+    final = dynamics_model.state.range
 
 @WithDeferredSubSystems
 class GASPVehicleDynamics(ODESystem):
