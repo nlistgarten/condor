@@ -32,7 +32,9 @@ class Field:
     def _set_resolve_name(self):
         self._resolve_name = ".".join([self._model_name, self._name])
 
-    def __init_subclass__(cls, symbol_class=None, **kwargs):
+    def __init_subclass__(
+            cls, symbol_class=None, default_direction=Direction.internal, **kwargs
+    ):
         # TODO: make sure python version is correct
         super().__init_subclass__(**kwargs)
         if symbol_class is None:
@@ -42,8 +44,10 @@ class Field:
             symbol_class = globals().get(cls.__name__.replace('Field', 'Symbol'))
         cls.symbol_class = symbol_class
 
+        cls.default_direction = default_direction
+
     def __init__(
-        self, name='', model=None, direction=Direction.internal, inherit_from=None
+        self, direction=None, name='', model=None, inherit_from=None
     ):
         # TODO: currently, AssignedField types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
@@ -55,6 +59,8 @@ class Field:
 
         self._name = name
         self._model = model
+        if direction is None:
+            direction = self.__class__.default_direction
         self._direction = direction
         if model:
             self._model_name = model.__class__.__name__
@@ -146,6 +152,7 @@ class Field:
         for symbol in self._symbols:
             yield symbol
 
+
 def make_class_name(components):
     separate_words = ' '.join([comp.replace('_', ' ') for comp in components])
     # use pascal case from https://stackoverflow.com/a/8347192
@@ -155,53 +162,20 @@ def make_class_name(components):
 @dataclass
 class FrontendSymbolData:
     field_type: Field
-    name: str
     backend_repr: backend.symbol_class
+    name: str = ''
+
 
 
 @dataclass
-class BaseSymbol(BackendSymbolData, FrontendSymbolData):
+class BaseSymbol(FrontendSymbolData, BackendSymbolData,):
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
+
 
 class IndependentSymbol(BaseSymbol):
     pass
     # TODO: long description?
-
-@dataclass(repr=False)
-class FreeSymbol(IndependentSymbol):
-    upper_bound: float
-    lower_bound: float
-    # TODO: this data structure is  repeated in 2 other places, Symbol.__call__ and
-    # symbol_generator. It should be dry-able, but validation is complicated..
-    # one idea: where symbols gets instantiated, use **kwargs to try constructing,
-    # Symbol class will at least validate field name assignment. Then Field
-    # subclass does model-level validation.
-    # or can the symbol itself perform validation? It has field_type back
-    # referene, so it could do it...
-    # TODO: convert to shape? Then Symbol __call__ does one set of validation to ensure
-    # consistency of model, backend can do addiitonal validation (e.g., casadi doesn't
-    # support more than 2D due to matlab). Then again, symmetric and diagonal become
-    # less clear, maybe Symbols are also no more than 2D.
-    # but will eventually want N-D table lookup, knots and coefficients as parameters
-    # for table lookups that fed from a model, use partial to fix them for models that
-    # fed ? Use None for any dimension to follow broadcasting rules? Could even allow
-    # ellipse
-    # maybe have tables take knots and coeffs as an assigned input? Could similarly have
-    # LTI system generator take matrices as assigned inputs? Special AssignmentField
-    # that takes data instead of symbol. For fixed tables, not models that get optimized
-    # Actually, table knots match to inputs and coefficients match to outputs.
-    # so only LTI needs an assigned subclass for data/matrices that has fixed
-    # attributes?
-
-    # Then if bounds are here, must follow broadcasting rules
-
-
-@dataclass(repr=False)
-class InitializedSymbol(FreeSymbol):
-    initializer: float  # TODO union[numeric, expression]
-    warm_start: bool = True
-
 
 class IndependentField(Field):
     """
@@ -237,97 +211,71 @@ class IndependentField(Field):
     pass
 
 
-class FreeField(IndependentField,):
-    # TODO: is it possible to inherit the kwargs name, model, symbol_class?
-    # repeated... I guess kwargs only? but like name as optional positional. maybe
-    # additional only kwargs? how about update default? Should the default be done by
-    # name? e.g., FieldSubclass.__name__ + 'Symbol'? See AssignedField below
-    def __init__(
-        self, direction=Direction.input, name='', model=None, inherit_from=None,
-    ):
-        # TODO: should model types define the extra fields here?
-        # I guess these could be metaclasses, and things like DynamicsModel are really
-        # model types? could define state by creating inner class definition that
-        # subclasses this to define extra fields (e.g., optimization variable or
-        # implicit outputs getting ref, scaling, etc)
-        # this defaults with n, m, symmetric, etc.
-        # but actually do need to return just symbol from user code. so maybe libraries
-        # define symbol subclasses, __call__ takes the fields as args?
-        # they can just be dataclasses.
-        # having DynamicModelType be a metaclass (or, allowing/encouraging library
-        # Model(Types) to write a metaclass might allow useful hooks?j
-        super().__init__(
-            name=name, model=model, direction=direction, inherit_from=inherit_from
-        )
+@dataclass(repr=False)
+class FreeSymbol(IndependentSymbol):
+    upper_bound: float = np.inf
+    lower_bound: float = -np.inf
+    # Then if bounds are here, must follow broadcasting rules
 
-    def __call__(
-        self, shape=(1,), symmetric=False, diagonal=False,
-            upper_bound=np.inf, lower_bound=np.inf
-    ):
 
+class FreeField(IndependentField, default_direction=Direction.input):
+    def make_backend_symbol(
+        self, name, shape=(1,), symmetric=False, diagonal=False, **kwargs
+    ):
         if isinstance(shape, int):
             shape = (shape,)
-
-        pass_kwargs = dict(
-            name="%s_%d" % (self._resolve_name, len(self._symbols)),
-            shape=shape,
-            symmetric=symmetric,
-            diagonal=diagonal,
+        out = backend.symbol_generator(
+            name=name, shape=shape, symmetric=symmetric, diagonal=diagonal
         )
-        out = backend.symbol_generator(**pass_kwargs)
         symbol_data = backend.get_symbol_data(out)
-        self.create_symbol(
-            name=None,
+        kwargs.update(
             backend_repr=out,
-            upper_bound=upper_bound,
-            lower_bound=lower_bound,
-            **asdict(symbol_data)
+            **asdict(symbol_data),
         )
-        self._count += self._symbols[-1].size
-        return out
+        return kwargs
 
+    def __call__(self, **kwargs):
+        backend_name = name="%s_%d" % (self._resolve_name, len(self._symbols))
+        new_kwargs = self.make_backend_symbol(name=backend_name, **kwargs)
+        self.create_symbol(**new_kwargs)
+        self._count += self._symbols[-1].size
+        return self._symbols[-1].backend_repr
+
+
+
+@dataclass(repr=False)
+class InitializedSymbol(FreeSymbol,):
+    initializer: float = 0.  # TODO union[numeric, expression]
+    warm_start: bool = True
 
 class InitializedField(FreeField):
-    def __call__(
-        self, shape=(1,), symmetric=False, diagonal=False,
-            upper_bound=np.inf, lower_bound=np.inf, initializer=0, warm_start=True,
-    ):
+    pass
 
-        if isinstance(shape, int):
-            shape = (shape,)
 
-        pass_kwargs = dict(
-            name="%s_%d" % (self._resolve_name, len(self._symbols)),
-            shape=shape,
-            symmetric=symmetric,
-            diagonal=diagonal,
-        )
-        out = backend.symbol_generator(**pass_kwargs)
-        symbol_data = backend.get_symbol_data(out)
-        self.create_symbol(
-            name=None,
-            backend_repr=out,
-            upper_bound=upper_bound,
-            lower_bound=lower_bound,
-            initializer=initializer,
-            warm_start=warm_start,
-            **asdict(symbol_data)
-        )
-        self._count += self._symbols[-1].size
-        return out
+@dataclass(repr=False)
+class BoundedAssignmentSymbol(FreeSymbol):
+    pass
 
+class BoundedAssignmentField(Field, default_direction=Direction.output):
+    def __call__(self, value, eq=None, **kwargs):
+        symbol_data = backend.get_symbol_data(value)
+        name = name="%s_%s_%d" % (self._model_name, self._name, len(self._symbols))
+        if eq is not None:
+            if 'lower_bound' in kwargs or 'upper_bound' in kwargs:
+                raise ValueError
+            kwargs['lower_bound'] = eq
+            kwargs['upper_bound'] = eq
+        self.create_symbol(name=name, backend_repr=value,  **kwargs, **asdict(symbol_data))
+
+
+class DependentSymbol(BaseSymbol):
+    pass
 
 @dataclass(repr=False)
 class AssignedSymbol(BaseSymbol):
     pass
 
-class AssignedField(Field,):
-    def __init__(
-        self, direction=Direction.output, name='', model=None, inherit_from=None
-    ):
-        super().__init__(
-            name=name, model=model, direction=direction, inherit_from=inherit_from
-        )
+class AssignedField(Field, default_direction=Direction.output):
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
@@ -350,17 +298,20 @@ class AssignedField(Field,):
             )
             super().__setattr__(name, self._symbols[-1])
 
+
 @dataclass(repr=False)
-class MatchedSymbol(BaseSymbol):
+class MatchedSymbolMixin:
     match: BaseSymbol # match to the Symbol instance
 
     def update_name(self):
         self.name = '__'.join([self.field_type._name, self.match.name])
 
+@dataclass(repr=False)
+class MatchedSymbol(BaseSymbol, MatchedSymbolMixin,):
+    pass
+
 class MatchedField(Field,):
-    def __init__(
-        self, matched_to=None, direction=Direction.internal, name='', model=None, inherit_from=None
-    ):
+    def __init__(self, matched_to=None, **kwargs):
         """
         matched_to is Field instance that this MatchedField is matched to.
         """
@@ -372,9 +323,7 @@ class MatchedField(Field,):
         # TODO: should FreeField instance __call__ get a kwarg for all matched fields
         # that reference it and are assigned? -> two ways of assigning the match...
 
-        super().__init__(
-            name=name, model=model, direction=direction, inherit_from=inherit_from
-        )
+        super().__init__(**kwargs)
         self._matched_to = matched_to
         self._init_kwargs.update(dict(matched_to=matched_to))
         print("matched to", matched_to)

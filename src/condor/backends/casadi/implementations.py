@@ -89,3 +89,12 @@ class AlgebraicSystem:
     def __call__(self, *args, **kwargs):
         return self.callback(*args)
 
+class OptimizationProblem:
+    def __init__(self, model):
+        self.model = model
+        self.objective = getattr(model, 'objective', 0)
+        self.variables = casadi.vertcat(*flatten(model.variable))
+
+
+
+

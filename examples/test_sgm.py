@@ -5,8 +5,8 @@ class MySystem(co.ODESystem):
     print("starting user code for LTI class")
     n = 2
     m = 1
-    x = state(n)
-    C = state((n,n),)# symmetric=True)
+    x = state(shape=n)
+    C = state(shape=(n,n),)# symmetric=True)
     A = np.array([
         [0, 1],
         [0, 0],
@@ -56,6 +56,11 @@ class MySolver(co.AlgebraicSystem):
     class Casadi(co.Options):
         warm_start = False
 
+class MyProblem(co.OptimizationProblem):
+    x = variable()
+    y = variable()
+    constraint(x**2 + y**2, lower_bound = 1., upper_bound = 1.)
+    constraint(x**2 + y**2 + 5, eq=6.)
 
 """
 class Solve(co.AlgebraicSystem):
