@@ -30,6 +30,13 @@ class MySystem(co.ODESystem):
 class MyEvent(MySystem.Event):
     update[x] = 1.0
 
+assert MyEvent.inner_to is MySystem
+assert co.Event in MyEvent.__bases__
+assert MySystem.Event not in MyEvent.__bases__
+assert MySystem.Event in MySystem.inner_models
+assert MyEvent in MySystem.Event
+assert MyEvent.update._symbols[0].match in MySystem.state
+
 class Sys1out(co.ExplicitSystem):
     x = input()
     y = input()
@@ -55,6 +62,10 @@ class MySolver(co.AlgebraicSystem):
 
     class Casadi(co.Options):
         warm_start = False
+
+mysolution = MySolver(10, 1)
+assert mysolution.y2 == -100
+assert mysolution.y1 == 9
 
 class MyProblem(co.OptimizationProblem):
     x = variable()

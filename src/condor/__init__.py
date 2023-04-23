@@ -554,7 +554,7 @@ class Model(metaclass=ModelType):
 class InnerModelType(ModelType):
     def __iter__(cls):
         for subclass in cls.subclasses:
-            yield subclasses
+            yield subclass
 
     def register(cls, subclass):
         cls.subclasses.append(subclass)
