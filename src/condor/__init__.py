@@ -61,6 +61,7 @@ code could update it (add/overwrite)
 
 
 # may not be  really necessary, place holder in case it is
+# appears in __new__ as attrs
 class CondorClassDict(dict):
     def __getitem__(self, *args, **kwargs):
         #breakpoint()
@@ -80,8 +81,10 @@ class Options:
     Single option sub-class forces back end for this model?
     OR flag, if tihs backend then these options, otherwise no options (rely on defaults)
 
-    implementation, if provided, should be a callable that takes a model and possible
-    options and returns a callable that evaluates the model
+    attribute `implementation`, if provided, should be a callable that takes a model
+    and possible options and returns a callable that evaluates the model. Otherwise,
+    will try to find an implementation in backend.implementations of the class name of
+    the defined class or soonest MRO class name.
 
     All backend implementations must ship with reasonable defaults.
 
@@ -116,6 +119,11 @@ class Options:
     pass
     # TODO: do meta programming so implementation enums are available without import?
 
+    # TODO: could have a reserved keyword "implementation" on options that defaults to
+    # None, reference to an implementation to allow user provided ones? Maybe that's
+    # the best way to do it, even for model types that condor ships with? if
+    # inheritance works properly, can easily over-write per project, etc.
+
 
 
 
@@ -143,19 +151,35 @@ class ModelType(type):
         sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
         cls_dict = CondorClassDict(**sup_dict)
 
-        dicts = [base.__dict__ for base in bases]
-
-        for _dict in dicts:
+        for base in bases:
+            _dict = base.__dict__
             for k, v in _dict.items():
                 if isinstance(v, Field):
                     v_class = v.__class__
                     v_init_kwargs = v._init_kwargs.copy()
                     for init_k, init_v  in v._init_kwargs.items():
                         if isinstance(init_v, Field):
-                            v_init_kwargs[init_k] = cls_dict[init_v._name]
+                            # TODO not sure this will be the best way to remap connected
+                            # fields based on inheritance, but maybe sufficient?
+                            if base.inner_to and init_v._name in base.inner_to.__dict__:
+                                get_from = base.inner_to.__dict__
+                            else:
+                                get_from = cls_dict
+                            v_init_kwargs[init_k] = get_from[init_v._name]
                     cls_dict[k] = v.inherit(
                         model_name, field_type_name=k, **v_init_kwargs
                     )
+                if isinstance(v, ModelType):
+                    if v.inner_to is base and v in base.inner_models:
+                        # inner model inheritance & binding in new
+                        cls_dict[k] = v
+            if base is not Model and base.inner_to:
+                for attr_name, attr_val in base.inner_to.__original_attrs__.items():
+                    cls_dict[attr_name] = attr_val
+                # TODO: document __from_outer__?
+                cls_dict['__from_outer__'] = base.inner_to.__original_attrs__
+
+
         print("end prepare for", model_name, cls_dict)
         return cls_dict
 
@@ -170,27 +194,51 @@ class ModelType(type):
             return f"<{cls.__name__}>"
 
     def __new__(cls, name, bases, attrs, **kwargs):
-        # TODO: replace if tree with match cases?
+        # case 1: class Model -- provides machinery to make subsequent cases easier to
+        # implement.
+        # case 2: ____ - library code that defines fields, etc that user code inherits
+        # from (case 3+). Implementations are tied to 2? "Library Models"?
+        # case 3: User Model - inherits from ____, defines the actual model that is
+        # being analyzed
+        # case 4: Subclass of user model to extend it?
+        # I don't think InnerModel deviates from this, except perhaps disallowing
+        # case 4
+        # Generally, bases arg will be len <= 1. Just from the previous level. Is there
+        # a case for mixins? InnerModel approach seems decent, could repeat for
+        # WithDeferredSubsystems, then Model layer is quite complete 
 
-        # TODO: add hooks so e.g., DynamicModel (or consumer) can deal with inner
-        # class for events. Not sure if that's the same as a deferred subsystem -- 
-        # can hooks be classmethods on the Model subclass? I suspect at least post_new
-        # hook will be dot callable, pre_new hook can be taken from attrs?
-        # need to return a status (defined by enum?) of continue rest of if-tree or
-        # continue to next attr
+
+        # TODO: thought hooks might be necessary for inner model/deferred subsystems,
+        # but inner model worked well. If needed, this is a decent prototype:
         pre_super_new_hook = attrs.pop('pre_super_new_attr_hook', None)
         # pre_new_attr_hook(super_attrs, attr_name, attr_val)
         post_super_new_hook = attrs.pop('post_super_new_attr_hook', None)
         # pre_new_attr_hook(new_cls, attr_name, attr_val)
 
-        print("CondorModelType.__new__ for", name)
+        # TODO: replace if tree with match cases?
+        attrs_from_outer = attrs.pop('__from_outer__', None)
+        if attrs_from_outer:
+            for attr_name, attr_val in attrs_from_outer.items():
+                if attrs[attr_name] is attr_val:
+                    attrs.pop(attr_name)
+                else:
+                    # TODO: make this a warning/error? add test (really for all
+                    # warning/error raise)
+                    print(f"{attr_name} was defined on outer of {name}")
+
+        print("CondorModelType.__new__ for", name, bases, kwargs)
         print(attrs)
-        # what gets manipulated on attrs before new_cls?
+
+        # perform as much processing as possible before caller super().__new__
+        # by building up super_attrs from attrs; some operations need to operate on the
+        # constructed class, like binding fields and innermodels
 
         super_attrs = {}
 
         if bases:
             super_attrs['_parent_name'] = bases[0].__name__
+            if 'inner_to' not in kwargs and bases[0] is not Model and bases[0].inner_to:
+                kwargs['inner_to'] = bases[0].inner_to
         else:
             super_attrs['_parent_name'] = ''
 
@@ -198,38 +246,38 @@ class ModelType(type):
         free_fields = [] # used to find free symbols and replace with symbol
         matched_fields = []
 
-        # will be used to pack arguments in (inputs) and unpack results (output)
+        # will be used to pack arguments in (inputs) and unpack results (output), other
+        # convenience
         input_fields = []
         output_fields = []
         internal_fields = []
         input_names = []
         output_names = []
+        inner_models = []
 
+        # TODO: better reserve word check? see check attr name below
+        orig_attrs = {k:v for k,v in attrs.items() if not k.startswith("__")}
+
+        # TODO: use a special inner class like _meta to de-clutter model namespace?
         super_attrs.update(dict(
             input_fields = input_fields,
             output_fields = output_fields,
             input_names = input_names,
             output_names = output_names,
+            inner_models = [],
+            __original_attrs__ = orig_attrs,
         ))
-        # TODO: create dataclass for each output type, assign as class attribute?
-        # actually, does the implementation get this? It stuffs and returns on call
-        # well, moel instance still needs to assign result to attr on self
-
-        # can similar structure be used for inputs? Don't want to make it hard to
-        # instantiate -- and most Symbol inputs have a convenient name that's free.
-        # What about matched symbol inputs like dot for DAE? 
 
 
         for attr_name, attr_val in attrs.items():
             # TODO: process name clahees on attr_name? can't protect against internal
             # over-write (maybe user intends to do that) but can raise error for
             # over-writing parent, e.g., creating a "state" variable in a DynamicModel
-            # subclass
+            # subclass. Implemented some name clash checks, but can it be easier by
+            # changing the condor dict setattr?
+
             # need to have protected names? I guess whatever we're doing for Options and
             # convenience fields like input_fields, input_fields, etc?
-
-
-            # TODO: hook for pre- super_new call
 
             pass_attr = True
 
@@ -241,19 +289,12 @@ class ModelType(type):
             if isinstance(attr_val, MatchedField):
                 matched_fields.append(attr_val)
             if isinstance(attr_val, Field):
-                # TODO: may need to deal with both cases that might occur: 
-                # ModelType defining field OR user calling a model? Or should output
-                # datastructure not be a subclass of BaseSymbol? Probably not!
-                # and probably don't even need to handle them especially
-                # can differentiate model definition by logic on bases -- can probably
-                # add helper attributes to Field and/or flag from bases
                 if attr_val._direction == Direction.input:
                     input_fields.append(attr_val)
                 if attr_val._direction == Direction.output:
                     output_fields.append(attr_val)
                 if attr_val._direction == Direction.internal:
                     internal_fields.append(attr_val)
-
             if isinstance(attr_val, backend.symbol_class):
                 # from a FreeField
                 known_symbol_type = False
@@ -268,15 +309,29 @@ class ModelType(type):
                         attr_val = symbol
                         pass_attr = False
                         break
+
+                # TODO: MatchedField in "free" mode
+                # TODO: from the output of a subsystem? Does this case matter? 
+
                 if not known_symbol_type:
                     print("unknown symbol type", attr_name, attr_val)
                     # Hit by DynamicModel.independent_variable
-            #if isinstance(attr_val, Model):
-            # TODO: from a sub-model (or deferred model?) call
+
+            # TODO: other possible attr types to process:
+            # maybe field dataclass, if we care about intervening in eventual assignment
+            # deferred subsystems, but perhaps this will never get hit? need to figure
+            # out how a model with deferred subsystem behaves
+
+            if isinstance(attr_val, ModelType):
+                if attr_val.inner_to in bases and attr_val in attr_val.inner_to.inner_models:
+                    # handle inner classes below, don't add to super
+                    continue
 
             if pass_attr:
                 check_attr_name(attr_name, attr_val, super_attrs, bases)
                 super_attrs[attr_name] = attr_val
+
+        # before calling super new, process fields
 
         for matched_field in matched_fields:
             for matched_symbol in matched_field:
@@ -307,12 +362,6 @@ class ModelType(type):
         orig_doc = attrs.get("__doc__", "")
         super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
-        # TODO: validate backend_options and add to super_attrs
-        # could have a reserved keyword "implementation" on options that defaults to
-        # None, reference to an implementation to allow user provided ones? Maybe that's
-        # the best way to do it, even for model types that condor ships with? if
-        # inheritance works properly, can easily over-write per project, etc.
-
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
 
         implementation = None
@@ -335,12 +384,13 @@ class ModelType(type):
             backend_option = {}
 
         if implementation is None:
+            # TODO: search MRO?
             for base in bases:
                 if (
                     isinstance(base, ModelType) and 
                     (base.__name__ in backend.implementations.__dict__)
                 ):
-                    # TODO: or are these directly on backend along with symbol_Class,
+                    # TODO: or are these directly on backend along with symbol_class,
                     # symbol_generator, and other things are in a utils submodule?
                     implementation = getattr(
                         backend.implementations,
@@ -352,24 +402,32 @@ class ModelType(type):
             new_cls.implementation = implementation(new_cls, **backend_option)
 
         for attr_name, attr_val in attrs.items():
-            # TODO: hook for post-- super_new call
             if isinstance(attr_val, Field):
-                # need hook to define which Field types form args of imp.call and in
-                # what order? Or __init__ just take kwargs and it's up to the
-                # implementation/backend to validate?
-                # this one definitely needs to be done after super new since we're
-                # binding the class object
                 attr_val.bind(attr_name, new_cls)
 
-                # TODO: is it helpful to collect the fields? maybe not since
-                # implemntations know what fields exist
+            if isinstance(attr_val, ModelType):
+                if attr_val.inner_to in bases and attr_val in attr_val.inner_to.inner_models:
+                    # attr_val is an inner model to base, so this is a field-like inner
+                    # model that the user will sub-class
 
+                    # new_cls is a user model that inherits an inner model type
 
-            # TODO: add dependent variable data structure? they'll have to be constructed so implementation
-            # data can be unpacked to represent model (chain dot accessors)
-            # Solver type systems have solver variables that are "FreeField" like but
-            # outputs?
+                    use_bases = (InnerModel,)
+                    if Model in attr_val.__bases__ and len(attr_val.__bases__) == 1:
+                        pass
+                    else:
+                        raise NotImplemented
+                        # does this work?
+                        use_bases = use_bases + attr_val.__bases__
 
+                    attr_val = InnerModelType(
+                        attr_name,
+                        use_bases,
+                        attr_val.__original_attrs__,
+                        inner_to = new_cls,
+                        original_class = attr_val,
+                    )
+                    setattr(new_cls, attr_name, attr_val)
 
         return new_cls
 
@@ -458,11 +516,93 @@ class Model(metaclass=ModelType):
         return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
 
 
+    def __init_subclass__(cls, *args, inner_to=None, inner_through=None, **kwargs):
+        print("init subclass", cls, args, kwargs, "inner_to", inner_to)
+        # TODO: some kind of registration? I would really like it to be as field-like as
+        # possible. And ideally the event-function itself has a convenience accessor?
+        cls.inner_to = inner_to
+
+        if inner_to:
+            # TODO: other validation?
+            if cls.__name__ in inner_to.__dict__:
+                raise ValueError
+
+
+            subclass_of_inner = False
+            for base in cls.__bases__:
+                if base is not Model:
+                    if base in inner_to.inner_models:
+                        subclass_of_inner = True
+                        break
+                        # TODO: base is ~ the field that cls should be added to...
+                        # This could all be in ModelType.__new__, inner_to is in kwargs
+
+            if subclass_of_inner:
+                # register as symbol of field, not directly added
+                if not inner_through:
+                    raise ValueError
+            else:
+                # create as field
+                inner_to.inner_models.append(cls)
+                setattr(inner_to, cls.__name__, cls)
+
+
+class InnerModelType(ModelType):
+    def __iter__(cls):
+        for subclass in cls.subclasses:
+            yield subclasses
+
+    def register(cls, subclass):
+        cls.subclasses.append(subclass)
+
+    def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
+        print("\nInnerModelType.__new__ for class", cls,"name", name, "bases", bases,
+              "original", original_class, "\nkwargs:", kwargs, "\nattrs:", attrs, "\n")
+        # case 1: InnerModel
+        # case 2: library inner model inherited to user model through user model's __new__
+        # case 3: subclass of inherited inner model -- user
+        case1 = name == "InnerModel"
+        case2 = inner_to is not None and original_class is not None
+        case3 = not case1 and not case2
+        if case1 or case2:
+            new_cls = super().__new__(cls, name, bases, attrs, inner_to=inner_to, **kwargs)
+
+        if case2:
+            new_cls.original_class = original_class
+            # reference to original class so uer sub-classes inherit directly, see below
+
+        if case3:
+            if len(bases) > 1:
+                raise ValueError
+            inner_through = bases[0]
+            original_class = inner_through.original_class
+            # subclass original class, inheriting
+            # will inherit inner_to from original_class
+            new_cls = original_class.__class__(name, (original_class,), attrs,
+                                               inner_through=inner_through, **kwargs)
+            # create links
+            inner_through.register(new_cls)
+            new_cls.inner_through = inner_through
+            new_cls.inner_to = inner_through.inner_to
+
+        return new_cls
+
+
+class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
+    subclasses = []
+
+
 # TODO: move deferred stuff out?
 class DeferredType(ModelType):
+    """
+    Deferred model's are of type DeferredType
+    """
     pass
 
-class Deferred(metaclass=DeferredType):
+class Deferred(Model, metaclass=DeferredType):
+    """
+    Deferred model's have only model input/output defined
+    """
     input = FreeField()
     output = FreeField(Direction.output)
 
@@ -518,12 +658,11 @@ class WithDeferredSubsystems():
     # construction doesn't happen until binding the deferred subsystems
 
 
-# Move to "contrib" or something?
+# TODO: Move to "contrib" or something?
 class ExplicitSystem(Model):
     """
     output is an explicit function of input
     """
-    # TODO: rename?
     input = FreeField()
     output = AssignedField()
 
@@ -572,8 +711,8 @@ class OptimizationProblem(Model):
     # Are constraints internal? I think so
 
 
-
 class ODESystem(Model):
+
     """
     independent_variable - indepdendent variable of ODE, notionally time but can be used
     for anything. Used directly by subclasses (e.g., user code may use
@@ -620,10 +759,8 @@ class ODESystem(Model):
     dot = MatchedField(state)
     output = AssignedField()
 
-    class Event(Model, ):
-        # TODO: how to match to parent state? special __prepare__ hook on Event that DynamicsModel
-        # sets up
-        # update = MatchedField(state)
-        # TODO: singleton event function is very similar to optimization problem objective.
-        pass
+class Event(Model, inner_to = ODESystem):
+    # TODO: singleton field event.function is very similar to 
+    # OptimizationProblem.objective, trajectorymodel.output.{terminal, integrand} fields
+    update = MatchedField(ODESystem.state)
 

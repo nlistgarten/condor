@@ -23,7 +23,12 @@ class MySystem(co.ODESystem):
     dot[C] = A@C + C@A.T
     # dot naming, although have to do more work to minimize other setattr's 
     output.y = C.T @ C
+
     print("ending user code for LTI class")
+
+
+class MyEvent(MySystem.Event):
+    update[x] = 1.0
 
 class Sys1out(co.ExplicitSystem):
     x = input()
