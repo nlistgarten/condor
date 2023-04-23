@@ -230,6 +230,7 @@ class AircraftMission(SGM):
 
     class constrained_ascent(mode):
         throttle = propulsion.takeoff
+        # Actually, this is best as an OptimizationProblem :)
         alpha = min(
             solve(TAS_constraint),
             solve(xlf_constraint),
@@ -255,6 +256,23 @@ class trajectory_analysis(model=some_ode_class,):
     model.p = input
     # so trajectory analysis distinguishes between parameters (inputs?) and sets
     # constants, not the ODE!!
+
+# really it needs to be
+class MyTrajectory(TrajectoryModel):
+    model = some_ode_class # not sure if this is an API or convention
+
+    # add outputs that depend on either integral or terminal terms
+    integrand_term.output1 = ... #some expressin
+    terminal_term.output2 = ... # some expression
+
+    # or both
+    integrand_term.output0 = ...
+    terminal_term.output0 = ...
+
+    # in general, need to make the backend repr's available! Easiest to make model an
+    # inner_to, it's just the way it gets used it's not really an inner, it's a consumer
+    # really, inner mechanism is an "Attached" mechanism? 
+    # TODO: rename inner to attached
 
 
 # wrapping an numeric python method (no solvers)

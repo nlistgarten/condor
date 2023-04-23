@@ -470,7 +470,10 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
         raise NameError(f"Attempting to assign attribute {attr_name} which already exists{clash_string}")
 
 class Model(metaclass=ModelType):
-
+    """
+    Define a ____ by subclassing Model, creating field types, and writing an
+    implementation.
+    """
     def __init__(self, *args, **kwargs):
         cls = self.__class__
         # bind *args and **kwargs to to appropriate signature
@@ -589,6 +592,12 @@ class InnerModelType(ModelType):
 
 
 class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
+    """
+    Create an inner model ____ by assigning an inner_to keyward arguement to a ____. The
+    argument references another ____. Then a user outer model (a subclass of ____)
+    can create multiple subclass of the InnerModel by sub-classing from
+    <outer_model>.<inner_model ____>
+    """
     subclasses = []
 
 
@@ -732,10 +741,16 @@ class ODESystem(Model):
 
     note: no time-varying input. Assume dynamicsmodels "pull" what they need from other
     models. Need to augment state with "pulled" dynamicsmodels.
+    But do need a "control" that could be defined based on mode? 
 
-    inner classes of "Event" subclass
+    is "mode" the only finite state?
+    mode can be an innner model that assigns controls (direct over-write should be
+    possible)
+    I suppose you could have different modes that are used to define independent
+    controls. OK. 
 
-
+    inner model "Event" (see below). For a MyODESyStem model, create a sub-class of
+    MyODESystem.Event,
     inner classes of "Mode" subclass
 
 
@@ -754,13 +769,26 @@ class ODESystem(Model):
 
     independent_variable = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
+    finite_state = FreeField(Direction.internal)
     # TODO: should internal free field symbolss NOT be dot accessible on the models?
     parameter = FreeField()
     dot = MatchedField(state)
+    control = FreeField(Direction.internal)
     output = AssignedField()
 
 class Event(Model, inner_to = ODESystem):
-    # TODO: singleton field event.function is very similar to 
-    # OptimizationProblem.objective, trajectorymodel.output.{terminal, integrand} fields
+    # TODO: singleton field event.function is very similar to objective in
+    # OptimizationProblem
     update = MatchedField(ODESystem.state)
+    # make[mode_var] = SomeModeSubclass
+    make = MatchedField(ODESystem.finite_state)
+
+class Mode(Model, inner_to=ODESystem):
+    make = MatchedField(ODESystem.control)
+    # e.g., make[alpha] = ...
+
+class ODETrajectory(Model, inner_to=ODESystem):
+    integrand_term = AssignedField()
+    terminal_term = AssignedField()
+
 
