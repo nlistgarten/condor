@@ -152,6 +152,9 @@ class Field:
         for symbol in self._symbols:
             yield symbol
 
+    def __len__(self):
+        return len(self._symbols)
+
 
 def make_class_name(components):
     separate_words = ' '.join([comp.replace('_', ' ') for comp in components])

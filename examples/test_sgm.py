@@ -28,7 +28,7 @@ class MySystem(co.ODESystem):
 
 
 class MyEvent(MySystem.Event):
-    update[x] = 1.0
+    update[x] = x**2 + C @ x
 
 assert MyEvent.inner_to is MySystem
 assert co.Event in MyEvent.__bases__
