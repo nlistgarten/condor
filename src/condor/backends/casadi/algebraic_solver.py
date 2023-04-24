@@ -77,6 +77,8 @@ class Newton:
 
             # eval jacobian
             J = self.fprime(x, p)
+            if np.any(~np.isfinite(J)):
+                breakpoint()
 
             # newton step calculation J @ d = -f
             dx = linalg.solve(J, -f)
@@ -213,7 +215,8 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
 
         self.func = casadi.Function(
             f"{name}_rootfinder_func",
-            casadi.vertsplit(p),
+            #casadi.vertsplit(p),
+            [p],
             casadi.vertsplit(out_imp) + casadi.vertsplit(out_exp),
         )
 

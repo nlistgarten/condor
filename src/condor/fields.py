@@ -220,15 +220,21 @@ class FreeSymbol(IndependentSymbol):
     lower_bound: float = -np.inf
     # Then if bounds are here, must follow broadcasting rules
 
+    def __post_init__(self):
+        print("doing a post init broadcast")
+        super().__post_init__()
+        self.upper_bound = np.broadcast_to(self.upper_bound, self.shape)
+        self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
+
 
 class FreeField(IndependentField, default_direction=Direction.input):
     def make_backend_symbol(
-        self, name, shape=(1,), symmetric=False, diagonal=False, **kwargs
+        self, name, indexable=True, shape=(1,), symmetric=False, diagonal=False, **kwargs
     ):
         if isinstance(shape, int):
             shape = (shape,)
         out = backend.symbol_generator(
-            name=name, shape=shape, symmetric=symmetric, diagonal=diagonal
+            name=name, indexable=indexable, shape=shape, symmetric=symmetric, diagonal=diagonal
         )
         symbol_data = backend.get_symbol_data(out)
         kwargs.update(
@@ -237,7 +243,7 @@ class FreeField(IndependentField, default_direction=Direction.input):
         )
         return kwargs
 
-    def __call__(self, **kwargs):
+    def __call__(self, indexable=True,  **kwargs):
         backend_name = name="%s_%d" % (self._resolve_name, len(self._symbols))
         new_kwargs = self.make_backend_symbol(name=backend_name, **kwargs)
         self.create_symbol(**new_kwargs)

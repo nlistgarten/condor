@@ -16,31 +16,68 @@ class ExplicitSystem:
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
     def __call__(self, *args):
-        return self.func(*args)
+        #return self.func(args)
+        #return wrap(self.model.output, self.func(*wrap(self.model.input, args)))
+        return wrap(self.model.output, self.func(*flatten(args, complete=False)))
 
 class InitializerMixin:
-    def parse_initializers(self, field, initializer_args):
-        # TODO: flatten
-        defined_initializers = field.list_of("initializer")
+    def set_initial(self, *args, **kwargs):
+        if args:
+            # assume it's all initialized values, so flatten and assign
+            self.x0 = flatten(args)
+        else:
+            count_accumulator = 0
+            for field in self.parsed_initialized_fields:
+                size_cum_sum = np.cumsum([count_accumulator] + field.list_of('size'))
+                for start_idx, end_idx, name in zip(
+                    size_cum_sum, size_cum_sum[1:], field.list_of('name')
+                ):
+                    if name in kwargs:
+                        self.x0[start_idx:end_idx] = flatten(kwargs[name])
+                count_accumulator += field._count
+
+    def parse_initializers(self, fields, initializer_args):
+        # currently assuming all initializer fields get initialized together
+        # TODO: flatten -- might be done?
         x0_at_construction = []
         initializer_exprs = []
-        for solver_var in field:
-            if isinstance(solver_var.initializer, casadi.MX):
-                x0_at_construction.append(np.zeros(solver_var.shape))
-                initializer_exprs.append(solver_var.initializer)
-            elif solver_var.warm_start:
-                x0_at_construction.append(solver_var.initializer)
-                initializer_exprs.append(solver_var.backend_repr)
-            else:
-                x0_at_construction.append(solver_var.initializer)
-                initializer_exprs.append(solver_var.initializer)
-        setattr(self, f"{field._name}_at_construction", flatten(x0_at_construction))
+        # TODO: shoud broadcasting be done elsewhere? with field? bounds needs it too
+
+        if isinstance(fields, co.Field):
+            fields = [fields]
+
+
+        for field in fields:
+            defined_initializers = field.list_of("initializer")
+            for solver_var in field:
+                if isinstance(solver_var.initializer, casadi.MX):
+                    x0_at_construction.extend(np.zeros(solver_var.size))
+                    initializer_exprs.extend(
+                        casadi.vertsplit(solver_var.initializer.reshape((-1,1)))
+                    )
+                elif solver_var.warm_start:
+                    x0_at_construction.extend(
+                        np.broadcast_to(solver_var.initializer, (solver_var.size,))
+                    )
+                    initializer_exprs.extend(
+                        casadi.vertsplit(solver_var.backend_repr.reshape((-1,1)))
+                    )
+                else:
+                    x0_at_construction.append(solver_var.initializer)
+                    initializer_exprs.append(solver_var.initializer)
+
+        self.parsed_initialized_fields = fields
+
+        #setattr(self, f"{field._name}_at_construction", flatten(x0_at_construction))
+        self.initial_at_construction = flatten(x0_at_construction)
         initializer_exprs = flatten(initializer_exprs)
-        setattr(self, f"{field._name}_initializer_func", casadi.Function(
+        #setattr(self, f"{field._name}_initializer_func",
+        self.initializer_func = casadi.Function(
             f"{field._model_name}_{field._name}_initializer",
             initializer_args,
             initializer_exprs,
-        ))
+        )
+
 
 class AlgebraicSystem(InitializerMixin):
 
@@ -85,13 +122,14 @@ class AlgebraicSystem(InitializerMixin):
             self.g1,
             flatten(model.implicit_output.list_of("lower_bound")),
             flatten(model.implicit_output.list_of("upper_bound")),
-            self.implicit_output_at_construction,
+            #self.implicit_output_at_construction,
+            self.initial_at_construction,
             rootfinder_options,
-            self.implicit_output_initializer_func,
+            self.initializer_func,
         )
 
-    def __call__(self, *args, **kwargs):
-        out = self.callback(*flatten(args))
+    def __call__(self, *in_args, **kwargs):
+        out = self.callback(casadi.vertcat(*flatten(in_args)))
         #out = self.callback(*args)
         wrap_implicit = wrap(
             self.model.implicit_output,
@@ -102,6 +140,11 @@ class AlgebraicSystem(InitializerMixin):
             out[:self.model.explicit_output._count]
         )
         return *wrap_implicit, *wrap_explicit
+
+    def set_initial(self, *args, **kwargs):
+        self.x0 = self.callback.x0
+        super().set_initial(*args, **kwargs)
+        self.callback.x0 = self.x0
 
 class OptimizationProblem(InitializerMixin):
     def __init__(
@@ -141,7 +184,8 @@ class OptimizationProblem(InitializerMixin):
             #calc_lam_p=False,
         )
 
-        self.x0 = self.variable_at_construction.copy()
+        self.x0 = self.initial_at_construction.copy()
+        #self.variable_at_construction.copy()
 
         self.optimizer = casadi.nlpsol(
             model.__name__,
@@ -159,7 +203,8 @@ class OptimizationProblem(InitializerMixin):
             initializer_args += [p]
         if not self.has_p or not isinstance(args[0], casadi.MX):
             self.x0 = casadi.vertcat(
-                *self.variable_initializer_func(*initializer_args)
+                #*self.variable_initializer_func(*initializer_args)
+                *self.initializer_func(*initializer_args)
             ).toarray().reshape(-1)
         call_args = dict(
             x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg
@@ -170,5 +215,4 @@ class OptimizationProblem(InitializerMixin):
             self.x0 = out["x"]
 
         return wrap(self.model.variable, out["x"])
-
 

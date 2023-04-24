@@ -296,7 +296,11 @@ class ModelType(type):
                     output_fields.append(attr_val)
                 if attr_val._direction == Direction.internal:
                     internal_fields.append(attr_val)
-            if isinstance(attr_val, backend.symbol_class):
+            # TODO: match pattern would vbe much better for tuple
+            if (
+                isinstance(attr_val, backend.symbol_class) or 
+                isinstance(attr_val, tuple)
+            ):
                 # from a FreeField
                 known_symbol_type = False
                 for free_field in free_fields:
@@ -307,6 +311,8 @@ class ModelType(type):
                         if symbol.name and symbol.name != attr_name:
                             raise NameError(f"Symbol on {free_field} has name {symbo.name} but assigned to {attr_name}")
                         symbol.name = attr_name
+                        if isinstance(attr_val, tuple):
+                            backend.tuple_to_symbol(symbol)
                         attr_val = symbol
                         pass_attr = False
                         break
@@ -502,6 +508,10 @@ class Model(metaclass=ModelType):
         self.output_kwargs = output_kwargs = {
             out_name: val for out_name, val in zip(cls.output_names, imp_out)
         }
+
+        for out_name, out_val in self.output_kwargs.items():
+            if out_val.size == 1:
+                self.output_kwargs[out_name] = out_val[0]
 
         # pack into dot-able storage, over-writting fields and symbols
         for output_field in cls.output_fields:
