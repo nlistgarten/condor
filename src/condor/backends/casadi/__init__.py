@@ -1,7 +1,6 @@
 import casadi
 from condor.backends.casadi import implementations
 from condor.backends import BackendSymbolData
-from condor.backends.casadi.utils import flatten
 import numpy as np
 
 name = 'Casadi'

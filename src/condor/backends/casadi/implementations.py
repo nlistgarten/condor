@@ -127,9 +127,8 @@ class AlgebraicSystem(InitializerMixin):
             self.initializer_func,
         )
 
-    def __call__(self, *in_args, **kwargs):
-        out = self.callback(casadi.vertcat(*flatten(in_args)))
-        #out = self.callback(*args)
+    def __call__(self, *args, **kwargs):
+        out = self.callback(casadi.vertcat(*flatten(args)))
         wrap_implicit = wrap(
             self.model.implicit_output,
             out[:self.model.implicit_output._count]
