@@ -17,7 +17,7 @@ class Sellar(co.OptimizationProblem):
     y1, y2 = Resid(x, z)
 
     objective = x**2 + z[1] + y1 + exp(-y2)
-    constraint(y1, lower_bound=3.16)
+    constraint(y1, lower_bound=3.16, name="con1")
     constraint(y2, upper_bound=24.)
 
 Sellar.implementation.set_initial(x=1., z=[5., 2.,])

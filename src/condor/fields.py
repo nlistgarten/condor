@@ -260,16 +260,15 @@ class InitializedSymbol(FreeSymbol,):
 class InitializedField(FreeField):
     pass
 
-
-
 @dataclass(repr=False)
 class BoundedAssignmentSymbol(FreeSymbol):
     pass
 
 class BoundedAssignmentField(Field, default_direction=Direction.output):
-    def __call__(self, value, eq=None, **kwargs):
+    def __call__(self, value, eq=None, name='', **kwargs):
         symbol_data = backend.get_symbol_data(value)
-        name = name="%s_%s_%d" % (self._model_name, self._name, len(self._symbols))
+        if not name:
+            name="%s_%s_%d" % (self._model_name, self._name, len(self._symbols))
         if eq is not None:
             if 'lower_bound' in kwargs or 'upper_bound' in kwargs:
                 raise ValueError
@@ -319,6 +318,7 @@ class MatchedSymbolMixin:
 @dataclass(repr=False)
 class MatchedSymbol(BaseSymbol, MatchedSymbolMixin,):
     pass
+
 
 class MatchedField(Field,):
     def __init__(self, matched_to=None, **kwargs):

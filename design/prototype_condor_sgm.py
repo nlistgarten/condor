@@ -347,21 +347,6 @@ class aero_interface(Deferred):
     CL = output()
 
 
-@WithDeferredSubSystems
-class GASPTrajectory(TrajectoryModel):
-    propulsion = subsystem(propulsion_interface)
-    aero = subsystem(aero_interface)
-    weight_initial = parameter()
-
-    # realize the dynamics model
-    dynamics_model = GASPVehicleDynamics(aero=aero, propulsion=propulsion)
-
-class fuel_burn(GASPTrajectory.output):
-    final = dynamics_model.state.weight - weight_intial
-    # integral defaults to 0.
-
-class range_flown(GASPTrajectory.output):
-    final = dynamics_model.state.range
 
 @WithDeferredSubSystems
 class GASPVehicleDynamics(ODESystem):
@@ -374,6 +359,12 @@ class GASPVehicleDynamics(ODESystem):
     gamma = state()
 
     # see dynamics model above with events etc
+
+# Doesn't need deferral decorator since it's an attached model
+class GASPTrajectory(GASPVehicleDynamics.TrajectoryModel):
+
+    terminal.fuel_burn = weight - weight_intial
+    terminal.range_flown = downrange
 
 
 class CoupledSizingClosure(OptimizationModel):

@@ -15,7 +15,7 @@ class ExplicitSystem:
         self.model = model
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
-    def __call__(self, *args):
+    def __call__(self, model_instance, *args):
         # TODO: can probably wrap then flatten instead of incomplete flatten?
         return wrap(self.model.output, self.func(*flatten(args, complete=False)))
 
@@ -127,8 +127,9 @@ class AlgebraicSystem(InitializerMixin):
             self.initializer_func,
         )
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, model_instance, *args, **kwargs):
         out = self.callback(casadi.vertcat(*flatten(args)))
+        # TODO: verify this will never become stale
         wrap_implicit = wrap(
             self.model.implicit_output,
             out[:self.model.implicit_output._count]
@@ -137,6 +138,17 @@ class AlgebraicSystem(InitializerMixin):
             self.model.explicit_output,
             out[:self.model.explicit_output._count]
         )
+
+        if hasattr(self.callback, 'resid'):
+            resid = self.callback.resid
+            wrap_residual = wrap(
+                self.model.residual,
+                resid,
+            )
+            dataclass_kwarg = {}
+            for resid_name, value in zip(self.model.residual.list_of('name'), wrap_residual):
+                dataclass_kwarg[resid_name] = value
+            model_instance.residual = self.model.residual._dataclass(**dataclass_kwarg)
         return *wrap_implicit, *wrap_explicit
 
     def set_initial(self, *args, **kwargs):
@@ -194,7 +206,7 @@ class OptimizationProblem(InitializerMixin):
         # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
         # to try to get sensitivity from ipopt. so far no...
 
-    def __call__(self, *args):
+    def __call__(self, model_instance, *args):
         initializer_args = [self.x0]
         if self.has_p:
             p = casadi.vertcat(*flatten(args))
@@ -211,6 +223,7 @@ class OptimizationProblem(InitializerMixin):
         out = self.optimizer(**call_args)
         if not self.has_p or not isinstance(args[0], casadi.MX):
             self.x0 = out["x"]
+
 
         return wrap(self.model.variable, out["x"])
 

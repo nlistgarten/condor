@@ -232,7 +232,7 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
         self.x0[ubx_violations] = self.ubx[ubx_violations]
 
         self.x0 = self.newton(self.x0, p)
-        resid, out_exp = self.resid_func(self.x0, p)
+        self.resid, out_exp = self.resid_func(self.x0, p)
         out_exp = out_exp.toarray().reshape(-1)
 
         return tuple([*self.x0, *out_exp])

@@ -497,15 +497,11 @@ class Model(metaclass=ModelType):
                 setattr(self, input_name, input_kwargs[input_name])
             setattr(self, input_field._name, input_field._dataclass(**dataclass_kwarg))
 
-        imp_out = cls.implementation(*list(input_kwargs.values()))
+        imp_out = cls.implementation(self, *list(input_kwargs.values()))
 
         self.output_kwargs = output_kwargs = {
             out_name: val for out_name, val in zip(cls.output_names, imp_out)
         }
-
-        for out_name, out_val in self.output_kwargs.items():
-            if out_val.size == 1:
-                self.output_kwargs[out_name] = out_val[0]
 
         # pack into dot-able storage, over-writting fields and symbols
         for output_field in cls.output_fields:
@@ -514,6 +510,9 @@ class Model(metaclass=ModelType):
                 dataclass_kwarg[output_name] = output_kwargs[output_name]
                 setattr(self, output_name, output_kwargs[output_name])
             setattr(self, output_field._name, output_field._dataclass(**dataclass_kwarg))
+
+    def bind_field(self, field, values, symbols_to_instance=False):
+        pass
 
     def __iter__(self):
         cls = self.__class__
@@ -807,8 +806,11 @@ class Mode(Model, inner_to=ODESystem):
     make = MatchedField(ODESystem.control)
     # e.g., make[alpha] = ...
 
-class ODETrajectory(Model, inner_to=ODESystem):
+class Trajectory(Model, inner_to=ODESystem):
+    initial = MatchedField(ODESystem.state)
     integrand_term = AssignedField()
     terminal_term = AssignedField()
+
+    # TODO: is it possible to have an accumulator term?
 
 
