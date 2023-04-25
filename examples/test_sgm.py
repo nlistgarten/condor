@@ -6,7 +6,7 @@ class MySystem(co.ODESystem):
     n = 2
     m = 1
     x = state(shape=n)
-    C = state(shape=(n,n),)# symmetric=True)
+    C = state(shape=(n,n))# symmetric=True)
     A = np.array([
         [0, 1],
         [0, 0],

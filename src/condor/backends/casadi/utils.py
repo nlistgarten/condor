@@ -60,6 +60,7 @@ def flatten(symbols, complete=True):
         # handle symbolic and hope tuple of symbolics
         # TODO: generalize tuple handling for more general indexible variables
         #       also in model.__new__ and backend/casadi/__init__ symbol generator?
+        return [symbol.reshape((-1,1)) for symbol in symbols]
         return [symbol.reshape((-1,1)) if isinstance(symbol, casadi.MX) else
                 casadi.vertcat(*symbol) for symbol in symbols]
         # imp construction or symbolic
@@ -83,10 +84,4 @@ def wrap(field, values):
         new_values[start_idx:end_idx]
         for start_idx, end_idx in zip(size_cum_sum, size_cum_sum[1:])
     ])
-
-def tuple_to_symbol(symbol):
-    symbol.backend_repr = casadi.vertcat(*symbol.backend_repr)
-
-
-
 

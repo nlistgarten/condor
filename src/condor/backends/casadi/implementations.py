@@ -16,8 +16,7 @@ class ExplicitSystem:
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
     def __call__(self, *args):
-        #return self.func(args)
-        #return wrap(self.model.output, self.func(*wrap(self.model.input, args)))
+        # TODO: can probably wrap then flatten instead of incomplete flatten?
         return wrap(self.model.output, self.func(*flatten(args, complete=False)))
 
 class InitializerMixin:

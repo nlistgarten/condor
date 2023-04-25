@@ -42,7 +42,3 @@ sellar_opt = Sellar()
 resid_at_opt = Resid(*sellar_opt)
 obj_at_opt = Obj(*sellar_opt)
 
-
-
-
-

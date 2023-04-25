@@ -296,11 +296,7 @@ class ModelType(type):
                     output_fields.append(attr_val)
                 if attr_val._direction == Direction.internal:
                     internal_fields.append(attr_val)
-            # TODO: match pattern would vbe much better for tuple
-            if (
-                isinstance(attr_val, backend.symbol_class) or 
-                isinstance(attr_val, tuple)
-            ):
+            if isinstance(attr_val, backend.symbol_class):
                 # from a FreeField
                 known_symbol_type = False
                 for free_field in free_fields:
@@ -311,8 +307,6 @@ class ModelType(type):
                         if symbol.name and symbol.name != attr_name:
                             raise NameError(f"Symbol on {free_field} has name {symbo.name} but assigned to {attr_name}")
                         symbol.name = attr_name
-                        if isinstance(attr_val, tuple):
-                            backend.tuple_to_symbol(symbol)
                         attr_val = symbol
                         pass_attr = False
                         break
