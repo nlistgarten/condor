@@ -17,7 +17,9 @@ class ExplicitSystem:
 
     def __call__(self, model_instance, *args):
         # TODO: can probably wrap then flatten instead of incomplete flatten?
-        return wrap(self.model.output, self.func(*flatten(args, complete=False)))
+        model_instance.bind_field(
+            self.model.output, self.func(*args)
+        )
 
 class InitializerMixin:
     def set_initial(self, *args, **kwargs):
@@ -129,27 +131,23 @@ class AlgebraicSystem(InitializerMixin):
 
     def __call__(self, model_instance, *args, **kwargs):
         out = self.callback(casadi.vertcat(*flatten(args)))
-        # TODO: verify this will never become stale
-        wrap_implicit = wrap(
+        model_instance.bind_field(
             self.model.implicit_output,
             out[:self.model.implicit_output._count]
         )
-        wrap_explicit = wrap(
+        model_instance.bind_field(
             self.model.explicit_output,
             out[:self.model.explicit_output._count]
         )
 
         if hasattr(self.callback, 'resid'):
+            # TODO: verify this will never become stale
+            # TODO: it seems a bit WET to wrap each field and then, eventually, bind
+            # each field. 
             resid = self.callback.resid
-            wrap_residual = wrap(
-                self.model.residual,
-                resid,
+            model_instance.bind_field(
+                self.model.residual, resid, symbols_to_instance=False
             )
-            dataclass_kwarg = {}
-            for resid_name, value in zip(self.model.residual.list_of('name'), wrap_residual):
-                dataclass_kwarg[resid_name] = value
-            model_instance.residual = self.model.residual._dataclass(**dataclass_kwarg)
-        return *wrap_implicit, *wrap_explicit
 
     def set_initial(self, *args, **kwargs):
         self.x0 = self.callback.x0
@@ -224,6 +222,7 @@ class OptimizationProblem(InitializerMixin):
         if not self.has_p or not isinstance(args[0], casadi.MX):
             self.x0 = out["x"]
 
-
-        return wrap(self.model.variable, out["x"])
+        model_instance.bind_field(self.model.variable, out["x"])
+        model_instance.bind_field(self.model.constraint, out["g"])
+        model_instance.objective = out["f"].toarray()[0,0]
 

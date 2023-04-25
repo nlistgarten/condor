@@ -490,29 +490,37 @@ class Model(metaclass=ModelType):
         # TODO: check bounds on model inputs?
 
         # pack into dot-able storage, over-writting fields and symbols
-        for input_field in cls.input_fields:
-            dataclass_kwarg = {}
-            for input_name in input_field.list_of('name'):
-                dataclass_kwarg[input_name] = input_kwargs[input_name]
-                setattr(self, input_name, input_kwargs[input_name])
-            setattr(self, input_field._name, input_field._dataclass(**dataclass_kwarg))
+        self.bind_input_fields()
 
-        imp_out = cls.implementation(self, *list(input_kwargs.values()))
+        cls.implementation(self, *list(input_kwargs.values()))
 
         self.output_kwargs = output_kwargs = {
-            out_name: val for out_name, val in zip(cls.output_names, imp_out)
+            out_name: getattr(self, out_name)
+            for field in self.output_fields
+            for out_name in field.list_of('name')
         }
 
-        # pack into dot-able storage, over-writting fields and symbols
-        for output_field in cls.output_fields:
-            dataclass_kwarg = {}
-            for output_name in output_field.list_of('name'):
-                dataclass_kwarg[output_name] = output_kwargs[output_name]
-                setattr(self, output_name, output_kwargs[output_name])
-            setattr(self, output_field._name, output_field._dataclass(**dataclass_kwarg))
+    def bind_input_fields(self):
+        cls = self.__class__
+        all_values = list(self.input_kwargs.values())
 
-    def bind_field(self, field, values, symbols_to_instance=False):
-        pass
+        slice_start = 0
+        for field in cls.input_fields:
+            slice_end = slice_start + len(field)
+            values = all_values[slice_start: slice_end]
+            slice_start = slice_end
+            self.bind_field(field, values, symbols_to_instance=True, wrap=False)
+
+
+    def bind_field(self, field, values, symbols_to_instance=True, wrap=True):
+        dataclass_kwarg = {}
+        if wrap:
+            values = backend.wrap(field, values)
+        for symbol_name, value in zip(field.list_of('name'), values):
+            dataclass_kwarg[symbol_name] = value
+            if symbols_to_instance:
+                setattr(self, symbol_name, value)
+        setattr(self, field._name, field._dataclass(**dataclass_kwarg))
 
     def __iter__(self):
         cls = self.__class__

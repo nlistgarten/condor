@@ -69,14 +69,17 @@ def flatten(symbols, complete=True):
         return [ np.atleast_1d(symbol).reshape(-1)  for symbol in symbols]
 
 def wrap(field, values):
+    if isinstance(values, casadi.MX):
+        return [values]
     size_cum_sum = np.cumsum([0] + field.list_of('size'))
     # TODO: need to make sure 
 
-    new_values = np.atleast_1d(values).reshape(-1)
+    if isinstance(values, (float, int, casadi.DM,)) or len(field) != len(values):
+        values = np.atleast_1d(values).reshape(-1)
     return tuple([
-        new_values[start_idx]
+        values[start_idx]
         if symbol.size == 1
-        else new_values[start_idx:end_idx].reshape(symbol.shape)
+        else values[start_idx:end_idx].reshape(symbol.shape)
         for start_idx, end_idx, symbol in zip(size_cum_sum, size_cum_sum[1:], field)
     ])
 
