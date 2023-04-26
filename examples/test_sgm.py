@@ -1,8 +1,13 @@
 import numpy as np
 import condor as co
 
+
 class MySystem(co.ODESystem):
     print("starting user code for LTI class")
+    ts = list()
+    for i in range(3):
+        ts.append(parameter(name=f"t_{i}"))
+
     n = 2
     m = 1
     x = state(shape=n)
@@ -11,6 +16,7 @@ class MySystem(co.ODESystem):
         [0, 1],
         [0, 0],
     ])
+
 
     # A = parameter(n,n)
     # B = parameter(n,m)
@@ -29,6 +35,9 @@ class MySystem(co.ODESystem):
 
 class MyEvent(MySystem.Event):
     update[x] = x**2 + C @ x
+
+class MyEvent(MySystem.Event):
+    update[x] = x -2
 
 assert MyEvent.inner_to is MySystem
 assert co.Event in MyEvent.__bases__

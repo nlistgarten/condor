@@ -229,12 +229,12 @@ class FreeSymbol(IndependentSymbol):
 
 class FreeField(IndependentField, default_direction=Direction.input):
     def make_backend_symbol(
-        self, name, shape=(1,), symmetric=False, diagonal=False, **kwargs
+        self, backend_name, shape=(1,), symmetric=False, diagonal=False, **kwargs
     ):
         if isinstance(shape, int):
             shape = (shape,)
         out = backend.symbol_generator(
-            name=name, shape=shape, symmetric=symmetric, diagonal=diagonal
+            name=backend_name, shape=shape, symmetric=symmetric, diagonal=diagonal
         )
         symbol_data = backend.get_symbol_data(out)
         kwargs.update(
@@ -244,8 +244,8 @@ class FreeField(IndependentField, default_direction=Direction.input):
         return kwargs
 
     def __call__(self, **kwargs):
-        backend_name = name="%s_%d" % (self._resolve_name, len(self._symbols))
-        new_kwargs = self.make_backend_symbol(name=backend_name, **kwargs)
+        backend_name = "%s_%d" % (self._resolve_name, len(self._symbols))
+        new_kwargs = self.make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_symbol(**new_kwargs)
         self._count += self._symbols[-1].size
         return self._symbols[-1].backend_repr
