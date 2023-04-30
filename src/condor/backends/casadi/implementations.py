@@ -43,6 +43,9 @@ class InitializerMixin:
         x0_at_construction = []
         initializer_exprs = []
         # TODO: shoud broadcasting be done elsewhere? with field? bounds needs it too
+        # bounds are definitely done in FreeField, I believe this reshape/broadcast_to
+        # is complete (just for initializer attribute on initialized field) -- I guess
+        # it might be drier in post_init of initialized field?
 
         if isinstance(fields, co.Field):
             fields = [fields]
@@ -54,18 +57,22 @@ class InitializerMixin:
                 if isinstance(solver_var.initializer, casadi.MX):
                     x0_at_construction.extend(np.zeros(solver_var.size))
                     initializer_exprs.extend(
-                        casadi.vertsplit(solver_var.initializer.reshape((-1,1)))
-                    )
-                elif solver_var.warm_start:
-                    x0_at_construction.extend(
-                        np.broadcast_to(solver_var.initializer, (solver_var.size,))
-                    )
-                    initializer_exprs.extend(
-                        casadi.vertsplit(solver_var.backend_repr.reshape((-1,1)))
+                        casadi.vertsplit(
+                            solver_var.initializer.reshape((solver_var.size,1))
+                        )
                     )
                 else:
-                    x0_at_construction.append(solver_var.initializer)
-                    initializer_exprs.append(solver_var.initializer)
+                    shaped_initial = np.broadcast_to(
+                        solver_var.initializer, solver_var.shape
+                    ).reshape(-1)
+                    if solver_var.warm_start:
+                        x0_at_construction.extend(shaped_initial)
+                        initializer_exprs.extend(
+                            casadi.vertsplit(solver_var.backend_repr.reshape((-1,1)))
+                        )
+                    else:
+                        x0_at_construction.append(shaped_initial)
+                        initializer_exprs.append(shaped_initial)
 
         self.parsed_initialized_fields = fields
 
@@ -225,4 +232,83 @@ class OptimizationProblem(InitializerMixin):
         model_instance.bind_field(self.model.variable, out["x"])
         model_instance.bind_field(self.model.constraint, out["g"])
         model_instance.objective = out["f"].toarray()[0,0]
+
+def get_state_setter(field, setter_args, default=0.):
+    """
+    field is MatchedField matching to the state
+    """
+    setter_exprs = []
+    if isinstance(setter_args, casadi.MX):
+        setter_args = [setter_args]
+
+    for state in field._matched_to:
+        setter_symbol = field.get(match=state)
+        if default is None:
+            default = state.backend_repr
+        if isinstance(setter_symbol, list) and len(setter_symbol) == 0:
+            setter_symbol = default
+        elif isinstance(setter_symbol, co.BaseSymbol):
+            setter_symbol = setter_symbol.backend_repr
+        else:
+            raise ValueError
+
+        if isinstance(setter_symbol, casadi.MX):
+            setter_exprs.extend(
+                casadi.vertsplit(setter_symbol.reshape((state.size,1)))
+            )
+        else:
+            setter_exprs.append(np.broadcast_to(setter_symbol, state.shape).reshape(-1))
+    #setter_exprs = flatten(setter_exprs)
+    setter_exprs = [casadi.vertcat(*setter_exprs)]
+    setter_func = casadi.Function(
+        f"{field._model_name}_{field._matched_to._name}_{field._name}",
+        setter_args,
+        setter_exprs,
+    )
+    setter_func.expr = setter_exprs[0]
+    return setter_func
+
+
+
+class TrajectoryAnalysis:
+    def __init__(self, model):
+        self.model = model
+        self.ode_model = ode_model = model.inner_to
+        self.p = casadi.vertcat(*flatten(ode_model.parameter))
+        self.x = casadi.vertcat(*flatten(ode_model.state))
+        self.y_expr = casadi.vertcat(*flatten(ode_model.output))
+        self.x0 = get_state_setter(ode_model.initial, self.p)
+        self.simulation_signature = [
+            self.ode_model.independent_variable,
+            self.x,
+            self.p,
+        ]
+        self.xdot = get_state_setter(
+            ode_model.dot,
+            self.simulation_signature
+        )
+        self.y = casadi.Function(
+            f"{ode_model.__name__}_output",
+            self.simulation_signature,
+            [self.y_expr],
+        )
+        self.e_expr = [event.function for event in ode_model.Event.subclasses]
+        self.e = casadi.Function(
+            f"{ode_model.__name__}_event",
+            self.simulation_signature,
+            self.e_expr,
+        )
+        self.sym_event_channel = casadi.MX.sym('event_channel')
+        self.h_expr = sum([
+            get_state_setter(
+                event.update,
+                self.simulation_signature
+            ).expr*(self.sym_event_channel==idx)
+            for idx, event in enumerate(ode_model.Event.subclasses)
+        ])
+        self.h = casadi.Function(
+            f"{ode_model.__name__}_update",
+            self.simulation_signature + [self.sym_event_channel],
+            [self.h_expr],
+        )
 

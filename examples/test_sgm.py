@@ -34,9 +34,11 @@ class MySystem(co.ODESystem):
 
 
 class MyEvent(MySystem.Event):
+    function = MySystem.independent_variable - 10.
     update[x] = x**2 + C @ x
 
 class MyEvent(MySystem.Event):
+    function = MySystem.independent_variable - 100.
     update[x] = x -2
 
 assert MyEvent.inner_to is MySystem
@@ -45,6 +47,18 @@ assert MySystem.Event not in MyEvent.__bases__
 assert MySystem.Event in MySystem.inner_models
 assert MyEvent in MySystem.Event
 assert MyEvent.update._symbols[0].match in MySystem.state
+
+class MySim(MySystem.TrajectoryAnalysis):
+    # this over-writes which is actually really nice
+    initial[x] = 1.
+    initial[C] = np.eye(2)*parameter()
+
+    out1 = trajectory_output(integrand=x.T@x)
+    out2 = trajectory_output(x.T@x)
+    out3 = trajectory_output(C[0,0], C[1,1])
+
+
+
 
 class Sys1out(co.ExplicitSystem):
     x = input()

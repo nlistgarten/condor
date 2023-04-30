@@ -4,7 +4,7 @@ import numpy as np
 from condor.fields import (
     Direction, Field, BaseSymbol, IndependentSymbol, FreeSymbol,
     IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
-    BoundedAssignmentField
+    BoundedAssignmentField, TrajectoryOutputField,
 )
 from condor.backends.default import backend
 """
@@ -61,16 +61,28 @@ code could update it (add/overwrite)
 
 
 
-# may not be  really necessary, place holder in case it is
 # appears in __new__ as attrs
 class CondorClassDict(dict):
+
     def __getitem__(self, *args, **kwargs):
         #breakpoint()
         return super().__getitem__(*args, **kwargs)
 
-    def __setitem__(self, *args, **kwargs):
-        #breakpoint()
-        return super().__setitem__(*args, **kwargs)
+    def __setitem__(self, key, val):
+        return super().__setitem__(key, val)
+        # could be used to allow magic name update for symbols, Code below takes a
+        # declared variable of the name `some_var__count__` and replaces it with 
+        # `some_var_0` so you can assign variables in a loop and get unique accessors.
+        # but name can get passed to FreeSymbols, and that is more explicit.
+        count_suffix = '__count__'
+        if key.endswith(count_suffix):
+            base_name = key.split(count_suffix)[0]
+            count = 0
+            for ekey in self:
+                if ekey.startswith(base_name):
+                    count += 1
+            key = key.replace(count_suffix, f"_{count}")
+            breakpoint()
 
 class Options:
     """
@@ -244,7 +256,7 @@ class ModelType(type):
             super_attrs['_parent_name'] = ''
 
         backend_options = {}
-        free_fields = [] # used to find free symbols and replace with symbol
+        independent_fields = [] # used to find free symbols and replace with symbol
         matched_fields = []
 
         # will be used to pack arguments in (inputs) and unpack results (output), other
@@ -285,8 +297,8 @@ class ModelType(type):
             if isinstance(attr_val, type) and issubclass(attr_val, Options):
                 backend_options[attr_name] =  attr_val
                 continue
-            if isinstance(attr_val, FreeField):
-                free_fields.append(attr_val)
+            if isinstance(attr_val, IndependentField):
+                independent_fields.append(attr_val)
             if isinstance(attr_val, MatchedField):
                 matched_fields.append(attr_val)
             if isinstance(attr_val, Field):
@@ -299,7 +311,7 @@ class ModelType(type):
             if isinstance(attr_val, backend.symbol_class):
                 # from a FreeField
                 known_symbol_type = False
-                for free_field in free_fields:
+                for free_field in independent_fields:
                     symbol = free_field.get(backend_repr=attr_val)
                     # not a list (empty or len > 1)
                     if isinstance(symbol, BaseSymbol):
@@ -363,7 +375,70 @@ class ModelType(type):
         orig_doc = attrs.get("__doc__", "")
         super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
+        inner_to=kwargs.pop('inner_to', None)
+        inner_through=kwargs.pop('inner_through', None)
+
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
+
+        # handle inner classes
+        new_cls.inner_to = inner_to
+        if inner_to:
+            # TODO: other validation?
+            if new_cls.__name__ in inner_to.__dict__:
+                raise ValueError
+
+            subclass_of_inner = False
+            for base in new_cls.__bases__:
+                if base is not Model:
+                    if base in inner_to.inner_models:
+                        subclass_of_inner = True
+                        break
+                        # TODO: base is ~ the field that cls should be added to...
+                        # This could all be in ModelType.__new__, inner_to is in kwargs
+
+            if subclass_of_inner:
+                # register as symbol of field, not directly added
+                if not inner_through:
+                    raise ValueError
+            else:
+                # create as field
+                inner_to.inner_models.append(new_cls)
+                setattr(inner_to, new_cls.__name__, new_cls)
+
+        if inner_through:
+            # create links
+            inner_through.register(new_cls)
+            new_cls.inner_through = inner_through
+            new_cls.inner_to = inner_through.inner_to
+
+        for attr_name, attr_val in attrs.items():
+            if isinstance(attr_val, Field):
+                attr_val.bind(attr_name, new_cls)
+
+            if isinstance(attr_val, ModelType):
+                if attr_val.inner_to in bases and attr_val in attr_val.inner_to.inner_models:
+                    # attr_val is an inner model to base, so this is a field-like inner
+                    # model that the user will sub-class
+
+                    # new_cls is a user model that inherits an inner model type
+
+                    use_bases = (InnerModel,)
+                    if Model in attr_val.__bases__ and len(attr_val.__bases__) == 1:
+                        pass
+                    else:
+                        raise NotImplemented
+                        # does this work?
+                        use_bases = use_bases + attr_val.__bases__
+
+                    attr_val = InnerModelType(
+                        attr_name,
+                        use_bases,
+                        attr_val.__original_attrs__,
+                        inner_to = new_cls,
+                        original_class = attr_val,
+                    )
+                    setattr(new_cls, attr_name, attr_val)
+
 
         implementation = None
 
@@ -401,34 +476,6 @@ class ModelType(type):
 
         if implementation is not None:
             new_cls.implementation = implementation(new_cls, **backend_option)
-
-        for attr_name, attr_val in attrs.items():
-            if isinstance(attr_val, Field):
-                attr_val.bind(attr_name, new_cls)
-
-            if isinstance(attr_val, ModelType):
-                if attr_val.inner_to in bases and attr_val in attr_val.inner_to.inner_models:
-                    # attr_val is an inner model to base, so this is a field-like inner
-                    # model that the user will sub-class
-
-                    # new_cls is a user model that inherits an inner model type
-
-                    use_bases = (InnerModel,)
-                    if Model in attr_val.__bases__ and len(attr_val.__bases__) == 1:
-                        pass
-                    else:
-                        raise NotImplemented
-                        # does this work?
-                        use_bases = use_bases + attr_val.__bases__
-
-                    attr_val = InnerModelType(
-                        attr_name,
-                        use_bases,
-                        attr_val.__original_attrs__,
-                        inner_to = new_cls,
-                        original_class = attr_val,
-                    )
-                    setattr(new_cls, attr_name, attr_val)
 
         return new_cls
 
@@ -494,6 +541,8 @@ class Model(metaclass=ModelType):
 
         cls.implementation(self, *list(input_kwargs.values()))
 
+        # generally implementations are responsible for binding computed values.
+        # implementations know about models, models don't know about implementations
         self.output_kwargs = output_kwargs = {
             out_name: getattr(self, out_name)
             for field in self.output_fields
@@ -531,37 +580,6 @@ class Model(metaclass=ModelType):
         return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
 
 
-    def __init_subclass__(cls, *args, inner_to=None, inner_through=None, **kwargs):
-        print("init subclass", cls, args, kwargs, "inner_to", inner_to)
-        # TODO: some kind of registration? I would really like it to be as field-like as
-        # possible. And ideally the event-function itself has a convenience accessor?
-        cls.inner_to = inner_to
-
-        if inner_to:
-            # TODO: other validation?
-            if cls.__name__ in inner_to.__dict__:
-                raise ValueError
-
-
-            subclass_of_inner = False
-            for base in cls.__bases__:
-                if base is not Model:
-                    if base in inner_to.inner_models:
-                        subclass_of_inner = True
-                        break
-                        # TODO: base is ~ the field that cls should be added to...
-                        # This could all be in ModelType.__new__, inner_to is in kwargs
-
-            if subclass_of_inner:
-                # register as symbol of field, not directly added
-                if not inner_through:
-                    raise ValueError
-            else:
-                # create as field
-                inner_to.inner_models.append(cls)
-                setattr(inner_to, cls.__name__, cls)
-
-
 class InnerModelType(ModelType):
     def __iter__(cls):
         for subclass in cls.subclasses:
@@ -584,6 +602,7 @@ class InnerModelType(ModelType):
 
         if case2:
             new_cls.original_class = original_class
+            new_cls.subclasses = []
             # reference to original class so uer sub-classes inherit directly, see below
 
         if case3:
@@ -595,10 +614,6 @@ class InnerModelType(ModelType):
             # will inherit inner_to from original_class
             new_cls = original_class.__class__(name, (original_class,), attrs,
                                                inner_through=inner_through, **kwargs)
-            # create links
-            inner_through.register(new_cls)
-            new_cls.inner_through = inner_through
-            new_cls.inner_to = inner_through.inner_to
 
         return new_cls
 
@@ -610,7 +625,7 @@ class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
     can create multiple subclass of the InnerModel by sub-classing from
     <outer_model>.<inner_model ____>
     """
-    subclasses = []
+    pass
 
 
 # TODO: move deferred stuff out?
@@ -796,29 +811,40 @@ class ODESystem(Model):
 
     independent_variable = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
-    finite_state = FreeField(Direction.internal)
+    initial = MatchedField(state)
+    # finite state is an idiom not a unique field
+    # finite_state = FreeField(Direction.internal)
     # TODO: should internal free field symbolss NOT be dot accessible on the models?
     parameter = FreeField()
     dot = MatchedField(state)
     control = FreeField(Direction.internal)
     output = AssignedField()
 
+# TODO: need to exlcude fields, particularly dot, initial, etc. 
+# define which fields get lifted completely, which become "read only" (can't generate
+# new state) etc. 
 class Event(Model, inner_to = ODESystem):
     # TODO: singleton field event.function is very similar to objective in
     # OptimizationProblem
-    update = MatchedField(ODESystem.state)
+    update = MatchedField(ODESystem.state, direction=Direction.output)
     # make[mode_var] = SomeModeSubclass
-    make = MatchedField(ODESystem.finite_state)
+    # actually, just update it
+    #make = MatchedField(ODESystem.finite_state)
 
 class Mode(Model, inner_to=ODESystem):
     make = MatchedField(ODESystem.control)
     # e.g., make[alpha] = ...
+    # only for control signals? and any control signals must be set by mode?
+    # maybe also provide different dot override?
+    # condition attribute is a symbolic relation used to determine when make is applied
 
-class Trajectory(Model, inner_to=ODESystem):
-    initial = MatchedField(ODESystem.state)
-    integrand_term = AssignedField()
-    terminal_term = AssignedField()
 
-    # TODO: is it possible to have an accumulator term?
+
+# TODO: trajectory should ex
+# TODO: decide on better model API for how state, etc. interact between ODESystem and
+# trajectory analysis. Will impact Implementation and TrajectoryOutputFIeld
+class TrajectoryAnalysis(Model, inner_to=ODESystem):
+    trajectory_output = TrajectoryOutputField()
+    # singleton simulate_to? or t_f?
 
 

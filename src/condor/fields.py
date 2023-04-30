@@ -277,6 +277,32 @@ class BoundedAssignmentField(Field, default_direction=Direction.output):
         self.create_symbol(name=name, backend_repr=value,  **kwargs, **asdict(symbol_data))
 
 
+@dataclass(repr=False)
+class TrajectoryOutputSymbol(IndependentSymbol):
+    integrand_state: BaseSymbol = None
+
+class TrajectoryOutputField(IndependentField, default_direction=Direction.output):
+    def __call__(self, terminal_term=0, integrand=0, **kwargs):
+        if isinstance(integrand, backend.symbol_class) or integrand != 0.:
+            ode_model = self._inherits_from._model.inner_to
+            integrand_state = ode_model.state(
+                name=f'augmented_state_for_traj_analysis_{len(self._symbols)}'
+            )
+            ode_model.dot[integrand_state] = integrand
+            terminal_term = terminal_term + integrand_state
+            kwargs['integrand_state']=integrand_state
+        elif not isinstance(terminal_term, backend.symbol_class) and terminal_term == 0.:
+            raise ValueError
+
+        symbol_data = backend.get_symbol_data(terminal_term)
+
+        self.create_symbol(
+            backend_repr=terminal_term,
+            **kwargs,
+            **asdict(symbol_data)
+        )
+        return terminal_term
+
 class DependentSymbol(BaseSymbol):
     pass
 

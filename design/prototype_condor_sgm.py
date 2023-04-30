@@ -408,13 +408,18 @@ plot(
 )
 
 
+# TODO: is it possible to have an accumulator term? Would need to attach to (each)
+# event? A trajectory could interact with each event class, but not clear what the
+# API is. basically want to add an update to each event? Could be a case for a
+# MatchedField that takes two matches, an output name and an event. how to create
+# accumulator ? I guess something like this?
+accumulator = FreeField()
+accumulate = MatchedField(accumulator, ODESystem.Event)
 
-
-
-
-
-
-
-
-
+# then behavior is
+sigma = accumulator()
+accumulate[sigma, MyEvent] = ... 
+# some expression of ODESystem.state and/or MyEvent.update[...]? May need to access
+# backend repr if using MyEvent directly; could just re-write any expressions as
+# needed and that would probably be fine
 
