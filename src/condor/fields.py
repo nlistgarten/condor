@@ -275,6 +275,7 @@ class BoundedAssignmentField(Field, default_direction=Direction.output):
             kwargs['lower_bound'] = eq
             kwargs['upper_bound'] = eq
         self.create_symbol(name=name, backend_repr=value,  **kwargs, **asdict(symbol_data))
+        self._count += self._symbols[-1].size
 
 
 @dataclass(repr=False)
@@ -301,6 +302,7 @@ class TrajectoryOutputField(IndependentField, default_direction=Direction.output
             **kwargs,
             **asdict(symbol_data)
         )
+        self._count += self._symbols[-1].size
         return terminal_term
 
 class DependentSymbol(BaseSymbol):
@@ -331,6 +333,7 @@ class AssignedField(Field, default_direction=Direction.output):
                 # these reasons, ditch intermediate stuff.
                 **asdict(symbol_data)
             )
+            self._count += self._symbols[-1].size
             super().__setattr__(name, self._symbols[-1])
 
 

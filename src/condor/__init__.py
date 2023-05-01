@@ -873,6 +873,7 @@ class LTIType(ModelType):
             K = attrs["parameter"](shape=B.T.shape)
             attrs["K"] = K
             dynamics = (A-B@K)@x
+            attrs["output"].feedback_control = K@x
         else:
             dynamics = A@x
 

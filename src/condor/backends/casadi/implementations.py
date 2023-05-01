@@ -313,7 +313,11 @@ class TrajectoryAnalysis:
         ])
 
 
-        self.simupy_kwargs = dict(
+        self.simupy_shape_data = dict(
+            dim_state = ode_model.state._count,
+            dim_output = ode_model.output._count,
+        )
+        self.simupy_func_kwargs = dict(
             state_equation_function = get_state_setter(
                 ode_model.dot,
                 self.simulation_signature
@@ -323,16 +327,17 @@ class TrajectoryAnalysis:
                 self.simulation_signature,
                 [self.y_expr],
             ),
-            event_function = casadi.Function(
+            event_equation_function = casadi.Function(
                 f"{ode_model.__name__}_event",
                 self.simulation_signature,
                 self.e_expr,
             ),
-            update_function = casadi.Function(
+            update_equation_function = casadi.Function(
                 f"{ode_model.__name__}_update",
                 self.simulation_signature + [self.sym_event_channel],
                 [self.h_expr],
             ),
+
         )
         self.callback = ShootingGradientMethod(self)
 
