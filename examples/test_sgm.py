@@ -59,6 +59,26 @@ class MySim(MySystem.TrajectoryAnalysis):
 
 
 
+class DblInt(co.ODESystem, metaclass=co.LTIType):
+    A = np.array([
+        [0, 1],
+        [0, 0],
+    ])
+    B = np.array([[0,1]]).T
+
+class DblIntLQR(DblInt.TrajectoryAnalysis):
+    initial[x] = [1., 0.]
+    Q = np.eye(2)
+    R = np.eye(1)
+    cost = trajectory_output(integrand= x.T@Q@x + (K@x).T @ R @ (K@x))
+
+class DblIntDt(co.ODESystem, metaclass=co.LTIType):
+    A = np.array([
+        [0, 1],
+        [0, 0],
+    ])
+    B = np.array([[0,1]]).T
+    dt = 0.1
 
 class Sys1out(co.ExplicitSystem):
     x = input()

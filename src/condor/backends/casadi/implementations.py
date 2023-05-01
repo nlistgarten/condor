@@ -4,6 +4,7 @@ import numpy as np
 from enum import Enum, auto
 from condor.backends.casadi.utils import flatten, wrap
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
+from condor.backends.casadi.shooting_gradient_method import ShootingGradientMethod
 
 
 class ExplicitSystem:
@@ -257,7 +258,15 @@ def get_state_setter(field, setter_args, default=0.):
                 casadi.vertsplit(setter_symbol.reshape((state.size,1)))
             )
         else:
-            setter_exprs.append(np.broadcast_to(setter_symbol, state.shape).reshape(-1))
+            # casadi.MX is always a matrix, and broadcast_to cannot handle (n,) to (n,1)
+            if state.shape[1] == 1:
+                setter_exprs.append(
+                    np.broadcast_to(setter_symbol, state.size).reshape(-1)
+                )
+            else:
+                setter_exprs.append(
+                    np.broadcast_to(setter_symbol, state.shape).reshape(-1)
+                )
     #setter_exprs = flatten(setter_exprs)
     setter_exprs = [casadi.vertcat(*setter_exprs)]
     setter_func = casadi.Function(
@@ -274,31 +283,27 @@ class TrajectoryAnalysis:
     def __init__(self, model):
         self.model = model
         self.ode_model = ode_model = model.inner_to
+
         self.p = casadi.vertcat(*flatten(ode_model.parameter))
         self.x = casadi.vertcat(*flatten(ode_model.state))
-        self.y_expr = casadi.vertcat(*flatten(ode_model.output))
-        self.x0 = get_state_setter(ode_model.initial, self.p)
         self.simulation_signature = [
+            self.p,
             self.ode_model.independent_variable,
             self.x,
-            self.p,
         ]
-        self.xdot = get_state_setter(
-            ode_model.dot,
-            self.simulation_signature
-        )
-        self.y = casadi.Function(
-            f"{ode_model.__name__}_output",
-            self.simulation_signature,
-            [self.y_expr],
-        )
-        self.e_expr = [event.function for event in ode_model.Event.subclasses]
-        self.e = casadi.Function(
-            f"{ode_model.__name__}_event",
-            self.simulation_signature,
-            self.e_expr,
-        )
         self.sym_event_channel = casadi.MX.sym('event_channel')
+
+
+        self.traj_out = casadi.vertcat(*flatten(model.trajectory_output))
+        self.traj_out_func = casadi.Function(
+            f"{model.__name__}_trajectory_output",
+            self.simulation_signature,
+            [self.traj_out]
+        )
+
+        self.x0 = get_state_setter(ode_model.initial, self.p)
+        self.y_expr = casadi.vertcat(*flatten(ode_model.output))
+        self.e_expr = [event.function for event in ode_model.Event.subclasses]
         self.h_expr = sum([
             get_state_setter(
                 event.update,
@@ -306,9 +311,28 @@ class TrajectoryAnalysis:
             ).expr*(self.sym_event_channel==idx)
             for idx, event in enumerate(ode_model.Event.subclasses)
         ])
-        self.h = casadi.Function(
-            f"{ode_model.__name__}_update",
-            self.simulation_signature + [self.sym_event_channel],
-            [self.h_expr],
+
+
+        self.simupy_kwargs = dict(
+            state_equation_function = get_state_setter(
+                ode_model.dot,
+                self.simulation_signature
+            ),
+            output_equation_function = casadi.Function(
+                f"{ode_model.__name__}_output",
+                self.simulation_signature,
+                [self.y_expr],
+            ),
+            event_function = casadi.Function(
+                f"{ode_model.__name__}_event",
+                self.simulation_signature,
+                self.e_expr,
+            ),
+            update_function = casadi.Function(
+                f"{ode_model.__name__}_update",
+                self.simulation_signature + [self.sym_event_channel],
+                [self.h_expr],
+            ),
         )
+        self.callback = ShootingGradientMethod(self)
 

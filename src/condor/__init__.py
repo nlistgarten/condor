@@ -191,6 +191,7 @@ class ModelType(type):
                     cls_dict[attr_name] = attr_val
                 # TODO: document __from_outer__?
                 cls_dict['__from_outer__'] = base.inner_to.__original_attrs__
+        # TODO: is it better to do inner model magic in InnerModelType.__prepare__?
 
 
         print("end prepare for", model_name, cls_dict)
@@ -219,6 +220,10 @@ class ModelType(type):
         # Generally, bases arg will be len <= 1. Just from the previous level. Is there
         # a case for mixins? InnerModel approach seems decent, could repeat for
         # WithDeferredSubsystems, then Model layer is quite complete 
+
+        # TODO: add support for inheriting other models -- subclasses are
+        # modifying/adding (no deletion? need mixins to pre-build pieces?) to parent
+        # classes.  case 4
 
 
         # TODO: thought hooks might be necessary for inner model/deferred subsystems,
@@ -591,7 +596,7 @@ class InnerModelType(ModelType):
     def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
         print("\nInnerModelType.__new__ for class", cls,"name", name, "bases", bases,
               "original", original_class, "\nkwargs:", kwargs, "\nattrs:", attrs, "\n")
-        # case 1: InnerModel
+        # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
         # case 3: subclass of inherited inner model -- user
         case1 = name == "InnerModel"
@@ -846,5 +851,42 @@ class Mode(Model, inner_to=ODESystem):
 class TrajectoryAnalysis(Model, inner_to=ODESystem):
     trajectory_output = TrajectoryOutputField()
     # singleton simulate_to? or t_f?
+
+class LTI_DT_Update(ModelType):
+    def __new__(cls, name, bases, attrs, **kwargs):
+        x = attrs["x"]
+        attrs["update"][x] = attrs["dynamics"]
+        return super().__new__(cls, name, bases, attrs, **kwargs)
+
+
+
+
+class LTIType(ModelType):
+    def __new__(cls, name, bases, attrs, **kwargs):
+        A = attrs['A']
+        B = attrs.get('B', None)
+        dt = attrs.get('dt', 0.)
+        x = attrs["state"](shape=A.shape[0])
+        attrs["x"] = x
+
+        if B is not None:
+            K = attrs["parameter"](shape=B.T.shape)
+            attrs["K"] = K
+            dynamics = (A-B@K)@x
+        else:
+            dynamics = A@x
+
+        if not dt:
+            attrs["dot"][x] = dynamics
+
+        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
+
+        if dt:
+            dt_attrs = InnerModelType.__prepare__("DT", (new_cls.Event,))
+            dt_attrs["function"] = np.sin(new_cls.independent_variable*np.pi/dt)
+            dt_attrs["update"][dt_attrs["x"]] = dynamics
+            DTclass = InnerModelType("DT", (new_cls.Event,), attrs=dt_attrs)
+
+        return new_cls
 
 
