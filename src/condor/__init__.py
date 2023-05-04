@@ -188,6 +188,19 @@ class ModelType(type):
                         cls_dict[k] = v
             if base is not Model and base.inner_to:
                 for attr_name, attr_val in base.inner_to.__original_attrs__.items():
+                    # TODO: document copy fields?
+                    if attr_name in base.__copy_fields__:
+                        field_class = attr_val.__class__
+                        field_init_kwargs = attr_val._init_kwargs.copy()
+                        # I know it has no field references
+                        copied_field = attr_val.inherit(
+                            model_name, field_type_name=attr_name, **field_init_kwargs
+                        )
+                        copied_field._symbols = [sym for sym in attr_val]
+                        copied_field._count += sum(copied_field.list_of('size'))
+                        cls_dict[attr_name] = copied_field
+                        continue
+
                     cls_dict[attr_name] = attr_val
                 # TODO: document __from_outer__?
                 cls_dict['__from_outer__'] = base.inner_to.__original_attrs__
@@ -242,6 +255,7 @@ class ModelType(type):
                 else:
                     # TODO: make this a warning/error? add test (really for all
                     # warning/error raise)
+                    # Or allow silent passage of redone variables? eg copying
                     print(f"{attr_name} was defined on outer of {name}")
 
         print("CondorModelType.__new__ for", name, bases, kwargs)
@@ -323,7 +337,10 @@ class ModelType(type):
                         known_symbol_type = True
                         if symbol.name and symbol.name != attr_name:
                             raise NameError(f"Symbol on {free_field} has name {symbo.name} but assigned to {attr_name}")
-                        symbol.name = attr_name
+                        if attr_name:
+                            symbol.name = attr_name
+                        else:
+                            symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
                         attr_val = symbol
                         pass_attr = False
                         break
@@ -350,6 +367,12 @@ class ModelType(type):
                 super_attrs[attr_name] = attr_val
 
         # before calling super new, process fields
+
+        for field in independent_fields:
+            for symbol in field:
+                if not symbol.name:
+                    symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
+                    print("setting name for", symbol.name)
 
         for matched_field in matched_fields:
             for matched_symbol in matched_field:
@@ -382,6 +405,7 @@ class ModelType(type):
 
         inner_to=kwargs.pop('inner_to', None)
         inner_through=kwargs.pop('inner_through', None)
+        copy_fields=kwargs.pop('copy_fields', [])
 
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
 
@@ -409,6 +433,7 @@ class ModelType(type):
                 # create as field
                 inner_to.inner_models.append(new_cls)
                 setattr(inner_to, new_cls.__name__, new_cls)
+                new_cls.__copy_fields__ = copy_fields
 
         if inner_through:
             # create links
@@ -435,12 +460,19 @@ class ModelType(type):
                         # does this work?
                         use_bases = use_bases + attr_val.__bases__
 
+                    # TODO: can we dry up all these extra args? or is it necessary to
+                    # specify these? or at leat document that this is where new features
+                    # on inner models need to be added, in addition to poping from
+                    # kwargs, etc. When reverting inner model stuff to InnerModel's init
+                    # subclass, may be more obvious
+
                     attr_val = InnerModelType(
                         attr_name,
                         use_bases,
                         attr_val.__original_attrs__,
                         inner_to = new_cls,
                         original_class = attr_val,
+                        copy_fields = attr_val.__copy_fields__,
                     )
                     setattr(new_cls, attr_name, attr_val)
 
@@ -775,6 +807,8 @@ class ODESystem(Model):
     `t=DynamicsModel.independent_variable`, implementations will use this symbol
     directly for fields)
 
+    renamed to t
+
     parameter - auxilary variables (constant-in-time) that determine system behavior
 
     state - fully defines evolution of system driven by ODEs
@@ -789,6 +823,11 @@ class ODESystem(Model):
     note: no time-varying input. Assume dynamicsmodels "pull" what they need from other
     models. Need to augment state with "pulled" dynamicsmodels.
     But do need a "control" that could be defined based on mode? 
+
+    control - time-varying placeholder, useful for re-defining, using mode, etc.
+    set it with `make` field -- all controls MUST be set? or default to 0.
+
+    make - set control a value/computation
 
     is "mode" the only finite state?
     mode can be an innner model that assigns controls (direct over-write should be
@@ -807,6 +846,7 @@ class ODESystem(Model):
     # TODO: indepdent var  needs its own descriptor type? OR do we want user classes to do
     # t = DynamicsModel.independent_variable ? That would allow leaving it like this and
     # consumers still know what it is
+    # or just set it to t and always use it?
 
     # TODO: Are initial conditions an attribute of the dynamicsmodel or the trajectory 
     # analysis that consumes it?
@@ -814,7 +854,7 @@ class ODESystem(Model):
     # TODO: mode and corresponding FiniteState type?
 
 
-    independent_variable = backend.symbol_generator('t')
+    t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
     initial = MatchedField(state)
     # finite state is an idiom not a unique field
@@ -824,20 +864,52 @@ class ODESystem(Model):
     dot = MatchedField(state)
     control = FreeField(Direction.internal)
     output = AssignedField()
+    make = MatchedField(control)
+
+# TODO: decide on better model API for how state, etc. interact between ODESystem and
+# trajectory analysis. Will impact Implementation and TrajectoryOutputFIeld
+# copy initialize? don't copy state or dot? maybe parameter?
+class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "initial"]):
+    """
+    this is what simulates an ODE system
+    set tf. 
+    define trajectory outputs
+    modify parameters and initial (local copy)
+
+    gets _res, t, state, output (from odesystem) assigned from simulation
+    """
+    trajectory_output = TrajectoryOutputField()
+    default_tf = 1_000_000.
+    # singleton simulate_to? or t_f?
 
 # TODO: need to exlcude fields, particularly dot, initial, etc. 
 # define which fields get lifted completely, which become "read only" (can't generate
 # new state) etc. 
+# maybe allow creation of new parameters (into ODESystem parameter field), access to
+# state, etc. 
 class Event(Model, inner_to = ODESystem):
+    """
+    function defines when event occurs
+    update for any state that needs it
+    """
     # TODO: singleton field event.function is very similar to objective in
     # OptimizationProblem
     update = MatchedField(ODESystem.state, direction=Direction.output)
     # make[mode_var] = SomeModeSubclass
     # actually, just update it
     #make = MatchedField(ODESystem.finite_state)
+    # terminates = True -> return nan instead of update?
 
-class Mode(Model, inner_to=ODESystem):
-    make = MatchedField(ODESystem.control)
+# this should just provide the capabiility to overwrite make (or whatever sets control)
+# and dot based on condition...
+# needs to inject on creation
+class Mode(Model, inner_to=ODESystem,):
+    """
+    convenience for defining conditional behavior for state dynamics and/or controls
+    depending on `condition`. 
+    """
+    pass
+    # make = MatchedField(ODESystem.control)
     # e.g., make[alpha] = ...
     # only for control signals? and any control signals must be set by mode?
     # maybe also provide different dot override?
@@ -845,20 +917,12 @@ class Mode(Model, inner_to=ODESystem):
 
 
 
-# TODO: trajectory should ex
-# TODO: decide on better model API for how state, etc. interact between ODESystem and
-# trajectory analysis. Will impact Implementation and TrajectoryOutputFIeld
-class TrajectoryAnalysis(Model, inner_to=ODESystem):
-    trajectory_output = TrajectoryOutputField()
-    # singleton simulate_to? or t_f?
 
 class LTI_DT_Update(ModelType):
     def __new__(cls, name, bases, attrs, **kwargs):
         x = attrs["x"]
         attrs["update"][x] = attrs["dynamics"]
         return super().__new__(cls, name, bases, attrs, **kwargs)
-
-
 
 
 class LTIType(ModelType):
@@ -884,7 +948,7 @@ class LTIType(ModelType):
 
         if dt:
             dt_attrs = InnerModelType.__prepare__("DT", (new_cls.Event,))
-            dt_attrs["function"] = np.sin(new_cls.independent_variable*np.pi/dt)
+            dt_attrs["function"] = np.sin(new_cls.t*np.pi/dt)
             dt_attrs["update"][dt_attrs["x"]] = dynamics
             DTclass = InnerModelType("DT", (new_cls.Event,), attrs=dt_attrs)
 

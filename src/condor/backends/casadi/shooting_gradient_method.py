@@ -2,7 +2,7 @@ from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
 import casadi
 from simupy.systems import DynamicalSystem
 import numpy as np
-from functools import partial
+from scipy import interpolate
 
 def simupy_wrapper(f, p):
     return lambda t, state, output=None, **kwargs: f(p, t, state, **kwargs).toarray().reshape(-1)
@@ -14,7 +14,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         self.func = casadi.Function(
             f"{intermediate.model.__name__}_placeholder",
             [intermediate.p],
-            [intermediate.traj_out],
+            [intermediate.traj_out_expr],
         )
         self.i = intermediate
         self.construct(name, {})
@@ -27,9 +27,14 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         simupy_kwargs = {k: simupy_wrapper(v, p) for k, v in self.i.simupy_func_kwargs.items()}
         system = DynamicalSystem(**simupy_kwargs, **self.i.simupy_shape_data)
         system.initial_condition = self.i.x0(p).toarray().reshape(-1)
-        tf = 10.
+        tf = getattr(self.i.model, 'tf', self.i.model.default_tf)
         self.res = res = system.simulate(tf)
-        return self.i.traj_out_func(p, res.t[-1], res.x[-1]),
+        integrand = interpolate.make_interp_spline(res.t, [
+            self.i.traj_out_integrand_func(p, t, x)
+            for t, x in zip(res.t, res.x)
+        ]).antiderivative()
+        integral = integrand(res.t[-1]) - integrand(res.t[0])
+        return self.i.traj_out_terminal_term_func(p, res.t[-1], res.x[-1]) + integral,
 
 
 """

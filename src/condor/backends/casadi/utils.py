@@ -74,12 +74,20 @@ def wrap(field, values):
     size_cum_sum = np.cumsum([0] + field.list_of('size'))
     # TODO: need to make sure 
 
-    if isinstance(values, (float, int, casadi.DM,)) or len(field) != len(values):
+    if isinstance(values, (float, int, casadi.DM,)):# or len(field) != len(values):
+        if not isinstance(values, (float, int, casadi.DM,)) and len(field) != len(values):
+            breakpoint()
         values = np.atleast_1d(values).reshape(-1)
+
     return tuple([
         values[start_idx]
         if symbol.size == 1
+
         else values[start_idx:end_idx].reshape(symbol.shape)
+        if values[start_idx:end_idx].size == symbol.size
+
+        else values[start_idx:end_idx].reshape(symbol.shape + (-1,))
+
         for start_idx, end_idx, symbol in zip(size_cum_sum, size_cum_sum[1:], field)
     ])
 

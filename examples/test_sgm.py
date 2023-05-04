@@ -34,11 +34,11 @@ class MySystem(co.ODESystem):
 
 
 class MyEvent(MySystem.Event):
-    function = MySystem.independent_variable - 10.
+    function = MySystem.t - 10.
     update[x] = x**2 + C @ x
 
 class MyEvent(MySystem.Event):
-    function = MySystem.independent_variable - 100.
+    function = MySystem.t - 100.
     update[x] = x -2
 
 assert MyEvent.inner_to is MySystem
@@ -57,6 +57,9 @@ class MySim(MySystem.TrajectoryAnalysis):
     out2 = trajectory_output(x.T@x)
     out3 = trajectory_output(C[0,0], C[1,1])
 
+    # correctly fails
+    #out4 = trajectory_output(C[0,0], x)
+
 
 
 class DblInt(co.ODESystem, metaclass=co.LTIType):
@@ -70,6 +73,7 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     initial[x] = [1., 0.]
     Q = np.eye(2)
     R = np.eye(1)
+    tf = 100.
     cost = trajectory_output(integrand= x.T@Q@x + (K@x).T @ R @ (K@x))
 
 class DblIntDt(co.ODESystem, metaclass=co.LTIType):
@@ -79,6 +83,13 @@ class DblIntDt(co.ODESystem, metaclass=co.LTIType):
     ])
     B = np.array([[0,1]]).T
     dt = 0.1
+
+class DblIntDtLQR(DblInt.TrajectoryAnalysis):
+    initial[x] = [1., 0.]
+    Q = np.eye(2)
+    R = np.eye(1)
+    tf = 100.
+    cost = trajectory_output(integrand= x.T@Q@x + (K@x).T @ R @ (K@x))
 
 class Sys1out(co.ExplicitSystem):
     x = input()

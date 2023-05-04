@@ -284,24 +284,37 @@ class TrajectoryAnalysis:
         self.model = model
         self.ode_model = ode_model = model.inner_to
 
-        self.p = casadi.vertcat(*flatten(ode_model.parameter))
+        self.p = casadi.vertcat(*flatten(model.parameter))
         self.x = casadi.vertcat(*flatten(ode_model.state))
         self.simulation_signature = [
             self.p,
-            self.ode_model.independent_variable,
+            self.ode_model.t,
             self.x,
         ]
         self.sym_event_channel = casadi.MX.sym('event_channel')
 
+        self.traj_out_expr = casadi.vertcat(*flatten(
+            model.trajectory_output
+        ))
 
-        self.traj_out = casadi.vertcat(*flatten(model.trajectory_output))
-        self.traj_out_func = casadi.Function(
-            f"{model.__name__}_trajectory_output",
+        self.traj_out_integrand = casadi.vertcat(*flatten(
+            model.trajectory_output.list_of('integrand')
+        ))
+        self.traj_out_integrand_func = casadi.Function(
+            f"{model.__name__}_trajectory_output_integrand",
             self.simulation_signature,
-            [self.traj_out]
+            [self.traj_out_integrand]
+        )
+        self.traj_out_terminal_term = casadi.vertcat(*flatten(
+            model.trajectory_output.list_of('terminal_term')
+        ))
+        self.traj_out_terminal_term_func = casadi.Function(
+            f"{model.__name__}_trajectory_output_terminal_term",
+            self.simulation_signature,
+            [self.traj_out_terminal_term]
         )
 
-        self.x0 = get_state_setter(ode_model.initial, self.p)
+        self.x0 = get_state_setter(model.initial, self.p)
         self.y_expr = casadi.vertcat(*flatten(ode_model.output))
         self.e_expr = [event.function for event in ode_model.Event.subclasses]
         self.h_expr = sum([
@@ -309,6 +322,10 @@ class TrajectoryAnalysis:
                 event.update,
                 self.simulation_signature
             ).expr*(self.sym_event_channel==idx)
+            if not getattr(event, 'terminate', False)
+
+            else np.full(np.nan, (self.model.state._count,))
+
             for idx, event in enumerate(ode_model.Event.subclasses)
         ])
 
@@ -340,4 +357,28 @@ class TrajectoryAnalysis:
 
         )
         self.callback = ShootingGradientMethod(self)
+
+
+    def __call__(self, model_instance, *args):
+        out = self.callback(casadi.vertcat(*flatten(args)))
+        res = self.callback.res
+        model_instance.bind_field(
+            self.model.trajectory_output,
+            out
+        )
+        model_instance._res = res
+        model_instance.t = res.t
+        model_instance.bind_field(
+            self.ode_model.state,
+            res.x.T,
+            wrap=True,
+        )
+        model_instance.bind_field(
+            self.ode_model.output,
+            res.y.T,
+            wrap=True,
+        )
+
+
+
 

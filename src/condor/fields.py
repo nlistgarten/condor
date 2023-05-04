@@ -137,6 +137,7 @@ class Field:
     def create_symbol(self, **kwargs):
         kwargs.update(dict(field_type=self))
         self._symbols.append(self.symbol_class(**kwargs))
+        self._count += getattr(self._symbols[-1], 'size', 1)
 
     def create_dataclass(self):
         # TODO: do processing to handle different field types
@@ -247,7 +248,6 @@ class FreeField(IndependentField, default_direction=Direction.input):
         backend_name = "%s_%d" % (self._resolve_name, len(self._symbols))
         new_kwargs = self.make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_symbol(**new_kwargs)
-        self._count += self._symbols[-1].size
         return self._symbols[-1].backend_repr
 
 
@@ -275,35 +275,58 @@ class BoundedAssignmentField(Field, default_direction=Direction.output):
             kwargs['lower_bound'] = eq
             kwargs['upper_bound'] = eq
         self.create_symbol(name=name, backend_repr=value,  **kwargs, **asdict(symbol_data))
-        self._count += self._symbols[-1].size
 
 
 @dataclass(repr=False)
 class TrajectoryOutputSymbol(IndependentSymbol):
-    integrand_state: BaseSymbol = None
+    terminal_term: BaseSymbol = 0.
+    integrand: BaseSymbol = 0.
 
 class TrajectoryOutputField(IndependentField, default_direction=Direction.output):
     def __call__(self, terminal_term=0, integrand=0, **kwargs):
-        if isinstance(integrand, backend.symbol_class) or integrand != 0.:
-            ode_model = self._inherits_from._model.inner_to
-            integrand_state = ode_model.state(
-                name=f'augmented_state_for_traj_analysis_{len(self._symbols)}'
-            )
-            ode_model.dot[integrand_state] = integrand
-            terminal_term = terminal_term + integrand_state
-            kwargs['integrand_state']=integrand_state
-        elif not isinstance(terminal_term, backend.symbol_class) and terminal_term == 0.:
-            raise ValueError
+        # Use quadrature instead of state.
+        # to create a copy of state on TrajectoryAnalysis and give trajectory_output
+        # access to new copy, would need to add a reference at copy time which is
+        # doable but less clean, especially since this is just a hack to avoid
+        # quadrature anyway
+        # then didn't need to re-arrange ModelType.__new__ to give access to inner_to, 
+        # etc. before implementation binding. 
+        # TODO: undo inner_to refactor from  0195013ddf58dc1fa8f589d99671ba231ab846a6
 
-        symbol_data = backend.get_symbol_data(terminal_term)
+
+
+        if isinstance(terminal_term, backend.symbol_class):
+            # comstant terminal terms are handled below
+            shape_data = backend.get_symbol_data(terminal_term)
+            kwargs['terminal_term'] = terminal_term
+
+        if isinstance(integrand, backend.symbol_class):
+            if 'terminal_term' in kwargs:
+                assert backend.get_symbol_data(integrand) == shape_data
+            else:
+                shape_data = backend.get_symbol_data(integrand)
+                kwargs['terminal_term'] = np.broadcast_to(terminal_term, shape_data.shape)
+        else:
+            integrand = np.broadcast_to(integrand, shape_data.shape)
+
+        kwargs['integrand'] = integrand
+
+        shape_data_dict = asdict(shape_data)
+
+
+        traj_out_placeholder = backend.symbol_generator(
+            name=f'trajectory_output_{len(self._symbols)}',
+            **shape_data_dict,
+        )
+
 
         self.create_symbol(
-            backend_repr=terminal_term,
+            backend_repr=traj_out_placeholder,
             **kwargs,
-            **asdict(symbol_data)
+            **shape_data_dict,
         )
-        self._count += self._symbols[-1].size
-        return terminal_term
+        return traj_out_placeholder
+
 
 class DependentSymbol(BaseSymbol):
     pass
@@ -333,7 +356,6 @@ class AssignedField(Field, default_direction=Direction.output):
                 # these reasons, ditch intermediate stuff.
                 **asdict(symbol_data)
             )
-            self._count += self._symbols[-1].size
             super().__setattr__(name, self._symbols[-1])
 
 
