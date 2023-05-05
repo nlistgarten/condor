@@ -1,11 +1,13 @@
 from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
 import casadi
 from simupy.systems import DynamicalSystem
+from simupy.block_diagram import DEFAULT_INTEGRATOR_OPTIONS
 import numpy as np
 from scipy import interpolate
 
 def simupy_wrapper(f, p):
-    return lambda t, state, output=None, **kwargs: f(p, t, state, **kwargs).toarray().reshape(-1)
+    return lambda t, state, output=None, **kwargs: f(p, t, state, *kwargs.values()).toarray().reshape(-1)
+
 
 class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
     def __init__(self, intermediate):
@@ -18,6 +20,8 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         )
         self.i = intermediate
         self.construct(name, {})
+        self.int_options = DEFAULT_INTEGRATOR_OPTIONS.copy()
+        self.int_options.update(self.i.kwargs)
 
     def has_jacobian(self):
         return False
@@ -28,7 +32,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         system = DynamicalSystem(**simupy_kwargs, **self.i.simupy_shape_data)
         system.initial_condition = self.i.x0(p).toarray().reshape(-1)
         tf = getattr(self.i.model, 'tf', self.i.model.default_tf)
-        self.res = res = system.simulate(tf)
+        self.res = res = system.simulate(tf, integrator_options=self.int_options)
         integrand = interpolate.make_interp_spline(res.t, [
             self.i.traj_out_integrand_func(p, t, x)
             for t, x in zip(res.t, res.x)
@@ -44,7 +48,7 @@ DblIntLQR.implementation.callback([0.1, 0])
 import casadi
 from simupy.systems import DynamicalSystem
 from condor.backends.casadi.shooting_gradient_method import simupy_wrapper
-self = DblIntLQR.implementation.callback
+self = DblIntDtLQR.implementation.callback
 args = ([1., 0.], )
 
 """

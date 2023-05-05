@@ -278,11 +278,13 @@ def get_state_setter(field, setter_args, default=0.):
     return setter_func
 
 
-
 class TrajectoryAnalysis:
-    def __init__(self, model):
+    def __init__(self, model, **kwargs):
         self.model = model
         self.ode_model = ode_model = model.inner_to
+
+        self.kwargs = kwargs
+
 
         self.p = casadi.vertcat(*flatten(model.parameter))
         self.x = casadi.vertcat(*flatten(ode_model.state))
@@ -328,11 +330,20 @@ class TrajectoryAnalysis:
 
             for idx, event in enumerate(ode_model.Event.subclasses)
         ])
+        self.event_time_only = [
+            casadi.depends_on(e.function, ode_model.t) and
+            not sum([
+                casadi.depends_on(e.function, state)
+                for state in ode_model.state.list_of('backend_repr')
+            ])
 
+            for e in ode_model.Event.subclasses
+        ]
 
         self.simupy_shape_data = dict(
             dim_state = ode_model.state._count,
             dim_output = ode_model.output._count,
+            num_events = len(ode_model.Event.subclasses),
         )
         self.simupy_func_kwargs = dict(
             state_equation_function = get_state_setter(

@@ -820,20 +820,19 @@ class ODESystem(Model):
     output - dynamic output at particular state and value of independent variable
     (point-wise in independent variable)
 
-    note: no time-varying input. Assume dynamicsmodels "pull" what they need from other
-    models. Need to augment state with "pulled" dynamicsmodels.
-    But do need a "control" that could be defined based on mode? 
+    note: no time-varying input to system. Assume dynamicsmodels "pull" what they need 
+    from other models. 
+    Need to augment state with "pulled" dynamicsmodels
+    But do need a "control" that could be defined based on mode? automatically added to
+    output? or is it always just a placeholder for functional space gradient?
+    Or also allow it to define eg feedback control
 
-    control - time-varying placeholder, useful for re-defining, using mode, etc.
+    control - time-varying placeholder, useful for re-defining using mode, etc.
     set it with `make` field -- all controls MUST be set? or default to 0.
 
     make - set control a value/computation
 
-    is "mode" the only finite state?
-    mode can be an innner model that assigns controls (direct over-write should be
-    possible)
-    I suppose you could have different modes that are used to define independent
-    controls. OK. 
+    dt - reserved keyword for DT?
 
     inner model "Event" (see below). For a MyODESyStem model, create a sub-class of
     MyODESystem.Event,
@@ -846,20 +845,22 @@ class ODESystem(Model):
     # TODO: indepdent var  needs its own descriptor type? OR do we want user classes to do
     # t = DynamicsModel.independent_variable ? That would allow leaving it like this and
     # consumers still know what it is
-    # or just set it to t and always use it?
+    # or just set it to t and always use it? trying this way...
 
     # TODO: Are initial conditions an attribute of the dynamicsmodel or the trajectory 
     # analysis that consumes it?
+    # Currently, ODESystem sets a default that TrajectoryAnalysis can override for
+    # current sim. Is that okay?
 
     # TODO: mode and corresponding FiniteState type?
+    # Yes mode with condition, no FiniteState -- this is an idiom 
+
+    # TODO: convenience for setting max_step based on discrete time systems?
 
 
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
     initial = MatchedField(state)
-    # finite state is an idiom not a unique field
-    # finite_state = FreeField(Direction.internal)
-    # TODO: should internal free field symbolss NOT be dot accessible on the models?
     parameter = FreeField()
     dot = MatchedField(state)
     control = FreeField(Direction.internal)
@@ -899,6 +900,9 @@ class Event(Model, inner_to = ODESystem):
     # actually, just update it
     #make = MatchedField(ODESystem.finite_state)
     # terminates = True -> return nan instead of update?
+    def __init_subclass__(cls, dt=0., **kwargs):
+        if dt:
+            cls.function
 
 # this should just provide the capabiility to overwrite make (or whatever sets control)
 # and dot based on condition...
@@ -950,7 +954,7 @@ class LTIType(ModelType):
             dt_attrs = InnerModelType.__prepare__("DT", (new_cls.Event,))
             dt_attrs["function"] = np.sin(new_cls.t*np.pi/dt)
             dt_attrs["update"][dt_attrs["x"]] = dynamics
-            DTclass = InnerModelType("DT", (new_cls.Event,), attrs=dt_attrs)
+            DTclass = InnerModelType("DT", (new_cls.Event,), attrs=dt_attrs, )
 
         return new_cls
 
