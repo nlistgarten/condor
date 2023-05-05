@@ -15,7 +15,7 @@ def asdict(obj):
 class Direction(Enum):
     """
     Used to indicate the direction of a Symbol relative to a model
-    MatchedField may need to become MatchedSymbol and also use direction -- will
+    MatchedField may need to become MatchedSymbol and also use direction -- might
     be useful for DAE models, etc.
     """
     output = -1
@@ -23,10 +23,28 @@ class Direction(Enum):
     input = 1
 
 class FieldValues:
+    """
+    Base class for Field dataclasses -- may need to use issubclass/isinstance
+    """
     pass
 
 class Field:
     """
+    base field
+
+    model templates have field instances added to them which are parents of symbols used
+    in models
+
+    how to create a new Field type:
+    - subclass Symbol as needed. Will automatically try to find NameSymbol for NameField,
+    or provide as symbol_class kwarg in subclass definition
+    - update _init_kwargs to define kwargs that should get passed during inheritance
+      from Model templates to user models
+    - until a better API is designed & implemented, instance attributes created during
+      __init__ should start with a _ so setattr on assignedfields can filter it
+    - use create_symbol to create symbols, passing **kwargs to symbol dataclass as much
+      as possible to keep DRY
+
     """
 
     def _set_resolve_name(self):
@@ -35,7 +53,7 @@ class Field:
     def __init_subclass__(
             cls, symbol_class=None, default_direction=Direction.internal, **kwargs
     ):
-        # TODO: make sure python version is correct
+        # TODO: make sure python version requirement is correct
         super().__init_subclass__(**kwargs)
         if symbol_class is None:
             # TODO: ensure this works for different file organizations? e.g., will it
@@ -116,6 +134,7 @@ class Field:
     def get(self, **kwargs):
         """
         return list of field symbols where every field matches kwargs
+        if only one, return symbol without list wrapper
         """
         # TODO: what's the lightest-weight way to be able query? these should get called
         # very few times, so hopefully don't need to stress too much about
@@ -160,6 +179,8 @@ class Field:
 def make_class_name(components):
     separate_words = ' '.join([comp.replace('_', ' ') for comp in components])
     # use pascal case from https://stackoverflow.com/a/8347192
+    # TODO: this is turning mid-word uppercase (e.g., from a CamelCaseClassName) -- how
+    # to just capitalize first character of word?
     return ''.join(word for word in separate_words.title() if not word.isspace())
 
 
@@ -168,8 +189,6 @@ class FrontendSymbolData:
     field_type: Field
     backend_repr: backend.symbol_class
     name: str = ''
-
-
 
 @dataclass
 class BaseSymbol(FrontendSymbolData, BackendSymbolData,):
@@ -183,34 +202,8 @@ class IndependentSymbol(BaseSymbol):
 
 class IndependentField(Field):
     """
-    Fields that are arguments to implementation function:
-    Better: used to define fields? Free?
-    Symbol, deferred subsystems
-    others?
-    boundedsymbol adds upper and lower attribute
-    or just always have bounds and validate them for Functions but pass on to solvers,
-    etc? default bounds can be +/- inf
-
-    No, really it's fields that are generated e.g., x = state()
-    vs things that are assigned eg output.z = ...
-    Then again, getattr and getitem can also be used to "generate" a symbol by name
-
-
-    DependentFields instead of ComputedFields
-    These have things (Actual Fields) assigned to them 
-    free, matched
-    Maybe something that just creates data structure? Could be useful for inheriting
-    Aviary cleanly. Might need matching subclass of Indep.
-
-
-    I also kind of think the three we have are the only three that will be developed,
-    especially if "matched" can be any generalized to patterns? oh but also deferred
-    symbol, eventually events, modes. But are those really special types of
-    sub-models?
-
-    And (especially with advanced setattr) Free can be used create a dotable data
-    structure heirarchy?
-
+    Mixin for fields which generate a symbol that are assigned to a class attribute
+    during model definition.
     """
     pass
 

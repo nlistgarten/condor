@@ -20,7 +20,7 @@ Or, should the implementations just live in the main backend?
 
 Backend Implementations
 [x] must be able to flatten model symbols to backend arrays,
-[ ] wrap backend arrays to model symbol, matching shape -- 
+[x] wrap backend arrays to model symbol, matching shape -- 
 [ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics (if
 different, eg casadi DM) and backend symbols
 [ ] ideally, handle special case symmetric and dynamic flags for FreeSymbol and
@@ -132,13 +132,6 @@ class Options:
     pass
     # TODO: do meta programming so implementation enums are available without import?
 
-    # TODO: could have a reserved keyword "implementation" on options that defaults to
-    # None, reference to an implementation to allow user provided ones? Maybe that's
-    # the best way to do it, even for model types that condor ships with? if
-    # inheritance works properly, can easily over-write per project, etc.
-
-
-
 
 class ModelType(type):
     """
@@ -155,7 +148,8 @@ class ModelType(type):
     # like django. neat.
 
     # can I do all the name clash protection that's needed? from child to parent class I
-    # think definitely, and probably can't protect user model from over-writing self
+    # think definitely, and probably can't protect user model from over-writing self in
+    # model but can protect by modifying setattr on CondorDict
 
 
     @classmethod
@@ -164,9 +158,13 @@ class ModelType(type):
         sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
         cls_dict = CondorClassDict(**sup_dict)
 
+        # TODO: may need to search MRO resolution, not just bases, which without mixins
+        # are just singletons. For fields and inner classes, since each generation of
+        # class is getting re-inherited, this is sufficient. 
         for base in bases:
             _dict = base.__dict__
             for k, v in _dict.items():
+                # inherit fields from base -- bound in __new__
                 if isinstance(v, Field):
                     v_class = v.__class__
                     v_init_kwargs = v._init_kwargs.copy()
@@ -182,13 +180,20 @@ class ModelType(type):
                     cls_dict[k] = v.inherit(
                         model_name, field_type_name=k, **v_init_kwargs
                     )
+                # inherit inner model from base, create reference now, bind in new
                 if isinstance(v, ModelType):
                     if v.inner_to is base and v in base.inner_models:
                         # inner model inheritance & binding in new
                         cls_dict[k] = v
+
+            # if base is an inner model, make reference  of outer model attributes
+            # and copy fields from class __copy_fields__ kwarg definition. This allows
+            # inner field to modify local copy without affecting outer model
             if base is not Model and base.inner_to:
                 for attr_name, attr_val in base.inner_to.__original_attrs__.items():
-                    # TODO: document copy fields?
+                    # TODO: document copy fields? can this get DRY'd up?
+                    # don't like that symbol copying is here, maybe should be method on
+                    # field?
                     if attr_name in base.__copy_fields__:
                         field_class = attr_val.__class__
                         field_init_kwargs = attr_val._init_kwargs.copy()
@@ -224,6 +229,7 @@ class ModelType(type):
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement.
         # case 2: ____ - library code that defines fields, etc that user code inherits
+        # maybe call this model template?
         # from (case 3+). Implementations are tied to 2? "Library Models"?
         # case 3: User Model - inherits from ____, defines the actual model that is
         # being analyzed
@@ -237,16 +243,23 @@ class ModelType(type):
         # TODO: add support for inheriting other models -- subclasses are
         # modifying/adding (no deletion? need mixins to pre-build pieces?) to parent
         # classes.  case 4
+        # fields would need to combine _symbols
 
 
         # TODO: thought hooks might be necessary for inner model/deferred subsystems,
         # but inner model worked well. If needed, this is a decent prototype:
+        # ACTUALLY -- subclass of ModelType should be used, can do things before/after
+        # calling super new?
         pre_super_new_hook = attrs.pop('pre_super_new_attr_hook', None)
         # pre_new_attr_hook(super_attrs, attr_name, attr_val)
         post_super_new_hook = attrs.pop('post_super_new_attr_hook', None)
         # pre_new_attr_hook(new_cls, attr_name, attr_val)
 
-        # TODO: replace if tree with match cases?
+
+        # __from_outer__ attribute is attached to InnerModel`s during __prepare__ to
+        # give references to IndependentVariable backend_repr`s conveniently for
+        # constructing InnerModel symbols. They get cleaned up since they live in the
+        # outer model
         attrs_from_outer = attrs.pop('__from_outer__', None)
         if attrs_from_outer:
             for attr_name, attr_val in attrs_from_outer.items():
@@ -256,6 +269,7 @@ class ModelType(type):
                     # TODO: make this a warning/error? add test (really for all
                     # warning/error raise)
                     # Or allow silent passage of redone variables? eg copying
+                    # but copying is a special case that can be guarded...
                     print(f"{attr_name} was defined on outer of {name}")
 
         print("CondorModelType.__new__ for", name, bases, kwargs)
@@ -301,6 +315,7 @@ class ModelType(type):
         ))
 
 
+        # TODO: replace if tree with match cases?
         for attr_name, attr_val in attrs.items():
             # TODO: process name clahees on attr_name? can't protect against internal
             # over-write (maybe user intends to do that) but can raise error for
@@ -328,7 +343,7 @@ class ModelType(type):
                 if attr_val._direction == Direction.internal:
                     internal_fields.append(attr_val)
             if isinstance(attr_val, backend.symbol_class):
-                # from a FreeField
+                # from a IndependentField
                 known_symbol_type = False
                 for free_field in independent_fields:
                     symbol = free_field.get(backend_repr=attr_val)
@@ -346,11 +361,11 @@ class ModelType(type):
                         break
 
                 # TODO: MatchedField in "free" mode
-                # TODO: from the output of a subsystem? Does this case matter? 
+                # TODO: from the output of a subsystem? Does this case matter?
 
                 if not known_symbol_type:
                     print("unknown symbol type", attr_name, attr_val)
-                    # Hit by DynamicModel.independent_variable
+                    # Hit by ODESystem.t, is that okay?
 
             # TODO: other possible attr types to process:
             # maybe field dataclass, if we care about intervening in eventual assignment
@@ -362,6 +377,7 @@ class ModelType(type):
                     # handle inner classes below, don't add to super
                     continue
 
+            # Options, InnerModel, and IndependentSymbol are not added here
             if pass_attr:
                 check_attr_name(attr_name, attr_val, super_attrs, bases)
                 super_attrs[attr_name] = attr_val
@@ -370,6 +386,8 @@ class ModelType(type):
 
         for field in independent_fields:
             for symbol in field:
+                # add names to symbols -- must be an unnamed symbol without a reference
+                # assignment in the class
                 if not symbol.name:
                     symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
                     print("setting name for", symbol.name)
@@ -378,6 +396,8 @@ class ModelType(type):
             for matched_symbol in matched_field:
                 matched_symbol.update_name()
 
+        # symbols from input and input fields are added directly to model
+        # all fields are "finalized" by creating dataclass
         for input_field in input_fields:
             for in_symbol in input_field:
                 in_name = in_symbol.name
@@ -397,11 +417,12 @@ class ModelType(type):
                 output_names.append(out_name)
             output_field.create_dataclass()
 
-        # process docstring
+        # process docstring / add simple equation
         lhs_doc = ', '.join([out_name for out_name in output_names])
         arg_doc = ', '.join([arg_name for arg_name in input_names])
         orig_doc = attrs.get("__doc__", "")
         super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
+
 
         inner_to=kwargs.pop('inner_to', None)
         inner_through=kwargs.pop('inner_through', None)
@@ -409,7 +430,10 @@ class ModelType(type):
 
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
 
-        # handle inner classes
+        # creating an InnerClass
+        # inner_to kwarg is added to InnerModel  template definition or for subclasses
+        # of innermodel templates, in InnerModel.__new__. For subclasses of template,
+        # reference to base is inner_through
         new_cls.inner_to = inner_to
         if inner_to:
             # TODO: other validation?
@@ -441,6 +465,7 @@ class ModelType(type):
             new_cls.inner_through = inner_through
             new_cls.inner_to = inner_through.inner_to
 
+        # Bind Fields and InnerModels -- require reference to constructed Model
         for attr_name, attr_val in attrs.items():
             if isinstance(attr_val, Field):
                 attr_val.bind(attr_name, new_cls)
@@ -477,6 +502,7 @@ class ModelType(type):
                     setattr(new_cls, attr_name, attr_val)
 
 
+        # Bind implementation
         implementation = None
 
         if backend_options and backend.name in backend_options:
@@ -556,7 +582,7 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
 
 class Model(metaclass=ModelType):
     """
-    Define a ____ by subclassing Model, creating field types, and writing an
+    Define a Model Template  by subclassing Model, creating field types, and writing an
     implementation.
     """
     def __init__(self, *args, **kwargs):
@@ -630,7 +656,8 @@ class InnerModelType(ModelType):
               "original", original_class, "\nkwargs:", kwargs, "\nattrs:", attrs, "\n")
         # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
-        # case 3: subclass of inherited inner model -- user
+        # (inner model template)
+        # case 3: subclass of inherited inner model -- user defined model
         case1 = name == "InnerModel"
         case2 = inner_to is not None and original_class is not None
         case3 = not case1 and not case2
@@ -657,15 +684,17 @@ class InnerModelType(ModelType):
 
 class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
     """
-    Create an inner model ____ by assigning an inner_to keyward arguement to a ____. The
-    argument references another ____. Then a user outer model (a subclass of ____)
-    can create multiple subclass of the InnerModel by sub-classing from
-    <outer_model>.<inner_model ____>
+    Create an inner model template  by assigning an inner_to keyward arguement during
+    model template definition. The argument references another model template (which
+    becomes the "outer model"). Then a user outer model (a subclass of the inner model
+    template which is bound to outer model) can create multiple subclass of the 
+    InnerModel by sub-classing from <outer_model>.<inner_model template>
     """
     pass
 
 
-# TODO: move deferred stuff out?
+# TODO: move deferred stuff out? Or leave here if it has tightly-coupled mechanisms like
+# inner model. Or is deferred really just a type of inner model that all models can get?
 class DeferredType(ModelType):
     """
     Deferred model's are of type DeferredType
@@ -800,14 +829,11 @@ class OptimizationProblem(Model):
 
 
 class ODESystem(Model):
-
     """
-    independent_variable - indepdendent variable of ODE, notionally time but can be used
+    t - indepdendent variable of ODE, notionally time but can be used
     for anything. Used directly by subclasses (e.g., user code may use
-    `t=DynamicsModel.independent_variable`, implementations will use this symbol
+    `u=DynamicsModel.t`, implementations will use this symbol
     directly for fields)
-
-    renamed to t
 
     parameter - auxilary variables (constant-in-time) that determine system behavior
 
@@ -836,7 +862,9 @@ class ODESystem(Model):
 
     inner model "Event" (see below). For a MyODESyStem model, create a sub-class of
     MyODESystem.Event,
-    inner classes of "Mode" subclass
+    inner classes of "Mode" subclass -- conditional overwrite of dot and make
+    inner classes of TrajectoryAnalysis -- perform simulations with particular
+    trajectory outputs. Local copy of parameters, initial to allow sim-specific
 
 
 
@@ -850,13 +878,20 @@ class ODESystem(Model):
     # TODO: Are initial conditions an attribute of the dynamicsmodel or the trajectory 
     # analysis that consumes it?
     # Currently, ODESystem sets a default that TrajectoryAnalysis can override for
-    # current sim. Is that okay?
+    # current sim. I think I like this
 
     # TODO: mode and corresponding FiniteState type?
-    # Yes mode with condition, no FiniteState -- this is an idiom 
+    # Yes mode with condition, no FiniteState -- this is an idiom for a state with no
+    # dot and only updated to integer values. Expect to use in conditions with ==. Can
+    # python enum values get passed to backend?
 
-    # TODO: convenience for setting max_step based on discrete time systems?
+    # TODO: convenience for setting max_step based on discrete time systems? And would
+    # like event functions of form (t - te) to loop with a specified tf. For now can set
+    # max_step in trajectoryanalysis options manually...
 
+    # TODO: decide how controls work :) Ideally, easy to switch between continuous and
+    # sampled feedback, open-loop control. Open-loop would need some type of
+    # specification so adjoint gradients could get computed??
 
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
@@ -867,13 +902,11 @@ class ODESystem(Model):
     output = AssignedField()
     make = MatchedField(control)
 
-# TODO: decide on better model API for how state, etc. interact between ODESystem and
-# trajectory analysis. Will impact Implementation and TrajectoryOutputFIeld
-# copy initialize? don't copy state or dot? maybe parameter?
+
 class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "initial"]):
     """
     this is what simulates an ODE system
-    set tf. 
+    tf parameter 
     define trajectory outputs
     modify parameters and initial (local copy)
 
@@ -881,7 +914,6 @@ class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "i
     """
     trajectory_output = TrajectoryOutputField()
     default_tf = 1_000_000.
-    # singleton simulate_to? or t_f?
 
 # TODO: need to exlcude fields, particularly dot, initial, etc. 
 # define which fields get lifted completely, which become "read only" (can't generate
@@ -906,20 +938,14 @@ class Event(Model, inner_to = ODESystem):
 
 # this should just provide the capabiility to overwrite make (or whatever sets control)
 # and dot based on condition...
-# needs to inject on creation
+# needs to inject on creation? Or is TrajectoryAnalysis implementation expected to
+# iterate Modes and inject? Then can add dot and make to copy_fields
 class Mode(Model, inner_to=ODESystem,):
     """
     convenience for defining conditional behavior for state dynamics and/or controls
     depending on `condition`. 
     """
     pass
-    # make = MatchedField(ODESystem.control)
-    # e.g., make[alpha] = ...
-    # only for control signals? and any control signals must be set by mode?
-    # maybe also provide different dot override?
-    # condition attribute is a symbolic relation used to determine when make is applied
-
-
 
 
 class LTI_DT_Update(ModelType):
@@ -928,7 +954,8 @@ class LTI_DT_Update(ModelType):
         attrs["update"][x] = attrs["dynamics"]
         return super().__new__(cls, name, bases, attrs, **kwargs)
 
-
+# TODO: fix. replace with function? need to decide how controls work and update. Flags
+# for feedback control, open-loop control, sampled feedback control
 class LTIType(ModelType):
     def __new__(cls, name, bases, attrs, **kwargs):
         A = attrs['A']
