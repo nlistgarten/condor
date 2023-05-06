@@ -893,6 +893,12 @@ class ODESystem(Model):
     # sampled feedback, open-loop control. Open-loop would need some type of
     # specification so adjoint gradients could get computed??
 
+
+    # TODO: currently, to get a discrete time control need to augment state and provide
+    # a separate initializer, even though it's  generally going to be the same
+    # expression as the update. Should that be fixed in simupy? event funciton = 0 -> do
+    # update? I can fix it in casadi shooting_gradient_method.py as well.
+
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
     initial = MatchedField(state)
@@ -943,46 +949,60 @@ class Event(Model, inner_to = ODESystem):
 class Mode(Model, inner_to=ODESystem,):
     """
     convenience for defining conditional behavior for state dynamics and/or controls
-    depending on `condition`. 
+    depending on `condition`. No condition to over-write behavior, essentially a way to
+    do inheritance for ODESystems which is otherwise hard? Can this be used instead of
+    deferred subsystems? Yes but only for ODESystems..
     """
     pass
 
 
-class LTI_DT_Update(ModelType):
-    def __new__(cls, name, bases, attrs, **kwargs):
-        x = attrs["x"]
-        attrs["update"][x] = attrs["dynamics"]
-        return super().__new__(cls, name, bases, attrs, **kwargs)
 
-# TODO: fix. replace with function? need to decide how controls work and update. Flags
-# for feedback control, open-loop control, sampled feedback control
-class LTIType(ModelType):
-    def __new__(cls, name, bases, attrs, **kwargs):
-        A = attrs['A']
-        B = attrs.get('B', None)
-        dt = attrs.get('dt', 0.)
-        x = attrs["state"](shape=A.shape[0])
-        attrs["x"] = x
+def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):
 
-        if B is not None:
-            K = attrs["parameter"](shape=B.T.shape)
-            attrs["K"] = K
-            dynamics = (A-B@K)@x
-            attrs["output"].feedback_control = K@x
+    attrs = ModelType.__prepare__(name, (ODESystem,))
+    attrs["A"] = A
+    state = attrs["state"]
+    x = state(shape=A.shape[0])
+    attrs["x"] = x
+    xdot = A@x
+    if dt <= 0. and dt_plant:
+        raise ValueError
+
+    if B is not None:
+        attrs["B"] = B
+        K = attrs["parameter"](shape=B.T.shape)
+        attrs["K"] = K
+
+        if dt and not dt_plant:
+            # sampled control
+            u = state(shape=B.shape[1])
+            attrs["u"] = u
+            #attrs["initial"][u] = -K@x
         else:
-            dynamics = A@x
+            # feedback control matching system
+            u = -K@x
+            attrs["output"].u = u
 
-        if not dt:
-            attrs["dot"][x] = dynamics
+        xdot += B@u
 
-        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
+    if not (dt_plant and dt):
+        attrs["dot"][x] = xdot
 
-        if dt:
-            dt_attrs = InnerModelType.__prepare__("DT", (new_cls.Event,))
-            dt_attrs["function"] = np.sin(new_cls.t*np.pi/dt)
-            dt_attrs["update"][dt_attrs["x"]] = dynamics
-            DTclass = InnerModelType("DT", (new_cls.Event,), attrs=dt_attrs, )
+    plant = ModelType(name, (ODESystem,), attrs)
 
-        return new_cls
+    if dt:
+        dt_attrs = InnerModelType.__prepare__("DT", (plant.Event,))
+        dt_attrs["function"] = np.sin(plant.t*np.pi/dt)
+        if dt_plant:
+            from scipy.signal import cont2discrete
+            if B is None:
+                B = np.zeros((A.shape[0], 1))
+            Ad,Bd,*_ = cont2discrete((A,B,None,None), dt=dt)
+            dt_attrs["update"][dt_attrs["x"]] = (Ad - Bd@K) @ x
+        elif B is not None:
+            dt_attrs["update"][dt_attrs["u"]] = -K@x
+            #dt_attrs["update"][dt_attrs["x"]] = x
+        DTclass = InnerModelType("DT", (plant.Event,), attrs=dt_attrs, )
 
+    return plant
 

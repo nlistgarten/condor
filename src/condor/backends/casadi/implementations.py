@@ -237,6 +237,7 @@ class OptimizationProblem(InitializerMixin):
 def get_state_setter(field, setter_args, default=0.):
     """
     field is MatchedField matching to the state
+    default None to pass through
     """
     setter_exprs = []
     if isinstance(setter_args, casadi.MX):
@@ -244,10 +245,12 @@ def get_state_setter(field, setter_args, default=0.):
 
     for state in field._matched_to:
         setter_symbol = field.get(match=state)
-        if default is None:
-            default = state.backend_repr
         if isinstance(setter_symbol, list) and len(setter_symbol) == 0:
-            setter_symbol = default
+            if default is not None:
+                setter_symbol = default
+            else:
+                #setter_symbol = casadi.vertcat(*flatten(state.backend_repr)
+                setter_symbol = (state.backend_repr).reshape((-1,1))
         elif isinstance(setter_symbol, co.BaseSymbol):
             setter_symbol = setter_symbol.backend_repr
         else:
@@ -316,13 +319,20 @@ class TrajectoryAnalysis:
             [self.traj_out_terminal_term]
         )
 
-        self.x0 = get_state_setter(model.initial, self.p)
-        self.y_expr = casadi.vertcat(*flatten(ode_model.output))
+        self.x0 = get_state_setter(model.initial, self.p,)
+        if len(ode_model.output):
+            self.y_expr = casadi.vertcat(*flatten(ode_model.output))
+        else:
+            self.y_expr = get_state_setter(
+                ode_model.dot,
+                self.simulation_signature
+            ).expr
         self.e_expr = [event.function for event in ode_model.Event.subclasses]
         self.h_expr = sum([
             get_state_setter(
                 event.update,
-                self.simulation_signature
+                self.simulation_signature,
+                default=None,
             ).expr*(self.sym_event_channel==idx)
             if not getattr(event, 'terminate', False)
 

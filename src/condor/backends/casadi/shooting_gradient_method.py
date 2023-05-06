@@ -27,55 +27,37 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         return False
 
     def eval(self, args):
-        p = casadi.vertcat(*args)
-        simupy_kwargs = {k: simupy_wrapper(v, p) for k, v in self.i.simupy_func_kwargs.items()}
-        system = DynamicalSystem(**simupy_kwargs, **self.i.simupy_shape_data)
-        system.initial_condition = self.i.x0(p).toarray().reshape(-1)
-        tf = getattr(self.i.model, 'tf', self.i.model.default_tf)
-        self.res = res = system.simulate(tf, integrator_options=self.int_options)
-        event_times, event_channels = np.where(np.diff(np.sign(res.e), axis=0) != 0)
-        integral = 0.
-        event_times_list = event_times.tolist()
-        if len(event_times_list) == 0 or event_times_list[0] != 0:
-            event_times_list = [0] + event_times_list
         """
-        event_times_list = [0]
-        In [1]: dt_sim.cost
-        Out[1]: 223663998910.09833
-
-        In [2]: ct_sim.cost
-        Out[2]: 15.047689050094773
-
-        piecewise integrands agrees for CT but not DT
-        In [1]: dt_sim.cost
-        Out[1]: -14164545690.117931
-
-        In [2]: ct_sim.cost
-        Out[2]: 15.047689050094773
-
-        piecewise for ct is unchanged... can I assume DT disagreement is because of
-        malformed cost?
-
-        """
-        for t_start_idx, t_end in zip(event_times_list, event_times_list[1:] + [None]):
-            segment_slice = slice(t_start_idx, t_end)
-            integrand = interpolate.make_interp_spline(res.t[segment_slice], [
-                self.i.traj_out_integrand_func(p, t, x)
-                for t, x in zip(res.t[segment_slice], res.x[segment_slice])
-            ]).antiderivative()
-
-            integral += integrand(res.t[segment_slice][-1]) - integrand(res.t[segment_slice][0])
-        return self.i.traj_out_terminal_term_func(p, res.t[-1], res.x[-1]) + integral,
-
-
-"""
-
-DblIntLQR.implementation.callback([0.1, 0])
-
 import casadi
 from simupy.systems import DynamicalSystem
 from condor.backends.casadi.shooting_gradient_method import simupy_wrapper
 self = DblIntDtLQR.implementation.callback
 args = ([1., 0.], )
 
-"""
+        """
+        p = casadi.vertcat(*args)
+        simupy_kwargs = {k: simupy_wrapper(v, p) for k, v in self.i.simupy_func_kwargs.items()}
+        system = DynamicalSystem(**simupy_kwargs, **self.i.simupy_shape_data)
+        system.initial_condition = self.i.x0(p).toarray().reshape(-1)
+        tf = getattr(self.i.model, 'tf', self.i.model.default_tf)
+        self.res = res = system.simulate(tf, integrator_options=self.int_options)
+        #event_times, event_channels = np.where(np.diff(np.sign(res.e), axis=0) != 0)
+        event_times, event_channels = np.where(
+            np.abs(np.diff(np.sign(res.e), axis=0)) == 2
+        )
+        integral = 0.
+        event_times_list = (event_times+1).tolist()
+        if len(event_times_list) == 0 or event_times_list[0] != 0:
+            event_times_list = [0] + event_times_list
+        for t_start_idx, t_end_idx in zip(event_times_list, event_times_list[1:] + [None]):
+
+            segment_slice = slice(t_start_idx, t_end_idx)
+            integrand = interpolate.make_interp_spline(res.t[segment_slice], [
+                self.i.traj_out_integrand_func(p, t, x)
+                for t, x in zip(res.t[segment_slice], res.x[segment_slice])
+            ])
+            integrand_antideriv = integrand.antiderivative()
+            integral += integrand_antideriv(res.t[segment_slice][-1]) - integrand_antideriv(res.t[segment_slice][0])
+        return self.i.traj_out_terminal_term_func(p, res.t[-1], res.x[-1]) + integral,
+
+

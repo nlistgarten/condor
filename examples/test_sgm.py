@@ -62,24 +62,9 @@ class MySim(MySystem.TrajectoryAnalysis):
     #out4 = trajectory_output(C[0,0], x)
 
 
-
-class DblInt(co.ODESystem, metaclass=co.LTIType):
-    A = np.array([
-        [0, 1],
-        [0, 0],
-    ])
-    B = np.array([[0,1]]).T
-
-class DblIntLQR(DblInt.TrajectoryAnalysis):
-    initial[x] = [1., 0.]
-    Q = np.eye(2)
-    R = np.eye(1)
-    tf = 100.
-    cost = trajectory_output(integrand= x.T@Q@x + (K@x).T @ R @ (K@x))
-
 from dataclasses import asdict
 
-def LTI_plot(sim,):
+def LTI_plot(sim,t_slice=slice(None,None)):
     for field in [sim.state, sim.output]:
         for sym_name, symbol in asdict(field).items():
             if symbol.ndim > 1:
@@ -90,37 +75,64 @@ def LTI_plot(sim,):
             plt.suptitle(f"{sim.__class__.__name__} {field.__class__.__name__}.{sym_name}")
             if n > 1:
                 for ax, x in zip(axes, symbol):
-                    ax.plot(sim.t, x.squeeze())
+                    ax.plot(sim.t[t_slice], x.squeeze()[t_slice])
                     ax.grid(True)
             else:
-                plt.plot(sim.t, x.squeeze())
+                plt.plot(sim.t[t_slice], symbol.squeeze()[t_slice])
                 plt.grid(True)
 
 
-ct_sim = DblIntLQR([1, .1])
-LTI_plot(ct_sim)
+dblintA = np.array([
+    [0, 1],
+    [0, 0],
+])
+dblintB = np.array([[0,1]]).T
 
-class DblIntDt(co.ODESystem, metaclass=co.LTIType):
-    A = np.array([
-        [0, 1],
-        [0, 0],
-    ])
-    B = np.array([[0,1]]).T
-    dt = 5.
-
-class DblIntDtLQR(DblIntDt.TrajectoryAnalysis):
+DblInt = co.LTI(A=dblintA, B=dblintB, name="DblInt")
+class DblIntLQR(DblInt.TrajectoryAnalysis):
     initial[x] = [1., 0.]
     Q = np.eye(2)
     R = np.eye(1)
     tf = 100.
     cost = trajectory_output(integrand= x.T@Q@x + (K@x).T @ R @ (K@x))
+    #cost = trajectory_output(integrand= x.T@Q@x + u.T @ R @ u)
+
+
+ct_sim = DblIntLQR([1, .1])
+LTI_plot(ct_sim)
+
+DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=5.)
+class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
+    initial[x] = [1., 0.]
+    initial[u] = -K@[1., 0.]
+    Q = np.eye(2)
+    R = np.eye(1)
+    tf = 100.
+    cost = trajectory_output(integrand= x.T@Q@x + u.T @ R @ u)
 
     class Casadi(co.Options):
-        max_step = 5.
+        max_step = 1.
 
-dt_sim = DblIntDtLQR([1, .1])
+sampled_sim = DblIntSampledLQR([5E-3, 0.1])
+LTI_plot(sampled_sim)
+
+
+DblIntDt = co.LTI(A=dblintA, B=dblintB, name="DblIntDt", dt=5., dt_plant=True)
+class DblIntDtLQR(DblIntDt.TrajectoryAnalysis):
+    initial[x] = [1., 0.]
+    Q = np.eye(2)
+    R = np.eye(1)
+    tf = 100.
+    #cost = trajectory_output(integrand= x.T@Q@x + u.T @ R @ u)
+    cost = trajectory_output(integrand= x.T@Q@x + (K@x).T @ R @ (K@x))
+
+    class Casadi(co.Options):
+        max_step = 1.
+
+dt_sim = DblIntDtLQR([0.005, 0.1])
 LTI_plot(dt_sim)
 plt.show()
+
 
 class Sys1out(co.ExplicitSystem):
     x = input()
