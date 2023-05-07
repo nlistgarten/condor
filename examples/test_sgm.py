@@ -101,6 +101,18 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
 ct_sim = DblIntLQR([1, .1])
 LTI_plot(ct_sim)
 
+
+class CtOptLQR(co.OptimizationProblem):
+    K = variable(shape=DblIntLQR.K.shape)
+    objective = DblIntLQR(K).cost
+
+    class Casadi(co.Options):
+        exact_hessian = False
+
+lqr_sol = CtOptLQR()
+
+
+
 DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=5.)
 class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
     initial[x] = [1., 0.]

@@ -189,7 +189,6 @@ class OptimizationProblem(InitializerMixin):
         self.ipopt_opts = ipopt_opts = dict(
             print_time= False,
             ipopt = dict(
-                # hessian_approximation="limited-memory",
                 print_level=5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
                 tol=1E-14,
                 #max_iter=1000,
@@ -199,6 +198,10 @@ class OptimizationProblem(InitializerMixin):
             #calc_lam_x=False,
             #calc_lam_p=False,
         )
+        if not exact_hessian:
+            ipopt_opts["ipopt"].update(
+                hessian_approximation="limited-memory",
+            )
 
         self.x0 = self.initial_at_construction.copy()
         #self.variable_at_construction.copy()

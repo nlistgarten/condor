@@ -8,6 +8,55 @@ from scipy import interpolate
 def simupy_wrapper(f, p):
     return lambda t, state, output=None, **kwargs: f(p, t, state, *kwargs.values()).toarray().reshape(-1)
 
+class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callback):
+    def has_jacobian(self):
+        return False
+
+    def __init__(self, shot, name, inames, onames, opts):
+        casadi.Callback.__init__(self)
+        self.shot = shot
+        self.name = name
+        self.inames = inames
+        self.onames = onames
+        self.opts = opts
+        self.construct(name, {})
+
+    def get_n_in(self):
+        return 2
+
+    def get_n_out(self):
+        return 1
+
+    def get_sparsity_in(self,i):
+        shot = self.shot
+        p = shot.i.p
+        out = shot.i.traj_out_expr
+        if i==0: # nominal input
+            return casadi.Sparsity.dense(p.shape)
+        elif i==1: # nominal output
+            return casadi.Sparsity(out.shape)
+
+    def get_sparsity_out(self,i):
+        shot = self.shot
+        p = shot.i.p
+        out = shot.i.traj_out_expr
+        return casadi.Sparsity.dense(out.shape[0], p.shape[0])
+
+    def eval(self, args):
+        print("\n"*10, f"eval jacobian for {self.name}", sep="\n")
+        print("args",args)
+        if hasattr(self.shot, "p"):
+            print(f"p={self.shot.p}")
+
+        assert casadi.is_equal(self.shot.p, args[0])
+        p = args[0]
+        o = args[1]
+        n = o.shape[0]
+        m = p.shape[0]
+        jac = casadi.DM(n, m)
+
+        return jac
+
 
 class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
     def __init__(self, intermediate):
@@ -23,8 +72,13 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         self.int_options = DEFAULT_INTEGRATOR_OPTIONS.copy()
         self.int_options.update(self.i.kwargs)
 
-    def has_jacobian(self):
-        return False
+    def get_jacobian(self, name, inames, onames, opts):
+        print("\n"*10, f"getting jacobian for {self} . {name}", sep="\n")
+        if hasattr(self, "p"):
+            print(f"p={self.p}")
+        self.jac = ShootingGradientMethodJacobian(self, name, inames, onames, opts)
+        breakpoint()
+        return self.jac
 
     def eval(self, args):
         """
@@ -35,8 +89,9 @@ self = DblIntDtLQR.implementation.callback
 args = ([1., 0.], )
 
         """
-        p = casadi.vertcat(*args)
+        self.p = p = casadi.vertcat(*args)
         simupy_kwargs = {k: simupy_wrapper(v, p) for k, v in self.i.simupy_func_kwargs.items()}
+        self.simupy_kwargs = simupy_kwargs
         system = DynamicalSystem(**simupy_kwargs, **self.i.simupy_shape_data)
         system.initial_condition = self.i.x0(p).toarray().reshape(-1)
         tf = getattr(self.i.model, 'tf', self.i.model.default_tf)
