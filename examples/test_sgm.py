@@ -54,25 +54,16 @@ LTI_plot(ct_sim)
 
 
 
+from condor.backends.casadi.implementations import OptimizationProblem
 class CtOptLQR(co.OptimizationProblem):
     K = variable(shape=DblIntLQR.K.shape)
     objective = DblIntLQR(K).cost
 
     class Casadi(co.Options):
-        exact_hessian = False
+        method = OptimizationProblem.Method.scipy_cg
 
 lqr_sol = CtOptLQR()
 
-
-from scipy.optimize import minimize
-
-minimize(
-    lambda p: DblIntLQR.implementation.callback(p).toarray().squeeze(),
-    [0., 0.],
-    jac=lambda p: DblIntLQR.implementation.callback.jac_callback(p, [0]).toarray().squeeze(),
-    method='CG',
-    #options=dict(maxiter=1),
-)
 
 import sys
 sys.exit()
@@ -109,59 +100,3 @@ dt_sim = DblIntDtLQR([0.005, 0.1])
 LTI_plot(dt_sim)
 plt.show()
 
-
-class Sys1out(co.ExplicitSystem):
-    x = input()
-    y = input()
-    output.z = x**2 + y
-
-class Sys2out(co.ExplicitSystem):
-    """
-    A test explicit system with two outputs
-    """
-    x = input()
-    y = input()
-    output.w = x**2 + y**2
-    output.z = x**2 + y
-
-class MySolver(co.AlgebraicSystem):
-    x = parameter()
-    z = parameter()
-    y2 = implicit_output(lower_bound=0., initializer=1.)
-    y1 = implicit_output(lower_bound=0.)
-
-    residual.y1 = y2 + x**2
-    residual.y2 = y1 - x+z
-
-    class Casadi(co.Options):
-        warm_start = False
-
-mysolution = MySolver(10, 1)
-assert mysolution.y2 == -100
-assert mysolution.y1 == 9
-
-class MyProblem(co.OptimizationProblem):
-    x = variable()
-    y = variable()
-    constraint(x**2 + y**2, lower_bound = 1., upper_bound = 1.)
-    constraint(x**2 + y**2 + 5, eq=6.)
-
-"""
-class Solve(co.AlgebraicSystem):
-
-class FailedSolver1(co.ExplicitSystem):
-    x = input()
-    y = input()
-    output.x = x**2 + y**2
-
-class FailedSolver2(co.ExplicitSystem):
-    x = input()
-    y = input()
-    output = x**2 + y**2
-
-class FailedSolver3(co.ExplicitSystem):
-    x = input()
-    y = input()
-    output.input = x**2 + y**2
-
-"""

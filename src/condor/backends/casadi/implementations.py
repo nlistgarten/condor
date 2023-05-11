@@ -6,6 +6,7 @@ from condor.backends.casadi.utils import flatten, wrap
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 from condor.backends.casadi.shooting_gradient_method import ShootingGradientMethod
 
+from scipy.optimize import minimize
 
 class ExplicitSystem:
     def __init__(self, model):
@@ -163,9 +164,16 @@ class AlgebraicSystem(InitializerMixin):
         self.callback.x0 = self.x0
 
 class OptimizationProblem(InitializerMixin):
+
+    class Method(Enum):
+        ipopt = auto()
+        scipy_cg = auto()
+        scipy_slsqp = auto()
+
     def __init__(
         self, model,
-        exact_hessian=True, 
+        exact_hessian=True,
+        method=Method.ipopt
     ):
         self.model = model
 
@@ -186,35 +194,53 @@ class OptimizationProblem(InitializerMixin):
             initializer_args += [self.p]
             self.nlp_args["p"] = p
         self.parse_initializers(model.variable, initializer_args)
-        self.ipopt_opts = ipopt_opts = dict(
-            print_time= False,
-            ipopt = dict(
-                print_level=5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
-                #tol=1E-14, # tighter tol for sensitivty
-                #accept_every_trial_step="yes",
-                #max_iter=1000,
-            ),
-            bound_consistency=True,
-            #clip_inactive_lam=True,
-            #calc_lam_x=False,
-            #calc_lam_p=False,
-        )
-        # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
-        # to try to get sensitivity from ipopt. so far no...
-        if not exact_hessian:
-            ipopt_opts["ipopt"].update(
-                hessian_approximation="limited-memory",
-            )
-
         self.x0 = self.initial_at_construction.copy()
         #self.variable_at_construction.copy()
 
-        self.optimizer = casadi.nlpsol(
-            model.__name__,
-            "ipopt",
-            self.nlp_args,
-            self.ipopt_opts,
-        )
+        self.method = method
+        if self.method is OptimizationProblem.Method.ipopt:
+
+            self.ipopt_opts = ipopt_opts = dict(
+                print_time= False,
+                ipopt = dict(
+                    print_level=5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
+                    #tol=1E-14, # tighter tol for sensitivty
+                    #accept_every_trial_step="yes",
+                    #max_iter=1000,
+                ),
+                bound_consistency=True,
+                #clip_inactive_lam=True,
+                #calc_lam_x=False,
+                #calc_lam_p=False,
+            )
+            # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
+            # to try to get sensitivity from ipopt. so far no...
+            if not exact_hessian:
+                ipopt_opts["ipopt"].update(
+                    hessian_approximation="limited-memory",
+                )
+
+            self.optimizer = casadi.nlpsol(
+                model.__name__,
+                "ipopt",
+                self.nlp_args,
+                self.ipopt_opts,
+            )
+        else:
+            self.optimizer = None
+            self.f_func = casadi.Function(
+                f"{model.__name__}_objective",
+                [self.x, self.p],
+                [self.f],
+            )
+            self.f_jac_func = casadi.Function(
+                f"{model.__name__}_objective",
+                [self.x, self.p],
+                [casadi.jacobian(self.f, self.x)],
+            )
+
+
+
 
     def __call__(self, model_instance, *args):
         initializer_args = [self.x0]
@@ -226,18 +252,38 @@ class OptimizationProblem(InitializerMixin):
                 #*self.variable_initializer_func(*initializer_args)
                 *self.initializer_func(*initializer_args)
             ).toarray().reshape(-1)
-        call_args = dict(
-            x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg
-        )
 
-        out = self.optimizer(**call_args)
-        if not self.has_p or not isinstance(args[0], casadi.MX):
-            self.x0 = out["x"]
+        if self.method is OptimizationProblem.Method.ipopt:
+            call_args = dict(
+                x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg
+            )
 
-        model_instance.bind_field(self.model.variable, out["x"])
-        model_instance.bind_field(self.model.constraint, out["g"])
-        model_instance.objective = out["f"].toarray()[0,0]
-        self.stats = model_instance._stats = self.optimizer.stats()
+            out = self.optimizer(**call_args)
+            if not self.has_p or not isinstance(args[0], casadi.MX):
+                self.x0 = out["x"]
+
+            model_instance.bind_field(self.model.variable, out["x"])
+            model_instance.bind_field(self.model.constraint, out["g"])
+            model_instance.objective = out["f"].toarray()[0,0]
+            self.stats = model_instance._stats = self.optimizer.stats()
+        elif self.method is OptimizationProblem.Method.scipy_cg:
+            if self.has_p:
+                extra_args = (p,)
+            else:
+                extra_args = ([],)
+
+
+            min_out = minimize(
+                lambda *args: self.f_func(*args).toarray().squeeze(),
+                self.x0,
+                jac=lambda *args: self.f_jac_func(*args).toarray().squeeze(),
+                method='CG',
+                args = extra_args,
+            )
+            model_instance.bind_field(self.model.variable, min_out.x)
+            model_instance.objective = min_out.fun
+            self.x0 = min_out.x
+            self.stats = model_instance._stats = min_out
 
 def get_state_setter(field, setter_args, default=0.):
     """
