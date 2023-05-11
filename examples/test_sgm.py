@@ -2,66 +2,6 @@ import numpy as np
 import condor as co
 import matplotlib.pyplot as plt
 
-
-class MySystem(co.ODESystem):
-    print("starting user code for LTI class")
-    ts = list()
-    for i in range(3):
-        ts.append(parameter(name=f"t_{i}"))
-
-    n = 2
-    m = 1
-    x = state(shape=n)
-    C = state(shape=(n,n))# symmetric=True)
-    A = np.array([
-        [0, 1],
-        [0, 0],
-    ])
-
-
-    # A = parameter(n,n)
-    # B = parameter(n,m)
-    # K = parameter(m,n)
-
-    W = C.T @ C
-
-    # indexing an output/computation by state
-    dot[x] = A@x #(A - B @ K) @ x
-    dot[C] = A@C + C@A.T
-    # dot naming, although have to do more work to minimize other setattr's 
-    output.y = C.T @ C
-
-    print("ending user code for LTI class")
-
-
-class MyEvent(MySystem.Event):
-    function = MySystem.t - 10.
-    update[x] = x**2 + C @ x
-
-class MyEvent(MySystem.Event):
-    function = MySystem.t - 100.
-    update[x] = x -2
-
-assert MyEvent.inner_to is MySystem
-assert co.Event in MyEvent.__bases__
-assert MySystem.Event not in MyEvent.__bases__
-assert MySystem.Event in MySystem.inner_models
-assert MyEvent in MySystem.Event
-assert MyEvent.update._symbols[0].match in MySystem.state
-
-class MySim(MySystem.TrajectoryAnalysis):
-    # this over-writes which is actually really nice
-    initial[x] = 1.
-    initial[C] = np.eye(2)*parameter()
-
-    out1 = trajectory_output(integrand=x.T@x)
-    out2 = trajectory_output(x.T@x)
-    out3 = trajectory_output(C[0,0], C[1,1])
-
-    # correctly fails
-    #out4 = trajectory_output(C[0,0], x)
-
-
 from dataclasses import asdict
 
 def LTI_plot(sim,t_slice=slice(None,None)):
