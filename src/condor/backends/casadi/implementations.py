@@ -190,7 +190,8 @@ class OptimizationProblem(InitializerMixin):
             print_time= False,
             ipopt = dict(
                 print_level=5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
-                tol=1E-14,
+                #tol=1E-14, # tighter tol for sensitivty
+                #accept_every_trial_step="yes",
                 #max_iter=1000,
             ),
             bound_consistency=True,
@@ -198,6 +199,8 @@ class OptimizationProblem(InitializerMixin):
             #calc_lam_x=False,
             #calc_lam_p=False,
         )
+        # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
+        # to try to get sensitivity from ipopt. so far no...
         if not exact_hessian:
             ipopt_opts["ipopt"].update(
                 hessian_approximation="limited-memory",
@@ -212,8 +215,6 @@ class OptimizationProblem(InitializerMixin):
             self.nlp_args,
             self.ipopt_opts,
         )
-        # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
-        # to try to get sensitivity from ipopt. so far no...
 
     def __call__(self, model_instance, *args):
         initializer_args = [self.x0]
@@ -236,6 +237,7 @@ class OptimizationProblem(InitializerMixin):
         model_instance.bind_field(self.model.variable, out["x"])
         model_instance.bind_field(self.model.constraint, out["g"])
         model_instance.objective = out["f"].toarray()[0,0]
+        self.stats = model_instance._stats = self.optimizer.stats()
 
 def get_state_setter(field, setter_args, default=0.):
     """
@@ -294,6 +296,7 @@ class TrajectoryAnalysis:
 
         self.p = casadi.vertcat(*flatten(model.parameter))
         self.x = casadi.vertcat(*flatten(ode_model.state))
+        self.lamda = casadi.MX.sym("lambda", ode_model.state._count)
         self.simulation_signature = [
             self.p,
             self.ode_model.t,
@@ -305,17 +308,18 @@ class TrajectoryAnalysis:
             model.trajectory_output
         ))
 
-        self.traj_out_integrand = casadi.vertcat(*flatten(
-            model.trajectory_output.list_of('integrand')
-        ))
+        integrand_terms = flatten(model.trajectory_output.list_of('integrand'))
+        self.traj_out_integrand = casadi.vertcat(*integrand_terms)
         self.traj_out_integrand_func = casadi.Function(
             f"{model.__name__}_trajectory_output_integrand",
             self.simulation_signature,
             [self.traj_out_integrand]
         )
-        self.traj_out_terminal_term = casadi.vertcat(*flatten(
-            model.trajectory_output.list_of('terminal_term')
-        ))
+
+        traj_out_names = model.trajectory_output.list_of('name')
+
+        terminal_terms = flatten(model.trajectory_output.list_of('terminal_term'))
+        self.traj_out_terminal_term = casadi.vertcat(*terminal_terms)
         self.traj_out_terminal_term_func = casadi.Function(
             f"{model.__name__}_trajectory_output_terminal_term",
             self.simulation_signature,
@@ -323,13 +327,14 @@ class TrajectoryAnalysis:
         )
 
         self.x0 = get_state_setter(model.initial, self.p,)
+        state_equation_func = get_state_setter(
+            ode_model.dot,
+            self.simulation_signature
+        )
         if len(ode_model.output):
             self.y_expr = casadi.vertcat(*flatten(ode_model.output))
         else:
-            self.y_expr = get_state_setter(
-                ode_model.dot,
-                self.simulation_signature
-            ).expr
+            self.y_expr = state_equation_func.expr
         self.e_expr = [event.function for event in ode_model.Event.subclasses]
         self.h_expr = sum([
             get_state_setter(
@@ -353,16 +358,13 @@ class TrajectoryAnalysis:
             for e in ode_model.Event.subclasses
         ]
 
-        self.simupy_shape_data = dict(
+        self.sim_shape_data = dict(
             dim_state = ode_model.state._count,
             dim_output = ode_model.output._count,
             num_events = len(ode_model.Event.subclasses),
         )
-        self.simupy_func_kwargs = dict(
-            state_equation_function = get_state_setter(
-                ode_model.dot,
-                self.simulation_signature
-            ),
+        self.sim_func_kwargs = dict(
+            state_equation_function = state_equation_func,
             output_equation_function = casadi.Function(
                 f"{ode_model.__name__}_output",
                 self.simulation_signature,
@@ -380,6 +382,66 @@ class TrajectoryAnalysis:
             ),
 
         )
+
+        self.adjoint_signature = [
+            self.p,
+            self.x,
+            self.ode_model.t,
+            self.lamda,
+        ]
+        # TODO: is there something more pythonic than repeated, very similar list
+        # comprehensions?
+        self.lamda0s = [
+            casadi.jacobian(terminal_term, self.x) for terminal_term in terminal_terms
+        ]
+        self.lamda0_funcs = [
+            casadi.Function(
+                f"{model.__name__}_{traj_name}_lamda0",
+                self.adjoint_signature[:-1],
+                [lamda0],
+            ) for lamda0, traj_name in zip(self.lamda0s, traj_out_names)
+        ]
+        self.grad0s = [
+            casadi.jacobian(terminal_term, self.p) for terminal_term in terminal_terms
+        ]
+        self.grad0_funcs = [
+            casadi.Function(
+                f"{model.__name__}_{traj_name}_grad0",
+                self.adjoint_signature[:-1],
+                [grad0],
+            ) for grad0, traj_name in zip(self.grad0s, traj_out_names)
+        ]
+
+        lamda_jac = casadi.jacobian(state_equation_func.expr, self.x).T
+        grad_jac = casadi.jacobian(state_equation_func.expr, self.p)
+
+        self.lamda_dots = [
+            lamda_jac @ self.lamda + casadi.jacobian(integrand_term, self.x).T
+            for integrand_term in integrand_terms
+        ]
+        self.grad_dots = [
+            self.lamda.T @ grad_jac + casadi.jacobian(integrand_term, self.p)
+            for integrand_term in integrand_terms
+        ]
+
+        self.lamda_dot_funcs = [
+            casadi.Function(
+                f"{model.__name__}_{traj_name}_lamda_dot",
+                self.adjoint_signature,
+                [lamda_dot],
+            ) for lamda_dot, traj_name in zip(self.lamda_dots, traj_out_names)
+        ]
+        self.grad_dot_funcs = [
+            casadi.Function(
+                f"{model.__name__}_{traj_name}_grad_dot",
+                self.adjoint_signature,
+                [grad_dot],
+            ) for grad_dot, traj_name in zip(self.grad_dots, traj_out_names)
+        ]
+
+        # lamda updates
+        # grad updates
+
         self.callback = ShootingGradientMethod(self)
 
 

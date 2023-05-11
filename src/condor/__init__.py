@@ -893,11 +893,31 @@ class ODESystem(Model):
     # sampled feedback, open-loop control. Open-loop would need some type of
     # specification so adjoint gradients could get computed??
 
+    # SimuPy-coupled TODO
+
+    # TODO switch to scikits.odes, especially updating update function API to get an
+    # array of length num_events 0 for did not occur and +/-1 for direction
+
+    # TODO: simupy currently requires dim_output > 0, which kinda makes sense for the
+    # BlockDiagram case and kinda makes sense for disciplined dynamical system modeling,
+    # but maybe doesn't make sense for single system simulation? 
+
+    # OR can/should trajectory output integrandds get added to simupy outputs, save a
+    # for-loop?
+
+    # what is a good output for adjoint system?
 
     # TODO: currently, to get a discrete time control need to augment state and provide
     # a separate initializer, even though it's  generally going to be the same
     # expression as the update. Should that be fixed in simupy? event funciton = 0 -> do
     # update? I can fix it in casadi shooting_gradient_method.py as well.
+
+    # Are simupy outputs even good? need to be disciplined to keep system encapsolation
+    # anyway, and control as discrete state prevents the re-computation. I guess
+    # back-to-back computation of a "continuous" optimization (not sure if DAEs can do
+    # this) is fine too? but maybe in 
+
+    # TODO: add event times/event channels to SimulationResult during detection
 
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)

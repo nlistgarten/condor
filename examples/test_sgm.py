@@ -90,16 +90,28 @@ dblintB = np.array([[0,1]]).T
 
 DblInt = co.LTI(A=dblintA, B=dblintB, name="DblInt")
 class DblIntLQR(DblInt.TrajectoryAnalysis):
-    initial[x] = [1., 0.]
+    initial[x] = [1., 0.1]
     Q = np.eye(2)
     R = np.eye(1)
-    tf = 100.
-    cost = trajectory_output(integrand= x.T@Q@x + (K@x).T @ R @ (K@x))
+    tf = 32.
+    cost = trajectory_output(integrand= (x.T@Q@x + (K@x).T @ R @ (K@x))/2)
     #cost = trajectory_output(integrand= x.T@Q@x + u.T @ R @ u)
 
+    class Casadi(co.Options):
+        nsteps = 5000
+        atol = 1e-15
+        #max_step = 1.
 
-ct_sim = DblIntLQR([1, .1])
+
+
+#ct_sim = DblIntLQR([1, .1])
+#LTI_plot(ct_sim)
+
+ct_sim = DblIntLQR([0., 0.,])
 LTI_plot(ct_sim)
+#plt.show()
+
+
 
 
 class CtOptLQR(co.OptimizationProblem):
@@ -112,6 +124,18 @@ class CtOptLQR(co.OptimizationProblem):
 lqr_sol = CtOptLQR()
 
 
+from scipy.optimize import minimize
+
+minimize(
+    lambda p: DblIntLQR.implementation.callback(p).toarray().squeeze(),
+    [0., 0.],
+    jac=lambda p: DblIntLQR.implementation.callback.jac_callback(p, [0]).toarray().squeeze(),
+    method='CG',
+    #options=dict(maxiter=1),
+)
+
+import sys
+sys.exit()
 
 DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=5.)
 class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
