@@ -2,6 +2,7 @@ import casadi
 import condor as co
 import numpy as np
 from enum import Enum, auto
+from dataclasses import dataclass
 from condor.backends.casadi.utils import flatten, wrap
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 from condor.backends.casadi.shooting_gradient_method import ShootingGradientMethod
@@ -381,8 +382,8 @@ class TrajectoryAnalysis:
             self.y_expr = casadi.vertcat(*flatten(ode_model.output))
         else:
             self.y_expr = state_equation_func.expr
-        self.e_expr = [event.function for event in ode_model.Event.subclasses]
-        self.h_expr = sum([
+        self.e_exprs = [event.function for event in ode_model.Event.subclasses]
+        self.h_exprs = [
             get_state_setter(
                 event.update,
                 self.simulation_signature,
@@ -390,10 +391,11 @@ class TrajectoryAnalysis:
             ).expr*(self.sym_event_channel==idx)
             if not getattr(event, 'terminate', False)
 
-            else np.full(np.nan, (self.model.state._count,))
+            else np.full(np.nan, (self.model.state._count,))*(self.sym_event_channel==idx)
+
 
             for idx, event in enumerate(ode_model.Event.subclasses)
-        ])
+        ]
         self.event_time_only = [
             casadi.depends_on(e.function, ode_model.t) and
             not sum([
@@ -419,12 +421,12 @@ class TrajectoryAnalysis:
             event_equation_function = casadi.Function(
                 f"{ode_model.__name__}_event",
                 self.simulation_signature,
-                self.e_expr,
+                self.e_exprs,
             ),
             update_equation_function = casadi.Function(
                 f"{ode_model.__name__}_update",
                 self.simulation_signature + [self.sym_event_channel],
-                [self.h_expr],
+                [sum(self.h_exprs)],
             ),
 
         )
@@ -462,7 +464,7 @@ class TrajectoryAnalysis:
         grad_jac = casadi.jacobian(state_equation_func.expr, self.p)
 
         self.lamda_dots = [
-            lamda_jac @ self.lamda + casadi.jacobian(integrand_term, self.x).T
+            -lamda_jac @ self.lamda - casadi.jacobian(integrand_term, self.x).T
             for integrand_term in integrand_terms
         ]
         self.grad_dots = [
@@ -487,6 +489,95 @@ class TrajectoryAnalysis:
 
         # lamda updates
         # grad updates
+        self.dte_dxs = []
+        self.d2te_dxdts = []
+        self.dh_dxs = []
+
+        self.dte_dps = []
+        self.d2te_dpdts = []
+        self.dh_dps = []
+
+        for event, e_expr, h_expr in zip(
+            ode_model.Event.subclasses, self.e_exprs, self.h_exprs
+        ):
+            dg_dx = casadi.jacobian(e_expr, self.x)
+            dg_dt = casadi.jacobian(e_expr, ode_model.t)
+            dg_dp = casadi.jacobian(e_expr, self.p)
+
+            dte_dx = dg_dx/(dg_dx@state_equation_func.expr)
+            dte_dp = dg_dp/(dg_dx@state_equation_func.expr + dg_dt)
+
+            d2te_dxdt = (
+                casadi.jacobian(dte_dx, ode_model.t)
+                + casadi.jacobian(dte_dx, self.x) @ state_equation_func.expr
+            )
+            d2te_dpdt = (
+                casadi.jacobian(dte_dp, ode_model.t)
+                + casadi.jacobian(dte_dp, self.x) @ state_equation_func.expr
+            )
+
+            dh_dx = casadi.jacobian(h_expr, self.x)
+            dh_dp = casadi.jacobian(h_expr, self.p)
+
+
+            self.dte_dxs.append(
+                casadi.Function(
+                    f"{event.__name__}_dte_dx",
+                    self.simulation_signature,
+                    [dte_dx]
+                )
+            )
+            self.dte_dxs[-1].expr = dte_dx
+
+            self.dte_dps.append(
+                casadi.Function(
+                    f"{event.__name__}_dte_dp",
+                    self.simulation_signature,
+                    [dte_dp]
+                )
+            )
+            self.dte_dps[-1].expr = dte_dp
+
+            self.d2te_dxdts.append(
+                casadi.Function(
+                    f"{event.__name__}_d2te_dxdt",
+                    self.simulation_signature,
+                    [d2te_dxdt]
+                )
+            )
+            self.d2te_dxdts[-1].expr = d2te_dxdt
+
+            self.d2te_dpdts.append(
+                casadi.Function(
+                    f"{event.__name__}_d2te_dpdt",
+                    self.simulation_signature,
+                    [d2te_dpdt]
+                )
+            )
+            self.d2te_dpdts[-1].expr = d2te_dpdt
+
+
+            self.dh_dxs.append(
+                casadi.Function(
+                    f"{event.__name__}_dh_dx",
+                    self.simulation_signature,
+                    [dh_dx]
+                )
+            )
+            self.dh_dxs[-1].expr = dh_dx
+
+            self.dh_dps.append(
+                casadi.Function(
+                    f"{event.__name__}_dh_dp",
+                    self.simulation_signature,
+                    [dh_dp]
+                )
+            )
+            self.dh_dps[-1].expr = dh_dp
+
+
+
+
 
         self.callback = ShootingGradientMethod(self)
 

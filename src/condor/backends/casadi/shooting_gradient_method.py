@@ -7,17 +7,14 @@ from scipy import interpolate
 
 
 def adjoint_wrapper(f, p, res, segment_slice):
-    sliced_t = res.t[segment_slice]
-    sliced_t_1 = sliced_t[-1]
     x_interp = interpolate.make_interp_spline(
-        sliced_t,
+        res.t[segment_slice],
         res.x[segment_slice, :],
     )
-    transform_t = lambda t: sliced_t[-1] - t
     return (
         lambda t, adjoint, output=None, **kwargs:
         f(
-            p, x_interp(sliced_t_1 - t), sliced_t_1 - t, adjoint, *kwargs.values()
+            p, x_interp(t), t, adjoint, *kwargs.values()
         ).toarray().reshape(-1)
     )
 
@@ -122,9 +119,6 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             [None] + rev_event_times_list[:-1],
         ):
             segment_slice = slice(t_start_idx, t_end_idx)
-            # simulation is from t_0 to t_1
-            # adjoint prop is from 0 to (t_1 - t_0) representing t_1 to t_0
-            # want 0 -> t_1 and (t_1 - t_0) -> t_0
             adjoint_segment_tf = np.diff(sim_res.t[segment_slice][[0, -1]])[0]
             for idx, (lamda0, lamda_dot_func, grad_dot_func,) in enumerate(
                     zip(lamda0s, self.i.lamda_dot_funcs, self.i.grad_dot_funcs)
@@ -141,13 +135,12 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 )
                 adjoint_sys.initial_condition = lamda0.toarray().reshape(-1)
                 adjoint_res = adjoint_sys.simulate(
-                    adjoint_segment_tf, integrator_options=self.shot.int_options
+                    sim_res.t[segment_slice][[-1,0]],
+                    integrator_options=self.shot.int_options
                 )
                 integrand_interp = interpolate.make_interp_spline(
-                    sim_res.t[segment_slice][-1] - adjoint_res.t[::-1],
+                    adjoint_res.t[::-1],
                     adjoint_res.y[::-1],
-                    # adjoint_res.t,
-                    # adjoint_res.y[:],
                 )
                 integrand_antideriv = integrand_interp.antiderivative()
                 jac[idx, :] += (
