@@ -374,6 +374,14 @@ class TrajectoryAnalysis:
         )
 
         self.x0 = get_state_setter(model.initial, self.p,)
+        dx0_dp_expr = casadi.jacobian(self.x0.expr, self.p)
+        self.dx0_dp = casadi.Function(
+            f"{model.__name__}_x0_jacobian",
+            [self.p],
+            [dx0_dp_expr],
+        )
+        self.dx0_dp.expr = dx0_dp_expr
+
         state_equation_func = get_state_setter(
             ode_model.dot,
             self.simulation_signature
@@ -391,7 +399,11 @@ class TrajectoryAnalysis:
             ).expr*(self.sym_event_channel==idx)
             if not getattr(event, 'terminate', False)
 
-            else np.full(np.nan, (self.model.state._count,))*(self.sym_event_channel==idx)
+            else casadi.if_else(
+                (self.sym_event_channel==idx),
+                np.full((ode_model.state._count,), np.nan,),
+                0.,
+            )
 
 
             for idx, event in enumerate(ode_model.Event.subclasses)
@@ -421,7 +433,7 @@ class TrajectoryAnalysis:
             event_equation_function = casadi.Function(
                 f"{ode_model.__name__}_event",
                 self.simulation_signature,
-                self.e_exprs,
+                [casadi.vertcat(*self.e_exprs)],
             ),
             update_equation_function = casadi.Function(
                 f"{ode_model.__name__}_update",
