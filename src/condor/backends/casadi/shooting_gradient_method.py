@@ -106,7 +106,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
         sim_res = self.shot.res
         lamda0s = [
-            lamda0_func(p, sim_res.x[-1], sim_res.t[-1])
+            lamda0_func(p, sim_res.x[-1], sim_res.t[-1]).toarray().reshape(-1)
             for lamda0_func in self.i.lamda0_funcs
         ]
 
@@ -114,11 +114,12 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             jac[i_out, :] = grad0_func(p, sim_res.x[-1], sim_res.t[-1])
 
         rev_event_times_list = sim_res.event_times_list[::-1]
-        for t_start_idx, t_end_idx in zip(
+        for t0_idx, t1_idx, event_channel, in zip(
             rev_event_times_list,
             [None] + rev_event_times_list[:-1],
+            sim_res.event_channels[::-1].tolist() + [None],
         ):
-            segment_slice = slice(t_start_idx, t_end_idx)
+            segment_slice = slice(t0_idx, t1_idx)
             adjoint_segment_tf = np.diff(sim_res.t[segment_slice][[0, -1]])[0]
             for idx, (lamda0, lamda_dot_func, grad_dot_func,) in enumerate(
                     zip(lamda0s, self.i.lamda_dot_funcs, self.i.grad_dot_funcs)
@@ -133,7 +134,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     dim_state = self.i.ode_model.state._count,
                     dim_output = num_parameter,
                 )
-                adjoint_sys.initial_condition = lamda0.toarray().reshape(-1)
+                adjoint_sys.initial_condition = lamda0
                 adjoint_res = adjoint_sys.simulate(
                     sim_res.t[segment_slice][[-1,0]],
                     integrator_options=self.shot.int_options
@@ -147,6 +148,45 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     integrand_antideriv(sim_res.t[segment_slice][-1]) -
                     integrand_antideriv(sim_res.t[segment_slice][0])
                 ).reshape((1,-1))
+
+                """
+                ct_sim = DblIntLQR([0., 0.,])
+                ct_sim.implementation.callback.jac_callback([0., 0.,], [0.])
+
+                dt_sim = DblIntLQR([0., 0.,])
+                ct_sim.implementation.callback.jac_callback([0., 0.,], [0.])
+                """
+
+                if event_channel is None:
+                    continue
+
+                lamdaf = adjoint_res.x[-1]
+                tep = sim_res.t[t0_idx]
+                xtep = sim_res.t[t0_idx]
+                tem_idx = t0_idx-1
+                tem = sim_res.t[tem_idx]
+                xtem = sim_res.x[tem_idx]
+
+                delta_fs = (
+                    self.i.sim_func_kwargs["state_equation_function"](p, tep, xtep)
+                    - self.i.sim_func_kwargs["state_equation_function"](p, tem, xtem)
+                )
+
+                delta_xs = xtep - xtem
+
+                lamda0s[idx] = ((
+                    self.i.dh_dxs[event_channel](p, tem, xtem, event_channel).T
+                    + self.i.dte_dxs[event_channel](p, tem, xtem).T @ delta_fs.T
+                    + self.i.d2te_dxdts[event_channel](p, tem, xtem).T @ delta_xs.T
+                ) @ lamdaf).toarray().reshape(-1)
+
+                jac[idx, :] += lamdaf[None, :] @ (
+                #jac[idx, :] += lamda0s[idx][None, :] @ (
+                    self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
+                    - delta_fs @ self.i.dte_dps[event_channel](p, tem, xtem)
+                    - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
+                )
+
             self.res = adjoint_res
 
 

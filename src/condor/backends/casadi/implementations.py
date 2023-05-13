@@ -560,7 +560,7 @@ class TrajectoryAnalysis:
             self.dh_dxs.append(
                 casadi.Function(
                     f"{event.__name__}_dh_dx",
-                    self.simulation_signature,
+                    self.simulation_signature + [self.sym_event_channel],
                     [dh_dx]
                 )
             )
@@ -569,7 +569,7 @@ class TrajectoryAnalysis:
             self.dh_dps.append(
                 casadi.Function(
                     f"{event.__name__}_dh_dp",
-                    self.simulation_signature,
+                    self.simulation_signature + [self.sym_event_channel],
                     [dh_dp]
                 )
             )
@@ -584,23 +584,24 @@ class TrajectoryAnalysis:
 
     def __call__(self, model_instance, *args):
         out = self.callback(casadi.vertcat(*flatten(args)))
-        res = self.callback.res
         model_instance.bind_field(
             self.model.trajectory_output,
             out
         )
-        model_instance._res = res
-        model_instance.t = res.t
-        model_instance.bind_field(
-            self.ode_model.state,
-            res.x.T,
-            wrap=True,
-        )
-        model_instance.bind_field(
-            self.ode_model.output,
-            res.y.T,
-            wrap=True,
-        )
+        if hasattr(self.callback, 'res'):
+            res = self.callback.res
+            model_instance._res = res
+            model_instance.t = res.t
+            model_instance.bind_field(
+                self.ode_model.state,
+                res.x.T,
+                wrap=True,
+            )
+            model_instance.bind_field(
+                self.ode_model.output,
+                res.y.T,
+                wrap=True,
+            )
 
 
 

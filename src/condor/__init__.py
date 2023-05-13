@@ -893,10 +893,12 @@ class ODESystem(Model):
     # sampled feedback, open-loop control. Open-loop would need some type of
     # specification so adjoint gradients could get computed??
 
+    # TODO: handle events that only depend on time specifically
+
     # SimuPy-coupled TODO
 
     # TODO switch to scikits.odes, especially updating update function API to get an
-    # array of length num_events 0 for did not occur and +/-1 for direction
+    # array of length num_events w/ elements 0 for did not occur and +/-1 for direction
 
     # TODO: simupy currently requires dim_output > 0, which kinda makes sense for the
     # BlockDiagram case and kinda makes sense for disciplined dynamical system modeling,
@@ -915,9 +917,12 @@ class ODESystem(Model):
     # Are simupy outputs even good? need to be disciplined to keep system encapsolation
     # anyway, and control as discrete state prevents the re-computation. I guess
     # back-to-back computation of a "continuous" optimization (not sure if DAEs can do
-    # this) is fine too? but maybe in 
+    # this) is fine too? I think DAE version will be even more efficient, since
+    # everything is a "state" and computed simultaneously. Can you do MAUD approach in
+    # IDA to provide solvers for explicit expressions? 
 
     # TODO: add event times/event channels to SimulationResult during detection
+    # TODO: pass in a SimulationResult object to simulate to append to?
 
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)

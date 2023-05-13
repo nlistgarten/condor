@@ -1,0 +1,50 @@
+import numpy as np
+import condor as co
+import matplotlib.pyplot as plt
+from scipy import linalg, signal
+
+dblintA = np.array([
+    [0, 1],
+    [0, 0],
+])
+dblintB = np.array([[0,1]]).T
+dt = 0.5
+
+
+DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=dt)
+class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
+    initial[x] = [1., 0.1]
+    initial[u] = -K@initial[x].backend_repr
+    Q = np.eye(2)
+    R = np.eye(1)
+    tf = 32.#16.125
+    cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
+    class Casadi(co.Options):
+        max_step = .125
+
+from condor.backends.casadi.implementations import OptimizationProblem
+class SampledOptLQR(co.OptimizationProblem):
+    K = variable(shape=DblIntSampledLQR.K.shape)
+    objective = DblIntSampledLQR(K).cost
+    class Casadi(co.Options):
+        exact_hessian = False
+        method = OptimizationProblem.Method.scipy_cg
+
+lqr_sol_samp = SampledOptLQR()
+
+sampled_sim = DblIntSampledLQR([0., 0.])
+sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
+
+Q = DblIntSampledLQR.Q
+R = DblIntSampledLQR.R
+A = dblintA
+B = dblintB
+
+Ad, Bd = signal.cont2discrete((A, B, None, None), dt)[:2]
+S = linalg.solve_discrete_are(Ad, Bd, Q, R,)
+K = linalg.solve(Bd.T @ S @ Bd + R, Bd.T @ S @ Ad)
+
+
+sampled_sim = DblIntSampledLQR(K)
+jac_cb= sampled_sim.implementation.callback.jac_callback
+jac_cb(K, [0.])
