@@ -119,16 +119,16 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 self.i.ode_model.Event.subclasses[event_channel], 'terminate', False
             ):
                 continue
-            for idx, (lamda0,) in enumerate(lamda0s):
+            for idx, lamda0, in enumerate(lamda0s):
                 tf = sim_res.t[-1]
                 xf = sim_res.x[-1]
                 fxf = self.i.sim_func_kwargs["state_equation_function"](p, tf, xf)
 
-                jac[idx, :] += lamda0[None, :] @ -delta_fs @ self.i.dte_dps[event_channel](p, tf, xf)
+                jac[idx, :] += -lamda0[None, :] @ fxf @ self.i.dte_dps[event_channel](p, tf, xf)
                 lamda0s[idx] = (
-                    lamda0 +
+                    lamda0 -
                     (self.i.dte_dxs[event_channel](p, tf, xf).T @ fxf.T) @ lamda0
-                )
+                ).toarray().reshape(-1)
 
 
 
@@ -154,12 +154,17 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     ),
                     dim_state = self.i.ode_model.state._count,
                     dim_output = num_parameter,
+                    num_events=0,
                 )
                 adjoint_sys.initial_condition = lamda0
-                adjoint_res = adjoint_sys.simulate(
-                    sim_res.t[segment_slice][[-1,0]],
-                    integrator_options=self.shot.int_options
-                )
+                try:
+                    adjoint_res = adjoint_sys.simulate(
+                        sim_res.t[segment_slice][[-1,0]],
+                        integrator_options=self.shot.int_options
+                    )
+                except Exception as e:
+                    breakpoint()
+                    raise e
                 integrand_interp = interpolate.make_interp_spline(
                     adjoint_res.t[::-1],
                     adjoint_res.y[::-1],
@@ -205,14 +210,14 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
                 lamda0s[idx] = ((
                     self.i.dh_dxs[event_channel](p, tem, xtem, event_channel).T
-                    + self.i.dte_dxs[event_channel](p, tem, xtem).T @ delta_fs.T
+                    - self.i.dte_dxs[event_channel](p, tem, xtem).T @ delta_fs.T
                     + self.i.d2te_dxdts[event_channel](p, tem, xtem).T @ delta_xs.T
                 ) @ lamdaf).toarray().reshape(-1)
 
                 jac[idx, :] += lamdaf[None, :] @ (
                 #jac[idx, :] += lamda0s[idx][None, :] @ (
                     self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
-                    - delta_fs @ self.i.dte_dps[event_channel](p, tem, xtem)
+                    + delta_fs @ self.i.dte_dps[event_channel](p, tem, xtem)
                     - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
                 )
 

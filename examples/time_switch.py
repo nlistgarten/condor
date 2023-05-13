@@ -16,8 +16,8 @@ class DblInt(co.ODESystem):
     t2 = parameter()
     # TODO: fix once mode and control work?
     dot[x] = A@x + B*(
-        -1*(t < t1)
-        +1*(t >= t1)*(t<(t1+t2))
+        1*(t < t1)
+        -1*(t >= t1)*(t<(t1+t2))
     )
 
 class Switch1(DblInt.Event):
@@ -28,7 +28,7 @@ class Switch2(DblInt.Event):
     terminate = True
 
 class Transfer(DblInt.TrajectoryAnalysis):
-    initial[x] = [10., 0.]
+    initial[x] = [-9., 0.]
     Q = np.eye(2)
     cost = trajectory_output((x.T @ Q @ x)/2)
     tf = 10.
@@ -39,27 +39,24 @@ class Transfer(DblInt.TrajectoryAnalysis):
         max_step = 1.
 
 
-sim = Transfer(t1=1., t2= 4.,)
-LTI_plot(sim)
-plt.show()
-
-import sys
-sys.exit()
-
 from condor.backends.casadi.implementations import OptimizationProblem
-class CtOptLQR(co.OptimizationProblem):
-    K = variable(shape=DblIntLQR.K.shape)
-    objective = DblIntLQR(K).cost
-
+class MinimumTime(co.OptimizationProblem):
+    t1 = variable(lower_bound=0)
+    t2 = variable(lower_bound=0)
+    objective = Transfer(t1, t2).cost
     class Casadi(co.Options):
+        exact_hessian = False
         method = OptimizationProblem.Method.scipy_cg
 
-lqr_sol = CtOptLQR()
+sim = Transfer(t1=1., t2= 4.,)
+LTI_plot(sim)
+#plt.show()
+0.0169526, 3.76823
+broke_ts = [0.01695263, 3.76822885]
 
-S = linalg.solve_continuous_are(dblintA,dblintB, DblIntLQR.Q, DblIntLQR.R)
-K = linalg.solve(DblIntLQR.R, dblintB.T@S)
-
-lqr_are = DblIntLQR(K)
-jac_callback = lqr_are.implementation.callback.jac_callback
-jac_callback(K, [0])
+#sim = Transfer(*broke_ts)
+#jac_callback = sim.implementation.callback.jac_callback
+#jac_callback(broke_ts, [0])
+MinimumTime.implementation.set_initial(t1=2.163165480675697, t2=4.361971866705403)
+opt = MinimumTime()
 
