@@ -17,7 +17,8 @@ class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
     initial[u] = -K@initial[x].backend_repr
     Q = np.eye(2)
     R = np.eye(1)
-    tf = 32.#16.125
+    tf = 32. # 12 iters, 21 calls 1E-8 jac
+    #tf = 16. # 9 iters, 20 calls, 1E-7
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
     class Casadi(co.Options):
         max_step = .125

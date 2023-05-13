@@ -109,9 +109,28 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             lamda0_func(p, sim_res.x[-1], sim_res.t[-1]).toarray().reshape(-1)
             for lamda0_func in self.i.lamda0_funcs
         ]
-
         for i_out, grad0_func in enumerate(self.i.grad0_funcs):
             jac[i_out, :] = grad0_func(p, sim_res.x[-1], sim_res.t[-1])
+
+        # TODO: make sure this is robust enough:
+        terminal_event_channels = np.isclose(sim_res.e[-1], 0.)
+        for event_channel in np.where(terminal_event_channels)[0]:
+            if not getattr(
+                self.i.ode_model.Event.subclasses[event_channel], 'terminate', False
+            ):
+                continue
+            for idx, (lamda0,) in enumerate(lamda0s):
+                tf = sim_res.t[-1]
+                xf = sim_res.x[-1]
+                fxf = self.i.sim_func_kwargs["state_equation_function"](p, tf, xf)
+
+                jac[idx, :] += lamda0[None, :] @ -delta_fs @ self.i.dte_dps[event_channel](p, tf, xf)
+                lamda0s[idx] = (
+                    lamda0 +
+                    (self.i.dte_dxs[event_channel](p, tf, xf).T @ fxf.T) @ lamda0
+                )
+
+
 
         rev_event_times_list = sim_res.event_times_list[::-1]
         for t0_idx, t1_idx, event_channel, in zip(
@@ -124,6 +143,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             for idx, (lamda0, lamda_dot_func, grad_dot_func,) in enumerate(
                     zip(lamda0s, self.i.lamda_dot_funcs, self.i.grad_dot_funcs)
             ):
+
+
                 adjoint_sys = DynamicalSystem(
                     state_equation_function = adjoint_wrapper(
                         lamda_dot_func, p, sim_res, segment_slice
@@ -157,13 +178,21 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 ct_sim.implementation.callback.jac_callback([0., 0.,], [0.])
                 """
 
+                lamdaf = adjoint_res.x[-1]
+
                 if event_channel is None:
+                    if t0_idx != 0:
+                        raise ValueError
+
+                    jac[idx, :] += lamdaf[None, :] @ self.i.dx0_dp(p)
+
+
                     continue
 
-                lamdaf = adjoint_res.x[-1]
                 tep = sim_res.t[t0_idx]
                 xtep = sim_res.t[t0_idx]
                 tem_idx = t0_idx-1
+
                 tem = sim_res.t[tem_idx]
                 xtem = sim_res.x[tem_idx]
 
