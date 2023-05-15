@@ -5,6 +5,8 @@ from simupy.block_diagram import DEFAULT_INTEGRATOR_OPTIONS
 import numpy as np
 from scipy import interpolate
 
+DEBUG_LEVEL = 1
+
 
 def adjoint_wrapper(f, p, res, segment_slice):
     x_interp = interpolate.make_interp_spline(
@@ -53,11 +55,12 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         return casadi.Sparsity.dense(out.shape[0], p.shape[0])
 
     def eval(self, args):
-        print("\n"*10, f"eval jacobian for {self.name}", sep="\n")
-        print("args",args)
-        if hasattr(self.shot, "p"):
-            print(f"p={self.shot.p}")
-        print(f"o={self.shot.output.toarray()}")
+        if DEBUG_LEVEL:
+            print("\n"*10, f"eval jacobian for {self.name}", sep="\n")
+            print("args",args)
+            if hasattr(self.shot, "p"):
+                print(f"p={self.shot.p}")
+            print(f"o={self.shot.output.toarray()}")
 
         assert casadi.is_equal(self.shot.p, args[0])
         assert casadi.is_equal(self.shot.res.p, args[0])
@@ -111,6 +114,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         ]
         for i_out, grad0_func in enumerate(self.i.grad0_funcs):
             jac[i_out, :] = grad0_func(p, sim_res.x[-1], sim_res.t[-1])
+        if DEBUG_LEVEL:
+            print("initial jacobian:", jac.toarray())
 
         # TODO: make sure this is robust enough:
         terminal_event_channels = np.isclose(sim_res.e[-1], 0.)
@@ -124,12 +129,25 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 xf = sim_res.x[-1]
                 fxf = self.i.sim_func_kwargs["state_equation_function"](p, tf, xf)
 
-                jac[idx, :] += -lamda0[None, :] @ fxf @ self.i.dte_dps[event_channel](p, tf, xf)
-                lamda0s[idx] = (
-                    lamda0 -
-                    (self.i.dte_dxs[event_channel](p, tf, xf).T @ fxf.T) @ lamda0
+                lamda0s[idx] += (
+                    (
+                        self.i.dte_dxs[event_channel](p, tf, xf).T @ fxf.T
+                        #- self.i.d2te_dxdts[event_channel](p, tf, xf).T @ xf.T
+                    ) @ lamda0
                 ).toarray().reshape(-1)
 
+                # doesn't really affect state switch, which is only one that should
+                # matter
+                use_lamda = lamda0[None, :]
+                #use_lamda = lamda0s[idx][None, :]
+
+                jac[idx, :] += -use_lamda @ (
+                    fxf @ self.i.dte_dps[event_channel](p, tf, xf)
+                    #- xf[:, None] @ self.i.d2te_dpdts[event_channel](p, tf, xf).T
+                )
+
+        if DEBUG_LEVEL:
+            print("terminal event:", jac.toarray())
 
 
         rev_event_times_list = sim_res.event_times_list[::-1]
@@ -208,23 +226,40 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
                 delta_xs = xtep - xtem
 
+                lam_dot = adjoint_sys.state_equation_function(tep, lamdaf)
+
                 lamda0s[idx] = ((
                     self.i.dh_dxs[event_channel](p, tem, xtem, event_channel).T
-                    - self.i.dte_dxs[event_channel](p, tem, xtem).T @ delta_fs.T
+                    - self.i.dte_dxs[event_channel](p, tem, xtem).T @ (
+                        delta_fs.T #+ lam_dot[None, :]
+                    )
                     + self.i.d2te_dxdts[event_channel](p, tem, xtem).T @ delta_xs.T
                 ) @ lamdaf).toarray().reshape(-1)
 
-                jac[idx, :] += lamdaf[None, :] @ (
-                #jac[idx, :] += lamda0s[idx][None, :] @ (
+                # correct for sampled LQR
+                use_lamda = lamdaf[None, :]
+
+                # dramatically improves state-switch but incorrect for sampled LQR
+                # state-switch not actually good
+                # but really good for time switched!!!
+                use_lamda = lamda0s[idx][None, :] 
+
+
+                jac[idx, :] += use_lamda @ (
                     self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
-                    + delta_fs @ self.i.dte_dps[event_channel](p, tem, xtem)
+                    + (
+                        delta_fs + lam_dot
+                    ) @ self.i.dte_dps[event_channel](p, tem, xtem)
                     - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
                 )
+            if DEBUG_LEVEL:
+                print("event", event_channel, jac.toarray())
 
             self.res = adjoint_res
 
 
-        print('computed jac:',jac.toarray())
+        if DEBUG_LEVEL:
+            print('computed jac:',jac.toarray())
         return jac,
 
 
@@ -246,9 +281,10 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         self.int_options.update(self.i.kwargs)
 
     def get_jacobian(self, name, inames, onames, opts):
-        print("\n"*10, f"getting jacobian for {self} . {name}", sep="\n")
-        if hasattr(self, "p"):
-            print(f"p={self.p}")
+        if DEBUG_LEVEL:
+            print("\n"*10, f"getting jacobian for {self} . {name}", sep="\n")
+            if hasattr(self, "p"):
+                print(f"p={self.p}")
         self.jac_callback = ShootingGradientMethodJacobian(self, name, inames, onames, opts)
         return self.jac_callback
 

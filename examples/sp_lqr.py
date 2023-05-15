@@ -49,3 +49,6 @@ K = linalg.solve(Bd.T @ S @ Bd + R, Bd.T @ S @ Ad)
 sampled_sim = DblIntSampledLQR(K)
 jac_cb= sampled_sim.implementation.callback.jac_callback
 jac_cb(K, [0.])
+
+print(lqr_sol_samp._stats)
+

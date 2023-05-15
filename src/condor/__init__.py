@@ -181,10 +181,12 @@ class ModelType(type):
                         model_name, field_type_name=k, **v_init_kwargs
                     )
                 # inherit inner model from base, create reference now, bind in new
-                if isinstance(v, ModelType):
+                elif isinstance(v, ModelType):
                     if v.inner_to is base and v in base.inner_models:
                         # inner model inheritance & binding in new
                         cls_dict[k] = v
+                elif isinstance(v, backend.symbol_class):
+                    cls_dict[k] = v
 
             # if base is an inner model, make reference  of outer model attributes
             # and copy fields from class __copy_fields__ kwarg definition. This allows
@@ -563,7 +565,10 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
         # TODO: only need to check the parent, not all bases?
         if (
             attr_name in base.__dict__ and
-            not getattr(attr_val, '_inherits_from', None) == getattr(base, attr_name)
+            not (
+                getattr(attr_val, '_inherits_from', None) == getattr(base, attr_name)
+                or attr_val == getattr(base, attr_name)
+            )
         ):
             in_bases = True
             break
@@ -846,6 +851,11 @@ class ODESystem(Model):
     output - dynamic output at particular state and value of independent variable
     (point-wise in independent variable)
 
+    control - time-varying placeholder, useful for re-defining using mode, etc.
+    set it with `make` field -- all controls MUST be set? or default to 0.
+
+    make - set control a value/computation. Or `let`?
+
     note: no time-varying input to system. Assume dynamicsmodels "pull" what they need 
     from other models. 
     Need to augment state with "pulled" dynamicsmodels
@@ -853,10 +863,22 @@ class ODESystem(Model):
     output? or is it always just a placeholder for functional space gradient?
     Or also allow it to define eg feedback control
 
-    control - time-varying placeholder, useful for re-defining using mode, etc.
-    set it with `make` field -- all controls MUST be set? or default to 0.
+    I guess block diagram is nice for simulating something like saturation block --
+    create event and switch modes? but I guess that's re-creatable with modes. But maybe
+    needs control/subsitution -- I guess what I'm calling "control" is really an
+    (explicit) algebraic state? I guess this is really the same as an "output" and is in
+    fact how simupy implements it. maybe convert output to a freefield that takes an
+    expression (like constraint, I guess?) and then "make" is only in mode and adds
+    conditional behavior -- defaults to value from creation?
 
-    make - set control a value/computation
+    then keep control field but only for open loop control? not sure, but some way to
+    mark an output as a control signal
+
+    don't include specialty types like discrete control, etc? user must know that for
+    discrete time signal it requires state with dot=0 and update
+
+
+
 
     dt - reserved keyword for DT?
 
@@ -893,26 +915,34 @@ class ODESystem(Model):
     # sampled feedback, open-loop control. Open-loop would need some type of
     # specification so adjoint gradients could get computed??
 
-    # TODO: handle events that only depend on time specifically
+    # TODO: handle events that only depend on time specifically causes termination +
+    # restart -- need simupy to be able to expand simulationresult objects
+
+    # TODO: combine all events if functions are the same? maybe that happens
+    # automatically and that's okay
 
     # SimuPy-coupled TODO
 
     # TODO switch to scikits.odes, especially updating update function API to get an
     # array of length num_events w/ elements 0 for did not occur and +/-1 for direction
+    # don't use nan's to terminate? althogh, can't code-gen termination?
 
     # TODO: simupy currently requires dim_output > 0, which kinda makes sense for the
     # BlockDiagram case and kinda makes sense for disciplined dynamical system modeling,
-    # but maybe doesn't make sense for single system simulation? 
+    # but maybe doesn't make sense for single system simulation?
 
     # OR can/should trajectory output integrandds get added to simupy outputs, save a
     # for-loop?
 
-    # what is a good output for adjoint system?
+    # what is a good output for adjoint system? gradient integrand term!
 
     # TODO: currently, to get a discrete time control need to augment state and provide
     # a separate initializer, even though it's  generally going to be the same
     # expression as the update. Should that be fixed in simupy? event funciton = 0 -> do
     # update? I can fix it in casadi shooting_gradient_method.py as well.
+
+    # or is initial where we want it? consistent with initial conition processing for
+    # SGM. 
 
     # Are simupy outputs even good? need to be disciplined to keep system encapsolation
     # anyway, and control as discrete state prevents the re-computation. I guess
@@ -962,7 +992,7 @@ class Event(Model, inner_to = ODESystem):
     # make[mode_var] = SomeModeSubclass
     # actually, just update it
     #make = MatchedField(ODESystem.finite_state)
-    # terminates = True -> return nan instead of update?
+    # terminate = True -> return nan instead of update?
     def __init_subclass__(cls, dt=0., **kwargs):
         if dt:
             cls.function
