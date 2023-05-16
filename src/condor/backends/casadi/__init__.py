@@ -1,11 +1,10 @@
 import casadi
 from condor.backends.casadi import implementations
 from condor.backends import BackendSymbolData
-from condor.backends.casadi.utils import flatten, wrap
+from condor.backends.casadi.utils import flatten, wrap, symbol_class
 import numpy as np
 
 name = 'Casadi'
-symbol_class = casadi.MX
 
 def shape_to_nm(shape):
     if len(shape) > 2:
@@ -21,7 +20,7 @@ def shape_to_nm(shape):
 def symbol_generator(name, shape=(1,1), symmetric=False, diagonal=False):
     n, m = shape_to_nm(shape)
     print("casadi creating",name, n, m, symmetric, diagonal)
-    sym = casadi.MX.sym(name, (n, m))
+    sym = symbol_class.sym(name, (n, m))
     #sym = MixedMX.sym(name, (n, m))
     # TODO: symmetric and diagonal, 
 

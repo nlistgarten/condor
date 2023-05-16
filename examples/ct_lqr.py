@@ -31,7 +31,6 @@ LTI_plot(ct_sim)
 
 ct_sim = DblIntLQR([0., 0.,])
 LTI_plot(ct_sim)
-plt.show()
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class CtOptLQR(co.OptimizationProblem):
@@ -49,4 +48,7 @@ K = linalg.solve(DblIntLQR.R, dblintB.T@S)
 lqr_are = DblIntLQR(K)
 jac_callback = lqr_are.implementation.callback.jac_callback
 jac_callback(K, [0])
+
+print(lqr_sol._stats)
+plt.show()
 

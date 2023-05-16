@@ -1,6 +1,11 @@
 from dataclasses import dataclass, field
 import numpy as np
 
+"""
+Need to keep in a separate file so backend.get_symbol_data (required by fields which
+generate the symbols) can return filled dataclass without causing a circular import
+"""
+
 @dataclass
 class BackendSymbolData:
     shape: tuple # TODO: tuple of ints

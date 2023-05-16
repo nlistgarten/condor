@@ -2,6 +2,10 @@ import casadi
 import condor as co
 import numpy as np
 
+# base symbol class is MX because only MX can go through callbacks (e.g., models that
+# use AlgebraicSystem or ODESystem)
+symbol_class = casadi.MX
+
 class CasadiFunctionCallbackMixin:
     """Base class for wrapping a Function with a Callback"""
 
@@ -41,7 +45,7 @@ class CasadiFunctionCallbackMixin:
 def flatten(symbols, complete=True):
     if isinstance(symbols, co.Field):
         symbols = symbols.list_of("backend_repr")
-    if isinstance(symbols, casadi.MX):
+    if isinstance(symbols, symbol_class):
         symbol = symbols
         return tuple([
             elem
@@ -56,7 +60,7 @@ def flatten(symbols, complete=True):
     if isinstance(symbols, float):
         return [symbols]
 
-    if isinstance(symbols[0], casadi.MX):
+    if isinstance(symbols[0], symbol_class):
         return [symbol.reshape((-1,1)) for symbol in symbols]
     else:
         # numeric only?
@@ -69,7 +73,7 @@ def flatten(symbols, complete=True):
         return [ np.atleast_1d(symbol).reshape(-1)  for symbol in symbols]
 
 def wrap(field, values):
-    if isinstance(values, casadi.MX):
+    if isinstance(values, symbol_class):
         return [values]
     size_cum_sum = np.cumsum([0] + field.list_of('size'))
     # TODO: need to make sure 

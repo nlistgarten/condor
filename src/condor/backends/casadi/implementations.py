@@ -3,7 +3,7 @@ import condor as co
 import numpy as np
 from enum import Enum, auto
 from dataclasses import dataclass
-from condor.backends.casadi.utils import flatten, wrap
+from condor.backends.casadi.utils import flatten, wrap, symbol_class
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 from condor.backends.casadi.shooting_gradient_method import ShootingGradientMethod
 
@@ -57,7 +57,7 @@ class InitializerMixin:
         for field in fields:
             defined_initializers = field.list_of("initializer")
             for solver_var in field:
-                if isinstance(solver_var.initializer, casadi.MX):
+                if isinstance(solver_var.initializer, symbol_class):
                     x0_at_construction.extend(np.zeros(solver_var.size))
                     initializer_exprs.extend(
                         casadi.vertsplit(
@@ -248,7 +248,7 @@ class OptimizationProblem(InitializerMixin):
         if self.has_p:
             p = casadi.vertcat(*flatten(args))
             initializer_args += [p]
-        if not self.has_p or not isinstance(args[0], casadi.MX):
+        if not self.has_p or not isinstance(args[0], symbol_class):
             self.x0 = casadi.vertcat(
                 #*self.variable_initializer_func(*initializer_args)
                 *self.initializer_func(*initializer_args)
@@ -260,7 +260,7 @@ class OptimizationProblem(InitializerMixin):
             )
 
             out = self.optimizer(**call_args)
-            if not self.has_p or not isinstance(args[0], casadi.MX):
+            if not self.has_p or not isinstance(args[0], symbol_class):
                 self.x0 = out["x"]
 
             model_instance.bind_field(self.model.variable, out["x"])
@@ -292,7 +292,7 @@ def get_state_setter(field, setter_args, default=0.):
     default None to pass through
     """
     setter_exprs = []
-    if isinstance(setter_args, casadi.MX):
+    if isinstance(setter_args, symbol_class):
         setter_args = [setter_args]
 
     for state in field._matched_to:
@@ -308,12 +308,12 @@ def get_state_setter(field, setter_args, default=0.):
         else:
             raise ValueError
 
-        if isinstance(setter_symbol, casadi.MX):
+        if isinstance(setter_symbol, symbol_class):
             setter_exprs.extend(
                 casadi.vertsplit(setter_symbol.reshape((state.size,1)))
             )
         else:
-            # casadi.MX is always a matrix, and broadcast_to cannot handle (n,) to (n,1)
+            # symbol_class is always a matrix, and broadcast_to cannot handle (n,) to (n,1)
             if state.shape[1] == 1:
                 setter_exprs.append(
                     np.broadcast_to(setter_symbol, state.size).reshape(-1)
@@ -343,13 +343,13 @@ class TrajectoryAnalysis:
 
         self.p = casadi.vertcat(*flatten(model.parameter))
         self.x = casadi.vertcat(*flatten(ode_model.state))
-        self.lamda = casadi.MX.sym("lambda", ode_model.state._count)
+        self.lamda = symbol_class.sym("lambda", ode_model.state._count)
         self.simulation_signature = [
             self.p,
             self.ode_model.t,
             self.x,
         ]
-        self.sym_event_channel = casadi.MX.sym('event_channel')
+        self.sym_event_channel = symbol_class.sym('event_channel')
 
         self.traj_out_expr = casadi.vertcat(*flatten(
             model.trajectory_output
