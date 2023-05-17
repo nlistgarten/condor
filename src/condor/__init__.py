@@ -262,20 +262,21 @@ class ModelType(type):
         # give references to IndependentVariable backend_repr`s conveniently for
         # constructing InnerModel symbols. They get cleaned up since they live in the
         # outer model
-        attrs_from_outer = attrs.pop('__from_outer__', None)
-        if attrs_from_outer:
-            for attr_name, attr_val in attrs_from_outer.items():
-                if attrs[attr_name] is attr_val:
-                    attrs.pop(attr_name)
-                else:
-                    # TODO: make this a warning/error? add test (really for all
-                    # warning/error raise)
-                    # Or allow silent passage of redone variables? eg copying
-                    # but copying is a special case that can be guarded...
-                    print(f"{attr_name} was defined on outer of {name}")
+        attrs_from_outer = attrs.pop('__from_outer__', {})
+        for attr_name, attr_val in attrs_from_outer.items():
+            if attrs[attr_name] is attr_val:
+                attrs.pop(attr_name)
+            else:
+                # TODO: make this a warning/error? add test (really for all
+                # warning/error raise)
+                # Or allow silent passage of redone variables? eg copying
+                # but copying is a special case that can be guarded...
+                print(f"{attr_name} was defined on outer of {name}")
 
         print("CondorModelType.__new__ for", name, bases, kwargs)
         print(attrs)
+
+
 
         # perform as much processing as possible before caller super().__new__
         # by building up super_attrs from attrs; some operations need to operate on the
@@ -290,9 +291,19 @@ class ModelType(type):
         else:
             super_attrs['_parent_name'] = ''
 
+        inner_to=kwargs.pop('inner_to', None)
+        inner_through=kwargs.pop('inner_through', None)
+        copy_fields=kwargs.pop('copy_fields', [])
+
         backend_options = {}
-        independent_fields = [] # used to find free symbols and replace with symbol
         matched_fields = []
+
+        # used to find free symbols and replace with symbol, seeded with outer model
+        independent_fields = [
+            v for k, v in attrs_from_outer.items()
+            if isinstance(v, IndependentField) and k not in copy_fields
+        ]
+
 
         # will be used to pack arguments in (inputs) and unpack results (output), other
         # convenience
@@ -312,6 +323,8 @@ class ModelType(type):
             output_fields = output_fields,
             input_names = input_names,
             output_names = output_names,
+            internal_fields = internal_fields,
+            independent_fields = independent_fields,
             inner_models = [],
             __original_attrs__ = orig_attrs,
         ))
@@ -359,7 +372,13 @@ class ModelType(type):
                         else:
                             symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
                         attr_val = symbol
-                        pass_attr = False
+                        # pass attr if field is bound (_model is a constructed Model
+                        # class, not None), otherwise will get added later after more
+                        # processing
+                        pass_attr = free_field._model is not None
+                        if pass_attr:
+                            # TODO is this kind of defensive checking useful?
+                            assert issubclass(free_field._model, inner_to)
                         break
 
                 # TODO: MatchedField in "free" mode
@@ -399,14 +418,22 @@ class ModelType(type):
                 matched_symbol.update_name()
 
         # symbols from input and input fields are added directly to model
-        # all fields are "finalized" by creating dataclass
+        # previously, all fields were  "finalized" by creating dataclass
+        # ODESystem has no implementation and not all the fields should be finalized 
+        # Events may create new parameters that are canonical to the ODESystem model,
+        # and should be not be finalized until a trajectory analysis, which has its own
+        # copy. state must be fully defined by ODEsystem and can/should be finalized.
+        # What about output? Should fields have an optional skip_finalize or something
+        # that for when an inner class may modify it so don't finalize? And is that the
+        # only time it would come up?
+        # TODO: review this 
+
         for input_field in input_fields:
             for in_symbol in input_field:
                 in_name = in_symbol.name
                 check_attr_name(in_name, in_symbol, super_attrs, bases)
                 super_attrs[in_name] = in_symbol
                 input_names.append(in_name)
-            input_field.create_dataclass()
 
         for internal_field in internal_fields:
             internal_field.create_dataclass()
@@ -425,10 +452,6 @@ class ModelType(type):
         orig_doc = attrs.get("__doc__", "")
         super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
-
-        inner_to=kwargs.pop('inner_to', None)
-        inner_through=kwargs.pop('inner_through', None)
-        copy_fields=kwargs.pop('copy_fields', [])
 
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
 
@@ -540,9 +563,14 @@ class ModelType(type):
                     break
 
         if implementation is not None:
+            cls.finalize_input_fields(new_cls)
             new_cls.implementation = implementation(new_cls, **backend_option)
 
         return new_cls
+
+    def finalize_input_fields(cls):
+        for input_field in cls.input_fields:
+            input_field.create_dataclass()
 
 
 def check_attr_name(attr_name, attr_val, super_attrs, bases):
