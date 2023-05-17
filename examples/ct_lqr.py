@@ -16,8 +16,8 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     Q = np.eye(2)
     R = np.eye(1)
     tf = 32.
-    cost = trajectory_output(integrand= (x.T@Q@x + (K@x).T @ R @ (K@x))/2)
-    #cost = trajectory_output(integrand= x.T@Q@x + u.T @ R @ u)
+    u = output.u
+    cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
 
     class Casadi(co.Options):
         nsteps = 5000
@@ -31,6 +31,7 @@ LTI_plot(ct_sim)
 
 ct_sim = DblIntLQR([0., 0.,])
 LTI_plot(ct_sim)
+
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class CtOptLQR(co.OptimizationProblem):
@@ -50,5 +51,4 @@ jac_callback = lqr_are.implementation.callback.jac_callback
 jac_callback(K, [0])
 
 print(lqr_sol._stats)
-plt.show()
 

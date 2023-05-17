@@ -349,7 +349,10 @@ class AssignedField(Field, default_direction=Direction.output):
                 # these reasons, ditch intermediate stuff.
                 **asdict(symbol_data)
             )
-            super().__setattr__(name, self._symbols[-1])
+            #super().__setattr__(name, self._symbols[-1])
+
+    def __getattr__(self, name):
+        return self.get(name=name).backend_repr
 
 
 @dataclass(repr=False)
@@ -416,5 +419,5 @@ class MatchedField(Field,):
             # on direction? Does matched need two other direction options for internal
             # get vs set? or is that a separate type of matchedfield?
             raise ValueError
-        return item
+        return item.backend_repr
 
