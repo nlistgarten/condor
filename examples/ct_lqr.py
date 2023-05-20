@@ -19,11 +19,6 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     u = output.u
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
 
-    class Casadi(co.Options):
-        nsteps = 5000
-        atol = 1e-15
-        #max_step = 1.
-
 
 
 ct_sim = DblIntLQR([1, .1])

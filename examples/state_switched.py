@@ -35,10 +35,8 @@ class Transfer(DblInt.TrajectoryAnalysis):
     tf = 100.
 
     class Casadi(co.Options):
-        nsteps = 5000
-        atol = 1e-15
-        #rtol = 1e-12
-        #max_step = 0.5
+        use_lam_te_p = False
+        include_lam_dot = True
 
 
 from condor.backends.casadi.implementations import OptimizationProblem

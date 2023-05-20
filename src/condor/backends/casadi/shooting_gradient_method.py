@@ -5,7 +5,7 @@ from simupy.block_diagram import DEFAULT_INTEGRATOR_OPTIONS
 import numpy as np
 from scipy import interpolate
 
-DEBUG_LEVEL = 1
+DEBUG_LEVEL = 0
 
 
 def adjoint_wrapper(f, p, res, segment_slice):
@@ -226,7 +226,6 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
                 delta_xs = xtep - xtem
 
-                lam_dot = adjoint_sys.state_equation_function(tep, lamdaf)
 
                 lamda0s[idx] = ((
                     self.i.dh_dxs[event_channel](p, tem, xtem, event_channel).T
@@ -236,13 +235,19 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     + self.i.d2te_dxdts[event_channel](p, tem, xtem).T @ delta_xs.T
                 ) @ lamdaf).toarray().reshape(-1)
 
-                # correct for sampled LQR
-                use_lamda = lamdaf[None, :]
+                if self.i.use_lam_te_p:
+                    # correct for sampled LQR
+                    use_lamda = lamdaf[None, :]
+                else:
+                    # dramatically improves state-switch but incorrect for sampled LQR
+                    # state-switch not actually good
+                    # but really good for time switched!!!
+                    use_lamda = lamda0s[idx][None, :] 
 
-                # dramatically improves state-switch but incorrect for sampled LQR
-                # state-switch not actually good
-                # but really good for time switched!!!
-                use_lamda = lamda0s[idx][None, :] 
+                if self.i.include_lam_dot:
+                    lam_dot = adjoint_sys.state_equation_function(tep, lamdaf)
+                else:
+                    lam_dot = 0.
 
 
                 jac[idx, :] += use_lamda @ (
@@ -278,7 +283,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         self.i = intermediate
         self.construct(name, {})
         self.int_options = DEFAULT_INTEGRATOR_OPTIONS.copy()
-        self.int_options.update(self.i.kwargs)
+        self.int_options.update(self.i.integrator_options)
 
     def get_jacobian(self, name, inames, onames, opts):
         if DEBUG_LEVEL:
@@ -309,7 +314,12 @@ args = ([1., 0.], )
         self.simupy_kwargs = simupy_kwargs
         system = DynamicalSystem(**simupy_kwargs, **self.i.sim_shape_data)
         system.initial_condition = self.i.x0(p).toarray().reshape(-1)
+
+        # TODO: tf could be a parameter, then use model_instance to access tf which
+        # should be packed with value. But then need conditional for applying effect of
+        # event time on jacobian? So use terminating event
         tf = getattr(self.i.model, 'tf', self.i.model.default_tf)
+
         self.res = res = system.simulate(tf, integrator_options=self.int_options)
         #event_times, event_channels = np.where(np.diff(np.sign(res.e), axis=0) != 0)
         event_times, event_channels = np.where(

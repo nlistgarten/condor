@@ -33,12 +33,6 @@ class Transfer(DblInt.TrajectoryAnalysis):
     cost = trajectory_output((x.T @ Q @ x)/2)
     tf = 10.
 
-    class Casadi(co.Options):
-        nsteps = 5000
-        atol = 1e-15
-        #rtol = 1e-12
-        #max_step = 0.5
-
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):

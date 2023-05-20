@@ -249,10 +249,12 @@ class OptimizationProblem(InitializerMixin):
             p = casadi.vertcat(*flatten(args))
             initializer_args += [p]
         if not self.has_p or not isinstance(args[0], symbol_class):
-            self.x0 = casadi.vertcat(
-                #*self.variable_initializer_func(*initializer_args)
-                *self.initializer_func(*initializer_args)
-            ).toarray().reshape(-1)
+            self.x0 = self.initializer_func(*initializer_args)
+            if not isinstance(self.x0, casadi.DM):
+                self.x0 = casadi.vertcat(
+                    *self.x0
+                )
+            self.x0 = self.x0.toarray().reshape(-1)
 
         if self.method is OptimizationProblem.Method.ipopt:
             call_args = dict(
@@ -334,11 +336,14 @@ def get_state_setter(field, setter_args, default=0.):
 
 
 class TrajectoryAnalysis:
-    def __init__(self, model, **kwargs):
+    def __init__(self, model, use_lam_te_p=True, include_lam_dot=False,
+                 integrator_options={}):
         self.model = model
         self.ode_model = ode_model = model.inner_to
 
-        self.kwargs = kwargs
+        self.use_lam_te_p = use_lam_te_p
+        self.include_lam_dot = include_lam_dot
+        self.integrator_options = integrator_options
 
 
         self.p = casadi.vertcat(*flatten(model.parameter))
@@ -596,9 +601,12 @@ class TrajectoryAnalysis:
 
     def __call__(self, model_instance, *args):
         out = self.callback(casadi.vertcat(*flatten(args)))
+        if isinstance(out, casadi.MX):
+            out = casadi.vertsplit(out)
+
         model_instance.bind_field(
             self.model.trajectory_output,
-            out
+            out,
         )
         if hasattr(self.callback, 'res'):
             res = self.callback.res

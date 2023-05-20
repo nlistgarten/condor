@@ -14,14 +14,16 @@ dt = 0.5
 DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=dt)
 class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
     initial[x] = [1., 0.1]
-    initial[u] = -K@initial[x].backend_repr
+    initial[u] = -K@initial[x]
     Q = np.eye(2)
     R = np.eye(1)
     tf = 32. # 12 iters, 21 calls 1E-8 jac
     #tf = 16. # 9 iters, 20 calls, 1E-7
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
     class Casadi(co.Options):
-        max_step = .125
+        integrator_options = dict(
+            max_step = .125,
+        )
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class SampledOptLQR(co.OptimizationProblem):
