@@ -63,7 +63,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         if DEBUG_LEVEL > 2:
             print(f"o={self.shot.output.toarray()}")
 
-        assert casadi.is_equal(self.shot.p, args[0])
+        if not casadi.is_equal(self.shot.p, args[0]):
+            self.shot(args[0])
         assert casadi.is_equal(self.shot.res.p, args[0])
         p = args[0]
         o = args[1]
@@ -158,11 +159,14 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             sim_res.event_channels[::-1].tolist() + [None],
         ):
             segment_slice = slice(t0_idx, t1_idx)
-            adjoint_segment_tf = np.diff(sim_res.t[segment_slice][[0, -1]])[0]
+            adjoint_int_opts = self.shot.int_options.copy()
+            tspan = sim_res.t[segment_slice][[-1,0]]
+            adjoint_t_duration = np.diff(tspan)[0]
+            if adjoint_t_duration < adjoint_int_opts['max_step']*2:
+                adjoint_int_opts['max_step'] = adjoint_t_duration/2
             for idx, (lamda0, lamda_dot_func, grad_dot_func,) in enumerate(
                     zip(lamda0s, self.i.lamda_dot_funcs, self.i.grad_dot_funcs)
             ):
-
 
                 adjoint_sys = DynamicalSystem(
                     state_equation_function = adjoint_wrapper(
@@ -178,8 +182,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 adjoint_sys.initial_condition = lamda0
                 try:
                     adjoint_res = adjoint_sys.simulate(
-                        sim_res.t[segment_slice][[-1,0]],
-                        integrator_options=self.shot.int_options
+                        tspan,
+                        integrator_options=adjoint_int_opts
                     )
                 except Exception as e:
                     print(
@@ -187,10 +191,14 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                         f"event_channel: {event_channel}  output idx: {idx}"
                     )
                     raise e
-                integrand_interp = interpolate.make_interp_spline(
-                    adjoint_res.t[::-1],
-                    adjoint_res.y[::-1],
-                )
+                try:
+                    integrand_interp = interpolate.make_interp_spline(
+                        adjoint_res.t[::-1],
+                        adjoint_res.y[::-1],
+                        k=min(3, adjoint_res.t.size-2),
+                    )
+                except Exception as e:
+                    breakpoint()
                 integrand_antideriv = integrand_interp.antiderivative()
                 jac[idx, :] += (
                     integrand_antideriv(sim_res.t[segment_slice][-1]) -

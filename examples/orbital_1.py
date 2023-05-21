@@ -177,7 +177,7 @@ from condor.backends.casadi.implementations import OptimizationProblem
 class Hohmann(co.OptimizationProblem):
     tf = variable(initializer=500.)
     tig = 84.
-    tig = variable(initializer=100.)
+    tig = variable(initializer=200.)
     constraint(tf - tig, lower_bound=30.)
     constraint(tig, lower_bound=0.)
     sim = Sim(
@@ -190,7 +190,7 @@ class Hohmann(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian=False
-        #method = OptimizationProblem.Method.scipy_cg
+        method = OptimizationProblem.Method.scipy_trust_constr
 
 sol = Hohmann()
 
@@ -208,5 +208,5 @@ sim = Sim(
     tem=sol.tf,
 )
 new_sol_jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
-old_sol_sim = sim
+new_sol_sim = sim
 

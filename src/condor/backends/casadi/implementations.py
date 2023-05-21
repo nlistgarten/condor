@@ -7,7 +7,7 @@ from condor.backends.casadi.utils import flatten, wrap, symbol_class
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 from condor.backends.casadi.shooting_gradient_method import ShootingGradientMethod
 
-from scipy.optimize import minimize
+from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 
 class ExplicitSystem:
     def __init__(self, model):
@@ -169,6 +169,7 @@ class OptimizationProblem(InitializerMixin):
     class Method(Enum):
         ipopt = auto()
         scipy_cg = auto()
+        scipy_trust_constr = auto()
         scipy_slsqp = auto()
 
     def __init__(
@@ -235,10 +236,85 @@ class OptimizationProblem(InitializerMixin):
                 [self.f],
             )
             self.f_jac_func = casadi.Function(
-                f"{model.__name__}_objective",
+                f"{model.__name__}_objective_jac",
                 [self.x, self.p],
                 [casadi.jacobian(self.f, self.x)],
             )
+
+            if self.method is OptimizationProblem.Method.scipy_trust_constr:
+                g_split = casadi.vertsplit(self.g)
+                g_jacs = [casadi.jacobian(g, self.x) for g in g_split]
+
+                scipy_constraints = []
+
+                nonlinear_flags = [
+                    casadi.depends_on(g_jac, self.x) for g_jac in g_jacs
+                ]
+
+                # process nonlinear constraints
+                nonlinear_g_fun_exprs = [
+                    g_expr for g_expr, is_nonlinear in zip(g_split, nonlinear_flags)
+                    if is_nonlinear
+                ]
+                self.num_nonlinear_g = len(nonlinear_g_fun_exprs)
+                if self.num_nonlinear_g:
+                    nonlinear_g_jac_exprs = [
+                        g_jac for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
+                        if is_nonlinear
+                    ]
+
+                    self.g_func = casadi.Function(
+                        f"{model.__name__}_nonlinear_constraint",
+                        [self.x, self.p],
+                        [casadi.vertcat(*nonlinear_g_fun_exprs)],
+                    )
+
+
+                    self.g_jac_func =  casadi.Function(
+                        f"{model.__name__}_nonlinear_constraint_jac",
+                        [self.x, self.p],
+                        [casadi.vertcat(*nonlinear_g_jac_exprs)],
+                    )
+
+
+                    self.nonlinear_ub = np.array([
+                        ub for ub, is_nonlinear in zip(self.ubg, nonlinear_flags)
+                        if is_nonlinear
+                    ])
+
+                    self.nonlinear_lb = np.array([
+                        lb for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
+                        if is_nonlinear
+                    ])
+
+
+                # process linear constraints
+                linear_A_exprs = [
+                    g_jac for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
+                    if not is_nonlinear
+                ]
+                self.num_linear_g = len(linear_A_exprs)
+                if self.num_linear_g:
+
+                    self.linear_jac_func = casadi.Function(
+                        f"{model.__name__}_A",
+                        [self.p], [casadi.vertcat(*linear_A_exprs)],
+                    )
+
+                    self.linear_ub = np.array([
+                        ub for ub, is_nonlinear in zip(self.ubg, nonlinear_flags)
+                        if not is_nonlinear
+                    ])
+
+                    self.linear_lb = np.array([
+                        lb for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
+                        if not is_nonlinear
+                    ])
+
+
+
+
+
 
 
 
@@ -269,19 +345,50 @@ class OptimizationProblem(InitializerMixin):
             model_instance.bind_field(self.model.constraint, out["g"])
             model_instance.objective = out["f"].toarray()[0,0]
             self.stats = model_instance._stats = self.optimizer.stats()
-        elif self.method is OptimizationProblem.Method.scipy_cg:
+        else:
             if self.has_p:
                 extra_args = (p,)
             else:
                 extra_args = ([],)
+
+            scipy_constraints = []
+
+            if self.method is OptimizationProblem.Method.scipy_cg:
+                method_string = "CG"
+
+            elif self.method is OptimizationProblem.Method.scipy_trust_constr:
+                method_string = "trust-constr"
+                if self.num_linear_g:
+                    scipy_constraints.append(
+                        LinearConstraint(
+                            A = self.linear_jac_func(*extra_args).sparse(),
+                            ub = self.linear_ub,
+                            lb = self.linear_lb,
+                            keep_feasible=True,
+                        )
+                    )
+                if self.num_nonlinear_g:
+                    scipy_constraints.append(
+                        NonlinearConstraint(
+                            fun=(lambda *args:
+                                 self.g_func(*args, *extra_args).toarray().squeeze()
+                            ),
+                            jac=(lambda *args:
+                                 self.g_jac_func(*args, *extra_args).sparse()
+                            ),
+                            lb=self.nonlinear_lb, ub=self.nonlinear_ub
+                        )
+                    )
+
 
 
             min_out = minimize(
                 lambda *args: self.f_func(*args).toarray().squeeze(),
                 self.x0,
                 jac=lambda *args: self.f_jac_func(*args).toarray().squeeze(),
-                method='CG',
+                method=method_string,
                 args = extra_args,
+                constraints = scipy_constraints,
             )
             model_instance.bind_field(self.model.variable, min_out.x)
             model_instance.objective = min_out.fun
