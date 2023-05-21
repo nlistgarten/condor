@@ -628,14 +628,14 @@ class Model(metaclass=ModelType):
                 raise ValueError
             input_kwargs[input_name] = input_val
         input_kwargs.update(kwargs)
-        self.input_kwargs = input_kwargs
+        self.input_kwargs = {name: input_kwargs[name] for name in cls.input_names}
 
         # TODO: check bounds on model inputs?
 
         # pack into dot-able storage, over-writting fields and symbols
         self.bind_input_fields()
 
-        cls.implementation(self, *list(input_kwargs.values()))
+        cls.implementation(self, *list(self.input_kwargs.values()))
 
         # generally implementations are responsible for binding computed values.
         # implementations know about models, models don't know about implementations

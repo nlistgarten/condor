@@ -5,7 +5,7 @@ from simupy.block_diagram import DEFAULT_INTEGRATOR_OPTIONS
 import numpy as np
 from scipy import interpolate
 
-DEBUG_LEVEL = 0
+DEBUG_LEVEL = 1
 
 
 def adjoint_wrapper(f, p, res, segment_slice):
@@ -60,6 +60,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             print("args",args)
             if hasattr(self.shot, "p"):
                 print(f"p={self.shot.p}")
+        if DEBUG_LEVEL > 2:
             print(f"o={self.shot.output.toarray()}")
 
         assert casadi.is_equal(self.shot.p, args[0])
@@ -114,7 +115,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         ]
         for i_out, grad0_func in enumerate(self.i.grad0_funcs):
             jac[i_out, :] = grad0_func(p, sim_res.x[-1], sim_res.t[-1])
-        if DEBUG_LEVEL:
+        if DEBUG_LEVEL > 2:
             print("initial jacobian:", jac.toarray())
 
         # TODO: make sure this is robust enough:
@@ -139,14 +140,14 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 # doesn't really affect state switch, which is only one that should
                 # matter
                 use_lamda = lamda0[None, :]
-                #use_lamda = lamda0s[idx][None, :]
+                use_lamda = lamda0s[idx][None, :]
 
                 jac[idx, :] += -use_lamda @ (
                     fxf @ self.i.dte_dps[event_channel](p, tf, xf)
                     #- xf[:, None] @ self.i.d2te_dpdts[event_channel](p, tf, xf).T
                 )
 
-        if DEBUG_LEVEL:
+        if DEBUG_LEVEL > 2:
             print("terminal event:", jac.toarray())
 
 
@@ -181,7 +182,10 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                         integrator_options=self.shot.int_options
                     )
                 except Exception as e:
-                    breakpoint()
+                    print(
+                        "getting error during adjoint simulation",
+                        f"event_channel: {event_channel}  output idx: {idx}"
+                    )
                     raise e
                 integrand_interp = interpolate.make_interp_spline(
                     adjoint_res.t[::-1],
@@ -257,13 +261,13 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     ) @ self.i.dte_dps[event_channel](p, tem, xtem)
                     - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
                 )
-            if DEBUG_LEVEL:
+            if DEBUG_LEVEL > 2:
                 print("event", event_channel, jac.toarray())
 
             self.res = adjoint_res
 
 
-        if DEBUG_LEVEL:
+        if DEBUG_LEVEL > 2:
             print('computed jac:',jac.toarray())
         return jac,
 
