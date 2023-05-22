@@ -86,6 +86,7 @@ class MajorBurn(LinCovCW.Event):
     tem = parameter() # time end maneuver
 
     function = t - tig
+    at_time = [tig]
 
     t_d = tem - tig
 
@@ -135,8 +136,10 @@ class MajorBurn(LinCovCW.Event):
 
 class Terminate(LinCovCW.Event):
     terminate = True
-    #tf_ = parameter()
+    # TODO: how to make a symbol like this just provide the backend repr? or is this
+    # correct?
     function = t - MajorBurn.tem.backend_repr
+    at_time = [MajorBurn.tem.backend_repr]
 
 
 class Sim(LinCovCW.TrajectoryAnalysis):
@@ -154,11 +157,17 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     class Casadi(co.Options):
         use_lam_te_p = True
         include_lam_dot = False
+        # old result possibly used lam(te_p) for tf but lam(te_m) for ti?
 
-        #integrator_options = dict(
-        #    rtol = 1E-9,
-        #    atol = 1E-15,
-        #)
+        #use_lam_te_p = False
+
+        integrator_options = dict(
+            #name="dop853",
+            #rtol = 1E-9,
+            #atol = 1E-12,
+            nsteps = 10_000,
+            max_step = 30.,
+        )
 
 from scipy.io import loadmat
 Cov_0_matlab = loadmat('P_aug_0.mat')['P_aug_0'][0]
@@ -175,9 +184,9 @@ sim_kwargs = dict(
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class Hohmann(co.OptimizationProblem):
-    tf = variable(initializer=500.)
     tig = 84.
     tig = variable(initializer=200.)
+    tf = variable(initializer=500.)
     constraint(tf - tig, lower_bound=30.)
     constraint(tig, lower_bound=0.)
     sim = Sim(
@@ -194,6 +203,16 @@ class Hohmann(co.OptimizationProblem):
 
 sol = Hohmann()
 
+import sys
+sys.exit()
+
+sim = Sim(
+    **sim_kwargs,
+    tig=200.,
+    tem=500.,
+)
+jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+
 sim = Sim(
     **sim_kwargs,
     tig=84.08964425,
@@ -201,6 +220,7 @@ sim = Sim(
 )
 old_sol_jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 old_sol_sim = sim
+
 
 sim = Sim(
     **sim_kwargs,

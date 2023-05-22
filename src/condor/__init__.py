@@ -366,7 +366,7 @@ class ModelType(type):
                     if isinstance(symbol, BaseSymbol):
                         known_symbol_type = True
                         if symbol.name and symbol.name != attr_name:
-                            raise NameError(f"Symbol on {free_field} has name {symbo.name} but assigned to {attr_name}")
+                            raise NameError(f"Symbol on {free_field} has name {symbol.name} but assigned to {attr_name}")
                         if attr_name:
                             symbol.name = attr_name
                         else:

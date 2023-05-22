@@ -529,6 +529,10 @@ class TrajectoryAnalysis:
 
             for e in ode_model.Event.subclasses
         ]
+        self.exact_times = [
+            getattr(event, 'at_time', [casadi.inf])[0]
+            for event in ode_model.Event.subclasses
+        ]
 
         self.sim_shape_data = dict(
             dim_state = ode_model.state._count,

@@ -12,11 +12,13 @@ def adjoint_wrapper(f, p, res, segment_slice):
     x_interp = interpolate.make_interp_spline(
         res.t[segment_slice],
         res.x[segment_slice, :],
+        bc_type=["natural", "natural"],
     )
+    t0, t1 = res.t[segment_slice][[0, -1]]
     return (
         lambda t, adjoint, output=None, **kwargs:
-        f(
-            p, x_interp(t), t, adjoint, *kwargs.values()
+        -f(
+            p, x_interp(t1-t), t1-t, adjoint, *kwargs.values()
         ).toarray().reshape(-1)
     )
 
@@ -74,41 +76,6 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         # TODO: eventually, for cases where n > dim_state, compute adjoint for terminal
         # condition of each state, by linearity compute jacobian of desired outputs
 
-        # for each output
-            # initialize pJpp = 0 --> store directly in jac? oh this is dphi/dp
-            # initialize lamda = dphi/dx
-            # "_dot" = d/dt
-
-        # for each segment:
-            # build df/dx and df/dp
-            # for each output
-                # build dL/dx and dL/dp
-                # optimize for L = 0?
-                # integrate lamda_dot = df/dx.T @ lamda + dL/dx
-                # integrate pJpp_dot = df/dp.T @ lamda + dL/dp
-                # update lambda and pJpp for each event
-
-
-        # OR:
-
-        # df/{dx and dp}, built during init
-        # for each output:
-            # {dL}/{dx, dp} built during init
-            # use {dphi}/{dx, dp} to initialize. Need to know if terminated by an event.
-            # Does simupy append an update state if needed? is it ever needed? or
-            # inherently event occurance for termination -> no update? How to make sure
-            # channel found?
-        # for each segment:
-            # build x(t)
-            # for each output
-                # integrate lamda_dot = df/dx.T @ lamda + dL/dx
-                # integrate pJpp_dot = df/dp.T @ lamda + dL/dp
-                # update lambda and pJpp for each event
-                # since we'll have (potentially) multiple 
-
-        # OR
-        # use simupy event to trigger each segment, provide each update?
-
         sim_res = self.shot.res
         lamda0s = [
             lamda0_func(p, sim_res.x[-1], sim_res.t[-1]).toarray().reshape(-1)
@@ -143,6 +110,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 use_lamda = lamda0[None, :]
                 use_lamda = lamda0s[idx][None, :]
 
+
+                #breakpoint()
                 jac[idx, :] += -use_lamda @ (
                     fxf @ self.i.dte_dps[event_channel](p, tf, xf)
                     #- xf[:, None] @ self.i.d2te_dpdts[event_channel](p, tf, xf).T
@@ -160,7 +129,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         ):
             segment_slice = slice(t0_idx, t1_idx)
             adjoint_int_opts = self.shot.int_options.copy()
-            tspan = sim_res.t[segment_slice][[-1,0]]
+            tspan = sim_res.t[segment_slice][[0, -1]]
             adjoint_t_duration = np.diff(tspan)[0]
             if adjoint_t_duration < adjoint_int_opts['max_step']*2:
                 adjoint_int_opts['max_step'] = adjoint_t_duration/2
@@ -182,7 +151,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 adjoint_sys.initial_condition = lamda0
                 try:
                     adjoint_res = adjoint_sys.simulate(
-                        tspan,
+                        adjoint_t_duration,
                         integrator_options=adjoint_int_opts
                     )
                 except Exception as e:
@@ -193,16 +162,18 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     raise e
                 try:
                     integrand_interp = interpolate.make_interp_spline(
-                        adjoint_res.t[::-1],
-                        adjoint_res.y[::-1],
+                        tspan[1] - adjoint_res.t[::-1],
+                        -adjoint_res.y[::-1],
                         k=min(3, adjoint_res.t.size-2),
                     )
                 except Exception as e:
                     breakpoint()
                 integrand_antideriv = integrand_interp.antiderivative()
+                # TOGGLE THIS ONE
+                #breakpoint()
                 jac[idx, :] += (
-                    integrand_antideriv(sim_res.t[segment_slice][-1]) -
-                    integrand_antideriv(sim_res.t[segment_slice][0])
+                    integrand_antideriv(tspan[1]) -
+                    integrand_antideriv(tspan[0])
                 ).reshape((1,-1))
 
                 """
@@ -225,7 +196,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     continue
 
                 tep = sim_res.t[t0_idx]
-                xtep = sim_res.t[t0_idx]
+                xtep = sim_res.x[t0_idx]
                 tem_idx = t0_idx-1
 
                 tem = sim_res.t[tem_idx]
@@ -257,23 +228,26 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     use_lamda = lamda0s[idx][None, :] 
 
                 if self.i.include_lam_dot:
-                    lam_dot = adjoint_sys.state_equation_function(tep, lamdaf)
+                    lam_dot = -adjoint_sys.state_equation_function(tep, lamdaf)
                 else:
                     lam_dot = 0.
 
 
                 jac[idx, :] += use_lamda @ (
                     self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
-                    + (
-                        delta_fs + lam_dot
+                    - (
+                        +delta_fs + lam_dot
                     ) @ self.i.dte_dps[event_channel](p, tem, xtem)
-                    - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
+                    + delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
+                ) + (
+                    adjoint_sys.state_equation_function(tem, lamda0s[idx])[None, :] @
+                    delta_xs @ self.i.dte_dps[event_channel](p, tem, xtem)
                 )
+
             if DEBUG_LEVEL > 2:
                 print("event", event_channel, jac.toarray())
 
             self.res = adjoint_res
-
 
         if DEBUG_LEVEL > 2:
             print('computed jac:',jac.toarray())
