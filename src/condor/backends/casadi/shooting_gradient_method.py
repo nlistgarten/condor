@@ -12,13 +12,11 @@ def adjoint_wrapper(f, p, res, segment_slice):
     x_interp = interpolate.make_interp_spline(
         res.t[segment_slice],
         res.x[segment_slice, :],
-        bc_type=["natural", "natural"],
     )
-    t0, t1 = res.t[segment_slice][[0, -1]]
     return (
         lambda t, adjoint, output=None, **kwargs:
-        -f(
-            p, x_interp(t1-t), t1-t, adjoint, *kwargs.values()
+        f(
+            p, x_interp(t), t, adjoint, *kwargs.values()
         ).toarray().reshape(-1)
     )
 
@@ -129,10 +127,10 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         ):
             segment_slice = slice(t0_idx, t1_idx)
             adjoint_int_opts = self.shot.int_options.copy()
-            tspan = sim_res.t[segment_slice][[0, -1]]
-            adjoint_t_duration = np.diff(tspan)[0]
+            tspan = sim_res.t[segment_slice][[-1, 0]]
+            adjoint_t_duration = -np.diff(tspan)[0]
             if adjoint_t_duration < adjoint_int_opts['max_step']*2:
-                adjoint_int_opts['max_step'] = adjoint_t_duration/2
+                adjoint_int_opts['max_step'] = adjoint_t_duration/4
             for idx, (lamda0, lamda_dot_func, grad_dot_func,) in enumerate(
                     zip(lamda0s, self.i.lamda_dot_funcs, self.i.grad_dot_funcs)
             ):
@@ -151,7 +149,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 adjoint_sys.initial_condition = lamda0
                 try:
                     adjoint_res = adjoint_sys.simulate(
-                        adjoint_t_duration,
+                        tspan,
                         integrator_options=adjoint_int_opts
                     )
                 except Exception as e:
@@ -162,8 +160,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     raise e
                 try:
                     integrand_interp = interpolate.make_interp_spline(
-                        tspan[1] - adjoint_res.t[::-1],
-                        -adjoint_res.y[::-1],
+                        adjoint_res.t[::-1],
+                        adjoint_res.y[::-1],
                         k=min(3, adjoint_res.t.size-2),
                     )
                 except Exception as e:
@@ -172,8 +170,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 # TOGGLE THIS ONE
                 #breakpoint()
                 jac[idx, :] += (
-                    integrand_antideriv(tspan[1]) -
-                    integrand_antideriv(tspan[0])
+                    integrand_antideriv(tspan[0]) -
+                    integrand_antideriv(tspan[1])
                 ).reshape((1,-1))
 
                 """
@@ -231,7 +229,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     use_lamda = lamda0s[idx][None, :] 
 
                 if self.i.include_lam_dot:
-                    lam_dot = -adjoint_sys.state_equation_function(tep, lamdaf)
+                    lam_dot = adjoint_sys.state_equation_function(tep, lamdaf)
                 else:
                     lam_dot = 0.
 
@@ -242,7 +240,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                         +delta_fs + lam_dot
                     ) @ self.i.dte_dps[event_channel](p, tem, xtem)
                     - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
-                ) + (
+                ) - (
                     adjoint_sys.state_equation_function(tem, lamda0s[idx])[None, :] @
                     (delta_xs+0.) @ self.i.dte_dps[event_channel](p, tem, xtem)
                 )

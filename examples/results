@@ -1,5 +1,72 @@
+difference for ct lqr seems to be the boundar conditions on x_interp in adjoint wrapper
+
+     fun: 0.9746747717488164
+     jac: array([ 1.13771775e-06, -1.03498718e-06])
+ message: 'Optimization terminated successfully.'
+    nfev: 17
+     nit: 9
+    njev: 17
+  status: 0
+ success: True
+       x: array([0.99999795, 1.73204583])
+
+also makes sp lqr better:
+     fun: 0.9900483146246063
+     jac: array([ 2.75901268e-08, -1.16815240e-08])
+ message: 'Optimization terminated successfully.'
+    nfev: 21
+     nit: 12
+    njev: 21
+  status: 0
+ success: True
+       x: array([0.66131649, 1.32663953])
+
+time switch:
+     fun: 1.4629706826047088e-11
+     jac: array([-1.77024510e-06, -5.28002925e-06])
+ message: 'Optimization terminated successfully.'
+    nfev: 20
+     nit: 12
+    njev: 20
+  status: 0
+ success: True
+       x: array([3.00004072, 2.99995361])
+
+state switch still broken  need to be going backwards?
+
+orbital good after fixing adjoint max step
+ barrier_parameter: 1.0240000000000006e-08
+ barrier_tolerance: 1.0240000000000006e-08
+          cg_niter: 42
+      cg_stop_cond: 4
+            constr: [array([2755.80431968,   84.09947268])]
+       constr_nfev: [0]
+       constr_nhev: [0]
+       constr_njev: [0]
+    constr_penalty: 1.0
+  constr_violation: 0.0
+    execution_time: 79.29979491233826
+               fun: 0.28500000003972525
+              grad: array([-4.66382733e-09,  3.44991352e-09])
+               jac: [<2x2 sparse matrix of type '<class 'numpy.float64'>'
+	with 3 stored elements in Compressed Sparse Row format>]
+   lagrangian_grad: array([-4.78115410e-09,  3.44615572e-09])
+           message: '`gtol` termination condition is satisfied.'
+            method: 'tr_interior_point'
+              nfev: 29
+              nhev: 0
+               nit: 39
+             niter: 39
+              njev: 29
+        optimality: 4.78115410496791e-09
+            status: 1
+           success: True
+         tr_radius: 807183690.8363969
+                 v: [array([-3.75779664e-12, -1.21084574e-10])]
+                 x: array([  84.09947268, 2839.90379236])
+
 ---------------------------------------------------------------
-Uncommited changes on 36c232c5794eda25b6fe7c985c90a962ab5df4ba:
+d3dc65303f5739b2121b006025d1bc1111eae029:
 ---------------------------------------------------------------
 
 ct lqr:
