@@ -38,6 +38,11 @@ class Transfer(DblInt.TrajectoryAnalysis):
         use_lam_te_p = False
         include_lam_dot = True
 
+"""
+xtep: 3.162277664286934 delta_fs [0.00010635, -1] delta_xs [7.16227766e+00 1.06350492e-04]
+xtep: [-4.59824344  2.96405615] delta_fs [5.91527e-13, -2] delta_xs [5.89661653e-12 5.91526828e-13]
+"""
+
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):

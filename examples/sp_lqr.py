@@ -53,4 +53,7 @@ jac_cb= sampled_sim.implementation.callback.jac_callback
 jac_cb(K, [0.])
 
 print(lqr_sol_samp._stats)
-
+print(lqr_sol_samp.objective < sampled_sim.cost)
+print(lqr_sol_samp.objective, sampled_sim.cost)
+print("      ARE sol:", K,
+    "\niterative sol:", lqr_sol_samp.K)

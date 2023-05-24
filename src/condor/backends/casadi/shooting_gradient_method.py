@@ -197,6 +197,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
                 tep = sim_res.t[t0_idx]
                 xtep = sim_res.x[t0_idx]
+                #xtep = sim_res.t[t0_idx]
                 tem_idx = t0_idx-1
 
                 tem = sim_res.t[tem_idx]
@@ -208,6 +209,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 )
 
                 delta_xs = xtep - xtem
+
+                #print("xtep:", xtep, "delta_fs", delta_fs, "delta_xs", delta_xs)
 
 
                 lamda0s[idx] = ((
@@ -235,13 +238,13 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
                 jac[idx, :] += use_lamda @ (
                     self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
-                    - (
+                    + (
                         +delta_fs + lam_dot
                     ) @ self.i.dte_dps[event_channel](p, tem, xtem)
-                    + delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
+                    - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
                 ) + (
                     adjoint_sys.state_equation_function(tem, lamda0s[idx])[None, :] @
-                    delta_xs @ self.i.dte_dps[event_channel](p, tem, xtem)
+                    (delta_xs+0.) @ self.i.dte_dps[event_channel](p, tem, xtem)
                 )
 
             if DEBUG_LEVEL > 2:

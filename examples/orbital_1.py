@@ -203,6 +203,9 @@ class Hohmann(co.OptimizationProblem):
 
 sol = Hohmann()
 
+print(sol._stats)
+print((sol.tf - sol.tig)*sol.sim.omega*180/np.pi)
+
 import sys
 sys.exit()
 

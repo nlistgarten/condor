@@ -46,4 +46,9 @@ jac_callback = lqr_are.implementation.callback.jac_callback
 jac_callback(K, [0])
 
 print(lqr_sol._stats)
+print(lqr_are.cost, lqr_sol.objective)
+print(lqr_are.cost, lqr_sol.objective)
+print("      ARE sol:", K, 
+    "\niterative sol:", lqr_sol.K)
+
 

@@ -1,0 +1,145 @@
+---------------------------------------------------------------
+Uncommited changes on 36c232c5794eda25b6fe7c985c90a962ab5df4ba:
+---------------------------------------------------------------
+
+ct lqr:
+==============
+     fun: 0.9746747699384586
+     jac: array([ 3.07157188e-06, -1.89278169e-05])
+ message: 'Desired error not necessarily achieved due to precision loss.'
+    nfev: 54
+     nit: 12
+    njev: 44
+  status: 2
+ success: False
+       x: array([0.99991925, 1.7318495 ])
+
+sp lqr:
+==============
+     fun: 0.9900483146316192
+     jac: array([-4.27906575e-06,  6.51896247e-06])
+ message: 'Optimization terminated successfully.'
+    nfev: 21
+     nit: 13
+    njev: 21
+  status: 0
+ success: True
+       x: array([0.66131857, 1.32664499])
+
+
+time switched:
+==============
+     fun: 1.4629661992728185e-11
+     jac: array([-1.77025536e-06, -5.28002070e-06])
+ message: 'Optimization terminated successfully.'
+    nfev: 20
+     nit: 12
+    njev: 20
+  status: 0
+ success: True
+       x: array([3.00004072, 2.99995361])
+
+state switched:
+===============
+
+garbage :(
+
+
+orbital:
+==============
+ barrier_parameter: 1.0240000000000006e-08
+ barrier_tolerance: 1.0240000000000006e-08
+          cg_niter: 42
+      cg_stop_cond: 4
+            constr: [array([2755.80431968,   84.09947268])]
+       constr_nfev: [0]
+       constr_nhev: [0]
+       constr_njev: [0]
+    constr_penalty: 1.0
+  constr_violation: 0.0
+    execution_time: 81.1555073261261
+               fun: 0.28500000003972525
+              grad: array([-4.66382733e-09,  3.44991352e-09])
+               jac: [<2x2 sparse matrix of type '<class 'numpy.float64'>'
+	with 3 stored elements in Compressed Sparse Row format>]
+   lagrangian_grad: array([-4.78115410e-09,  3.44615572e-09])
+           message: '`gtol` termination condition is satisfied.'
+            method: 'tr_interior_point'
+              nfev: 29
+              nhev: 0
+               nit: 39
+             niter: 39
+              njev: 29
+        optimality: 4.78115410496791e-09
+            status: 1
+           success: True
+         tr_radius: 807183690.8363969
+                 v: [array([-3.75779664e-12, -1.21084574e-10])]
+                 x: array([  84.09947268, 2839.90379236])
+
+
+--------------------------------------------
+on 36c232c5794eda25b6fe7c985c90a962ab5df4ba:
+--------------------------------------------
+ct and sp lqr are same,
+time switch is broken,
+state switch is even worse (CG doesn't move at all)
+orbital seems fine
+
+--------------------------------------------
+on 8ab8a7e57324c86dbb6704a2fae9a3435eaeb608
+--------------------------------------------
+
+ct lqr:
+==============
+     fun: 0.974674771911601
+     jac: array([-6.73104891e-09, -9.07986995e-09])
+ message: 'Optimization terminated successfully.'
+    nfev: 18
+     nit: 9
+    njev: 18
+  status: 0
+ success: True
+       x: array([0.99999949, 1.73205199])
+
+sp lqr:
+==============
+     fun: 0.9900483146246069
+     jac: array([ 2.75901246e-08, -1.16815248e-08])
+ message: 'Optimization terminated successfully.'
+    nfev: 21
+     nit: 12
+    njev: 21
+  status: 0
+ success: True
+       x: array([0.66131649, 1.32663953])
+
+same number of fev but fewer iters? very slightly better performance
+     fun: 0.9900483146 246069
+     fun: 0.9900483146 316192
+
+
+time switched:
+==============
+     fun: 6.437154366120429e-13
+     jac: array([5.26732230e-06, 5.80823391e-07])
+ message: 'Optimization terminated successfully.'
+    nfev: 37
+     nit: 15
+    njev: 37
+  status: 0
+ success: True
+       x: array([3.00004126, 2.99995965])
+
+
+state switched:
+===============
+
+works but only because of typo with options that may not make sense
+
+orbital
+========
+simupy doesn't simulate one of the adjoint intervals to sufficient tolerance in time for some reason
+
+
+
