@@ -165,6 +165,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                         k=min(3, adjoint_res.t.size-2),
                     )
                 except Exception as e:
+                    print(e)
                     breakpoint()
                 integrand_antideriv = integrand_interp.antiderivative()
                 # TOGGLE THIS ONE
@@ -219,14 +220,16 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     + self.i.d2te_dxdts[event_channel](p, tem, xtem).T @ delta_xs.T
                 ) @ lamdaf).toarray().reshape(-1)
 
+                lamda_te_p = lamdaf
+                lamda_te_m = lamda0s[idx]
                 if self.i.use_lam_te_p:
                     # correct for sampled LQR
-                    use_lamda = lamdaf[None, :]
+                    use_lamda = lamda_te_p[None, :]
                 else:
                     # dramatically improves state-switch but incorrect for sampled LQR
                     # state-switch not actually good
                     # but really good for time switched!!!
-                    use_lamda = lamda0s[idx][None, :] 
+                    use_lamda = lamda_te_m[None, :]
 
                 if self.i.include_lam_dot:
                     lam_dot = adjoint_sys.state_equation_function(tep, lamdaf)
@@ -234,15 +237,20 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     lam_dot = 0.
 
 
+                #breakpoint()
                 jac[idx, :] += use_lamda @ (
                     self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
                     + (
-                        +delta_fs + lam_dot
+                        delta_fs 
                     ) @ self.i.dte_dps[event_channel](p, tem, xtem)
                     - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
                 ) - (
-                    adjoint_sys.state_equation_function(tem, lamda0s[idx])[None, :] @
-                    (delta_xs+0.) @ self.i.dte_dps[event_channel](p, tem, xtem)
+                    (1*adjoint_sys.state_equation_function(tem, lamda_te_m)[None, :] -
+                    1*adjoint_sys.state_equation_function(tep, lamda_te_p)[None, :]) @
+                    (delta_xs) @ self.i.dte_dps[event_channel](p, tem, xtem)
+                ) - (
+                    (lamda_te_p - lamda_te_m)[None, :]  @ self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
+                    @ (self.i.dte_dps[event_channel](p, tem, xtem).T @ self.i.dte_dps[event_channel](p, tem, xtem))
                 )
 
             if DEBUG_LEVEL > 2:

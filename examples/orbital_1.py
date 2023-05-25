@@ -2,6 +2,7 @@ import numpy as np
 import condor as co
 import casadi as ca
 
+from condor.backends.casadi.implementations import OptimizationProblem
 
 I6 = ca.MX.eye(6)
 Z6 = ca.MX(6, 6)
@@ -50,7 +51,7 @@ class LinCovCW(co.ODESystem):
     Acw[2,5] = 1
 
     Acw[3,5] = 2*omega
-    Acw[4,1] = -2*omega
+    Acw[4,1] = -omega**2
     Acw[5,2] = 3*omega**2
     Acw[5,3] = -2*omega
 
@@ -111,8 +112,10 @@ class MajorBurn(LinCovCW.Event):
     T_pp = stm[:3, :3]
     T_pv = stm[:3, 3:]
     T_pv_inv = ca.solve(T_pv, ca.MX.eye(3))
+
     Delta_v = (T_pv_inv @ rd - T_pv_inv@T_pp @ x[:3, 0]) - x[3:, 0]
 
+    update[Delta_v_mag] = Delta_v_mag + ca.norm_2(Delta_v)
     update[x]  = x + ca.vertcat(Z3, I3) @ (Delta_v)
 
     DG = ca.vertcat(
@@ -125,8 +128,6 @@ class MajorBurn(LinCovCW.Event):
     )
 
     update[C] = Dcal @ C @ Dcal.T + Cov_ctrl_offset
-
-    update[Delta_v_mag] = Delta_v_mag + ca.norm_2(Delta_v)
 
     Mc = DG @ ca.horzcat(Z6, I6)
     sigma_Dv__2 = ca.trace( Mc @ C @ Mc.T)
@@ -155,19 +156,14 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
     class Casadi(co.Options):
-        use_lam_te_p = True
-        include_lam_dot = False
-        # old result possibly used lam(te_p) for tf but lam(te_m) for ti?
-
-        #use_lam_te_p = False
 
         integrator_options = dict(
-            #name="dop853",
-            #rtol = 1E-9,
-            #atol = 1E-12,
+            rtol = 1E-9,
+            atol = 1E-12,
             nsteps = 10_000,
             max_step = 30.,
         )
+
 
 from scipy.io import loadmat
 Cov_0_matlab = loadmat('P_aug_0.mat')['P_aug_0'][0]
@@ -181,10 +177,7 @@ sim_kwargs = dict(
     rd=[500., 0., 0.],
 )
 
-
-from condor.backends.casadi.implementations import OptimizationProblem
 class Hohmann(co.OptimizationProblem):
-    tig = 84.
     tig = variable(initializer=200.)
     tf = variable(initializer=500.)
     constraint(tf - tig, lower_bound=30.)
@@ -195,26 +188,55 @@ class Hohmann(co.OptimizationProblem):
         **sim_kwargs
     )
 
-    objective = sim.tot_Delta_v_mag #+ 3*sim.tot_Delta_v_disp
+    objective = sim.tot_Delta_v_mag
 
     class Casadi(co.Options):
         exact_hessian=False
         method = OptimizationProblem.Method.scipy_trust_constr
 
-sol = Hohmann()
 
-print(sol._stats)
-print((sol.tf - sol.tig)*sol.sim.omega*180/np.pi)
+class TotalDeltaV(co.OptimizationProblem):
+    tig = variable(initializer=200.)
+    tf = variable(initializer=500.)
+    constraint(tf - tig, lower_bound=30.)
+    constraint(tig, lower_bound=0.)
+    sim = Sim(
+        tig=tig,
+        tem=tf,
+        **sim_kwargs
+    )
+
+    objective = sim.tot_Delta_v_mag + 3*sim.tot_Delta_v_disp
+
+    class Casadi(co.Options):
+        exact_hessian=False
+        method = OptimizationProblem.Method.scipy_trust_constr
+
+
+##############
+
+hohmann = Hohmann()
+hohmann_sim = Sim(**sim_kwargs, tig=hohmann.tig, tem=hohmann.tf)
+total_delta_v  = TotalDeltaV()
+tot_delta_v_sim = Sim(**sim_kwargs, tig=total_delta_v.tig, tem=total_delta_v.tf)
+
+print(hohmann._stats)
+print((hohmann.tf - hohmann.tig)*hohmann.sim.omega*180/np.pi)
+
+print(hohmann_sim.tot_Delta_v_disp)
+
+
+
+print(total_delta_v._stats)
+print((total_delta_v.tf - total_delta_v.tig)*total_delta_v.sim.omega*180/np.pi)
+
+print(tot_delta_v_sim.final_pos_disp)
 
 import sys
 sys.exit()
 
-sim = Sim(
-    **sim_kwargs,
-    tig=200.,
-    tem=500.,
-)
-jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+
+
 
 sim = Sim(
     **sim_kwargs,
@@ -233,3 +255,18 @@ sim = Sim(
 new_sol_jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 new_sol_sim = sim
 
+
+sim = Sim(
+    **sim_kwargs,
+    tig=200.,
+    tem=500.,
+)
+jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+print(jac[:2, -2:])
+
+DG = ca.Function(
+    "DG", 
+    [LinCovCW.omega.backend_repr, MajorBurn.tig.backend_repr, MajorBurn.tem.backend_repr],
+    [MajorBurn.DG]
+)
+DG(sim.omega, sim.tig, sim.tem)
