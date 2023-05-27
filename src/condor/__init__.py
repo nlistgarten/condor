@@ -982,6 +982,8 @@ class ODESystem(Model):
     # TODO: add event times/event channels to SimulationResult during detection
     # TODO: pass in a SimulationResult object to simulate to append to?
 
+    # TODO: don't like hacks to simupy to make it work...
+
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
     initial = MatchedField(state)

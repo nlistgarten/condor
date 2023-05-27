@@ -206,6 +206,8 @@ class TotalDeltaV(co.OptimizationProblem):
         **sim_kwargs
     )
 
+    constraint(sim.final_pos_disp, upper_bound=10.)
+
     objective = sim.tot_Delta_v_mag + 3*sim.tot_Delta_v_disp
 
     class Casadi(co.Options):
@@ -217,6 +219,7 @@ class TotalDeltaV(co.OptimizationProblem):
 
 hohmann = Hohmann()
 hohmann_sim = Sim(**sim_kwargs, tig=hohmann.tig, tem=hohmann.tf)
+
 total_delta_v  = TotalDeltaV()
 tot_delta_v_sim = Sim(**sim_kwargs, tig=total_delta_v.tig, tem=total_delta_v.tf)
 
@@ -224,8 +227,6 @@ print(hohmann._stats)
 print((hohmann.tf - hohmann.tig)*hohmann.sim.omega*180/np.pi)
 
 print(hohmann_sim.tot_Delta_v_disp)
-
-
 
 print(total_delta_v._stats)
 print((total_delta_v.tf - total_delta_v.tig)*total_delta_v.sim.omega*180/np.pi)
@@ -263,6 +264,7 @@ sim = Sim(
 )
 jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 print(jac[:2, -2:])
+
 
 DG = ca.Function(
     "DG", 

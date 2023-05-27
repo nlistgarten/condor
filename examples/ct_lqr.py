@@ -34,7 +34,9 @@ class CtOptLQR(co.OptimizationProblem):
     objective = DblIntLQR(K).cost
 
     class Casadi(co.Options):
+        exact_hessian = False
         method = OptimizationProblem.Method.scipy_cg
+        #method = OptimizationProblem.Method.scipy_trust_constr
 
 lqr_sol = CtOptLQR()
 

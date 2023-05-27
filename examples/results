@@ -1,3 +1,63 @@
+new changes:
+
+sp lqr unchanged
+     fun: 0.9900483146246063
+     jac: array([ 2.75901268e-08, -1.16815240e-08])
+ message: 'Optimization terminated successfully.'
+    nfev: 21
+     nit: 12
+    njev: 21
+  status: 0
+ success: True
+       x: array([0.66131649, 1.32663953])
+True
+0.9900483146246063 0.9901436291165177
+      ARE sol: [[0.65140165 1.31420219]] 
+iterative sol: [[0.66131649 1.32663953]]
+
+time takes one more call 
+     fun: 3.008671643193588e-11
+     jac: array([-4.04760434e-06, -7.51402417e-06])
+ message: 'Optimization terminated successfully.'
+    nfev: 22
+     nit: 12
+    njev: 22
+  status: 0
+ success: True
+       x: array([2.99999968, 2.99999216])
+
+orbital exactly matches previous results, I believe I had this on the previous commit but didn't update results
+barrier_parameter: 5.120000000000003e-08
+ barrier_tolerance: 5.120000000000003e-08
+          cg_niter: 29
+      cg_stop_cond: 1
+            constr: [array([2755.7739505 ,   84.08964518])]
+       constr_nfev: [0]
+       constr_nhev: [0]
+       constr_njev: [0]
+    constr_penalty: 1.0
+  constr_violation: 0.0
+    execution_time: 13.30492091178894
+               fun: 0.2850000000279469
+              grad: array([-4.48257988e-09, -1.47125494e-09])
+               jac: [<2x2 sparse matrix of type '<class 'numpy.float64'>'
+	with 3 stored elements in Compressed Sparse Row format>]
+   lagrangian_grad: array([-5.07195247e-09, -1.49003908e-09])
+           message: '`gtol` termination condition is satisfied.'
+            method: 'tr_interior_point'
+              nfev: 19
+              nhev: 0
+               nit: 28
+             niter: 28
+              njev: 19
+        optimality: 5.07195247211123e-09
+            status: 1
+           success: True
+         tr_radius: 95703125.0
+                 v: [array([-1.87841380e-11, -6.08156734e-10])]
+                 x: array([  84.08964518, 2839.86359568])
+
+I believe this was on f332b533595ce24c0b9ed520d967918d5ec4dc65  ~1?
 difference for ct lqr seems to be the boundar conditions on x_interp in adjoint wrapper
 
      fun: 0.9746747717488164

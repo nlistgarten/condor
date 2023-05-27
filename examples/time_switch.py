@@ -11,17 +11,21 @@ class DblInt(co.ODESystem):
         [0, 0],
     ])
     B = np.array([[0,1]]).T
+
     x = state(shape=A.shape[0])
+    mode = state()
+
     t1 = parameter()
     t2 = parameter()
     # TODO: fix once mode and control work?
     dot[x] = A@x + B*(
-        1*(t < t1)
-        -1*(t >= t1)*(t<(t1+t2))
+        1*(mode == 0.)
+        -1*(mode == 1.)
     )
 
 class Switch1(DblInt.Event):
     function = t - t1
+    update[mode] = 1.
 
 class Switch2(DblInt.Event):
     function = t - t2 - t1
@@ -31,8 +35,7 @@ class Transfer(DblInt.TrajectoryAnalysis):
     initial[x] = [-9., 0.]
     Q = np.eye(2)
     cost = trajectory_output((x.T @ Q @ x)/2)
-    tf = 10.
-
+    #tf = 10.
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
@@ -45,10 +48,25 @@ class MinimumTime(co.OptimizationProblem):
         method = OptimizationProblem.Method.scipy_cg
 
 sim = Transfer(t1=1., t2= 4.,)
+
+jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+"""
+old:
+eval jacobian for jac_Transfer
+args [DM([1, 4]), DM(00)]
+p=[1, 4]
+[[-56.9839, 0]]
+
+
+
+"""
+
 LTI_plot(sim)
+
 #plt.show()
 MinimumTime.implementation.set_initial(t1=2.163165480675697, t2=4.361971866705403)
 opt = MinimumTime()
 
+print(jac)
 print(opt._stats)
 

@@ -34,9 +34,9 @@ class Transfer(DblInt.TrajectoryAnalysis):
     cost = trajectory_output(((x-xd).T @ Q @ (x-xd))/2)
     tf = 100.
 
-    class Casadi(co.Options):
-        use_lam_te_p = False
-        include_lam_dot = True
+    #class Casadi(co.Options):
+        #use_lam_te_p = False
+        #include_lam_dot = True
 
 """
 xtep: 3.162277664286934 delta_fs [0.00010635, -1] delta_xs [7.16227766e+00 1.06350492e-04]

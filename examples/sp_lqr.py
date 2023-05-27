@@ -2,6 +2,7 @@ import numpy as np
 import condor as co
 import matplotlib.pyplot as plt
 from scipy import linalg, signal
+from sgm_test_util import LTI_plot
 
 dblintA = np.array([
     [0, 1],
@@ -22,8 +23,51 @@ class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
     class Casadi(co.Options):
         integrator_options = dict(
-            max_step = .125,
+            max_step = .5/4,
+            #atol = 1E-15,
+            #rtol = 1E-12,
         )
+
+
+"""
+
+(Pdb) t0_idx
+378
+(Pdb) tem_idx
+377
+(Pdb) tep
+31.500000000001
+(Pdb) tem
+31.499999999999
+
+
+# old
+(Pdb) lamda_te_p
+array([2.0875    , 0.57291667, 0.09973958])
+(Pdb) lamda_te_m
+array([2.0875    , 0.57291667, 0.        ])
+(Pdb) jac
+DM([[-0.413919, -0.00997396]])
+
+
+(Pdb) len(rev_event_times_list)
+64
+(Pdb) len(sim_res.event_channels[::-1].tolist())
+63
+
+eval jacobian for jac_DblIntSampledLQR
+args [DM([0, 0]), DM(00)]
+p=[0, 0]
+computed jac: [[-33766.07958293  -1861.97333331]]
+
+
+eval jacobian for jac_DblIntSampledLQR
+args [DM([1.00847, 0.0556103]), DM(00)]
+p=[1.00847, 0.0556103]
+computed jac: [[ 12746.54633657 -38106.02147473]]
+
+
+"""
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class SampledOptLQR(co.OptimizationProblem):
@@ -32,11 +76,19 @@ class SampledOptLQR(co.OptimizationProblem):
     class Casadi(co.Options):
         exact_hessian = False
         method = OptimizationProblem.Method.scipy_cg
+        #method = OptimizationProblem.Method.scipy_trust_constr
+
+
+sim = DblIntSampledLQR([1.00842737, 0.05634044])
+
+sim = DblIntSampledLQR([0., 0.])
+sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+
+
 
 lqr_sol_samp = SampledOptLQR()
-
-sampled_sim = DblIntSampledLQR([0., 0.])
-sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
+#sampled_sim = DblIntSampledLQR([0., 0.])
+#sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
 
 Q = DblIntSampledLQR.Q
 R = DblIntSampledLQR.R

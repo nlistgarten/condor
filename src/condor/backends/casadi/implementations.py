@@ -522,10 +522,12 @@ class TrajectoryAnalysis:
         ]
         self.event_time_only = [
             casadi.depends_on(e.function, ode_model.t) and
+            casadi.jacobian(e.function, ode_model.t).is_constant() and
             not sum([
                 casadi.depends_on(e.function, state)
                 for state in ode_model.state.list_of('backend_repr')
             ])
+
 
             for e in ode_model.Event.subclasses
         ]
@@ -536,7 +538,7 @@ class TrajectoryAnalysis:
 
         self.sim_shape_data = dict(
             dim_state = ode_model.state._count,
-            dim_output = ode_model.output._count,
+            dim_output = self.y_expr.shape[0],
             num_events = len(ode_model.Event.subclasses),
         )
         self.sim_func_kwargs = dict(
