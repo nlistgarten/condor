@@ -3,6 +3,7 @@ import condor as co
 import matplotlib.pyplot as plt
 from sgm_test_util import LTI_plot
 from scipy import linalg
+import casadi as ca
 
 
 class DblInt(co.ODESystem):
@@ -12,16 +13,21 @@ class DblInt(co.ODESystem):
     ])
     B = np.array([[0,1]]).T
     x = state(shape=A.shape[0])
+    mode = state()
     p1 = parameter()
     p2 = parameter()
     # TODO: fix once mode and control work?
     dot[x] = A@x + B*(
-        1*(x[0] < p1)
-        -1*(x[0] >= p1)*(x[0]<(p2))
+        1*(x[0] < p1)*(mode==0.)
+        -1*(x[0] > p1)*(mode==1.)
+        #1*(mode==0.)
+        #-1*(mode==1.)
     )
 
 class Switch1(DblInt.Event):
     function = x[0] - p1
+    #update[x] = x
+    update[mode] = 1.
 
 class Switch2(DblInt.Event):
     function = x[0] - p2
@@ -31,10 +37,19 @@ class Transfer(DblInt.TrajectoryAnalysis):
     initial[x] = [-9., 0.]
     xd = [1., 2.]
     Q = np.eye(2)
-    cost = trajectory_output(((x-xd).T @ Q @ (x-xd))/2)
+    cost = trajectory_output(
+        #ca.norm_2(x-xd)/2
+        #((x-xd).T @ Q @ (x-xd))/2
+        ((x-xd).T @ (x-xd))/2
+    )
     tf = 100.
 
-    #class Casadi(co.Options):
+    class Casadi(co.Options):
+        integrator_options = dict(
+            max_step = 0.5,
+            atol = 1E-15,
+            rtol = 1E-12,
+        )
         #use_lam_te_p = False
         #include_lam_dot = True
 
@@ -46,9 +61,9 @@ xtep: [-4.59824344  2.96405615] delta_fs [5.91527e-13, -2] delta_xs [5.89661653e
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
-    p1 = variable(lower_bound=0)
-    p2 = variable(lower_bound=0)
-    objective = Transfer(p1, p2).cost 
+    p1 = variable()
+    p2 = variable()
+    objective = Transfer(p1, p2).cost
 
     class Casadi(co.Options):
         exact_hessian = False
@@ -56,6 +71,9 @@ class MinimumTime(co.OptimizationProblem):
 
 p0 = -4., -1.
 sim = Transfer(*p0)
+sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+import sys
+sys.exit()
 LTI_plot(sim)
 #plt.show()
 

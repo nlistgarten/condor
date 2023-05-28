@@ -35,8 +35,8 @@ class CtOptLQR(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian = False
-        method = OptimizationProblem.Method.scipy_cg
-        #method = OptimizationProblem.Method.scipy_trust_constr
+        #method = OptimizationProblem.Method.scipy_cg
+        method = OptimizationProblem.Method.scipy_trust_constr
 
 lqr_sol = CtOptLQR()
 

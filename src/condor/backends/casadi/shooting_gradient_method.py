@@ -75,6 +75,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         # TODO: eventually, for cases where n > dim_state, compute adjoint for terminal
         # condition of each state, by linearity compute jacobian of desired outputs
 
+
         sim_res = self.shot.res
         lamda0s = [
             lamda0_func(p, sim_res.x[-1], sim_res.t[-1]).toarray().reshape(-1)
@@ -84,6 +85,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             jac[i_out, :] = grad0_func(p, sim_res.x[-1], sim_res.t[-1])
         if DEBUG_LEVEL > 2:
             print("initial jacobian:", jac.toarray())
+            print("initial lamda:", lamda0s)
 
         # TODO: make sure this is robust enough:
         terminal_event_channels = sim_res.event_select[-1]
@@ -98,17 +100,10 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 xf = sim_res.x[-1]
                 fxf = self.i.sim_func_kwargs["state_equation_function"](p, tf, xf)
 
-                lamda0s[idx] += (
-                    (
-                        self.i.dte_dxs[event_channel](p, tf, xf).T @ fxf.T
-                        #- self.i.d2te_dxdts[event_channel](p, tf, xf).T @ xf.T
-                    ) @ lamda0
-                ).toarray().reshape(-1)
-
                 # doesn't really affect state switch, which is only one that should
                 # matter
                 use_lamda = lamda0[None, :]
-                use_lamda = lamda0s[idx][None, :]
+                #use_lamda = lamda0s[idx][None, :]
 
 
                 jac[idx, :] += -use_lamda @ (
@@ -116,9 +111,20 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     #- xf[:, None] @ self.i.d2te_dpdts[event_channel](p, tf, xf).T
                 )
 
+
+                lamda0s[idx] -= (
+                    (
+                        self.i.dte_dxs[event_channel](p, tf, xf).T @ fxf.T
+                        #- self.i.d2te_dxdts[event_channel](p, tf, xf).T @ xf.T
+                    ) @ lamda0
+                ).toarray().reshape(-1)
+
+
         if DEBUG_LEVEL > 2:
             print("terminal event:", jac.toarray())
-
+            print("tf- lamda:", lamda0s)
+            print("fxf", fxf)
+            print("dte dx", self.i.dte_dxs[event_channel](p, tf, xf).T)
 
         for (t0_idx, t1_idx), event_channel, in zip(
             sim_res.span_idxs[::-1],
@@ -239,7 +245,6 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     lam_dot = 0.
 
 
-                #breakpoint()
                 jac[idx, :] += use_lamda @ (
                     self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
                     + (
@@ -250,13 +255,26 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     (1*adjoint_sys.state_equation_function(tem, lamda_te_m)[None, :] -
                     1*adjoint_sys.state_equation_function(tep, lamda_te_p)[None, :]) @
                     (delta_xs) @ self.i.dte_dps[event_channel](p, tem, xtem)
-                ) - (
+                ) - 1*(
                     (lamda_te_p - lamda_te_m)[None, :]  @ self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
                     @ (self.i.dte_dps[event_channel](p, tem, xtem).T @ self.i.dte_dps[event_channel](p, tem, xtem))
                 )
 
-            if DEBUG_LEVEL > 2:
-                print("event", event_channel, jac.toarray())
+                if DEBUG_LEVEL > 2:
+                    print("event", event_channel, jac.toarray())
+                    print("lamda te p")
+                    print(use_lamda, lamda_te_p )
+                    print("delta fs")
+                    print(delta_fs)
+                    print("delta xs")
+                    print(delta_xs)
+                    print("dte dps")
+                    print(self.i.dte_dps[event_channel](p, tem, xtem))
+                    print("dh dps")
+                    print(self.i.dh_dps[event_channel](p, tem, xtem, event_channel))
+                    print("lamda te m")
+                    print( lamda_te_m)
+
 
             self.res = adjoint_res
 
@@ -340,15 +358,14 @@ args = ([1., 0.], )
 
         int_options = self.int_options.copy()
         print(ts)
+        #breakpoint()
         for idx, t0, t1 in zip(range(len(ts)), ts, ts[1:]):
             half_span = (t1 - t0)/4
             if int_options['max_step'] == 0 or int_options['max_step'] > half_span:
                 int_options['max_step'] = half_span
             system.simulate((t0, t1), integrator_options=self.int_options, results=res)
             if t1 != ts[-1]:
-                system.initial_condition = system.update_equation_function(
-                    res.t[-1], res.x[-1, :], event_channels=[idx]
-                )
+                system.initial_condition = system.update_equation_function( res.t[-1], res.x[-1, :], event_channels=[idx])
 
         self.res = res
         sign_e = np.sign(res.e)
