@@ -35,8 +35,7 @@ class CtOptLQR(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian = False
-        #method = OptimizationProblem.Method.scipy_cg
-        method = OptimizationProblem.Method.scipy_trust_constr
+        method = OptimizationProblem.Method.scipy_cg
 
 lqr_sol = CtOptLQR()
 
@@ -49,7 +48,7 @@ jac_callback(K, [0])
 
 print(lqr_sol._stats)
 print(lqr_are.cost, lqr_sol.objective)
-print(lqr_are.cost, lqr_sol.objective)
+print(lqr_are.cost > lqr_sol.objective)
 print("      ARE sol:", K, 
     "\niterative sol:", lqr_sol.K)
 

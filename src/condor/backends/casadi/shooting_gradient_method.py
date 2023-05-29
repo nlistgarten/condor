@@ -6,7 +6,7 @@ import numpy as np
 from scipy import interpolate
 from scipy.optimize import fsolve
 
-DEBUG_LEVEL = 1
+DEBUG_LEVEL = 0
 
 
 def adjoint_wrapper(f, p, res, segment_slice):
@@ -87,9 +87,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             print("initial jacobian:", jac.toarray())
             print("initial lamda:", lamda0s)
 
-        # TODO: make sure this is robust enough:
         terminal_event_channels = sim_res.event_select[-1]
-        #terminal_event_channels = np.isclose(sim_res.e[-1], 0.)
         for event_channel in np.where(terminal_event_channels)[0]:
             if not getattr(
                 self.i.ode_model.Event.subclasses[event_channel], 'terminate', False
@@ -100,22 +98,13 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 xf = sim_res.x[-1]
                 fxf = self.i.sim_func_kwargs["state_equation_function"](p, tf, xf)
 
-                # doesn't really affect state switch, which is only one that should
-                # matter
-                use_lamda = lamda0[None, :]
-                #use_lamda = lamda0s[idx][None, :]
-
-
-                jac[idx, :] += -use_lamda @ (
+                jac[idx, :] += -lamda0[None, :] @ (
                     fxf @ self.i.dte_dps[event_channel](p, tf, xf)
-                    #- xf[:, None] @ self.i.d2te_dpdts[event_channel](p, tf, xf).T
                 )
-
 
                 lamda0s[idx] -= (
                     (
                         self.i.dte_dxs[event_channel](p, tf, xf).T @ fxf.T
-                        #- self.i.d2te_dxdts[event_channel](p, tf, xf).T @ xf.T
                     ) @ lamda0
                 ).toarray().reshape(-1)
 
@@ -173,24 +162,14 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     print(e)
                     breakpoint()
                 integrand_antideriv = integrand_interp.antiderivative()
-                # TOGGLE THIS ONE
-                #breakpoint()
                 jac[idx, :] += (
                     integrand_antideriv(tspan[0]) -
                     integrand_antideriv(tspan[1])
                 ).reshape((1,-1))
 
-                """
-                ct_sim = DblIntLQR([0., 0.,])
-                ct_sim.implementation.callback.jac_callback([0., 0.,], [0.])
-
-                dt_sim = DblIntLQR([0., 0.,])
-                ct_sim.implementation.callback.jac_callback([0., 0.,], [0.])
-                """
-
                 lamdaf = adjoint_res.x[-1]
 
-
+                # handle final segment for initial conditions
                 if event_channel is None:
                     if t0_idx != 0:
                         breakpoint()
@@ -222,30 +201,16 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
                 lamda0s[idx] = ((
                     self.i.dh_dxs[event_channel](p, tem, xtem, event_channel).T
-                    - self.i.dte_dxs[event_channel](p, tem, xtem).T @ (
-                        delta_fs.T #+ lam_dot[None, :]
-                    )
+                    - self.i.dte_dxs[event_channel](p, tem, xtem).T @ delta_fs.T
                     + self.i.d2te_dxdts[event_channel](p, tem, xtem).T @ delta_xs.T
                 ) @ lamdaf).toarray().reshape(-1)
 
                 lamda_te_p = lamdaf
                 lamda_te_m = lamda0s[idx]
-                if self.i.use_lam_te_p:
-                    # correct for sampled LQR
-                    use_lamda = lamda_te_p[None, :]
-                else:
-                    # dramatically improves state-switch but incorrect for sampled LQR
-                    # state-switch not actually good
-                    # but really good for time switched!!!
-                    use_lamda = lamda_te_m[None, :]
-
-                if self.i.include_lam_dot:
-                    lam_dot = adjoint_sys.state_equation_function(tep, lamdaf)
-                else:
-                    lam_dot = 0.
 
 
-                jac[idx, :] += use_lamda @ (
+
+                jac[idx, :] += lamda_te_p[None, :] @ (
                     self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
                     + (
                         delta_fs 
@@ -263,7 +228,6 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                 if DEBUG_LEVEL > 2:
                     print("event", event_channel, jac.toarray())
                     print("lamda te p")
-                    print(use_lamda, lamda_te_p )
                     print("delta fs")
                     print(delta_fs)
                     print("delta xs")
@@ -309,22 +273,9 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         return self.jac_callback
 
     def eval(self, args):
-        """
-import casadi
-from simupy.systems import DynamicalSystem
-from condor.backends.casadi.shooting_gradient_method import simupy_wrapper
-self = DblIntDtLQR.implementation.callback
-args = ([1., 0.], )
-
-        """
-        #if isinstance(args, (tuple, list)):
-        #    if len(args) == 1 and isinstance(args[0], casadi.DM):
-        #        args = args[0]
-        #    else:
-        #        raise ValueError
-
         p = casadi.vertcat(*args)
-        print("shot args:", p.toarray().squeeze())
+        if DEBUG_LEVEL:
+            print("shot args:", p.toarray().squeeze())
         self.p = p
         simupy_kwargs = {k: simupy_wrapper(v, p) for k, v in self.i.sim_func_kwargs.items()}
         self.simupy_kwargs = simupy_kwargs
@@ -333,7 +284,8 @@ args = ([1., 0.], )
 
         # TODO: tf could be a parameter, then use model_instance to access tf which
         # should be packed with value. But then need conditional for applying effect of
-        # event time on jacobian? So use terminating event
+        # event time on jacobian? So use terminating event -- could automatically
+        # generate and new "exact time" would handle it
         tf = getattr(self.i.model, 'tf', self.i.model.default_tf)
 
         res = SimulationResult(
@@ -357,8 +309,8 @@ args = ([1., 0.], )
             ts += [tf]
 
         int_options = self.int_options.copy()
-        print(ts)
-        #breakpoint()
+        if DEBUG_LEVEL:
+            print(ts)
         for idx, t0, t1 in zip(range(len(ts)), ts, ts[1:]):
             half_span = (t1 - t0)/4
             if int_options['max_step'] == 0 or int_options['max_step'] > half_span:
@@ -392,17 +344,7 @@ args = ([1., 0.], )
             # terminating event.
             event_times = np.concatenate((event_times, [res.t.size-1]))
 
-            #span_idxs = np.concatenate((span_idxs, [[event_times[-1], res.t.size]]))
-            #event_channels = np.concatenate((event_channels, [-1]))
-
-        try:
-            span_idxs = event_times[max(num_events-1, 0):].reshape(-1,2) + np.array([[0,1]])
-        except Exception as e:
-            breakpoint()
-            raise e
-        #span_idxs[:-1] += np.array(self.i.event_time_only)[[event_channels]].T * np.array([[0,1]])
-
-
+        span_idxs = event_times[max(num_events-1, 0):].reshape(-1,2) + np.array([[0,1]])
 
         integral = 0.
 

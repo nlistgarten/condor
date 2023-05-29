@@ -259,27 +259,9 @@ sim = Sim(
     **sim_kwargs
 )
 #jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+print(r._stats)
+print(v._stats)
 
 import sys
 sys.exit()
-
-DG = ca.Function(
-    "DG", 
-    [LinCovCW.omega.backend_repr, MinorBurn.tig, MinorBurn.tem],
-    [MinorBurn.DG]
-)
-DG(sim.omega, 700., 1210.)
-
-
-Mc = ca.Function(
-    "Mc", 
-    [LinCovCW.omega.backend_repr, MinorBurn.tig, MinorBurn.tem],
-    [MinorBurn.Mc]
-)
-Mc1 = Mc(sim.omega, 700., 1210.)
-C1 = sim._res.x[-1, 6:-2].reshape((12,12))
-triu_part = np.triu_indices(n=12,m=12)
-C1_sym = (C1 + C1.T)/2
-Mc1 @ C1_sym @ Mc1.T
-
 
