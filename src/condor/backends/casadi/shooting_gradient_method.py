@@ -6,13 +6,14 @@ import numpy as np
 from scipy import interpolate
 from scipy.optimize import fsolve
 
-DEBUG_LEVEL = 0
+DEBUG_LEVEL = 1
 
 
 def adjoint_wrapper(f, p, res, segment_slice):
     x_interp = interpolate.make_interp_spline(
         res.t[segment_slice],
         res.x[segment_slice, :],
+        k=min(3, res.t[segment_slice].size-1)
     )
     return (
         lambda t, adjoint, output=None, **kwargs:
@@ -308,16 +309,27 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         if not any_exact_terminating:
             ts += [tf]
 
+        sorted_t_idx = np.argsort(ts)
+
         int_options = self.int_options.copy()
         if DEBUG_LEVEL:
-            print(ts)
-        for idx, t0, t1 in zip(range(len(ts)), ts, ts[1:]):
+            print(ts, sorted_t_idx)
+        #for idx, t0, t1 in zip(range(len(ts)), ts, ts[1:]):
+        for t0_idx, t1_idx in zip(sorted_t_idx, sorted_t_idx[1:]):
+            t0 = ts[t0_idx]
+            t1 = ts[t1_idx]
             half_span = (t1 - t0)/4
-            if int_options['max_step'] == 0 or int_options['max_step'] > half_span:
+            if self.int_options['max_step'] == 0 or self.int_options['max_step'] > half_span:
                 int_options['max_step'] = half_span
             system.simulate((t0, t1), integrator_options=self.int_options, results=res)
-            if t1 != ts[-1]:
-                system.initial_condition = system.update_equation_function( res.t[-1], res.x[-1, :], event_channels=[idx])
+            if DEBUG_LEVEL:
+                print(f"simulated from idx {t0_idx} at time t={ts[t0_idx]} to idx {t1_idx} at time t={ts[t1_idx]}")
+            if t1_idx != sorted_t_idx[-1]:
+                if DEBUG_LEVEL:
+                    print(f"updating with event channel [{t1_idx-1}]")
+                system.initial_condition = system.update_equation_function(
+                    res.t[-1], res.x[-1, :], event_channels=[t1_idx-1]
+                )
 
         self.res = res
         sign_e = np.sign(res.e)
@@ -344,8 +356,16 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             # terminating event.
             event_times = np.concatenate((event_times, [res.t.size-1]))
 
-        span_idxs = event_times[max(num_events-1, 0):].reshape(-1,2) + np.array([[0,1]])
+        try:
+            span_idxs = event_times[max(num_events-1, 0):].reshape(-1,2) + np.array([[0,1]])
+        except Exception as e:
+            print(e)
+            print(res.t[event_times[:-1]], res.t[-1])
+            print(res.t[event_times[max(num_events-1, 0):-1]], res.t[-1])
+            breakpoint()
 
+        print(res.t[span_idxs[:-1]])
+        print(res.t[span_idxs[-1,0]:])
         integral = 0.
 
         self.res.span_idxs = span_idxs
@@ -363,7 +383,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
                 integrand = interpolate.make_interp_spline(res.t[segment_slice], [
                     self.i.traj_out_integrand_func(p, t, x)
                     for t, x in zip(res.t[segment_slice], res.x[segment_slice])
-                ])
+                ], k=min(3, res.t[segment_slice].size-1))
             except:
                 breakpoint()
             integrand_antideriv = integrand.antiderivative()

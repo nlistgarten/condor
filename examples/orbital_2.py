@@ -262,6 +262,4 @@ sim = Sim(
 print(r._stats)
 print(v._stats)
 
-import sys
-sys.exit()
 
