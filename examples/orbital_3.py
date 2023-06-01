@@ -111,8 +111,11 @@ class Measurements(LinCovCW.Event):
     N = ca.vertcat(Z3, Z3, Khat)
     update[C] = M @ C @ M.T + N @ Rcal @ N.T
 
-    function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
-    #function = t - meas_t_offset
+    update[Delta_v_disp] = Delta_v_disp# + ca.sqrt(sigma_Dv__2)
+    update[Delta_v_mag] = Delta_v_mag# + ca.sqrt(sigma_Dv__2)
+    update[x] = x
+    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
+    function = t - meas_t_offset
 
 def make_burn(rd, tig, tem):
     burn_name = "Burn%d" % (1 + sum([
@@ -242,10 +245,11 @@ sim_kwargs = dict(
 
     rd_1=[500., 0., 0.],
 
-    #meas_dt = 2300.,
-    #meas_t_offset = 851.,
-    meas_dt = 100.,
-    meas_t_offset = 51.,
+    meas_dt = 2300.,
+    meas_t_offset = 851.,
+
+    #meas_dt = 100.,
+    #meas_t_offset = 51.,
 )
 sim_kwargs.update(dict(
     initial_x=[-2000., 0., 1000., sim_kwargs['omega']*1000.*3/2, 0., 0.,],
@@ -302,14 +306,17 @@ class Meas1(co.OptimizationProblem):
         exact_hessian=False
         method = OptimizationProblem.Method.scipy_trust_constr
 
-#opt = Meas1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
-#opt_sim = Sim(
-#        tem_1=opt.tf,
-#        tig_1=opt.t1,
-#        **sim_kwargs
-#)
-#import sys
-#sys.exit()
+opt = Meas1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
+opt_sim = Sim(
+        tig_1=opt.t1,
+        **sim_kwargs
+)
+"""
+turning debug_level to 0 for shooting_gradient_method moves from 200s to 190s.
+
+"""
+import sys
+sys.exit()
 
 
 tigs = np.arange(10, 2200., 50)

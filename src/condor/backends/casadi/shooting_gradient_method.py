@@ -6,7 +6,7 @@ import numpy as np
 from scipy import interpolate
 from scipy.optimize import fsolve
 
-DEBUG_LEVEL = 1
+DEBUG_LEVEL = 0
 
 
 def adjoint_wrapper(f, p, res, segment_slice):
@@ -57,7 +57,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         return casadi.Sparsity.dense(out.shape[0], p.shape[0])
 
     def eval(self, args):
-        if DEBUG_LEVEL:
+        if DEBUG_LEVEL > 1:
             print("\n"*10, f"eval jacobian for {self.name}", sep="\n")
             print("args",args)
             if hasattr(self.shot, "p"):
@@ -124,8 +124,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             adjoint_int_opts = self.shot.int_options.copy()
             tspan = sim_res.t[segment_slice][[-1, 0]]
             adjoint_t_duration = -np.diff(tspan)[0]
-            if adjoint_t_duration < adjoint_int_opts['max_step']*2:
-                adjoint_int_opts['max_step'] = adjoint_t_duration/4
+            #if (adjoint_t_duration < adjoint_int_opts['max_step']*2:
+            adjoint_int_opts['max_step'] = adjoint_t_duration/4
             for idx, (lamda0, lamda_dot_func, grad_dot_func,) in enumerate(
                     zip(lamda0s, self.i.lamda_dot_funcs, self.i.grad_dot_funcs)
             ):
@@ -243,7 +243,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
             self.res = adjoint_res
 
-        if DEBUG_LEVEL > 0:
+        if DEBUG_LEVEL > 1:
             print('computed jac:',jac.toarray())
         return jac,
 
@@ -275,7 +275,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
 
     def eval(self, args):
         p = casadi.vertcat(*args)
-        if DEBUG_LEVEL:
+        if DEBUG_LEVEL > 1:
             print("shot args:", p.toarray().squeeze())
         self.p = p
         simupy_kwargs = {k: simupy_wrapper(v, p) for k, v in self.i.sim_func_kwargs.items()}
@@ -296,8 +296,9 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         num_events = self.i.sim_shape_data['num_events']
         ts = [0.,] + [
             fsolve(lambda t: simupy_kwargs['event_equation_function'](t, [])[idx], x0=0.)[0]
-            for idx in range(num_events)
             if self.i.event_time_only[idx]
+            else np.inf
+            for idx in range(num_events)
         ]
 
         terminating = np.array([
@@ -318,18 +319,28 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         for t0_idx, t1_idx in zip(sorted_t_idx, sorted_t_idx[1:]):
             t0 = ts[t0_idx]
             t1 = ts[t1_idx]
+            if np.isinf(t1):
+                break
             half_span = (t1 - t0)/4
             if self.int_options['max_step'] == 0 or self.int_options['max_step'] > half_span:
                 int_options['max_step'] = half_span
-            system.simulate((t0, t1), integrator_options=self.int_options, results=res)
+            system.simulate((t0, t1), integrator_options=int_options, results=res)
             if DEBUG_LEVEL:
                 print(f"simulated from idx {t0_idx} at time t={ts[t0_idx]} to idx {t1_idx} at time t={ts[t1_idx]}")
             if t1_idx != sorted_t_idx[-1]:
                 if DEBUG_LEVEL:
                     print(f"updating with event channel [{t1_idx-1}]")
-                system.initial_condition = system.update_equation_function(
+                update = system.update_equation_function(
                     res.t[-1], res.x[-1, :], event_channels=[t1_idx-1]
                 )
+                if np.any(np.isnan(update)):
+                    # TODO: is this a bug in casadi? in orbital3 with a single
+                    # measurement, get nans for delta_v_disp sometimes as optimizer is
+                    # jumping back and forth over discontinuity, usually when burn is
+                    # right before measurement, within 1E-6 eg 850.9999999020214 vs 851
+                    update[np.isnan(update)] = res.x[-1, np.isnan(update)]
+                system.initial_condition = update
+
 
         self.res = res
         sign_e = np.sign(res.e)
@@ -364,8 +375,9 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             print(res.t[event_times[max(num_events-1, 0):-1]], res.t[-1])
             breakpoint()
 
-        print(res.t[span_idxs[:-1]])
-        print(res.t[span_idxs[-1,0]:])
+        if DEBUG_LEVEL > 1:
+            print(res.t[span_idxs[:-1]])
+            print(res.t[span_idxs[-1,0]:])
         integral = 0.
 
         self.res.span_idxs = span_idxs
@@ -384,7 +396,8 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
                     self.i.traj_out_integrand_func(p, t, x)
                     for t, x in zip(res.t[segment_slice], res.x[segment_slice])
                 ], k=min(3, res.t[segment_slice].size-1))
-            except:
+            except Exception as e:
+                print(e)
                 breakpoint()
             integrand_antideriv = integrand.antiderivative()
             integral += integrand_antideriv(res.t[segment_slice][-1]) - integrand_antideriv(res.t[segment_slice][0])
