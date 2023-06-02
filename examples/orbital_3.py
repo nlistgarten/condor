@@ -90,32 +90,6 @@ class LinCovCW(co.ODESystem):
 sin = ca.sin
 cos = ca.cos
 
-class Measurements(LinCovCW.Event):
-    meas_dt = parameter()
-    meas_t_offset = parameter()
-    rcal = parameter(shape=3)
-    rcalhat = parameter(shape=3)
-
-    Rcal = ca.diag(rcal)
-    Rcalhat = ca.diag(rcalhat)
-
-    Hcal = ca.horzcat(I3, Z3)
-    Hcalhat = ca.horzcat(I3, Z3)
-
-    Khat = (P @ Hcalhat.T) @ ca.solve(Hcalhat @ P @ Hcalhat.T + Rcalhat, ca.MX.eye(3))
-    Acalhat = I6 - Khat @ Hcalhat
-    update[P] = Acalhat @ P @ Acalhat.T + Khat @ Rcalhat @ Khat.T
-
-    M01 = Khat @ Hcal
-    M = ca.vertcat( ca.horzcat(I6, Z6), ca.horzcat(M01, Acalhat) )
-    N = ca.vertcat(Z3, Z3, Khat)
-    update[C] = M @ C @ M.T + N @ Rcal @ N.T
-
-    update[Delta_v_disp] = Delta_v_disp# + ca.sqrt(sigma_Dv__2)
-    update[Delta_v_mag] = Delta_v_mag# + ca.sqrt(sigma_Dv__2)
-    update[x] = x
-    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
-    function = t - meas_t_offset
 
 def make_burn(rd, tig, tem):
     burn_name = "Burn%d" % (1 + sum([
@@ -222,6 +196,35 @@ class Terminate(LinCovCW.Event):
     function = t - MajorBurn.tem
     at_time = [MajorBurn.tem]
 
+class Measurements(LinCovCW.Event):
+    rcal = parameter(shape=3)
+    rcalhat = parameter(shape=3)
+
+    Rcal = ca.diag(rcal)
+    Rcalhat = ca.diag(rcalhat)
+
+    Hcal = ca.horzcat(I3, Z3)
+    Hcalhat = ca.horzcat(I3, Z3)
+
+    Khat = (P @ Hcalhat.T) @ ca.solve(Hcalhat @ P @ Hcalhat.T + Rcalhat, ca.MX.eye(3))
+    Acalhat = I6 - Khat @ Hcalhat
+    update[P] = Acalhat @ P @ Acalhat.T + Khat @ Rcalhat @ Khat.T
+
+    M01 = Khat @ Hcal
+    M = ca.vertcat( ca.horzcat(I6, Z6), ca.horzcat(M01, Acalhat) )
+    N = ca.vertcat(Z3, Z3, Khat)
+    update[C] = M @ C @ M.T + N @ Rcal @ N.T
+
+    #update[Delta_v_disp] = Delta_v_disp# + ca.sqrt(sigma_Dv__2)
+    #update[Delta_v_mag] = Delta_v_mag# + ca.sqrt(sigma_Dv__2)
+    #update[x] = x
+
+    meas_dt = parameter()
+    meas_t_offset = parameter()
+
+    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
+    function = t - meas_t_offset
+
 from scipy.io import loadmat
 Cov_0_matlab = loadmat('P_aug_0.mat')['P_aug_0'][0]
 
@@ -284,7 +287,7 @@ sim_kwargs.update(dict(
 ))
 
 
-class Meas1(co.OptimizationProblem):
+class Burn1(co.OptimizationProblem):
     t1 = variable(initializer=1900.)
     sigma_r_weight = parameter()
     sigma_Dv_weight = parameter()
@@ -306,33 +309,85 @@ class Meas1(co.OptimizationProblem):
         exact_hessian=False
         method = OptimizationProblem.Method.scipy_trust_constr
 
-opt = Meas1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
-opt_sim = Sim(
-        tig_1=opt.t1,
-        **sim_kwargs
-)
+#opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
+#opt_sim = Sim(
+#        tig_1=opt.t1,
+#        **sim_kwargs
+#)
+
+
+sim_kwargs.pop('meas_t_offset')
+sim_kwargs['tig_1'] = 900.
+
+class Meas1(co.OptimizationProblem):
+    t1 = variable(initializer=100.)
+    sigma_r_weight = parameter()
+    sigma_Dv_weight = parameter()
+    mag_Dv_weight = parameter()
+    sim = Sim(
+        **sim_kwargs,
+        meas_t_offset=t1
+    )
+
+    constraint(t1, lower_bound=30., upper_bound=sim_kwargs['tem_1']-30.)
+    objective = (
+        sigma_Dv_weight*sim.tot_Delta_v_disp
+        + sigma_r_weight*sim.final_pos_disp
+        + mag_Dv_weight*sim.tot_Delta_v_mag
+    )
+    class Casadi(co.Options):
+        exact_hessian=False
+        method = OptimizationProblem.Method.scipy_trust_constr
+#opt = Meas1(sigma_Dv_weight=0, mag_Dv_weight=1, sigma_r_weight=1)
+#sim = Sim(**sim_kwargs, meas_t_offset=100.)
+
+tigs = np.arange(11, 2200., 50)
+
+tigs = np.arange(300, 900, 10)
+
+sims= [
+    (
+        Sim(
+            #tig_1=tig,
+            meas_t_offset = tig,
+            **sim_kwargs
+        ),
+         Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
+    )
+    for tig in tigs
+]
+
+sims1 = [simout[0] for simout in sims]
+jacs1 = np.stack([simout[1] for simout in sims])
+
+Dv_mags = [sim.tot_Delta_v_mag for sim in sims1]
+Dv_disps = [sim.tot_Delta_v_disp for sim in sims1]
+pos_disps = [sim.final_pos_disp for sim in sims1]
+ordinates = [Dv_mags, Dv_disps, pos_disps]
+
+from scipy.interpolate import make_interp_spline
+interp = make_interp_spline(tigs, Dv_disps)
+derinterp = interp.derivative()
+
+fig, axes = plt.subplots(2, constrained_layout=True, sharex=True)
+axes[0].plot(tigs, Dv_disps)
+axes[0].grid(True)
+axes[1].plot(tigs, derinterp(tigs), label='numerical')
+#axes[1].plot(tigs, jacs1[:, 2, -1], label='SGM')
+axes[1].plot(tigs, jacs1[:, 1, -1], label='SGM')
+axes[1].plot(tigs, jacs1[:, 1, -1] - jacs1[:, 1, -1].max(), label='shifted SGM')
+axes[1].grid(True)
+axes[1].legend()
+plt.show()
+
+
+
 """
 turning debug_level to 0 for shooting_gradient_method moves from 200s to 190s.
 
 """
 import sys
 sys.exit()
-
-
-tigs = np.arange(10, 2200., 50)
-sims= [
-    Sim(
-        tig_1=tig,
-        **sim_kwargs
-    )
-    for tig in tigs
-]
-sims1 = sims
-
-Dv_mags = [sim.tot_Delta_v_mag for sim in sims]
-Dv_disps = [sim.tot_Delta_v_disp for sim in sims]
-pos_disps = [sim.final_pos_disp for sim in sims]
-ordinates = [Dv_mags, Dv_disps, pos_disps]
 
 fig, axes = plt.subplots(3, constrained_layout=True, sharex=True)
 for ax, ordinate in zip(axes, ordinates):
