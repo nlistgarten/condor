@@ -1,4 +1,5 @@
-import upcycle  # isort: skip
+import condor.upcycle as upcycle # isort: skip
+
 
 import os
 import pprint

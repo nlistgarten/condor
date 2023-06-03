@@ -13,8 +13,8 @@ class Resid(co.AlgebraicSystem):
 class Sellar(co.OptimizationProblem):
     x = variable(lower_bound=0, upper_bound=10)
     z = variable(shape=2, lower_bound=0, upper_bound=10)
-
-    y1, y2 = Resid(x, z)
+    resid = Resid(x, z)
+    y1, y2 = resid
 
     objective = x**2 + z[1] + y1 + exp(-y2)
     constraint(y1, lower_bound=3.16, name="con1")

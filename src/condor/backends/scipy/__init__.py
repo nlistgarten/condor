@@ -1,4 +1,4 @@
-
+import numpy as np
 import sympy as sym
 from sympy.physics.mechanics import dynamicsymbols
 from sympy.printing.pycode import PythonCodePrinter
@@ -202,6 +202,7 @@ def sympy2casadi(
             extra_assignments={}, return_assignments=True
         #)
 ):
+    breakpoint()
     import casadi
 
     ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in sympy_vars])

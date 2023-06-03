@@ -1,8 +1,7 @@
 import os
 import re
 
-from condor import SymbolicArray, TableLookup, Solver
-from casadi_backend import sympy2casadi, SolverWithWarmStart
+from condor.backends.scipy import sympy2casadi, SymbolicArray, TableLookup, Solver, assignment_cse
 
 import casadi
 import numpy as np
@@ -79,7 +78,11 @@ class UpcycleSystem:
 
 
 class UpcycleImplicitSystem(UpcycleSystem):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.declaration_string = ""
+        self.residual_string = ""
+
 
 class UpcycleExplicitSystem(UpcycleSystem):
     def to_implicit(self):
@@ -87,9 +90,13 @@ class UpcycleExplicitSystem(UpcycleSystem):
         for output in self.outputs:
             self.outputs[output] = self.outputs[output] - self.output_symbols[output]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.output_string = ""
+
 
 class UpcycleSolver:
-    def __init__(self, path="", parent=None, om_equiv=None):
+    def __init__(self, path="", parent=None, om_equiv=None, ):
         self.path = path
         self.parent = parent
         self.om_equiv=om_equiv
@@ -99,6 +106,9 @@ class UpcycleSolver:
         self.internal_loop = False
 
         self.children = []
+
+        self.solver_name = sanitize_variable_name(repr(self))
+        self.param_string = ""
 
     def __repr__(self):
         if self.path == "":
@@ -156,13 +166,16 @@ class UpcycleSolver:
         self.children.append(child)
 
     def add_inputs(self, inputs):
-        for input_ in inputs:
+        for om_input_name in inputs:
+            input_ = sanitize_variable_name(om_input_name)
             if input_ in self.outputs:
                 # shouldn't happen if this is only getting called for ivcs?
                 breakpoint()
 
             if input_ not in self.inputs:
                 self.inputs.append(input_)
+                self.param_string += f"\n    {input_} = parameter(shape={inputs[om_input_name]['shape']})"
+
 
     @property
     def outputs(self):
@@ -180,51 +193,46 @@ class UpcycleSolver:
                 if not isinstance(s, UpcycleImplicitSystem) # solvers or explicit
                 for o in s.outputs]
 
+    @property
+    def implicit_output_declaration_string(self):
+        return "".join([
+            sys.declaration_string
+            for sys in self.children
+            if isinstance(sys, UpcycleImplicitSystem)
+        ])
+
+    @property
+    def implicit_output_residual_string(self):
+        return "".join([
+            sys.residual_string
+            for sys in self.children
+            if isinstance(sys, UpcycleImplicitSystem)
+        ])
+
+
+    @property
+    def explicit_output_computation_string(self):
+        return "".join([
+            s.output_string
+            for s in self.children
+            if isinstance(s, (UpcycleExplicitSystem, UpcycleSolver))
+        ])
+
+    @property
+    def explicit_output_assignment_string(self):
+        return "".join([
+            f"\n    explicit_output.{o} = {o}"
+            for s in self.children
+            if isinstance(s, (UpcycleExplicitSystem, UpcycleSolver))
+            for o in s.outputs
+        ])
+
+
 
     def _set_run(self, func):
         def wrapper(*inputs):
             return np.array(func(*inputs)).squeeze()
         self.run = wrapper
-
-
-    def __call__(self, *args):
-        is_casadi_symbolic = isinstance(args, (list, tuple)) and isinstance(args[0], (casadi.MX, casadi.SX))
-
-        if str(self.casadi_imp).endswith('IpoptInterface') or str(self.casadi_imp).endswith('Qrsqp'): # no wrapper
-
-            if self.implicit_outputs: # rootfinder, no wrapper
-                if is_casadi_symbolic:
-                    solver_out = self.casadi_imp(
-                        x0=self.x0, p=casadi.vertcat(*args), lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
-                    )
-                    return casadi.vertsplit(solver_out["x"]) + casadi.vertsplit(solver_out["g"][len(self.ubx):])
-
-                solver_out = self.casadi_imp(
-                    x0=self.x0, p=args, lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
-                )
-                return [np.concatenate([
-                    solver_out["x"].toarray().reshape(-1),
-                    solver_out["g"].toarray().reshape(-1)[len(self.ubx):]
-                ])]
-            else: # optimizer, no wrapper -- always numeric? for now...
-                args = np.array(args)
-                return self.casadi_imp(
-                    x0=args[self.design_var_indices],
-                    p=args[self.parameter_indices],
-                    lbx=self.lbx, ubx=self.ubx, lbg=self.lbg, ubg=self.ubg
-                )
-
-        elif str(self.casadi_imp).endswith('CallbackInternal'): # SolverWithWarmstart
-            if is_casadi_symbolic:
-                out = self.casadi_imp(*args)
-                return out
-                #return casadi.vertsplit(out)
-            else:
-                out = self.casadi_imp(*args)
-                return np.array(out).squeeze()
-
-        else: # a function,
-            return np.array(self.casadi_imp(*args)).squeeze()
 
 
 def get_sources(conn_df, sys_path, parent_path):
@@ -289,30 +297,26 @@ def upcycle_problem(make_problem, warm_start=False):
         if isinstance(omsys, om.IndepVarComp):
             print("indepvarcomp?")
 
-            flat_varnames = flatten_varnames(omsys._var_abs2meta["output"])
-            flat_varnames = sanitize_variable_names(flat_varnames)
 
             if upsolver is not top_upsolver:
                 warnings.warn("IVC not under top level model. Adding " +
                               "\n".join(flat_varnames) + " to " + upsolver.path 
                               + " as well as top level.")
                 # TODO: maybe don't need this with add_child
-                top_upsolver.add_inputs(flat_varnames)
-            upsolver.add_inputs(flat_varnames)
+                top_upsolver.add_inputs(omsys._var_abs2meta["output"])
+            upsolver.add_inputs(omsys._var_abs2meta["output"])
             continue
 
         # propagate inputs external to self up to parent solver
         sys_input_srcs = get_sources(conn_df, syspath, upsolver.path)
-        all_sys_input_srcs = flatten_varnames(prob.model._var_abs2meta["output"], sys_input_srcs)
-
 
         out_meta = omsys._var_abs2meta["output"]
         all_outputs = flatten_varnames(out_meta)
-
-
         # cleaning variable names here
         all_outputs = sanitize_variable_names(all_outputs)
-        clean_all_sys_input_srcs = sanitize_variable_names(all_sys_input_srcs)
+
+        # don't need to flatten anymore
+        clean_all_sys_input_srcs = sanitize_variable_names(sys_input_srcs)
 
 
         # TODO: can be DRY'd up, 
@@ -327,15 +331,34 @@ def upcycle_problem(make_problem, warm_start=False):
                     raise ValueError("null explicit system")
                 upsys.output_symbols[output_name] = symbol
                 upsys.outputs[output_name] = (symbol + expr).expand()
+                upsys.output_string += f"\n    {output_name} = {upsys.outputs[output_name]}"
 
         else:
             upsys = UpcycleImplicitSystem(syspath, upsolver)
             upsys.inputs.extend(clean_all_sys_input_srcs)
-            for output_name, symbol, expr in zip(all_outputs, omsys._outputs.asarray(), omsys._residuals.asarray()):
+
+            for om_name, symbol, expr in zip(out_meta, omsys._outputs.asarray(), omsys._residuals.asarray()):
+                output_name = sanitize_variable_name(om_name)
+                meta = out_meta[om_name]
+                declare_string = f"\n    {output_name} = implicit_output("
+                declare_string +=  f"\n        shape={meta['shape']},"
+                declare_string += f"\n        initializer={prob.model._outputs[om_name]},"
+                lb = meta["lower"]
+                if lb is not None:
+                    declare_string += f"\n        lower_bound={lb},"
+                ub = meta["upper"]
+                if ub is not None:
+                    declare_string += f"\n        upper_bound={ub},"
+                declare_string += "\n    )"
+                upsys.declaration_string += declare_string
+
                 if isinstance(symbol, SymbolicArray):
                     symbol, expr = symbol[0], expr[0]
                 upsys.output_symbols[output_name] = symbol
                 upsys.outputs[output_name] = expr
+                upsys.residual_string += f"\n    residual.{output_name} = {expr}"
+
+
 
         upsys.x0 = np.zeros(len(omsys._outputs))
         upsys.lbx = np.full_like(upsys.x0, -np.inf)
@@ -359,7 +382,7 @@ def upcycle_problem(make_problem, warm_start=False):
 
     upsolver = pop_upsolver(top_upsolver.path, upsolver)
 
-    upsolver = get_nlp_for_rootfinder(top_upsolver, prob, warm_start=warm_start)
+    upsolver = get_nlp_for_rootfinder(top_upsolver, prob,)
 
     if prob.driver._objs:# and False:
         updriver = UpcycleSolver(path="optimizer")
@@ -373,202 +396,60 @@ def upcycle_problem(make_problem, warm_start=False):
 # backends.
 
 def get_nlp_for_optimizer(upsolver, prob):
-    output_assignments = {}
-    for child in upsolver.children:
-
-        if isinstance(child, UpcycleExplicitSystem):
-            output_assignments.update({
-                sym.Symbol(k): v for k, v in child.outputs.items()
-            })
-
-        elif isinstance(child, UpcycleSolver):
-
-            sub_solver_name = sanitize_variable_name(repr(child))
-
-            if sub_solver_name not in Solver.registry:
-                # TODO: this set of calls gets made at least once more? so refactor?
-                # TODO: should this get done at the bottom?
-                sub_solver = get_nlp_for_rootfinder(child, prob)
-                Solver.registry[sub_solver_name] = sub_solver
-
-            output_assignments.update({
-                tuple(
-                    [sym.Symbol(k) for k in child.outputs]
-
-                ) :
-                Solver(sub_solver_name)(
-                    #sym.Array(
-                    *tuple(
-                        [ sym.Symbol(k) for k in child.inputs]
-                    )
-                )
-            })
-
-    inputs = [sym.Symbol(s) for s in upsolver.inputs]
-
-    exprs = [sym.Symbol(outp) for outp in upsolver.outputs]
-    cr, cs, f = sympy2casadi(exprs, inputs, output_assignments, False)
 
     cons_meta = prob.driver._cons
     obj_meta = prob.driver._objs
     dv_meta = prob.driver._designvars
 
-    upsolver.lbg = np.full(len(upsolver.outputs), -np.inf)
-    upsolver.ubg = np.full(len(upsolver.outputs), np.inf)
-    upsolver.lambda_func = f
+    declare_variable_string = "".join([
+          f"\n    {sanitize_variable_name(name)} = variable("
+        + f"\n        shape={meta.get('shape', (1,))},"
+        + f"\n        upper_bound={meta['upper']},"
+        + f"\n        lower_bound={meta['lower']},"
+        + f"\n        initializer={get_val(prob,meta['source'])},"
+        +  "\n    )"
+        for name, meta in dv_meta.items()
+    ])
 
-    idx_obj = upsolver.outputs.index(sanitize_variable_name(list(obj_meta.keys())[0]))
 
-    for name, meta in cons_meta.items():
-        if meta["size"] != 1:
-            raise NotImplementedError(f"Constraint {name} has size > 1")
+    constraint_string = "".join([
+           "\n    constraint("
+        + f"\n        {sanitize_variable_name(name)},"
+        + f"\n        upper_bound={meta['upper']},"
+        + f"\n        lower_bound={meta['lower']},"
+        +  "\n    )"
+        for name, meta in cons_meta.items()
+    ])
 
-        idx = upsolver.outputs.index(sanitize_variable_name(name))
-        upsolver.lbg[idx] = meta["lower"]
-        upsolver.ubg[idx] = meta["upper"]
-
-    upsolver.lbx = []
-    upsolver.ubx = []
-    upsolver.x0 = []
-    upsolver.design_var_indices = []
-    for tgtname, meta in dv_meta.items():
-        srcname = meta["source"]
-        for srcname_expanded in expand_varname(srcname, meta["size"]):
-            idx = upsolver.inputs.index(sanitize_variable_name(srcname_expanded))
-            upsolver.lbx.append(meta["lower"])
-            upsolver.ubx.append(meta["upper"])
-            upsolver.x0.append(get_val(prob, srcname_expanded, sanitized=False))
-            upsolver.design_var_indices.append(idx)
-
-    upsolver.p0 = []
-    upsolver.parameter_indices = []
-    for i, name in enumerate(upsolver.inputs):
-        if i not in upsolver.design_var_indices:
-            upsolver.p0.append(get_val(prob, name))
-            upsolver.parameter_indices.append(i)
-
-    x = casadi.vertcat(*[cs[i] for i in upsolver.design_var_indices])
-    p = casadi.vertcat(*[cs[i] for i in upsolver.parameter_indices])
-    f = cr[idx_obj]
-
-    nlp_args = {"x": x, "p": p, "f": f, "g": casadi.vertcat(*cr)}
-
-    opts = {
-        "expand": False,
-        "ipopt": {
-            "tol": 1e-10,
-            #"hessian_approximation": "limited-memory",
-        }
-    }
-    upsolver.casadi_imp = casadi.nlpsol("optimizer", "ipopt", nlp_args, opts)
-
+    upsolver.model_string = "\n".join([
+        f"class {upsolver.solver_name}(co.OptimizationProblem):"
+        + declare_variable_string,
+        upsolver.param_string,
+        upsolver.explicit_output_computation_string,
+        constraint_string,
+        f"\n    objective = {sanitize_variable_name(list(obj_meta.keys())[0])}"
+    ])
+    breakpoint()
     return upsolver
 
 
 # solver dict of all child explicit system output exprs, keys are symbols
-def get_nlp_for_rootfinder(upsolver, prob, warm_start=False):
-    # TODO: this is really a method on UpcycleSolver,
-    # this is creating a casadi numerical implementation
+def get_nlp_for_rootfinder(upsolver, prob,):
 
+    upsolver.model_string = "\n".join([
+        f"class {upsolver.solver_name}(co.AlgebraicSystem):"
+        + upsolver.param_string,
+        upsolver.implicit_output_declaration_string,
+        upsolver.explicit_output_computation_string,
+        upsolver.implicit_output_residual_string,
+        upsolver.explicit_output_assignment_string,
+    ])
 
-    # upsolver is UpcycleSolver instance
-    # prob is (root?) problem to get numeric values... can these get put in in the
-    # upsolver and its children?
+    assigned_vars = ", ".join(upsolver.outputs)
+    call_vars = ", ".join(upsolver.inputs)
+    upsolver.output_string = f"\n    ({assigned_vars}) = {upsolver.solver_name}({call_vars})"
+    Solver.registry[upsolver.solver_name] = upsolver
 
-    # if top solver
-    #   if there are constraints, add to implicit_outputs, set appropriate bounds
-    #   if there are design variables, update bounds on those inputs
-    #   inputs that are not dvs need their value
-    #   if any solved outputs or obective, return as nlpsolver
-    #   otherwise return as explicit expression
-
-    output_assignments = {}
-    for child in upsolver.children:
-
-        if isinstance(child, UpcycleExplicitSystem):
-            output_assignments.update({
-                sym.Symbol(k): v for k, v in child.outputs.items()
-            })
-
-        elif isinstance(child, UpcycleSolver):
-
-            sub_solver_name = sanitize_variable_name(child.path)
-
-            if sub_solver_name not in Solver.registry:
-                # TODO: this set of calls gets made at least once more? so refactor?
-                # TODO: should this get done at the bottom?
-                sub_solver = get_nlp_for_rootfinder(child, prob)
-                Solver.registry[sub_solver_name] = sub_solver
-
-            output_assignments.update({
-                tuple(
-                    [sym.Symbol(k) for k in child.outputs]
-                ) :
-                Solver(sub_solver_name)(
-                    #sym.Array(
-                    *tuple(
-                        [ sym.Symbol(k) for k in child.inputs]
-                    )
-                )
-            })
-
-
-    residual_args = [sym.Symbol(s) for s in upsolver.implicit_outputs + upsolver.inputs]
-
-    print(upsolver.path, '...', sep='')
-    if upsolver.path == "" and len(upsolver.implicit_outputs) == 0:
-        exprs = [sym.Symbol(outp) for outp in upsolver.outputs]
-        cr, cs, f = sympy2casadi(exprs, residual_args, output_assignments, False)
-        func = casadi.Function("model", casadi.vertsplit(cs), cr)
-        upsolver.casadi_imp = func
-        return upsolver
-
-    implicit_residuals = [
-        v.subs(output_assignments) 
-        for s in upsolver.children 
-        if isinstance(s, UpcycleImplicitSystem)
-        for v in s.outputs.values()
-    ]
-    cr, cs, f = sympy2casadi(implicit_residuals, residual_args, output_assignments)
-    upsolver.lambda_func = f
-
-    cs_split = casadi.vertsplit(cs)
-    x = casadi.vertcat(*cs_split[:len(upsolver.implicit_outputs)])
-    p = casadi.vertcat(*cs_split[len(upsolver.implicit_outputs):])
-
-    upsolver.x0 = np.hstack([get_val(prob, absname) for absname in upsolver.implicit_outputs])
-    upsolver.p0 = np.hstack([get_val(prob, absname) for absname in upsolver.inputs])
-    upsolver.lbx = np.hstack([s.lbx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
-    upsolver.ubx = np.hstack([s.ubx for s in upsolver.children if isinstance(s, UpcycleImplicitSystem)])
-
-    n_exp = len(upsolver.explicit_outputs)
-    n_imp = len(upsolver.implicit_outputs)
-
-
-    upsolver.lbg = np.hstack([np.zeros(n_imp), np.full(n_exp, -np.inf)])
-    upsolver.ubg = np.hstack([np.zeros(n_imp), np.full(n_exp, np.inf)])
-
-    nlp_args = {"x": x, "p": p, "f": 0, "g": casadi.vertcat(*cr)}
-    opts =  {}
-    #opts["qpsol.error_on_fail"] = "False"
-    opts["error_on_fail"] = False
-    #opts["ipopt.warm_start_init_point"] = "yes" if warm_start else "no"
-    #opts["ipopt.max_iter"] = 100
-    if upsolver.path:
-        solver_name = sanitize_variable_name(upsolver.path)
-    else:
-        solver_name = 'solver'
-
-    nlp = upsolver.casadi_imp = SolverWithWarmStart(
-        solver_name,
-        nlp_args,
-        upsolver.x0,
-        upsolver.p0,
-        upsolver.lbx,
-        upsolver.ubx,
-        upsolver.lbg,
-        upsolver.ubg,
-    )
     return upsolver
 
 
