@@ -65,9 +65,13 @@ class InitializerMixin:
                         )
                     )
                 else:
-                    shaped_initial = np.broadcast_to(
-                        solver_var.initializer, solver_var.shape
-                    ).reshape(-1)
+                    initializer_val = np.array(solver_var.initializer)
+                    if initializer_val.size == solver_var.size:
+                        shaped_initial = initializer_val.reshape(-1)
+                    else:
+                        shaped_initial = np.broadcast_to(
+                            initializer_val, solver_var.shape
+                        ).reshape(-1)
                     if solver_var.warm_start:
                         x0_at_construction.extend(shaped_initial)
                         initializer_exprs.extend(
@@ -147,7 +151,7 @@ class AlgebraicSystem(InitializerMixin):
         )
         model_instance.bind_field(
             self.model.explicit_output,
-            out[:self.model.explicit_output._count]
+            out[self.model.implicit_output._count:self.model.implicit_output._count+self.model.explicit_output._count]
         )
 
         if hasattr(self.callback, 'resid'):

@@ -1,7 +1,7 @@
 import os
 import re
 
-from condor.backends.scipy import sympy2casadi, SymbolicArray, TableLookup, Solver, assignment_cse
+from condor.backends.scipy import SymbolicArray, TableLookup, Solver, CodePrinter
 
 import casadi
 import numpy as np
@@ -229,12 +229,6 @@ class UpcycleSolver:
 
 
 
-    def _set_run(self, func):
-        def wrapper(*inputs):
-            return np.array(func(*inputs)).squeeze()
-        self.run = wrapper
-
-
 def get_sources(conn_df, sys_path, parent_path):
     sys_conns = conn_df[conn_df["tgt"].str.startswith(sys_path + ".")]
     return sys_conns["src"]
@@ -400,13 +394,14 @@ def get_nlp_for_optimizer(upsolver, prob):
     cons_meta = prob.driver._cons
     obj_meta = prob.driver._objs
     dv_meta = prob.driver._designvars
-
+    out_meta = prob.model._var_abs2meta['output']
     declare_variable_string = "".join([
-          f"\n    {sanitize_variable_name(name)} = variable("
-        + f"\n        shape={meta.get('shape', (1,))},"
+          #f"\n    {sanitize_variable_name(name)} = variable("
+          f"\n    {sanitize_variable_name(meta['source'])} = variable("
+        + f"\n        shape={out_meta[meta['source']]['shape']},"
         + f"\n        upper_bound={meta['upper']},"
         + f"\n        lower_bound={meta['lower']},"
-        + f"\n        initializer={get_val(prob,meta['source'])},"
+        + f"\n        initializer={get_val(prob,meta['source']).tolist()},"
         +  "\n    )"
         for name, meta in dv_meta.items()
     ])
@@ -429,7 +424,7 @@ def get_nlp_for_optimizer(upsolver, prob):
         constraint_string,
         f"\n    objective = {sanitize_variable_name(list(obj_meta.keys())[0])}"
     ])
-    breakpoint()
+
     return upsolver
 
 
@@ -558,13 +553,7 @@ def contaminate_variable_name(clean_name):
 def get_val(prob, name, sanitized=True, **kwargs):
     if sanitized: # re-contaminate variable names to interact with om
         name = contaminate_variable_name(name)
-    try:
-        return prob.get_val(name, **kwargs)[0]
-    except KeyError:
-        match = _VARNAME_PATTERN.match(name)
-        base_name = match[1]
-        idx = int(match[2])
-        return prob.get_val(base_name, **kwargs)[idx]
+    return prob.get_val(name, **kwargs)
 
 # SYMPY BACKEND FOR UPCYCLE -- I think casadi backend doesn't need getitem? easiest
 # thing is just build a numpy array of MX objects

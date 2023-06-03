@@ -586,6 +586,9 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
         # fields?
         return
 
+    if getattr(attr_val, 'backend_repr', None) == super_attrs.get(attr_name, None):
+        return
+
     # TODO: if user-defined field starts with _, raise value error?
 
     in_bases = False
