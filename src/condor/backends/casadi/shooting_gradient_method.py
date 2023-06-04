@@ -6,7 +6,7 @@ import numpy as np
 from scipy import interpolate
 from scipy.optimize import fsolve
 
-DEBUG_LEVEL = 0
+DEBUG_LEVEL = 1
 
 
 def adjoint_wrapper(f, p, res, segment_slice):
@@ -125,7 +125,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             tspan = sim_res.t[segment_slice][[-1, 0]]
             adjoint_t_duration = -np.diff(tspan)[0]
             #if (adjoint_t_duration < adjoint_int_opts['max_step']*2:
-            adjoint_int_opts['max_step'] = adjoint_t_duration/4
+            #adjoint_int_opts['max_step'] = adjoint_t_duration/4
             for idx, (lamda0, lamda_dot_func, grad_dot_func,) in enumerate(
                     zip(lamda0s, self.i.lamda_dot_funcs, self.i.grad_dot_funcs)
             ):
@@ -205,7 +205,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                     - self.i.dte_dxs[event_channel](p, tem, xtem).T @ delta_fs.T
                     + self.i.d2te_dxdts[event_channel](p, tem, xtem).T @ delta_xs.T
                 ) @ lamdaf
-                - 0*(
+                - 1*(
                     (
                         1*adjoint_sys.state_equation_function(tep, lamdaf)[None, :]
                     ) @ (delta_xs) @ self.i.dte_dxs[event_channel](p, tem, xtem)
@@ -224,12 +224,12 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                         delta_fs 
                     ) @ self.i.dte_dps[event_channel](p, tem, xtem)
                     - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
-                ) - 0*(
+                ) - 1*(
                     (
                         1*adjoint_sys.state_equation_function(tem, lamda_te_m)[None, :] -
                         1*adjoint_sys.state_equation_function(tep, lamda_te_p)[None, :]
                     ) @ (delta_xs) @ self.i.dte_dps[event_channel](p, tem, xtem)
-                ) - 0*(
+                ) - 1*(
                     (lamda_te_p - lamda_te_m)[None, :]  @ self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
                     @ (self.i.dte_dps[event_channel](p, tem, xtem).T @ self.i.dte_dps[event_channel](p, tem, xtem))
                 )
@@ -334,9 +334,9 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             t1 = ts[t1_idx]
             if np.isinf(t1):
                 break
-            half_span = (t1 - t0)/4
-            if self.int_options['max_step'] == 0 or self.int_options['max_step'] > half_span:
-                int_options['max_step'] = half_span
+            #half_span = (t1 - t0)/4
+            #if self.int_options['max_step'] == 0 or self.int_options['max_step'] > half_span:
+            #    int_options['max_step'] = half_span
             system.simulate((t0, t1), integrator_options=int_options, results=res)
             if DEBUG_LEVEL:
                 print(f"simulated from idx {t0_idx} at time t={ts[t0_idx]} to idx {t1_idx} at time t={ts[t1_idx]}")
