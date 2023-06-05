@@ -206,7 +206,14 @@ class TotalDeltaV(co.OptimizationProblem):
         **sim_kwargs
     )
 
-    constraint(sim.final_pos_disp, upper_bound=10.)
+    # TODO: adding a parameter and constraint to existing problem SHOULD be done by
+    # inheritance... I suppose the originally Hohmann model could easily be written to
+    # include more parameters to solve all permutations of this problem... weights for
+    # each output, upper bounds for each output (and combinations?)
+    # what about including a default for a paremter at a model level? no, just make a
+    # dict like unbounded_kwargs to fill in with a large number/inf
+    pos_disp_max = parameter()
+    constraint(sim.final_pos_disp-pos_disp_max, upper_bound=0.)
 
     objective = sim.tot_Delta_v_mag + 3*sim.tot_Delta_v_disp
 
@@ -220,16 +227,26 @@ class TotalDeltaV(co.OptimizationProblem):
 hohmann = Hohmann()
 hohmann_sim = Sim(**sim_kwargs, tig=hohmann.tig, tem=hohmann.tf)
 
-total_delta_v  = TotalDeltaV()
+total_delta_v  = TotalDeltaV(pos_disp_max=1000)
 tot_delta_v_sim = Sim(**sim_kwargs, tig=total_delta_v.tig, tem=total_delta_v.tf)
 
+total_delta_v_constrained  = TotalDeltaV(pos_disp_max=10.)
+tot_delta_v_constrained_sim = Sim(
+    **sim_kwargs, tig=total_delta_v_constrained.tig, tem=total_delta_v_constrained.tf
+)
+
+print("\n"*2,"hohmann")
 print(hohmann._stats)
 print((hohmann.tf - hohmann.tig)*hohmann.sim.omega*180/np.pi)
-
 print(hohmann_sim.tot_Delta_v_disp)
 
+print("\n"*2,"unconstrained Delta v")
 print(total_delta_v._stats)
 print((total_delta_v.tf - total_delta_v.tig)*total_delta_v.sim.omega*180/np.pi)
-
 print(tot_delta_v_sim.final_pos_disp)
+
+print("\n"*2,"constrained Delta v")
+print(total_delta_v_constrained._stats)
+print((total_delta_v_constrained.tf - total_delta_v_constrained.tig)*total_delta_v_constrained.sim.omega*180/np.pi)
+print(tot_delta_v_constrained_sim.final_pos_disp)
 

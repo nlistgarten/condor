@@ -259,7 +259,10 @@ sim = Sim(
     **sim_kwargs
 )
 #jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+print("\n"*3, "minimize position dispersions:")
 print(r._stats)
+
+print("\n"*3, "minimize Delta-v dispersions:")
 print(v._stats)
 
 

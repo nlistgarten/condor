@@ -52,7 +52,7 @@ assert df_root[~np.isclose(df_root["om_val"], df_root["co_val"], rtol=0., atol=1
 assert df_root[~np.isclose(df_root["om_val"], df_root["co_val"], rtol=1e-12, atol=0.)].size == 0
 
 ## try optimizer
-#inputs = np.hstack([upcycle.get_val(prob, absname) for absname in updriver.inputs])
+
 driver_inputs = [
     #prob.get_val(upcycle.contaminate_variable_name(absname))
     upcycle.get_val(prob, absname)
@@ -62,7 +62,12 @@ driver_out = optimizer(*driver_inputs)
 prob.run_driver()
 
 vals = []
-#for name, co_val in zip(upsolver.outputs, out):
+# TODO: need bound sub-model to make all outputs accessible... or required?
+# could similarly bind all instances of backend symbols, currently a reference to symbol
+# is left which can be turned into a function... need to figure out how to make sure it
+# can be re-entrant
+# Also, inconsistent return type between algebraic system and optimization problem,
+# should be consistent if possible -- need to decide how
 for name in updriver.inputs:
     om_val = upcycle.get_val(prob, name).reshape(-1)
     co_val = getattr(driver_out, name).reshape(-1)

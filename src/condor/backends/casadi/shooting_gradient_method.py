@@ -125,7 +125,8 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
             tspan = sim_res.t[segment_slice][[-1, 0]]
             adjoint_t_duration = -np.diff(tspan)[0]
             #if (adjoint_t_duration < adjoint_int_opts['max_step']*2:
-            #adjoint_int_opts['max_step'] = adjoint_t_duration/4
+            # this helps orbital_3 which has an event druation -> 0
+            adjoint_int_opts['max_step'] = adjoint_t_duration/4
             for idx, (lamda0, lamda_dot_func, grad_dot_func,) in enumerate(
                     zip(lamda0s, self.i.lamda_dot_funcs, self.i.grad_dot_funcs)
             ):
