@@ -24,6 +24,10 @@ class ExplicitSystem:
             self.model.output, self.func(*args)
         )
 
+class Tablelookup:
+    def __init__(self, model):
+        self.model = model
+
 class InitializerMixin:
     def set_initial(self, *args, **kwargs):
         if args:

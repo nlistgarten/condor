@@ -153,6 +153,14 @@ class Field:
             return items[0]
         return items
 
+    def flat_index(self, of_symbol):
+        idx = 0
+        for symbol in self:
+            if symbol is of_symbol:
+                break
+            idx += symbol.size
+        return idx
+
     def create_symbol(self, **kwargs):
         kwargs.update(dict(field_type=self))
         self._symbols.append(self.symbol_class(**kwargs))

@@ -1,4 +1,4 @@
-import upcycle  # isort: skip
+import condor.upcycle as upcycle # isort: skip
 
 import os
 import pprint
@@ -120,6 +120,13 @@ def make_problem():
 
 
 upsolver, prob = upcycle.upcycle_problem(make_problem, warm_start=True)
+import condor as co
+#[exec(solver.model_string) for solver in ]
+for solver in list(upsolver.iter_solvers())[::-1]:
+    print(solver.model_string)
+    exec(solver.model_string)
+
+
 
 inputs = np.hstack([upcycle.get_val(prob, absname) for absname in upsolver.inputs])
 out = upsolver(*inputs)
