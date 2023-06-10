@@ -33,6 +33,7 @@ who is responsible for:
 filling in fields/._dataclass?
 filling in model input/output attrs?
 
+
 """
 
 """
@@ -387,6 +388,11 @@ class ModelType(type):
                 if not known_symbol_type:
                     print("unknown symbol type", attr_name, attr_val)
                     # Hit by ODESystem.t, is that okay?
+                    # TODO: maybe DONT pass these on. they don't work to use in the
+                    # another model since they don't get bound correctly, then just have
+                    # dangling casadi expression/symbol. Event functions can just use
+                    # ODESystem.t, or maybe handle as a special case? Could  check to
+                    # see if it's in the template, and only keep those?
 
             # TODO: other possible attr types to process:
             # maybe field dataclass, if we care about intervening in eventual assignment
@@ -908,9 +914,6 @@ class ODESystem(Model):
     don't include specialty types like discrete control, etc? user must know that for
     discrete time signal it requires state with dot=0 and update
 
-
-
-
     dt - reserved keyword for DT?
 
     inner model "Event" (see below). For a MyODESyStem model, create a sub-class of
@@ -940,17 +943,37 @@ class ODESystem(Model):
 
     # TODO: convenience for setting max_step based on discrete time systems? And would
     # like event functions of form (t - te) to loop with a specified tf. For now can set
-    # max_step in trajectoryanalysis options manually...
+    # max_step in trajectoryanalysis options manually... OR figure out how to specify
+    # periodic exact-time simulation and then current machinery should be fine
 
     # TODO: decide how controls work :) Ideally, easy to switch between continuous and
     # sampled feedback, open-loop control. Open-loop would need some type of
     # specification so adjoint gradients could get computed??
 
-    # TODO: handle events that only depend on time specifically causes termination +
-    # restart -- need simupy to be able to expand simulationresult objects
-
     # TODO: combine all events if functions are the same? maybe that happens
-    # automatically and that's okay
+    # automatically and that's okay. Needs the new events API (mimicking sundials) to happen
+    # --> VERIFY that SGM works correctly? Would require non-conflicting update
+    # functions
+
+    # TODO: inside another model, the callback gets captured into the "expression" and
+    # will never hit the model's or implementation's __call__ methods. Would really like
+    # to 1) bind the simulation result (as in the implementation call) and/or 2)
+    # initialize the model since that is most likely where we would hook the
+    # sweepable-like logging. This is also/really a question about how to inject Model
+    # layer back into casadi expressions. Could be used for capturing dangling
+    # computations which currently leaning away from doing but trajectory is a special
+    # case... If the trajectory analysis only appears once in the other model could use
+    # the caching of result object on callback to 
+    # Can set an attribute (`from_implementation`) on callback  assuming we make sure
+    # new  instances of implementation (and callback) are created to ensure re-entrant.
+    # Then refactor binding to create new model instance as appropriate. This would be
+    # version #2, probably can't figure out what model called the trajectory analysis
+    # and bind in which is probably more consistent anyway.
+
+    # TODO: does the simulation result need to be included in the template somehow?
+    # Or is this an implementation detail and current approach is fine? Or how to
+    # indicate that time, state, and output fields are time varying and should be
+    # written as an arrray and not to eg the database?
 
     # SimuPy-coupled TODO
 
@@ -958,9 +981,14 @@ class ODESystem(Model):
     # array of length num_events w/ elements 0 for did not occur and +/-1 for direction
     # don't use nan's to terminate? althogh, can't code-gen termination?
 
+    # --> MAKE SURE scikits.odes is re-entrant. AND important TODO: figure out how to
+    # create new implementation instances as needed for parallelization. Not sure if
+    # that would happen automatically with pickle, etc.
+
     # TODO: simupy currently requires dim_output > 0, which kinda makes sense for the
     # BlockDiagram case and kinda makes sense for disciplined dynamical system modeling,
     # but maybe doesn't make sense for single system simulation?
+    # IF we were keeping intermediate computations, they would be good candidates
 
     # OR can/should trajectory output integrandds get added to simupy outputs, save a
     # for-loop?
@@ -983,9 +1011,9 @@ class ODESystem(Model):
     # IDA to provide solvers for explicit expressions? 
 
     # TODO: add event times/event channels to SimulationResult during detection
-    # TODO: pass in a SimulationResult object to simulate to append to?
 
-    # TODO: don't like hacks to simupy to make it work... especially 
+    # TODO: don't like hacks to simupy to make it work... especially the success
+    # checking stuff -- is that neccessary anymore?
 
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
@@ -1009,11 +1037,15 @@ class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "i
     trajectory_output = TrajectoryOutputField()
     default_tf = 1_000_000.
 
-# TODO: need to exlcude fields, particularly dot, initial, etc. 
+    # TODO: how to make trajectory outputs that depend on other state's outputs without
+    # adding an accumulator state and adding the updates to each event? Maybe that
+    # doesn't make sense...
+
+# TODO: need to exlcude fields, particularly dot, initial, etc.
 # define which fields get lifted completely, which become "read only" (can't generate
-# new state) etc. 
+# new state) etc.
 # maybe allow creation of new parameters (into ODESystem parameter field), access to
-# state, etc. 
+# state, etc.
 class Event(Model, inner_to = ODESystem):
     """
     function defines when event occurs

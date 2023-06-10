@@ -278,6 +278,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         self.construct(name, {})
         self.int_options = DEFAULT_INTEGRATOR_OPTIONS.copy()
         self.int_options.update(self.i.integrator_options)
+        self.from_implementation = False
 
     def get_jacobian(self, name, inames, onames, opts):
         if DEBUG_LEVEL:
@@ -416,6 +417,11 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             integrand_antideriv = integrand.antiderivative()
             integral += integrand_antideriv(res.t[segment_slice][-1]) - integrand_antideriv(res.t[segment_slice][0])
         self.output = self.i.traj_out_terminal_term_func(p, res.t[-1], res.x[-1]) + integral
+
+
+        if not self.from_implementation:
+            pass
+
         return self.output,
 
 

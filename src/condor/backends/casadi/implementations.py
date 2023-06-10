@@ -9,6 +9,10 @@ from condor.backends.casadi.shooting_gradient_method import ShootingGradientMeth
 
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 
+# TODO: make SGM and SolverWithWarmStart (really, back-tracking solver and possibly only
+# needed if broyden doesn't resolve it?) generic and figure out how to separate the
+# algorithm from the casadi callback. I think SWWS already does this pretty well
+
 class ExplicitSystem:
     def __init__(self, model):
         symbol_inputs = model.input.list_of("backend_repr")
@@ -713,15 +717,12 @@ class TrajectoryAnalysis:
             )
             self.dh_dps[-1].expr = dh_dp
 
-
-
-
-
         self.callback = ShootingGradientMethod(self)
 
-
     def __call__(self, model_instance, *args):
+        self.callback.from_implementation = True
         out = self.callback(casadi.vertcat(*flatten(args)))
+        self.callback.from_implementation = False
         if isinstance(out, casadi.MX):
             out = casadi.vertsplit(out)
 

@@ -72,8 +72,16 @@ class Sys2out(co.ExplicitSystem):
     """
     x = input()
     y = input()
+    v = y**2
     output.w = x**2 + y**2
     output.z = x**2 + y
+
+class Sys3out(co.ExplicitSystem):
+    z = input()
+    sys2 = Sys2out(z**2, z)
+    output.x = sys2.w
+    #output.y = sys2.v # doesn't get bound correctly so the sys3out model fails on call
+    output.y = sys2.z
 
 class MySolver(co.AlgebraicSystem):
     x = parameter()
@@ -96,6 +104,9 @@ class MyProblem(co.OptimizationProblem):
     y = variable()
     constraint(x**2 + y**2, lower_bound = 1., upper_bound = 1.)
     constraint(x**2 + y**2 + 5, eq=6.)
+
+
+
 
 """
 class Solve(co.AlgebraicSystem):
