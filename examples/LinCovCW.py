@@ -183,43 +183,6 @@ def make_burn(rd, tig, tem):
     return Burn
 
 
-
-class Terminate(LinCovCW.Event):
-    terminate = True
-    # TODO: how to make a symbol like this just provide the backend repr? or is this
-    # correct?
-    function = t - MajorBurn.tem
-    at_time = [MajorBurn.tem]
-
-class Measurements(LinCovCW.Event):
-    rcal = parameter(shape=3)
-    rcalhat = parameter(shape=3)
-
-    Rcal = ca.diag(rcal)
-    Rcalhat = ca.diag(rcalhat)
-
-    Hcal = ca.horzcat(I3, Z3)
-    Hcalhat = ca.horzcat(I3, Z3)
-
-    Khat = (P @ Hcalhat.T) @ ca.solve(Hcalhat @ P @ Hcalhat.T + Rcalhat, ca.MX.eye(3))
-    Acalhat = I6 - Khat @ Hcalhat
-    update[P] = Acalhat @ P @ Acalhat.T + Khat @ Rcalhat @ Khat.T
-
-    M01 = Khat @ Hcal
-    M = ca.vertcat( ca.horzcat(I6, Z6), ca.horzcat(M01, Acalhat) )
-    N = ca.vertcat(Z3, Z3, Khat)
-    update[C] = M @ C @ M.T + N @ Rcal @ N.T
-
-    #update[Delta_v_disp] = Delta_v_disp# + ca.sqrt(sigma_Dv__2)
-    #update[Delta_v_mag] = Delta_v_mag# + ca.sqrt(sigma_Dv__2)
-    #update[x] = x
-
-    meas_dt = parameter()
-    meas_t_offset = parameter()
-
-    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
-    function = t - meas_t_offset
-
 from scipy.io import loadmat
 Cov_0_matlab = loadmat('P_aug_0.mat')['P_aug_0'][0]
 
@@ -243,35 +206,12 @@ sim_kwargs = dict(
 
     rd_1=[500., 0., 0.],
 
-    meas_dt = 2300.,
-    meas_t_offset = 851.,
-
-    #meas_dt = 100.,
-    #meas_t_offset = 51.,
 )
 sim_kwargs.update(dict(
     initial_x=[-2000., 0., 1000., sim_kwargs['omega']*1000.*3/2, 0., 0.,],
     initial_C=Cov_0_matlab,
     initial_P=Cov_0_matlab[-6:, -6:] - Cov_0_matlab[:6, :6],
 ))
-
-# 1-burn sim
-class Sim(LinCovCW.TrajectoryAnalysis):
-    # TODO: add final burn Delta v (assume final relative v is 0, can get magnitude and
-    # dispersion)
-    tot_Delta_v_mag = trajectory_output(Delta_v_mag)
-    tot_Delta_v_disp = trajectory_output(Delta_v_disp)
-
-    Mr = ca.horzcat(I3, ca.MX(3,9))
-    sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
-    final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
-
-Sim.implementation.callback.get_jacobian(f'jac_{Sim.implementation.callback.name}', None, None, {})
-sim_kwargs.update(dict(
-    tem_1 = 2300.,
-))
-
-sim_kwargs.pop('meas_t_offset')
 
 
 
@@ -297,146 +237,4 @@ def deriv_check_plots(xgrid, xidx, sims):
         axes[1].grid(True)
         axes[1].legend()
     plt.show()
-
-
-meas_times = np.arange(300, 900, 5.)
-meas_sims= [
-    (
-        Sim(
-            tig_1=900.,
-            meas_t_offset = meas_time,
-            **sim_kwargs
-        ),
-         Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
-    )
-    for meas_time in meas_times
-]
-meas_idx = Sim.parameter.flat_index(Sim.meas_t_offset)
-deriv_check_plots(meas_times, meas_idx, meas_sims)
-
-
-tigs = np.arange(600, 1100., 5)
-tig_sims= [
-    (
-        Sim(
-            tig_1=tig,
-            meas_t_offset = 851,
-            **sim_kwargs
-        ),
-         Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
-    )
-    for tig in tigs
-]
-
-tig1_idx = Sim.parameter.flat_index(Sim.tig_1)
-deriv_check_plots(tigs, tig1_idx, tig_sims)
-
-
-
-# 2-burn sim
-sim_kwargs.update(dict(
-    tem_1 = 1210.,
-    tig_1 = 10.,
-))
-MinorBurn = make_burn(
-    rd = MajorBurn.rd, # desired position
-    tig = LinCovCW.parameter(), # time ignition
-    tem = MajorBurn.tem, # time end maneuver
-)
-
-class Sim2(LinCovCW.TrajectoryAnalysis):
-    # TODO: add final burn Delta v (assume final relative v is 0, can get magnitude and
-    # dispersion)
-    tot_Delta_v_mag = trajectory_output(Delta_v_mag)
-    tot_Delta_v_disp = trajectory_output(Delta_v_disp)
-
-    Mr = ca.horzcat(I3, ca.MX(3,9))
-    sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
-    final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
-
-Sim2.implementation.callback.get_jacobian(f'jac_{Sim2.implementation.callback.name}', None, None, {})
-
-tigs = np.arange(600, 1100., 5)
-sims= [
-    (
-        Sim2(
-            tig_2=tig,
-            meas_t_offset = 851,
-            **sim_kwargs
-        ),
-        Sim2.implementation.callback.jac_callback(Sim2.implementation.callback.p, [])
-    )
-    for tig in tigs
-]
-sims2 = sims
-tig2_idx = Sim2.parameter.flat_index(Sim2.tig_2)
-deriv_check_plots(tigs, tig2_idx, sims2)
-"""
-turning debug_level to 0 for shooting_gradient_method moves from 200s to 190s.
-
-"""
-
-import sys
-sys.exit()
-
-# was attempting to optimize measurement time given fixed burn schedule: converse of orbital_3
-class Meas1(co.OptimizationProblem):
-    t1 = variable(initializer=100.)
-    sigma_r_weight = parameter()
-    sigma_Dv_weight = parameter()
-    mag_Dv_weight = parameter()
-    sim = Sim(
-        **sim_kwargs,
-        meas_t_offset=t1,
-        tig_1=900.
-    )
-
-    constraint(t1, lower_bound=30., upper_bound=sim_kwargs['tem_1']-30.)
-    objective = (
-        sigma_Dv_weight*sim.tot_Delta_v_disp
-        + sigma_r_weight*sim.final_pos_disp
-        + mag_Dv_weight*sim.tot_Delta_v_mag
-    )
-    class Casadi(co.Options):
-        exact_hessian=False
-        method = OptimizationProblem.Method.scipy_trust_constr
-
-
-#opt = Meas1(sigma_Dv_weight=0, mag_Dv_weight=1, sigma_r_weight=1)
-#sim = Sim(**sim_kwargs, meas_t_offset=100.)
-
-fig, axes = plt.subplots(3, constrained_layout=True, sharex=True)
-for ax, ordinate in zip(axes, ordinates):
-    ax.plot(tigs, ordinate)
-    ax.grid(True)
-
-
-Dv_mags = [sim.tot_Delta_v_mag for sim in sims]
-Dv_disps = [sim.tot_Delta_v_disp for sim in sims]
-pos_disps = [sim.final_pos_disp for sim in sims]
-ordinates = [Dv_mags, Dv_disps, pos_disps]
-
-fig, axes = plt.subplots(3, constrained_layout=True, sharex=True)
-for ax, ordinate in zip(axes, ordinates):
-    ax.plot(tigs, ordinate)
-    ax.grid(True)
-
-
-plt.show()
-
-
-
-
-#sim1 = Sim(
-#        tem_1=opt.tf,
-#        tig_1=850,
-#        **sim_kwargs
-#)
-#
-#
-#sim2 = Sim(
-#        tem_1=opt.tf,
-#        tig_1=852,
-#        **sim_kwargs
-#)
 

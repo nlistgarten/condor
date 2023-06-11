@@ -4,7 +4,7 @@ import casadi as ca
 import matplotlib.pyplot as plt
 
 from condor.backends.casadi.implementations import OptimizationProblem
-from LinCovCW import LinCovCW, make_burn
+from LinCovCW import LinCovCW, make_burn, sim_kwargs, I3, Z3, I6, Z6
 
 MajorBurn = make_burn(
     rd = LinCovCW.parameter(shape=3), # desired position
@@ -49,41 +49,6 @@ class Measurements(LinCovCW.Event):
     #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
     function = t - meas_t_offset
 
-from scipy.io import loadmat
-Cov_0_matlab = loadmat('P_aug_0.mat')['P_aug_0'][0]
-
-sim_kwargs = dict(
-    omega = 0.00114,
-    # env.translation_process_noise_disp from IC_Traj_demo_000c.m
-    scal_w=[0.]*3 + [4.8E-10]*3,
-    #env.translation_maneuvers.var_noise_disp
-    scal_v=[2.5E-7]*3,
-    # env.translation_process_noise_err from IC_Traj_demo_000c.m
-    scalhat_w=[0.]*3 + [4.8E-10]*3,
-    #scalhat_w=[0.]*6,
-    # env.translation_maneuvers.var_noise_err
-    scalhat_v=[2.5E-7]*3,
-    # io.R = env.sensors.rel_pos.measurement_var; from rel_pos.m which is set by
-    # sig = 1e-3*(40/3); pos_var = [(sig)^2    (sig)^2    (sig)^2]; in rel_pos_ic.m
-    rcal=[(1e-3*(40/3))**2]*3,
-    # io.R_onb = io.onboard.sensors.rel_pos.measurement_var from rel_pos.m
-    # in runRelMotionSetup.m, io.onboard = io.environment
-    rcalhat=[(1e-3*(40/3))**2]*3,
-
-    rd_1=[500., 0., 0.],
-
-    meas_dt = 2300.,
-    meas_t_offset = 851.,
-
-    #meas_dt = 100.,
-    #meas_t_offset = 51.,
-)
-sim_kwargs.update(dict(
-    initial_x=[-2000., 0., 1000., sim_kwargs['omega']*1000.*3/2, 0., 0.,],
-    initial_C=Cov_0_matlab,
-    initial_P=Cov_0_matlab[-6:, -6:] - Cov_0_matlab[:6, :6],
-))
-
 # 1-burn sim
 class Sim(LinCovCW.TrajectoryAnalysis):
     # TODO: add final burn Delta v (assume final relative v is 0, can get magnitude and
@@ -98,6 +63,8 @@ class Sim(LinCovCW.TrajectoryAnalysis):
 
 sim_kwargs.update(dict(
     tem_1 = 2300.,
+    meas_dt = 2300.,
+    meas_t_offset = 851.,
 ))
 
 
