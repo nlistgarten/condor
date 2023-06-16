@@ -4,7 +4,7 @@ import casadi as ca
 import matplotlib.pyplot as plt
 
 from condor.backends.casadi.implementations import OptimizationProblem
-from LinCovCW import LinCovCW, make_burn, sim_kwargs, I3, Z3, I6, Z6, deriv_check_plots
+from LinCovCW import LinCovCW, make_burn, sim_kwargs, I3, Z3, I6, Z6, deriv_check_plots, make_sim
 
 
 MajorBurn = make_burn(
@@ -47,8 +47,11 @@ class Measurements(LinCovCW.Event):
     meas_dt = parameter()
     meas_t_offset = parameter()
 
-    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
-    function = t - meas_t_offset
+    function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
+    # this re-normalizes the derivative to be ~1 at the 0-crossings which may or may not
+    # be helpful
+    function = meas_dt*ca.sin(np.pi*(t-meas_t_offset)/meas_dt)/np.pi
+    #function = t - meas_t_offset
 
 sim_kwargs.update(dict(
     meas_dt = 2300.,
@@ -59,28 +62,65 @@ sim_kwargs.update(dict(
 ))
 
 # 1-burn sim
-class Sim(LinCovCW.TrajectoryAnalysis):
-    # TODO: add final burn Delta v (assume final relative v is 0, can get magnitude and
-    # dispersion)
-    tot_Delta_v_mag = trajectory_output(Delta_v_mag)
-    tot_Delta_v_disp = trajectory_output(Delta_v_disp)
+#class Sim(LinCovCW.TrajectoryAnalysis):
+#    # TODO: add final burn Delta v (assume final relative v is 0, can get magnitude and
+#    # dispersion)
+#    tot_Delta_v_mag = trajectory_output(
+#        sum([burn.Delta_v_mag for burn in make_burn.burns])
+#    )
+#    #tot_Delta_v_disp = trajectory_output(Delta_v_disp)
+#    tot_Delta_v_disp = trajectory_output(
+#        sum([burn.Delta_v_disp for burn in make_burn.burns])
+#    )
+#
+#    Mr = ca.horzcat(I3, ca.MX(3,9))
+#    sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
+#    final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
+#
+#    class Casadi(co.Options):
+#        integrator_options = dict(
+#            max_step = 1.,
+#            #atol = 1E-15,
+#            #rtol = 1E-12,
+#            nsteps = 10000,
+#        )
+#Sim.implementation.callback.get_jacobian(f'jac_{Sim.implementation.callback.name}', None, None, {})
 
-    Mr = ca.horzcat(I3, ca.MX(3,9))
-    sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
-    final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
+Sim = make_sim()
 
-Sim.implementation.callback.get_jacobian(f'jac_{Sim.implementation.callback.name}', None, None, {})
 sim_kwargs.update(dict(
     tem_1 = 2300.,
+    meas_dt = 200.,
+    #meas_t_offset = 7.5,
+    meas_t_offset = 851.,
 ))
+tigs = np.arange(600, 1100., 5)
+tig_sims= [
+    (
+        Sim(
+            tig_1=tig,
+            #meas_t_offset = 851,
+            **sim_kwargs
+        ),
+         Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
+    )
+    for tig in tigs
+]
+indep_var = Sim.tig_1
+output_vars = Sim.Delta_v_mag_1, Sim.Delta_v_disp_1, Sim.final_pos_disp
+deriv_check_plots(indep_var, output_vars, tig_sims, title_prefix='tig')
 
-sim_kwargs.pop('meas_t_offset')
+plt.show()
+import sys
+sys.exit()
 
+meas_times = np.arange(300, 1100, 5.)
 meas_times = np.arange(300, 900, 5.)
+meas_times = np.arange(2, 202, 5.)
 meas_sims= [
     (
         Sim(
-            tig_1=900.,
+            tig_1=901.,
             meas_t_offset = meas_time,
             **sim_kwargs
         ),
@@ -88,25 +128,16 @@ meas_sims= [
     )
     for meas_time in meas_times
 ]
-meas_idx = Sim.parameter.flat_index(Sim.meas_t_offset)
-deriv_check_plots(meas_times, meas_idx, meas_sims)
+indep_var = Sim.meas_t_offset
+deriv_check_plots(indep_var, output_vars, meas_sims, title_prefix='mt')
+
+plt.show()
+import sys
+sys.exit()
 
 
-tigs = np.arange(600, 1100., 5)
-tig_sims= [
-    (
-        Sim(
-            tig_1=tig,
-            meas_t_offset = 851,
-            **sim_kwargs
-        ),
-         Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
-    )
-    for tig in tigs
-]
 
-tig1_idx = Sim.parameter.flat_index(Sim.tig_1)
-deriv_check_plots(tigs, tig1_idx, tig_sims)
+
 
 
 

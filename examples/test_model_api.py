@@ -39,6 +39,7 @@ class MyEvent(MySystem.Event):
 class MyEvent(MySystem.Event):
     function = MySystem.t - 100.
     update[x] = x -2
+    z = state()
 
 assert MyEvent.inner_to is MySystem
 assert co.Event in MyEvent.__bases__
