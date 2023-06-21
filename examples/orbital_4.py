@@ -82,9 +82,10 @@ r_orbit_m = (r_earth_km+alt_km)*1E3
 base_kwargs = dict(
     omega = np.sqrt(mu_earth/((r_orbit_m)**3)),
     meas_dt = 10.,
-    meas_t_offset = 0.
+    meas_t_offset = 1.
 )
 
+scenario_1_target = [-200., 0., 0.]
 scenario_1_kwargs = dict(
     #  (0 km; −10 km; 0.2 km; 0 m∕s; 0 m∕s; 0 m∕s)
     # The initial relative states (radial, along-track, and cross-track) are 
@@ -96,15 +97,14 @@ scenario_1_kwargs = dict(
     # y is cross-track,
     # z altitude with +z below, -z above
     initial_x=[-10_000., 0.2, 0., 0., 0., 0.,],
-    rd_1=[-200., 0., 0.],
 )
 
+scenario_2_target = [200., 0., 0.]
 scenario_2_kwargs = dict(
     #The initial relative states (radial, along-track, and cross- track) are x0
     # (1 km; 10 km; 0.2 km; 0 m∕s; −1.7 m∕s; 0.2 m∕s, and the desired final relative 
     # states are xf (0 km; 0.2 km; 0 km; 0 m∕s; 0 m∕s; 0 m∕s). 
     initial_x=[-2000., 0., 1000., 1.71, 0., 0.,],
-    rd=[200., 0., 0.],
 )
 
 low_cost_kwargs = dict(
@@ -150,44 +150,162 @@ MajorBurn = make_burn(
 # 1-burn sim
 Sim = make_sim()
 
+scenario_a_tf = 2000.
+first_tig = 0.1 # TODO: handle this.... 
 scenario_1a = [
     Sim(
         **base_kwargs,
         **scenario_1_kwargs,
         **cost_system_kwargs,
-        terminate_time=2000.,
-        tig_1=0.1,
-        tem_1=2000.,
+        terminate_time=scenario_a_tf,
+        tem_1=scenario_a_tf,
+        tig_1=first_tig,
+        rd_1=scenario_1_target,
+    )
+    for cost_system_kwargs in [low_cost_kwargs, nominal_kwargs, high_cost_kwargs]
+]
+scenario_2a = [
+    Sim(
+        **base_kwargs,
+        **scenario_2_kwargs,
+        **cost_system_kwargs,
+        terminate_time=scenario_a_tf,
+        tem_1=scenario_a_tf,
+        tig_1=first_tig,
+        rd_1=scenario_2_target,
     )
     for cost_system_kwargs in [low_cost_kwargs, nominal_kwargs, high_cost_kwargs]
 ]
 
-[sim.final_pos_disp for sim in scenario_1a]
-[sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_1a]
-[sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_1a]
+
+print([sim.final_pos_disp for sim in scenario_1a])
+print([sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_1a])
+print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_1a])
+
+print([sim.final_pos_disp for sim in scenario_2a])
+print([sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_2a])
+print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_2a])
+
+# the dispersions are the same between scenario 1a and 2a, which makes sense -- just
+# propagating covariance between the first burn and final burn. 1b and 2b look like they
+# introduce more variations I assume because the intermediate burns are doing something
+# with linear CW dynamics 1a and 2a are identical, paper's nonlinearity tweaks it
+# slightly but not much
 
 
-class Burn1(co.OptimizationProblem):
-    t1 = variable(initializer=1900.)
-    sigma_r_weight = parameter()
-    sigma_Dv_weight = parameter()
-    mag_Dv_weight = parameter()
+
+MajorBurn = make_burn(
+    rd = LinCovCW.parameter(shape=3), # desired position
+    tig = LinCovCW.parameter(), # time ignition
+    tem = LinCovCW.parameter(), # time end maneuver
+)
+Sim = make_sim()
+scenario_kwargs = dict(
+    **scenario_1_kwargs,
+    terminate_time=scenario_a_tf,
+)
+scenario_target = scenario_1_target
+cost_system_kwargs = low_cost_kwargs
+
+class Deterministic2Burn1a(co.OptimizationProblem):
+    rds = []
+    n_burns = len(make_burn.burns)
+    burn_config = dict(tig_1=first_tig)
+    ts = [first_tig]
+    for burn_num, burn, next_burn in zip(range(1,n_burns+2), make_burn.burns, make_burn.burns[1:]):
+        ratio = burn_num/n_burns
+        ts.append(variable(
+            name=f"t_{burn_num+1}",
+            initializer=scenario_kwargs['terminate_time']*ratio
+        ))
+        rds.append(variable(
+            name=f"pos_{burn_num+1}",
+            shape=(3,),
+            initializer=np.array(scenario_kwargs["initial_x"][:3])*(1-ratio)+np.array(scenario_target)*ratio
+        ))
+        constraint(ts[-1]-ts[-2], lower_bound=10.)
+        burn_config[LinCovCW.parameter.get(backend_repr=burn.tem).name] = ts[-1]
+        burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tig).name] = ts[-1]
+        burn_config[LinCovCW.parameter.get(backend_repr=burn.rd).name] = rds[-1]
+    constraint(scenario_kwargs['terminate_time']-ts[-1], lower_bound=10.)
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = scenario_kwargs['terminate_time']
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = scenario_target
+
     sim = Sim(
-        tig_1=t1,
-        **sim_kwargs
-
+        **base_kwargs,
+        **scenario_kwargs,
+        **cost_system_kwargs,
+        **burn_config
     )
+    objective = sim.final_vel_mag + 3*sim.final_vel_disp
+    for burn_num in range(n_burns):
+        objective += getattr(sim, f"Delta_v_mag_{burn_num+1}") + 3*getattr(sim, f"Delta_v_disp_{burn_num+1}")
 
-    constraint(t1, lower_bound=30., upper_bound=sim_kwargs['tem_1']-30.)
-    constraint(sim.final_pos_disp, upper_bound=10.)
-    objective = (
-        sigma_Dv_weight*sim.tot_Delta_v_disp
-        + sigma_r_weight*sim.final_pos_disp
-        + mag_Dv_weight*sim.tot_Delta_v_mag
-    )
     class Casadi(co.Options):
         exact_hessian=False
-        method = OptimizationProblem.Method.scipy_trust_constr
+        #method = OptimizationProblem.Method.scipy_trust_constr
+
+
+
+import sys
+sys.exit()
+opt = Deterministic2Burn1a()
+"""
+
+trying to do deterministic optimization with extra  burn in middle got stuck on
+[-5076.54, 6.88871, 2582.95, 0.1, 1021.07, -200, 0, 0, 1021.07, 2000]
+rd: -5076.54, 6.88871, 2582.95,
+tig: 1021.07
+
+initialzied with:
+rd: array([-5.1e+03,  1.0e-01,  0.0e+00])
+tig: 1000.
+
+
+optimal trajectory for 1a with 1 burn:
+In [27]: x[:3, 0]
+Out[27]: array([-1.e+04,  2.e-01,  0.e+00])
+
+In [24]: np.where(t>1000.)[0]
+Out[24]: array([1322, 1323, 1324, ..., 2620, 2621, 2622])
+In [25]: x[:3, 1322]
+Out[25]: array([-5.09753611e+03,  2.34991856e-01,  2.58765334e+03])
+
+In [16]: np.where(t>1021.)
+Out[16]: (array([1350, 1351, 1352, ..., 2620, 2621, 2622]),)
+In [23]: x[:3, 1350]
+Out[23]: array([-4.95464320e+03,  2.32351375e-01,  2.58638861e+03])
+
+In [26]: x[:3, -1]
+Out[26]: array([-2.00000000e+02,  2.25210475e-15,  1.60198868e-08])
+
+
+so i5 had actually moved the altitude coordinate z to be aligned with the trajectory
+which isn't at all linear in the coordinate system which is neat! 
+
+also, the last iteration in ipopt was
+  96  9.4742132e+00 0.00e+00 1.70e-03 -11.0 6.54e+01    -  1.00e+00 4.44e-16f 52
+which seems close to the minimum value
+
+In [30]: scenario_1a[0].Delta_v_mag_1 + scenario_1a[0].final_vel_mag
+Out[30]: 9.474213195999624
+
+so quite good. Since there are at least a 1DOF family of solutions (for any tig there is
+at least 1 rd that is effectively a null burn) it makes sense the optimizaiton got
+stuck. is ipopt just jumping around the curve? probably.
+
+would scipy's SLSQP do any better? since it's an illconditioned problem, problaby not.
+The only other interesting thing would be to have a different burn model with Delta v
+directly under optimization control. This is similar to the SOCP model I wrote. This may
+de-couple the variables enough the optimizer can find that tig doesn't matter if Delta v
+-> 0. And the 1-burn case because less constrained (although, could let the final rd be
+a variable as well and it should be able to work in either case.
+
+"""
+
+scenario_b_tf = 12_000.
+
+
 
 #opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
 #opt_sim = Sim(

@@ -225,10 +225,10 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
                         delta_fs 
                     ) @ self.i.dte_dps[event_channel](p, tem, xtem)
                     - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
-                ) - 1*(
+                ) + 1*(
                     (
-                        1*adjoint_sys.state_equation_function(tem, lamda_te_m)[None, :] -
-                        1*adjoint_sys.state_equation_function(tep, lamda_te_p)[None, :]
+                        +1*adjoint_sys.state_equation_function(tep, lamda_te_p)[None, :]
+                        -1*adjoint_sys.state_equation_function(tem, lamda_te_m)[None, :]
                     ) @ (delta_xs) @ self.i.dte_dps[event_channel](p, tem, xtem)
                 ) - 1*(
                     (lamda_te_p - lamda_te_m)[None, :]  @ self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
@@ -388,6 +388,9 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             print(e)
             print(res.t[event_times[:-1]], res.t[-1])
             print(res.t[event_times[max(num_events-1, 0):-1]], res.t[-1])
+            breakpoint()
+
+        if np.any(np.diff(res.t[span_idxs[:-1]], axis=1)==0.):
             breakpoint()
 
         if DEBUG_LEVEL > 1:

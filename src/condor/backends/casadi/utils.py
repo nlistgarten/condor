@@ -42,10 +42,20 @@ class CasadiFunctionCallbackMixin:
     def get_jacobian(self, name, inames, onames, opts):
         return self.func.jacobian()
 
-def flatten(symbols, complete=True):
+def iterable_1d(symbol):
+    if isinstance(symbol, symbol_class):
+        return casadi.vertsplit(symbol.reshape((-1,1)))
+    #else:
+    return np.atleast_1d(symbol).reshape(-1)
+
+
+def flatten(symbols):
     if isinstance(symbols, co.Field):
+        # if it's a field, get all of the symbolic representations
         symbols = symbols.list_of("backend_repr")
+
     if isinstance(symbols, symbol_class):
+        # if it's a single 
         symbol = symbols
         return tuple([
             elem
@@ -62,15 +72,13 @@ def flatten(symbols, complete=True):
 
     if isinstance(symbols[0], symbol_class):
         return [symbol.reshape((-1,1)) for symbol in symbols]
-    else:
-        # numeric only?
-        if complete:
-            return [
-                elem
-                for symbol in symbols
-                for elem in np.atleast_1d(symbol).reshape(-1)
-            ]
-        return [ np.atleast_1d(symbol).reshape(-1)  for symbol in symbols]
+
+    return [
+        elem
+        for symbol in symbols
+        for elem in iterable_1d(symbol)
+    ]
+
 
 def wrap(field, values):
     if isinstance(values, symbol_class):

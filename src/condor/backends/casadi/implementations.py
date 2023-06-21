@@ -726,16 +726,12 @@ class TrajectoryAnalysis:
         if isinstance(out, casadi.MX):
             out = casadi.vertsplit(out)
 
-        model_instance.bind_field(
-            self.model.trajectory_output,
-            out,
-        )
         if hasattr(self.callback, 'res'):
             res = self.callback.res
             model_instance._res = res
             model_instance.t = res.t
             model_instance.bind_field(
-                self.ode_model.state,
+                self.model.state,
                 res.x.T,
                 wrap=True,
             )
@@ -745,6 +741,10 @@ class TrajectoryAnalysis:
                 wrap=True,
             )
 
+        model_instance.bind_field(
+            self.model.trajectory_output,
+            out,
+        )
 
 
 

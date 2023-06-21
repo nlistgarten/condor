@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from sgm_test_util import LTI_plot
 from scipy import linalg
 
+with_time_state = False
+# either include time as state or increase tolerances to ensure sufficient ODE solver
+# accuracy
 
 class DblInt(co.ODESystem):
     A = np.array([
@@ -15,6 +18,7 @@ class DblInt(co.ODESystem):
     x = state(shape=A.shape[0])
     mode = state()
 
+
     t1 = parameter()
     t2 = parameter()
     # TODO: fix once mode and control work?
@@ -22,6 +26,10 @@ class DblInt(co.ODESystem):
         1*(mode == 0.)
         -1*(mode == 1.)
     )
+
+    if with_time_state:
+        tt = state()
+        dot[tt] = 1.
 
 class Switch1(DblInt.Event):
     function = t - t1
@@ -35,7 +43,14 @@ class Transfer(DblInt.TrajectoryAnalysis):
     initial[x] = [-9., 0.]
     Q = np.eye(2)
     cost = trajectory_output((x.T @ Q @ x)/2)
-    #tf = 10.
+
+    if not with_time_state:
+        class Casadi(co.Options):
+            integrator_options = dict(
+                atol = 1E-15,
+                rtol = 1E-12,
+            )
+
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
@@ -45,7 +60,7 @@ class MinimumTime(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian = False
-        method = OptimizationProblem.Method.scipy_cg
+        #method = OptimizationProblem.Method.scipy_cg
 
 sim = Transfer(t1=1., t2= 4.,)
 

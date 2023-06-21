@@ -20,7 +20,6 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
 
 
-
 ct_sim = DblIntLQR([1, .1])
 LTI_plot(ct_sim)
 

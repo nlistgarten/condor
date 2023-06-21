@@ -53,7 +53,7 @@ class MinimumTime(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian = False
-        method = OptimizationProblem.Method.scipy_cg
+        #method = OptimizationProblem.Method.scipy_cg
 
 p0 = -4., -1.
 sim = Transfer(*p0)

@@ -1025,7 +1025,7 @@ class ODESystem(Model):
     make = MatchedField(control)
 
 
-class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "initial"]):
+class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "initial", "state"]):
     """
     this is what simulates an ODE system
     tf parameter 
