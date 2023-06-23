@@ -1,13 +1,11 @@
 import condor as co
 import numpy as np
-from condor.settings import set_settings
-import importlib
+from condor.settings import settings
+
 
 def get_LTI(**kwargs):
-    set_settings(kwargs)
-    import deferred_model_test as module
-    importlib.reload(module)
-    return module.LTI
+    mod = settings.get_module("deferred_model_test")
+    return mod.LTI
 
 dbl_int = get_LTI(
     A = np.array([
