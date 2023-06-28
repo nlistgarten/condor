@@ -1,10 +1,9 @@
 import condor as co
 import numpy as np
-from condor.settings import settings
 
 
 def get_LTI(**kwargs):
-    mod = settings.get_module("deferred_model_test", **kwargs)
+    mod = co.settings.get_module("deferred_model_test", **kwargs)
     return mod.LTI
 
 A = np.array([

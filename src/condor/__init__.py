@@ -7,6 +7,7 @@ from condor.fields import (
     BoundedAssignmentField, TrajectoryOutputField,
 )
 from condor.backends.default import backend
+from condor.conf import settings
 """
 Backend:
 [x] provide symbol_generator for creating backend symbol repr
