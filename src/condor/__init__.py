@@ -1048,8 +1048,18 @@ class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "i
 # state, etc.
 class Event(Model, inner_to = ODESystem):
     """
-    function defines when event occurs
     update for any state that needs it
+
+    terminate is a boolean flag to indicate whether the event terminates the simulation
+    (default is False)
+
+    function defines when event occurs OR at_time is an expression or slice of
+    expressions for when the event occurs. Slice assumes constant dt between start and
+    stop. use stop=None for infinite oscillator. Differs from standard slice
+    semantics in that both start and stop are inclusive, so slice(0, 1, 1) will generatw
+    two events at 0 and 1. This means an at_time of a single value of t_e is equiavelent
+    to slice(t_e, t_e, None)
+
     """
     # TODO: singleton field event.function is very similar to objective in
     # OptimizationProblem

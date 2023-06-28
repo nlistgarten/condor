@@ -5,7 +5,9 @@ from enum import Enum, auto
 from dataclasses import dataclass
 from condor.backends.casadi.utils import flatten, wrap, symbol_class
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
-from condor.backends.casadi.shooting_gradient_method import ShootingGradientMethod
+from condor.backends.casadi.shooting_gradient_method import (
+    ShootingGradientMethod, NextTimeFromSlice, System
+)
 
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 
@@ -409,8 +411,12 @@ class OptimizationProblem(InitializerMixin):
 
 def get_state_setter(field, setter_args, default=0.):
     """
+    used for building functions from matched fields to state (should this be
+    generalized?) used for dot, update, initial condition,
+
     field is MatchedField matching to the state
     default None to pass through
+
     """
     setter_exprs = []
     if isinstance(setter_args, symbol_class):
@@ -460,11 +466,6 @@ class TrajectoryAnalysis:
         self.model = model
         self.ode_model = ode_model = model.inner_to
 
-        self.use_lam_te_p = use_lam_te_p
-        self.include_lam_dot = include_lam_dot
-        self.integrator_options = integrator_options
-
-
         self.p = casadi.vertcat(*flatten(model.parameter))
         self.x = casadi.vertcat(*flatten(ode_model.state))
         self.lamda = symbol_class.sym("lambda", ode_model.state._count)
@@ -473,7 +474,6 @@ class TrajectoryAnalysis:
             self.ode_model.t,
             self.x,
         ]
-        self.sym_event_channel = symbol_class.sym('event_channel')
 
         self.traj_out_expr = casadi.vertcat(*flatten(
             model.trajectory_output
@@ -514,45 +514,88 @@ class TrajectoryAnalysis:
             self.y_expr = casadi.vertcat(*flatten(ode_model.output))
         else:
             self.y_expr = state_equation_func.expr
-        self.e_exprs = [event.function for event in ode_model.Event.subclasses]
-        self.h_exprs = [
-            get_state_setter(
-                event.update,
-                self.simulation_signature,
-                default=None,
-            ).expr*(self.sym_event_channel==idx)
-            if not getattr(event, 'terminate', False)
 
-            else casadi.if_else(
-                (self.sym_event_channel==idx),
-                np.full((ode_model.state._count,), np.nan,),
-                0.,
+        self.e_exprs = []
+        self.h_exprs = []
+        self.at_time_slices = []
+        self.terminating = []
+        for event_idx, event in enumerate(ode_model.Event.subclasses):
+            terminate = getattr(event, 'terminate', False)
+            self.terminating.append(terminate)
+            if hasattr(event, 'function') == hasattr(event, 'at_time'):
+                raise ValueError
+            if hasattr(event, 'function'):
+                e_expr = event.function
+            else:
+                at_time = event.at_time
+                if isinstance(at_time, slice):
+                    if at_time.step is None:
+                        raise ValueError
+
+                    e_expr = ca.sign
+                    if at_time.start is not None:
+                        at_time_start = at_time.start
+                    else:
+                        at_time_start = 0
+
+                    e_expr = at_time.step*casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)/casasadi.pi
+
+                    if at_time_start:
+                        e_expr = e_expr * (ode_model.t >= at_time_start)
+                        # if there is a start offset, add a linear term to provide a
+                        # zero-crossing at first occurance
+                        pre_term = (at_time_start - t) * (ode_model.t <= at_time_start)
+                    else:
+                        pre_term = 0
+
+                    if at_time.stop is not None:
+                        e_expr = e_expr * (ode_model.t <= at_time.stop)
+                        # if there is an end-time, hold constant to prevent additional
+                        # zero crossings -- hopefully works even if stop is on an event
+                        post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
+                        at_time_stop = at_time.stop
+                    else:
+                        post_term = 0
+                        at_time_stop = casadi.inf
+
+                    e_expr = e_expr + pre_term + post_term
+
+                    self.at_time_slices.append(
+                        casadi.Function(
+                            f"{ode_model.__name__}_at_times_{event_idx}",
+                            [self.p],
+                            [at_time_start, at_time_stop, at_time.step]
+                        )
+                    )
+                else:
+                    e_expr =  - at_time - ode_model.t
+                    self.at_time_slices.append(
+                        casadi.Function(
+                            f"{ode_model.__name__}_at_times_{event_idx}",
+                            [self.p],
+                            [at_time, at_time, 0]
+                        )
+                    )
+
+            self.e_exprs.append(
+                e_expr
             )
 
-
-            for idx, event in enumerate(ode_model.Event.subclasses)
-        ]
-        self.event_time_only = [
-            casadi.depends_on(e.function, ode_model.t) and
-            casadi.jacobian(e.function, ode_model.t).is_constant() and
-            not sum([
-                casadi.depends_on(e.function, state)
-                for state in ode_model.state.list_of('backend_repr')
-            ])
-
-
-            for e in ode_model.Event.subclasses
-        ]
-        self.exact_times = [
-            getattr(event, 'at_time', [casadi.inf])[0]
-            for event in ode_model.Event.subclasses
-        ]
-
-        self.sim_shape_data = dict(
-            dim_state = ode_model.state._count,
-            dim_output = self.y_expr.shape[0],
-            num_events = len(ode_model.Event.subclasses),
-        )
+            if terminate:
+                # For simupy, use nans to trigger termination; do we ever want to allow
+                # an update to a terminating event?
+                #self.h_exprs.append(
+                #    casadi.MX.nan(ode_model.state._count)
+                #)
+                self.terminating.append(event_idx)
+            self.h_exprs.append(
+                get_state_setter(
+                    event.update,
+                    self.simulation_signature,
+                    default=None,
+                )
+            )
+        self.num_events = len(ode_model.Event.subclasses)
         self.sim_func_kwargs = dict(
             state_equation_function = state_equation_func,
             output_equation_function = casadi.Function(

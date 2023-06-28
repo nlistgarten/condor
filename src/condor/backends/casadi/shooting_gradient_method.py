@@ -1,26 +1,109 @@
 from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
 import casadi
-from simupy.systems import DynamicalSystem
-from simupy.block_diagram import DEFAULT_INTEGRATOR_OPTIONS, SimulationResult
 import numpy as np
 from scipy import interpolate
 from scipy.optimize import fsolve
 
+from scikits.odes.sundials.cvode import CVODE, StatusEnum
+from itertools import count
+
 DEBUG_LEVEL = 1
 
 
-def adjoint_wrapper(f, p, res, segment_slice):
-    x_interp = interpolate.make_interp_spline(
-        res.t[segment_slice],
-        res.x[segment_slice, :],
-        k=min(3, res.t[segment_slice].size-1)
-    )
-    return (
-        lambda t, adjoint, output=None, **kwargs:
-        f(
-            p, x_interp(t), t, adjoint, *kwargs.values()
-        ).toarray().reshape(-1)
-    )
+Root = namedtuple("Root", ["index", "rootsfound"])
+Results = namedtuple("Results", ["t", "x", "e"],)
+
+class NextTimeFromSlice:
+    def __init__(self, at_time_func):
+        self.at_time_func = at_time_func
+
+    def set_p(self, p):
+        start, stop, step = self.at_time_func(self.p)
+        self.start = start
+        self.step = step
+        self.stop = stop
+
+    def __call__(self, t):
+        if t < self.start:
+            return start
+        if t >= self.stop:
+            # if t is exactly stop time, this has already occured
+            return np.inf
+        return (1+(t-self.start)//self.step)*self.step + self.start
+
+class System:
+    def __init__(self, dots, jac, events, num_events, p):
+        self._dots = dots
+        self._jac = jac
+        self._events = events
+        self.num_events = num_events
+        self.p = p
+        self.solver = CVODE(
+            self.dots,
+            jacfn=self.jac,
+            old_api=False,
+            one_step_compute=True,
+            rootfn=self.events,
+            nr_rootfns=self.num_events,
+        )
+
+    def dots(self, t, x, xdot,):# userdata=None,):
+        xdot[:] = self._dots(self.p, t, x)
+
+    def jac(self, t, x, xdot, jac, userdata=None,):
+        jac[...] = self._jac(self.p, t, x)
+
+    def events(self, t, x, g):
+        g[:] = self._events(self.p, t, x)
+
+    def simulate(self, t0, x0, tf, results=None):
+
+        if results is None:
+            results = Results([],[],[])
+
+        dense_t = results.t
+        dense_y = results.x
+        roots = results.e
+
+        solver = self.solver
+
+        solver.init_step(t0, x0)
+        solver.set_options(tstop=tf)
+
+        for cnt in count():
+            res = solver.step(t1)
+            print(cnt, res.flag, res.values.t)
+            dense_t.append(np.copy(res.values.t))
+            dense_y.append(np.copy(res.values.y))
+            match res.flag:
+                case StatusEnum.ROOT_RETURN:
+                    rootsfound = solver.rootinfo()
+                    roots.append(Root(cnt, rootsfound))
+
+                    if res.values.t == tf:
+                        break
+
+                case StatusEnum.TSTOP_RETURN:
+                    #continue
+                    break
+
+        return results
+
+class AdjointSystem(System):
+    def simulate(self, sys_res, lamda0):
+        self.x_interp = interpolate.make_interp_spline(
+            sys_res.t,
+            sys_res.x,
+            k=min(3, len(sys_res.t)-1)
+        )
+        return super().simulate(sys_res.t[-1], lamda0, sys_res.t[0])
+
+    def dots(self, t, x, xdot,):# userdata=None,):
+        xdot[:] = self._dots(self.p, self.x_interp(t), t, x)
+
+    def jac(self, t, x, xdot, jac, userdata=None,):
+        jac[...] = self._jac(self.p, self.x_interp(t), t, x)
+
 
 class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callback):
     def has_jacobian(self):
@@ -273,11 +356,10 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             f"{intermediate.model.__name__}_placeholder",
             [intermediate.p],
             [intermediate.traj_out_expr],
+            dict(allow_free=True,),
         )
         self.i = intermediate
         self.construct(name, {})
-        self.int_options = DEFAULT_INTEGRATOR_OPTIONS.copy()
-        self.int_options.update(self.i.integrator_options)
         self.from_implementation = False
 
     def get_jacobian(self, name, inames, onames, opts):
@@ -426,5 +508,4 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             pass
 
         return self.output,
-
 
