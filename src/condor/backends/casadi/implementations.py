@@ -326,13 +326,6 @@ class OptimizationProblem(InitializerMixin):
                     ])
 
 
-
-
-
-
-
-
-
     def __call__(self, model_instance, *args):
         initializer_args = [self.x0]
         if self.has_p:
@@ -393,8 +386,6 @@ class OptimizationProblem(InitializerMixin):
                             lb=self.nonlinear_lb, ub=self.nonlinear_ub
                         )
                     )
-
-
 
             min_out = minimize(
                 lambda *args: self.f_func(*args).toarray().squeeze(),
@@ -519,9 +510,15 @@ class TrajectoryAnalysis:
         self.h_exprs = []
         self.at_time_slices = []
         self.terminating = []
+
+        model_tf = getattr(model, 'tf', None)
+        if model_tf is not None:
+            class Terminate(ode_model.Event):
+                at_time = model_tf
+                terminate = True
+
         for event_idx, event in enumerate(ode_model.Event.subclasses):
             terminate = getattr(event, 'terminate', False)
-            self.terminating.append(terminate)
             if hasattr(event, 'function') == hasattr(event, 'at_time'):
                 raise ValueError
             if hasattr(event, 'function'):
@@ -573,7 +570,7 @@ class TrajectoryAnalysis:
                         casadi.Function(
                             f"{ode_model.__name__}_at_times_{event_idx}",
                             [self.p],
-                            [at_time, at_time, 0]
+                            [at_time, at_time, casadi.inf]
                         )
                     )
 
@@ -790,4 +787,8 @@ class TrajectoryAnalysis:
         )
 
 
-
+from enum import Enum
+class FlapType(float, Enum):
+    plain = 1
+    split = 2
+    nan = float('nan')
