@@ -18,14 +18,26 @@ class NextTimeFromSlice:
         self.start = start
         self.step = step
         self.stop = stop
+        self.direction = np.sign(step)
+
+    def before_start(self, t):
+        if self.direction < 0:
+            return t > self.start
+        return t < self.start
+
+    def after_stop(self, t):
+        # if t is exactly stop time, this has already occured
+        if self.direction < 0:
+            return t <= self.stop
+        return t >= self.stop
+
 
     def __call__(self, t):
         # TODO handle negative step?
-        if t < self.start:
-            return start
-        if t >= self.stop:
-            # if t is exactly stop time, this has already occured
-            return np.inf
+        if self.before_start(t):
+            return self.start
+        if self.after_stop(t):
+            return self.direction*np.inf
         return (1+(t-self.start)//self.step)*self.step + self.start
 
 """
@@ -40,30 +52,35 @@ different data type and method for AdjointSystem.
 """
 
 class TimeGeneratorFromSlices:
-    def __init__(self, t0, at_time_slices):
-        self.t0 = t0
+    def __init__(self, time_slices, direction=1):
         self.time_slices = time_slices
+        self.direction = direction
 
-    def __call__(self, p, t0 = 0.):
+    def __call__(self, p):
         # TODO handle negative step?
         for time_slice in self.time_slices:
             time_slice.set_p(p)
-        t  = t0
+
+        t = -self.direction*np.inf
+        if self.direction > 0:
+            get_time = min
+        else:
+            get_time = max
         while True:
             next_times = [time_slice(t) for time_slice in time_slices]
-            t = min(next_times)
+            t = get_time(next_times)
             yield t
             if np.isinf(t):
                 breakpoint()
+
 
 class System:
     def __init__(
             self, dots, jac, events, updates, time_generator, initial_state, terminating=[]
     ):
-        # p is a temporary instance attribute so system model can pass information
-        # correctly -- the Result of each simulation is the true "owner" of p. May try
-        # to figure out how to pass the Result around instead
-        self.p = None 
+        # result is a temporary instance attribute so system model can pass information
+        # correctly 
+        self.result = None
 
         # these instance attributes encapsolate the business data of a system
 
@@ -93,6 +110,7 @@ class System:
         # any(rootsfound[terminating]) --> terminates simulation
         self.terminating = terminating
 
+        self.num_events = len(updates)
         self.make_solver()
 
     def make_solver(self):
@@ -102,66 +120,68 @@ class System:
             old_api=False,
             one_step_compute=True,
             rootfn=self.events,
-            nr_rootfns=len(self.updates),
+            nr_rootfns=self.num_events,
         )
 
     def initial_state(self):
-        return self._initial_state(self.p)
+        return self._initial_state(self.result.p)
 
     def dots(self, t, x, xdot,):# userdata=None,):
-        xdot[:] = self._dots(self.p, t, x)
+        xdot[:] = self._dots(self.result.p, t, x)
 
     def jac(self, t, x, xdot, jac):#
-        jac[...] = self._jac(self.p, t, x)
+        jac[...] = self._jac(self.result.p, t, x)
 
     def events(self, t, x, g):
-        g[:] = self._events(self.p, t, x)
+        g[:] = self._events(self.result.p, t, x)
 
     def update(self, t, x, rootsfound):
         next_x = x # who is responsible for copying? I suppose simulate
         for root_sign, update in zip(rootsfound, self._updates):
             if root_sign != 0:
                 # 
-                next_x = update(self.p, res.values.t, next_x)
+                next_x = update(self.result.p, res.values.t, next_x)
         return next_x
 
     def time_generator(self):
-        for t in self.time_data:
+        for t in self._time_generator(self.result.p):
             yield t
 
 
-    def simulate(self, p, results=None):
+    def simulate(self):
         """
         expects:
         self.solver is an object with CVODE-like interface to parameterized
         dots, [jac,] and rootfns with init_step, set_options(tstop=...), and step()
         returns StatusEnum with TSTOP_RETURN and ROOT_RETURN members.
 
+        self.result is a namespace with t, x, and e attributes that can be appended with
+        time value, state at time, and possibly events e
         initializer 
         update 
         """
-        if results is None:
-            results = Result(p=p, system=self)
-        else:
-            # validate Result parameters and system?
-            pass
-
+        results = self.result
         solver = self.solver
+        time_generator = self.time_generator()
 
-        last_t = t0
-        next_x = x0
-
+        last_t = next(time_generator)
+        last_x = self.initial_state()
         results.t.append(last_t)
-        results.x.append(next_x)
+        results.x.append(last_x)
+        rootsfound = self.events(last_t, last_x, np.empty(self.num_events)) == 0.
 
-        for next_t in self.time_generator(p, t0):
+        # each iteration of this loop simulates until next generated time
+        while True:
+
+            next_t = next(time_generator)
             if np.isinf(next_t):
                 break
-            solver.init_step(last_t, next_x)
+            solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
             last_t = next_t
+
+            # each iteration of this loop simulates until next event or time stop
             while True:
-                idx = len(results.t)
                 res = solver.step(t1)
                 print(idx, res.flag, res.values.t)
                 if res.flag < 0:
@@ -172,12 +192,12 @@ class System:
                     results.x.append(np.copy(res.values.y))
 
                 if res.flag == case StatusEnum.ROOT_RETURN:
+                    idx = len(results.t)
                     rootsfound = solver.rootinfo()
                     results.e.append(Root(idx, rootsfound))
 
                     if np.any(rootsfound[self.terminating] != 0):
-                        self.p = None
-                        return results
+                        return
 
                     next_x = self.update(
                         res.values.t, np.copy(results.x[-1]), rootsfound
@@ -185,12 +205,18 @@ class System:
                     results.t.append(np.copy(res.values.t))
                     results.x.append(next_x)
                     solver.init_step(res.values.t, next_x)
+                    last_x = next_x
 
                 if res.values.t == next_t or res.flag != StatusEnum.TSTOP_RETURN:
                     break
 
-        self.p = None
-        return results
+
+    def __call__(self, p):
+        self.result = Result(p=p, system=self)
+        self.simulate()
+        result = self.result
+        self.result = None
+        return result
 
 
 @dataclass
@@ -205,12 +231,6 @@ class ResultBase:
     x: list[list] = field(default_factory=list)
     e: list[Root] = field(default_factory=list)
 
-    def __getitem__(self, key):
-        return self.__class__(
-            *tuple(getattr(self, field.name) for field in fields(self)[:-3]),
-            t=self.t[key], x=self.x[key], e=self.e[key]
-        )
-
 
 @dataclass
 class Result(ResultMixin, ResultBase):
@@ -221,17 +241,42 @@ class Result(ResultMixin, ResultBase):
 class AdjointResultMixin:
     state_result: Result
 
-    # does interpolant belong here or on its own dataclass?
-    interpolant: callable = None
-
-    def __post_init__(self):
-        if self.interpolant is None:
-            pass
-            # make interpolants
-
 
 @dataclass
 class AdjointResult(AdjointResultMixin, ResultBase):
+    pass
+
+
+@dataclass
+class ResultInterpolantMixin:
+    function: callable = lambda p, t, x: x
+    interpolants: list[callable] = None # field(init=False)
+    time_bounds: list[float] = None # field(init=False)
+    event_idxs: list
+
+    def __post_init__(self):
+        # make interpolants
+        event_idxs = [root.index for root in self.state_result.e]
+        self.time_bounds = np.array(self.state_result.t)[
+            [0] + event_idxs + [-1]
+        ]
+        self.interpolants = [
+            make_interp_spline(
+                self.state_result.t[idx0:idx1],
+                self.function(
+                    self.state_result.p,
+                    self.state_result.t[idx0:idx1],
+                    self.state_result.x[idx0:idx1],
+                ),
+                k=min(3, idx1-idx0)
+        pass
+
+    def __call__(self, t):
+    
+
+
+@dataclass
+class ResultInterpolant(AdjointResultMixin, ResultInterpolantMixin):
     pass
 
 
@@ -246,12 +291,12 @@ class AdjointSystem(System):
                          terminating=[0])
 
     def self.time_generator(self):
-        return [t1]
+        self.
 
     def initial_state(self):
-        return self._initial_state(self.p,)
+        return self._initial_state(self.p, self.some_arg_to_set_lamda0)
 
-    def simulate(self, some_arg_to_set_lamda0, state_results=None, adjoint_results=None):
+    def __call__(self, some_arg_to_set_lamda0, state_results, interpolants=None):
         self.some_arg_to_set_lamda0 = some_arg_to_set_lamda0
         # can also 
 

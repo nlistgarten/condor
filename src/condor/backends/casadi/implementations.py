@@ -508,7 +508,15 @@ class TrajectoryAnalysis:
 
         self.e_exprs = []
         self.h_exprs = []
-        self.at_time_slices = []
+        self.at_time_slices = [
+            casadi.Function(
+                f"{ode_model.__name__}_at_times_t0",
+                [self.p],
+                # TODO in future allow t0 to occur at arbitrary times
+                [0., 0., casadi.inf]
+            )
+        ]
+
         self.terminating = []
 
         model_tf = getattr(model, 'tf', None)
