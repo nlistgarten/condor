@@ -29,14 +29,14 @@ class NDSplinesJacobianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         if i==0: # nominal input
             return casadi.Sparsity.dense(anti_deriv_interp.xdim)
         elif i==1: # nominal output
-            return casadi.Sparsity(anti_deriv_interp.ydim)
+            return casadi.Sparsity(anti_deriv_interp.ydim, 1)
 
     def get_sparsity_out(self,i):
         anti_deriv_interp = self.antiderivative_callback.interpolant
         return casadi.Sparsity.dense(anti_deriv_interp.ydim, anti_deriv_interp.xdim)
 
     def eval(self, args):
-        return tuple(self.interpolant(args))
+        return tuple(self.interpolant(args[0]))
 
 
 class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
@@ -76,12 +76,12 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         jac_coefficients = np.stack([
             deriv_interpolant.coefficients
             for deriv_interpolant in deriv_interpolants
-        ], axis=-2)
-        jac_interpolant = ndsplines.NDSpline(
+        ], axis=-1)
+        interp = ndsplines.NDSpline(
             jac_knots, jac_coefficients, jac_degrees,
             self.interpolant.periodic, self.interpolant.extrapolate
         )
-        self.jac_callback = NDSplinesJacobianCallback(self, jac_interpolant, name,
+        self.jac_callback = NDSplinesJacobianCallback(self, interp, name,
                                                      inames, onames, opts)
         return self.jac_callback
 
@@ -95,8 +95,14 @@ class MyInterp(co.Tablelookup):
     input_data[x] = np.arange(10)*0.1
     output_data[y] = (input_data[x]-0.8)**2
 
+
 class MyOpt(co.OptimizationProblem):
     xx = variable()
     objective = MyInterp(xx).y
+
+    class Casadi(co.Options):
+        exact_hessian = False
+
+MyInterp.implementation.callback.jac_callback(0.3, 0.)
 
 """

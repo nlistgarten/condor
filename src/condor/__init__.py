@@ -134,6 +134,8 @@ class Options:
     pass
     # TODO: do meta programming so implementation enums are available without import?
 
+    # TODO: allow a generic options for non-solver specific options?
+
 
 class ModelType(type):
     """
