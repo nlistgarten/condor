@@ -15,6 +15,10 @@ class NDSplinesJacobianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         self.inames = inames
         self.onames = onames
         self.opts = opts
+
+        anti_deriv_interp = self.antiderivative_callback.interpolant
+        self.primary_shape = (anti_deriv_interp.ydim, anti_deriv_interp.xdim)
+
         self.construct(name, {})
         self.interpolant = interpolant
 
@@ -25,18 +29,21 @@ class NDSplinesJacobianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         return 1
 
     def get_sparsity_in(self,i):
-        anti_deriv_interp = self.antiderivative_callback.interpolant
         if i==0: # nominal input
-            return casadi.Sparsity.dense(anti_deriv_interp.xdim)
+            return casadi.Sparsity.dense(self.primary_shape[1])
         elif i==1: # nominal output
-            return casadi.Sparsity(anti_deriv_interp.ydim, 1)
+            return casadi.Sparsity(self.primary_shape[0], 1)
 
     def get_sparsity_out(self,i):
-        anti_deriv_interp = self.antiderivative_callback.interpolant
-        return casadi.Sparsity.dense(anti_deriv_interp.ydim, anti_deriv_interp.xdim)
+        return casadi.Sparsity.dense(self.primary_shape)
 
-    def eval(self, args):
-        return tuple(self.interpolant(args[0].toarray().squeeze()))
+    def eval(self, local_args):
+        array_vals = [
+                interp(local_args[0].toarray().squeeze())
+                for interp in self.interpolant
+            ]
+        return_val = np.concatenate(array_vals, axis=1)
+        return casadi.DM(return_val),
 
 
 class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
@@ -64,23 +71,9 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         return tuple(self.interpolant(args[0].toarray().squeeze()))
 
     def get_jacobian(self, name, inames, onames, opts):
-        deriv_interpolants = [
+        interp = [
             self.interpolant.derivative(idx) for idx in range(self.interpolant.xdim)
         ]
-        jac_knots = [
-            deriv_interpolants[idx].knots[idx] for idx in range(self.interpolant.xdim)
-        ]
-        jac_degrees = [
-            deriv_interpolants[idx].degrees[idx] for idx in range(self.interpolant.xdim)
-        ]
-        jac_coefficients = np.stack([
-            deriv_interpolant.coefficients
-            for deriv_interpolant in deriv_interpolants
-        ], axis=-2)
-        interp = ndsplines.NDSpline(
-            jac_knots, jac_coefficients, jac_degrees,
-            self.interpolant.periodic, self.interpolant.extrapolate
-        )
         self.jac_callback = NDSplinesJacobianCallback(self, interp, name,
                                                      inames, onames, opts)
         return self.jac_callback
