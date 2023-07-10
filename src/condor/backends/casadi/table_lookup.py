@@ -36,7 +36,7 @@ class NDSplinesJacobianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         return casadi.Sparsity.dense(anti_deriv_interp.ydim, anti_deriv_interp.xdim)
 
     def eval(self, args):
-        return tuple(self.interpolant(args[0]))
+        return tuple(self.interpolant(args[0].toarray().squeeze()))
 
 
 class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
@@ -45,8 +45,8 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         self.name = name = intermediate.model.__name__
         self.func = casadi.Function(
             f"{intermediate.model.__name__}_placeholder",
-            intermediate.symbol_inputs,
-            intermediate.symbol_outputs,
+            [casadi.vertcat(*intermediate.symbol_inputs)],
+            [casadi.vertcat(*intermediate.symbol_outputs)],
             dict(allow_free=True)
         )
         self.i = intermediate
@@ -61,7 +61,7 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         )
 
     def eval(self, args):
-        return tuple(self.interpolant(args))
+        return tuple(self.interpolant(args[0].toarray().squeeze()))
 
     def get_jacobian(self, name, inames, onames, opts):
         deriv_interpolants = [
@@ -76,7 +76,7 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         jac_coefficients = np.stack([
             deriv_interpolant.coefficients
             for deriv_interpolant in deriv_interpolants
-        ], axis=-1)
+        ], axis=-2)
         interp = ndsplines.NDSpline(
             jac_knots, jac_coefficients, jac_degrees,
             self.interpolant.periodic, self.interpolant.extrapolate
@@ -86,23 +86,6 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         return self.jac_callback
 
 """
-import condor as co
-import numpy as np
-class MyInterp(co.Tablelookup):
-    x = input()
-    y = output()
-
-    input_data[x] = np.arange(10)*0.1
-    output_data[y] = (input_data[x]-0.8)**2
-
-
-class MyOpt(co.OptimizationProblem):
-    xx = variable()
-    objective = MyInterp(xx).y
-
-    class Casadi(co.Options):
-        exact_hessian = False
-
 MyInterp.implementation.callback.jac_callback(0.3, 0.)
 
 """
