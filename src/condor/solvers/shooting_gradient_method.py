@@ -31,25 +31,13 @@ class NextTimeFromSlice:
             return t <= self.stop
         return t >= self.stop
 
-
     def __call__(self, t):
-        # TODO handle negative step?
         if self.before_start(t):
             return self.start
         if self.after_stop(t):
             return self.direction*np.inf
+        # TODO handle negative step -- may need to adjust a few of these
         return (1+(t-self.start)//self.step)*self.step + self.start
-
-"""
-want to be able to simulate adjoint in segments to prevent re-computing jacobian of
-costate, but currently not even caching it! But let's assume we'll need to do that
-eventually, so System(Base?) simulate should control events? 
-
-want system to simulate =
-
-really problem is I don't love that we need time_generator_data for System and it has a
-different data type and method for AdjointSystem. 
-"""
 
 class TimeGeneratorFromSlices:
     def __init__(self, time_slices, direction=1):
@@ -76,10 +64,15 @@ class TimeGeneratorFromSlices:
 
 class System:
     def __init__(
-            self, dots, jac, events, updates, time_generator, initial_state, terminating=[]
+        self, initial_state, dots, jac, time_generator,
+        events, updates, num_events, terminating,
     ):
+
+        # simulation must be terminated with event so must provide everything
+
         # result is a temporary instance attribute so system model can pass information
-        # correctly 
+        # to functions the sundials solvers call -- could be passed via the userdata
+        # option but these functions need wrappers to handle returned values anyway
         self.result = None
 
         # these instance attributes encapsolate the business data of a system
@@ -196,14 +189,19 @@ class System:
                     rootsfound = solver.rootinfo()
                     results.e.append(Root(idx, rootsfound))
 
-                    if np.any(rootsfound[self.terminating] != 0):
+                    next_x = self.update(
+                        res.values.t, np.copy(res.values.y), rootsfound
+
+                    )
+                    terminate = np.any(rootsfound[self.terminating] != 0)
+                    did_update = np.all(next_x == res.values.y)
+                    if not did_update or not terminate
+                        results.t.append(np.copy(res.values.t))
+                        results.x.append(next_x)
+
+                    if terminate:
                         return
 
-                    next_x = self.update(
-                        res.values.t, np.copy(results.x[-1]), rootsfound
-                    )
-                    results.t.append(np.copy(res.values.t))
-                    results.x.append(next_x)
                     solver.init_step(res.values.t, next_x)
                     last_x = next_x
 
@@ -249,30 +247,59 @@ class AdjointResult(AdjointResultMixin, ResultBase):
 
 @dataclass
 class ResultInterpolantMixin:
-    function: callable = lambda p, t, x: x
-    interpolants: list[callable] = None # field(init=False)
-    time_bounds: list[float] = None # field(init=False)
-    event_idxs: list
+    function: InitVar[callable] = lambda p, t, x: x
+    # don't pass interpolants to init?
+    # should state_Result be saved or just be an initvar? I back-references are OK so 
+    # we can keep it...
+    interpolants: list[callable] | None = None # field(init=False)
+    time_bounds: list[float] | None = None # field(init=False)
+    time_comparison: callable = field(init=False) # method
+    interval_select: int = field(init=False)
+    event_idxs: list | None = None
 
-    def __post_init__(self):
+    def __post_init__(self, function):
         # make interpolants
-        event_idxs = [root.index for root in self.state_result.e]
-        self.time_bounds = np.array(self.state_result.t)[
-            [0] + event_idxs + [-1]
-        ]
-        self.interpolants = [
-            make_interp_spline(
-                self.state_result.t[idx0:idx1],
-                self.function(
-                    self.state_result.p,
-                    self.state_result.t[idx0:idx1],
-                    self.state_result.x[idx0:idx1],
-                ),
-                k=min(3, idx1-idx0)
-        pass
+        state_result = self.state_result
+        if self.event_idxs is None:
+            # currently expect each root.index to be to the right of each event so is
+            # the start of each segment, so zero belongs with this set by adding the 
+            # element len(result.t), the slice of pairs slice(idx[i], idx[i+1]) 
+            # captures the whole segment including the last one. 
+
+            event_idxs = self.event_idxs = np.array([0] + [
+                root.index for root in state_result.e
+            ] + [len(state_result.t)])
+
+        if self.time_bounds is None:
+            self.time_bounds = np.array(state_result.t)[event_idxs]
+        if state_result.t[-1] < state_result.t[0]
+            self.time_comparison = self.time_bounds.__le__
+            self.interval_select = 0
+        else:
+            self.time_comparison = self.time_bounds.__ge__
+            self.interval_select = -1
+
+        if self.interpolants is None:
+            self.interpolants = [
+                make_interp_spline(
+                    state_result.t[idx0:idx1],
+                    function(
+                        state_result.p,
+                        state_result.t[idx0:idx1],
+                        state_result.x[idx0:idx1],
+                    ),
+                    k=min(3, idx1-idx0)
+                )
+                for idx0, idx1 in zip(
+                    event_idxs[:-1],
+                    event_idxs[1:],
+                )
+            ]
 
     def __call__(self, t):
-    
+        interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]
+        return self.interpolants[interval_idx](t)
+
 
 
 @dataclass
@@ -282,7 +309,7 @@ class ResultInterpolant(AdjointResultMixin, ResultInterpolantMixin):
 
 class AdjointSystem(System):
     def __init__(
-            self, dots, jac, events, updates, time_generator, terminating=[], p=None,
+            self, jac, events, updates, time_generator, terminating=[], p=None,
     ):
         """
         to support caching jacobians, 
@@ -321,8 +348,8 @@ class AdjointSystem(System):
 
 @dataclass
 class TrajectoryAnalysis:
-    integrand_terms: list[callable]
-    terminal_terms: list[callable]
+    integrand_terms: callable
+    terminal_terms: callable
 
     def __call__(self, result):
         # evaluate the trajectory analysis of this result
@@ -332,9 +359,15 @@ class TrajectoryAnalysis:
 
 @dataclass
 class ShootingGradientMethod:
+    # for system
+    d_x0_d_params: callable
+    d_dots_d_params: callable # could be cached, or just combined with integrand terms
+
+    # of length number of (trajectory) outputs
     d_integrand_terms_d_params: list[callable]
     d_terminal_terms_d_params: list[callable]
-    d_dots_d_params: callable
+
+    # of length number of events 
     d_update_d_params: list[callable]
     d_event_time_d_params: list[callable]
     d2_event_time_d_params_d_t: list[callable]
