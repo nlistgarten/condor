@@ -68,7 +68,7 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         )
 
     def eval(self, args):
-        return tuple(self.interpolant(args[0].toarray().squeeze()))
+        return self.interpolant(args[0].toarray().squeeze()),
 
     def get_jacobian(self, name, inames, onames, opts):
         interp = [
@@ -78,7 +78,3 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
                                                      inames, onames, opts)
         return self.jac_callback
 
-"""
-MyInterp.implementation.callback.jac_callback(0.3, 0.)
-
-"""

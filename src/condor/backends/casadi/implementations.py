@@ -49,7 +49,7 @@ class Tablelookup:
         self.input_data = [model.input_data.get(match=inp).backend_repr for inp in model.input]
         self.output_data = np.stack(
             [model.output_data.get(match=out).backend_repr for out in model.output],
-            axis=-1
+            axis=-1,
         )
         self.degrees = degrees
         self.callback = NDSplinesCallback(self)
