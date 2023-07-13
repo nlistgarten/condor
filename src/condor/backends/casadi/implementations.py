@@ -506,14 +506,14 @@ class TrajectoryAnalysis:
         )
 
 
-        self.x0 = get_state_setter(model.initial, self.p,)
-        self.dx0_dp_expr = casadi.jacobian(self.x0.expr, self.p)
-        dx0_dp = casadi.Function(
+        self.state0 = get_state_setter(model.initial, self.p,)
+        self.p_state0_p_p_expr = casadi.jacobian(self.state0.expr, self.p)
+        p_state0_p_p = casadi.Function(
             f"{model.__name__}_x0_jacobian",
             [self.p],
-            [self.dx0_dp_expr],
+            [self.p_state0_p_p_expr],
         )
-        dx0_dp.expr = dx0_dp_expr
+        p_state0_p_p.expr = p_state0_p_p_expr
 
 
 
@@ -640,36 +640,36 @@ class TrajectoryAnalysis:
         ]
         # TODO: is there something more pythonic than repeated, very similar list
         # comprehensions?
-        self.lamda0s = [
+        self.lamdaFs = [
             casadi.jacobian(terminal_term, self.x) for terminal_term in terminal_terms
         ]
-        self.lamda0_funcs = [
+        self.lamdaF_funcs = [
             casadi.Function(
-                f"{model.__name__}_{traj_name}_lamda0",
+                f"{model.__name__}_{traj_name}_lamdaF",
                 self.adjoint_signature[:-1],
-                [lamda0],
-            ) for lamda0, traj_name in zip(self.lamda0s, traj_out_names)
+                [lamdaF],
+            ) for lamdaF, traj_name in zip(self.lamdaFs, traj_out_names)
         ]
-        self.grad0s = [
+        self.gradFs = [
             casadi.jacobian(terminal_term, self.p) for terminal_term in terminal_terms
         ]
-        self.grad0_funcs = [
+        self.gradF_funcs = [
             casadi.Function(
-                f"{model.__name__}_{traj_name}_grad0",
+                f"{model.__name__}_{traj_name}_gradF",
                 self.adjoint_signature[:-1],
-                [grad0],
-            ) for grad0, traj_name in zip(self.grad0s, traj_out_names)
+                [gradF],
+            ) for gradF, traj_name in zip(self.gradFs, traj_out_names)
         ]
 
         lamda_jac = casadi.jacobian(state_equation_func.expr, self.x).T
         grad_jac = casadi.jacobian(state_equation_func.expr, self.p)
 
-        state_jac_func = casadi.Function(
+        state_dot_jac_func = casadi.Function(
             f"{ode_model.__name__}_state_jacobian",
             self.simulation_signature,
             lamda_jac.T,
         )
-        param_jac_func = casadi.Function(
+        param_dot_jac_func = casadi.Function(
             f"{ode_model.__name__}_param_jacobian",
             self.simulation_signature,
             grad_jac,
@@ -677,52 +677,23 @@ class TrajectoryAnalysis:
 
 
 
-
-        trajectory_analysis = sgm.TrajectoryAnalysis(
-            traj_out_integrand_func, traj_out_terminal_term_func,
-        )
-        StateSystem = sgm.System(
-            initial_state = self.x0,
-            dot = state_equation_func,
-            jac = state_jac_func,
-            time_generator = sgm.TimeGeneratorFromSlices(
-                at_time_slices
-            ),
-            events = casadi.Function(
-                f"{ode_model.__name__}_event",
-                self.simulation_signature,
-                [casadi.vertcat(*self.e_exprs)],
-            ),
-            updates = [
-                casadi.Function(
-                    f"{ode_model.__name__}_update_{h_idx}",
-                    self.simulation_signature,
-                    h_expr
-                ) for h_idx, h_expr in enumerate(self.h_exprs))
-            ],
-            num_events = num_events,
-            terminating = terminating,
-        )
-        shooting_gradient_method = sgm.ShootingGradientMethod(
-            d_x0_d_param = dx0_dp,
-            d_dots_d_params = param_jac_func,
-            d_terminal_terms_d_params = self.grad0_funcs,
-            d_integrand_terms_d_params = self.grad_dots,
-        )
-        AdjointSystem = sgm.AdjointSystem(
-            # coupled to the system itself
-            state_jac = state_jac_func,
-
-            # these are coupled to the trajectory output
-            adjoint_initializers = self.lamda0_funcs,
-            integrand_jacs = integrand_jac_funcs,
-        )
-
-        integrand_jacs = [
+        state_integrand_jacs = [
             casadi.jacobian(integrand_term, self.x).T
             for integrand_term in integrand_terms
         ]
-        integrand_jac_funcs = [
+        state_integrand_jac_funcs = [
+                casadi.Function(
+                    f"{ode_model.__name__}_integrand_jac_{ijac_expr_idx}",
+                    self.simulation_signature,
+                    ijac_expr
+                ) for ijac_expr_idx, ijac_expr in enumerate(integrand_jacs))
+        ]
+
+        param_integrand_jacs = [
+            casadi.jacobian(integrand_term, self.p).T
+            for integrand_term in integrand_terms
+        ]
+        param_integrand_jac_funcs = [
                 casadi.Function(
                     f"{ode_model.__name__}_integrand_jac_{ijac_expr_idx}",
                     self.simulation_signature,
@@ -841,6 +812,51 @@ class TrajectoryAnalysis:
                 )
             )
             self.dh_dps[-1].expr = dh_dp
+
+
+        trajectory_analysis = sgm.TrajectoryAnalysis(
+            traj_out_integrand_func, traj_out_terminal_term_func,
+        )
+        StateSystem = sgm.System(
+            initial_state = self.state0,
+            dot = state_equation_func,
+            jac = state_dot_jac_func,
+            time_generator = sgm.TimeGeneratorFromSlices(
+                at_time_slices
+            ),
+            events = casadi.Function(
+                f"{ode_model.__name__}_event",
+                self.simulation_signature,
+                [casadi.vertcat(*self.e_exprs)],
+            ),
+            updates = [
+                casadi.Function(
+                    f"{ode_model.__name__}_update_{h_idx}",
+                    self.simulation_signature,
+                    h_expr
+                ) for h_idx, h_expr in enumerate(self.h_exprs))
+            ],
+            num_events = num_events,
+            terminating = terminating,
+        )
+        shooting_gradient_method = sgm.ShootingGradientMethod(
+            p_x0_p_param = p_state0_p_p,
+            p_dots_p_params = param_dot_jac_func,
+            d_update_d_params = self.dh_dps,
+            d_event_time_d_params = self.dte_dps,
+            d2_event_time_d_params_d_t = self.d2te_dpdts,
+
+            p_terminal_terms_p_params = self.gradF_funcs,
+            p_integrand_terms_p_params = param_integrand_jac_funcs,
+            p_terminal_terms_p_state = self.lamdaF_funcs,
+            p_integrand_terms_p_state = state_integrand_jac_funcs,
+        )
+        AdjointSystem = sgm.AdjointSystem(
+            state_jac = state_dot_jac_func,
+            dte_dxs = self.dte_dxs,
+            d2te_dxdts = self.dt2_dxdts,
+            dh_dxs = self.dh_dxs,
+        )
 
         self.callback = ShootingGradientMethod(self)
 

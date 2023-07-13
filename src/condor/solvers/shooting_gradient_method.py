@@ -205,7 +205,7 @@ class System:
                     solver.init_step(res.values.t, next_x)
                     last_x = next_x
 
-                if res.values.t == next_t or res.flag != StatusEnum.TSTOP_RETURN:
+                if res.values.t == next_t or res.flag == StatusEnum.TSTOP_RETURN:
                     break
 
 
@@ -237,7 +237,13 @@ class Result(ResultMixin, ResultBase):
 
 @dataclass
 class AdjointResultMixin:
-    state_result: Result
+    state_jacobian: ResultInterpolantMixin
+    forcing_function: ResultInterpolantMixin
+    state_result: Result = field(init=False)
+
+    def __post_init__(self):
+        # TODO: validate forcing_function.result is the same?
+        self.state_result = self.state_jacobian.result
 
 
 @dataclass
@@ -247,6 +253,7 @@ class AdjointResult(AdjointResultMixin, ResultBase):
 
 @dataclass
 class ResultInterpolantMixin:
+    result: Result
     function: InitVar[callable] = lambda p, t, x: x
     # don't pass interpolants to init?
     # should state_Result be saved or just be an initvar? I back-references are OK so 
@@ -259,7 +266,7 @@ class ResultInterpolantMixin:
 
     def __post_init__(self, function):
         # make interpolants
-        state_result = self.state_result
+        result = self.result
         if self.event_idxs is None:
             # currently expect each root.index to be to the right of each event so is
             # the start of each segment, so zero belongs with this set by adding the 
@@ -267,12 +274,12 @@ class ResultInterpolantMixin:
             # captures the whole segment including the last one. 
 
             event_idxs = self.event_idxs = np.array([0] + [
-                root.index for root in state_result.e
-            ] + [len(state_result.t)])
+                root.index for root in result.e
+            ] + [len(result.t)])
 
         if self.time_bounds is None:
-            self.time_bounds = np.array(state_result.t)[event_idxs]
-        if state_result.t[-1] < state_result.t[0]
+            self.time_bounds = np.array(result.t)[event_idxs]
+        if result.t[-1] < result.t[0]
             self.time_comparison = self.time_bounds.__le__
             self.interval_select = 0
         else:
@@ -282,11 +289,11 @@ class ResultInterpolantMixin:
         if self.interpolants is None:
             self.interpolants = [
                 make_interp_spline(
-                    state_result.t[idx0:idx1],
+                    result.t[idx0:idx1],
                     function(
-                        state_result.p,
-                        state_result.t[idx0:idx1],
-                        state_result.x[idx0:idx1],
+                        result.p,
+                        result.t[idx0:idx1],
+                        result.x[idx0:idx1],
                     ),
                     k=min(3, idx1-idx0)
                 )
@@ -318,21 +325,25 @@ class AdjointSystem(System):
                          terminating=[0])
 
     def self.time_generator(self):
-        self.
+        last_event = self.result.state_result.e[-1]
+        if last_event.index != len(self.result.state_result.t)-1:
+            yield self.state_result.t[-1]
+        for event in self.result.state_result.e[::-1]:
+            self.rootsfound = event.rootsfound
+            yield self.state_result.t[event.index]
 
     def initial_state(self):
-        return self._initial_state(self.p, self.some_arg_to_set_lamda0)
+        return self.final_lamda
 
-    def __call__(self, some_arg_to_set_lamda0, state_results, interpolants=None):
-        self.some_arg_to_set_lamda0 = some_arg_to_set_lamda0
-        # can also 
-
-        self.x_interp = interpolate.make_interp_spline(
-            state_results.t,
-            state_results.x,
-            k=min(3, len(state_results.t)-1)
+    def __call__(self, final_lamda, forcing_function, state_jacobian):
+        self.final_lamda = final_lamda
+        self.result = AdjointResult(
+            system=self,
+            state_jacobian=state_jacobian,
+            forcing_function=forcing_function
         )
-        return super().simulate(lamda0, state_results.p, state_results.t[-1], lamda0, sys_res.t[0])
+        self.simulate()
+        return super().simulate()
 
     def dots(self, t, x, xdot,):# userdata=None,):
         # TODO adjoint system takes jacobian and integrand terms, do matrix multiply and
@@ -341,10 +352,10 @@ class AdjointSystem(System):
         # who would own the data for interpolating ? maybe just a new (data) class that
         # also stores the interpolant? then adjointsystem simulate can create it if
         # it'snot provided
-        xdot[:] = self._dots(self.p, self.x_interp(t), t, x)
+        xdot[:] = -self.result.state_jacobian(t).T @ x - self.result.forcing_function(t)
 
     def jac(self, t, x, xdot, jac, userdata=None,):
-        jac[...] = self._jac(self.p, self.x_interp(t), t, x)
+        jac[...] = -self.result.state_jacobian(t).T
 
 @dataclass
 class TrajectoryAnalysis:
@@ -359,18 +370,20 @@ class TrajectoryAnalysis:
 
 @dataclass
 class ShootingGradientMethod:
-    # for system
-    d_x0_d_params: callable
-    d_dots_d_params: callable # could be cached, or just combined with integrand terms
-
-    # of length number of (trajectory) outputs
-    d_integrand_terms_d_params: list[callable]
-    d_terminal_terms_d_params: list[callable]
-
-    # of length number of events 
+    # per system
+    p_x0_p_params: callable
+    p_dots_p_params: callable # could be cached, or just combined with integrand terms
+    # per system's events (length number of events)
     d_update_d_params: list[callable]
     d_event_time_d_params: list[callable]
     d2_event_time_d_params_d_t: list[callable]
+
+    # of length number of (trajectory) outputs
+    p_integrand_terms_p_params: list[callable]
+    p_terminal_terms_p_params: list[callable]
+    p_integrand_terms_p_state: list[callable]
+    p_terminal_terms_p_state: list[callable]
+
 
     def __call__(self, adjoint_result):
         pass
