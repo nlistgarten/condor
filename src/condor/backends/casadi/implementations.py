@@ -5,7 +5,7 @@ from enum import Enum, auto
 from dataclasses import dataclass
 from condor.backends.casadi.utils import flatten, wrap, symbol_class
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
-import condor.solvers.shooting_Gradient_method as sgm
+import condor.solvers.shooting_gradient_method as sgm
 import condor.backends.casadi.shooting_gradient_method as ca_sgm
 #from condor.backends.casadi.shooting_gradient_method import (
 #    ShootingGradientMethod, NextTimeFromSlice, System,
@@ -513,7 +513,7 @@ class TrajectoryAnalysis:
             [self.p],
             [self.p_state0_p_p_expr],
         )
-        p_state0_p_p.expr = p_state0_p_p_expr
+        p_state0_p_p.expr = self.p_state0_p_p_expr
 
 
 
@@ -667,12 +667,12 @@ class TrajectoryAnalysis:
         state_dot_jac_func = casadi.Function(
             f"{ode_model.__name__}_state_jacobian",
             self.simulation_signature,
-            lamda_jac.T,
+            [lamda_jac.T],
         )
         param_dot_jac_func = casadi.Function(
             f"{ode_model.__name__}_param_jacobian",
             self.simulation_signature,
-            grad_jac,
+            [grad_jac],
         )
 
 
@@ -683,10 +683,10 @@ class TrajectoryAnalysis:
         ]
         state_integrand_jac_funcs = [
                 casadi.Function(
-                    f"{ode_model.__name__}_integrand_jac_{ijac_expr_idx}",
+                    f"{ode_model.__name__}_state_integrand_jac_{ijac_expr_idx}",
                     self.simulation_signature,
-                    ijac_expr
-                ) for ijac_expr_idx, ijac_expr in enumerate(integrand_jacs))
+                    [ijac_expr],
+                ) for ijac_expr_idx, ijac_expr in enumerate(state_integrand_jacs)
         ]
 
         param_integrand_jacs = [
@@ -695,10 +695,10 @@ class TrajectoryAnalysis:
         ]
         param_integrand_jac_funcs = [
                 casadi.Function(
-                    f"{ode_model.__name__}_integrand_jac_{ijac_expr_idx}",
+                    f"{ode_model.__name__}_param_integrand_jac_{ijac_expr_idx}",
                     self.simulation_signature,
-                    ijac_expr
-                ) for ijac_expr_idx, ijac_expr in enumerate(integrand_jacs))
+                    [ijac_expr]
+                ) for ijac_expr_idx, ijac_expr in enumerate(param_integrand_jacs)
         ]
 
         self.lamda_dots = [
@@ -814,10 +814,10 @@ class TrajectoryAnalysis:
             self.dh_dps[-1].expr = dh_dp
 
 
-        trajectory_analysis = sgm.TrajectoryAnalysis(
+        self.trajectory_analysis = sgm.TrajectoryAnalysis(
             traj_out_integrand_func, traj_out_terminal_term_func,
         )
-        StateSystem = sgm.System(
+        self.StateSystem = sgm.System(
             initial_state = self.state0,
             dot = state_equation_func,
             jac = state_dot_jac_func,
@@ -829,18 +829,12 @@ class TrajectoryAnalysis:
                 self.simulation_signature,
                 [casadi.vertcat(*self.e_exprs)],
             ),
-            updates = [
-                casadi.Function(
-                    f"{ode_model.__name__}_update_{h_idx}",
-                    self.simulation_signature,
-                    h_expr
-                ) for h_idx, h_expr in enumerate(self.h_exprs))
-            ],
+            updates = self.h_exprs,
             num_events = num_events,
             terminating = terminating,
         )
-        shooting_gradient_method = sgm.ShootingGradientMethod(
-            p_x0_p_param = p_state0_p_p,
+        self.shooting_gradient_method = sgm.ShootingGradientMethod(
+            p_x0_p_params = p_state0_p_p,
             p_dots_p_params = param_dot_jac_func,
             d_update_d_params = self.dh_dps,
             d_event_time_d_params = self.dte_dps,
@@ -851,14 +845,14 @@ class TrajectoryAnalysis:
             p_terminal_terms_p_state = self.lamdaF_funcs,
             p_integrand_terms_p_state = state_integrand_jac_funcs,
         )
-        AdjointSystem = sgm.AdjointSystem(
+        self.AdjointSystem = sgm.AdjointSystem(
             state_jac = state_dot_jac_func,
             dte_dxs = self.dte_dxs,
-            d2te_dxdts = self.dt2_dxdts,
+            d2te_dxdts = self.d2te_dxdts,
             dh_dxs = self.dh_dxs,
         )
 
-        self.callback = ShootingGradientMethod(self)
+        self.callback = ca_sgm.ShootingGradientMethod(self)
 
     def __call__(self, model_instance, *args):
         self.callback.from_implementation = True
@@ -870,15 +864,10 @@ class TrajectoryAnalysis:
         if hasattr(self.callback, 'res'):
             res = self.callback.res
             model_instance._res = res
-            model_instance.t = res.t
+            model_instance.t = np.array(res.t)
             model_instance.bind_field(
                 self.model.state,
-                res.x.T,
-                wrap=True,
-            )
-            model_instance.bind_field(
-                self.ode_model.output,
-                res.y.T,
+                np.array(res.x).T,
                 wrap=True,
             )
 
@@ -887,9 +876,3 @@ class TrajectoryAnalysis:
             out,
         )
 
-
-from enum import Enum
-class FlapType(float, Enum):
-    plain = 1
-    split = 2
-    nan = float('nan')

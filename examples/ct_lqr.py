@@ -22,7 +22,8 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
 
 ct_sim = DblIntLQR([1, .1])
 LTI_plot(ct_sim)
-
+import sys
+sys.exit()
 ct_sim = DblIntLQR([0., 0.,])
 LTI_plot(ct_sim)
 

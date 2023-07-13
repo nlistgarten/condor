@@ -1,11 +1,11 @@
 import casadi
 import numpy as np
-from scipy import interpolate
+from scipy.interpolate import make_interp_spline
 from scipy.optimize import fsolve
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, InitVar
 from scikits.odes.sundials.cvode import CVODE, StatusEnum
-from itertools import count
+from collections import namedtuple
 
 Root = namedtuple("Root", ["index", "rootsfound"])
 
@@ -14,7 +14,7 @@ class NextTimeFromSlice:
         self.at_time_func = at_time_func
 
     def set_p(self, p):
-        start, stop, step = self.at_time_func(self.p)
+        start, stop, step = self.at_time_func(p)
         self.start = start
         self.step = step
         self.stop = stop
@@ -55,7 +55,7 @@ class TimeGeneratorFromSlices:
         else:
             get_time = max
         while True:
-            next_times = [time_slice(t) for time_slice in time_slices]
+            next_times = [time_slice(t) for time_slice in self.time_slices]
             t = get_time(next_times)
             yield t
             if np.isinf(t):
@@ -64,7 +64,7 @@ class TimeGeneratorFromSlices:
 
 class System:
     def __init__(
-        self, initial_state, dots, jac, time_generator,
+        self, initial_state, dot, jac, time_generator,
         events, updates, num_events, terminating,
     ):
 
@@ -80,7 +80,7 @@ class System:
         #   functions, see method wrapper for expected signature
 
         #     for CVODE interface once wrapped
-        self._dots = dots
+        self._dot = dot
         self._jac = jac
         self._events = events
         #     list of functions for 
@@ -117,16 +117,16 @@ class System:
         )
 
     def initial_state(self):
-        return self._initial_state(self.result.p)
+        return self._initial_state(self.result.p).toarray().squeeze()
 
     def dots(self, t, x, xdot,):# userdata=None,):
-        xdot[:] = self._dots(self.result.p, t, x)
+        xdot[:] = self._dot(self.result.p, t, x).toarray().squeeze()
 
     def jac(self, t, x, xdot, jac):#
-        jac[...] = self._jac(self.result.p, t, x)
+        jac[...] = self._jac(self.result.p, t, x).toarray().squeeze()
 
     def events(self, t, x, g):
-        g[:] = self._events(self.result.p, t, x)
+        g[:] = self._events(self.result.p, t, x).toarray().squeeze()
 
     def update(self, t, x, rootsfound):
         next_x = x # who is responsible for copying? I suppose simulate
@@ -134,11 +134,11 @@ class System:
             if root_sign != 0:
                 # 
                 next_x = update(self.result.p, res.values.t, next_x)
-        return next_x
+        return next_x.toarray().squeeze()
 
     def time_generator(self):
         for t in self._time_generator(self.result.p):
-            yield t
+            yield t.toarray()[0,0]
 
 
     def simulate(self):
@@ -175,16 +175,14 @@ class System:
 
             # each iteration of this loop simulates until next event or time stop
             while True:
-                res = solver.step(t1)
-                print(idx, res.flag, res.values.t)
+                res = solver.step(next_t)
                 if res.flag < 0:
                     breakpoint()
 
-                if res.flag != StatusEnum.TSTOP_RETURN:
-                    results.t.append(np.copy(res.values.t))
-                    results.x.append(np.copy(res.values.y))
+                results.t.append(np.copy(res.values.t))
+                results.x.append(np.copy(res.values.y))
 
-                if res.flag == case StatusEnum.ROOT_RETURN:
+                if res.flag == StatusEnum.ROOT_RETURN:
                     idx = len(results.t)
                     rootsfound = solver.rootinfo()
                     results.e.append(Root(idx, rootsfound))
@@ -195,7 +193,7 @@ class System:
                     )
                     terminate = np.any(rootsfound[self.terminating] != 0)
                     did_update = np.all(next_x == res.values.y)
-                    if not did_update or not terminate
+                    if not did_update or not terminate:
                         results.t.append(np.copy(res.values.t))
                         results.x.append(next_x)
 
@@ -231,28 +229,13 @@ class ResultBase:
 
 
 @dataclass
-class Result(ResultMixin, ResultBase):
+class Result(ResultBase, ResultMixin):
     pass
 
 
-@dataclass
-class AdjointResultMixin:
-    state_jacobian: ResultInterpolantMixin
-    forcing_function: ResultInterpolantMixin
-    state_result: Result = field(init=False)
-
-    def __post_init__(self):
-        # TODO: validate forcing_function.result is the same?
-        self.state_result = self.state_jacobian.result
-
 
 @dataclass
-class AdjointResult(AdjointResultMixin, ResultBase):
-    pass
-
-
-@dataclass
-class ResultInterpolantMixin:
+class ResultInterpolant:
     result: Result
     function: InitVar[callable] = lambda p, t, x: x
     # don't pass interpolants to init?
@@ -278,8 +261,11 @@ class ResultInterpolantMixin:
             ] + [len(result.t)])
 
         if self.time_bounds is None:
-            self.time_bounds = np.array(result.t)[event_idxs]
-        if result.t[-1] < result.t[0]
+
+            self.time_bounds = np.empty(self.event_idxs.shape)
+            self.time_bounds[:-1] = np.array(result.t)[event_idxs[:-1]]
+            self.time_bounds[-1] = result.t[-1]
+        if result.t[-1] < result.t[0]:
             self.time_comparison = self.time_bounds.__le__
             self.interval_select = 0
         else:
@@ -290,11 +276,8 @@ class ResultInterpolantMixin:
             self.interpolants = [
                 make_interp_spline(
                     result.t[idx0:idx1],
-                    function(
-                        result.p,
-                        result.t[idx0:idx1],
-                        result.x[idx0:idx1],
-                    ),
+                    [function( result.p, t, x,) 
+                     for t, x in zip(result.t[idx0:idx1], result.x[idx0:idx1])],
                     k=min(3, idx1-idx0)
                 )
                 for idx0, idx1 in zip(
@@ -310,21 +293,30 @@ class ResultInterpolantMixin:
 
 
 @dataclass
-class ResultInterpolant(AdjointResultMixin, ResultInterpolantMixin):
-    pass
+class AdjointResultMixin:
+    state_jacobian: ResultInterpolant
+    forcing_function: ResultInterpolant
+    state_result: Result = field(init=False)
 
+    def __post_init__(self):
+        # TODO: validate forcing_function.result is the same?
+        self.state_result = self.state_jacobian.result
+
+
+@dataclass
+class AdjointResult(ResultBase, AdjointResultMixin,):
+    pass
 
 class AdjointSystem(System):
     def __init__(
-            self, jac, events, updates, time_generator, terminating=[], p=None,
+            self, state_jac, dte_dxs, d2te_dxdts, dh_dxs,
     ):
         """
         to support caching jacobians, 
         """
-        super().__init__(dots, jac, events, updates, self._time_generator,
-                         terminating=[0])
+        self.state_jac = state_jac
 
-    def self.time_generator(self):
+    def time_generator(self):
         last_event = self.result.state_result.e[-1]
         if last_event.index != len(self.result.state_result.t)-1:
             yield self.state_result.t[-1]
@@ -365,7 +357,17 @@ class TrajectoryAnalysis:
     def __call__(self, result):
         # evaluate the trajectory analysis of this result
         # should this return a dataclass? Or just the vector of results?
-        pass
+        integral = 0.
+        integrand_interpolant = ResultInterpolant(result=result, function=self.integrand_terms)
+        for segment_interpolant, t0, t1 in zip(
+            integrand_interpolant.interpolants,
+            integrand_interpolant.time_bounds[:-1],
+            integrand_interpolant.time_bounds[1:],
+        ):
+            integrand_antideriv = segment_interpolant.antiderivative()
+            breakpoint()
+            integral += integrand_antideriv(t1) - integrand_antideriv(t0)
+        return self.terminal_terms(result.p, result.t[-1], result.x[-1]) + integral
 
 
 @dataclass
