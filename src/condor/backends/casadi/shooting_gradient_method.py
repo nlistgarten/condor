@@ -277,6 +277,5 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         p = casadi.vertcat(*args)
         self.res = self.i.StateSystem(p)
         self.output = self.i.trajectory_analysis(self.res)
-        breakpoint()
         return self.output,
 

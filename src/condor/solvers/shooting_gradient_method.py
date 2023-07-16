@@ -5,9 +5,11 @@ from scipy.optimize import fsolve
 
 from dataclasses import dataclass, field, InitVar
 from scikits.odes.sundials.cvode import CVODE, StatusEnum
-from collections import namedtuple
+from typing import NamedTuple
 
-Root = namedtuple("Root", ["index", "rootsfound"])
+class Root(NamedTuple):
+    index: int
+    rootsfound: list[int]
 
 class NextTimeFromSlice:
     def __init__(self, at_time_func):
@@ -132,8 +134,7 @@ class System:
         next_x = x # who is responsible for copying? I suppose simulate
         for root_sign, update in zip(rootsfound, self._updates):
             if root_sign != 0:
-                # 
-                next_x = update(self.result.p, res.values.t, next_x)
+                next_x = update(self.result.p, t, next_x)
         return next_x.toarray().squeeze()
 
     def time_generator(self):
@@ -152,6 +153,11 @@ class System:
         time value, state at time, and possibly events e
         initializer 
         update 
+
+        events have index corresponding to start of each segment. except perhaps the
+        first. -- can always assume the 0 index corresponds to initialization
+        initial and final segments may be singular if an event causes an update that
+        coincides with 
         """
         results = self.result
         solver = self.solver
@@ -159,9 +165,22 @@ class System:
 
         last_t = next(time_generator)
         last_x = self.initial_state()
+
         results.t.append(last_t)
         results.x.append(last_x)
-        rootsfound = self.events(last_t, last_x, np.empty(self.num_events)) == 0.
+
+        gs = np.empty(self.num_events)
+        self.events(last_t, last_x, gs)
+        rootsfound = gs == 0.
+        if np.any(rootsfound):
+            # subsequent events use length of time for index, so root index is the index
+            # of the updated state to the right of event. -> root coinciding with 
+            # initialization has index 1
+            result.e.append(Root(1, rootsfound))
+            last_x = self.update(last_t, last_x, rootsfound)
+            results.t.append(last_t)
+            results.x.append(last_x)
+
 
         # each iteration of this loop simulates until next generated time
         while True:
@@ -175,27 +194,25 @@ class System:
 
             # each iteration of this loop simulates until next event or time stop
             while True:
-                res = solver.step(next_t)
-                if res.flag < 0:
+                solver_res = solver.step(next_t)
+                if solver_res.flag < 0:
                     breakpoint()
 
-                results.t.append(np.copy(res.values.t))
-                results.x.append(np.copy(res.values.y))
+                results.t.append(np.copy(solver_res.values.t))
+                results.x.append(np.copy(solver_res.values.y))
 
-                if res.flag == StatusEnum.ROOT_RETURN:
+                if solver_res.flag == StatusEnum.ROOT_RETURN:
                     idx = len(results.t)
                     rootsfound = solver.rootinfo()
                     results.e.append(Root(idx, rootsfound))
 
                     next_x = self.update(
-                        res.values.t, np.copy(res.values.y), rootsfound
+                        solver_res.values.t, np.copy(solver_res.values.y), rootsfound
 
                     )
                     terminate = np.any(rootsfound[self.terminating] != 0)
-                    did_update = np.all(next_x == res.values.y)
-                    if not did_update or not terminate:
-                        results.t.append(np.copy(res.values.t))
-                        results.x.append(next_x)
+                    results.t.append(np.copy(solver_res.values.t))
+                    results.x.append(next_x)
 
                     if terminate:
                         return
@@ -203,7 +220,7 @@ class System:
                     solver.init_step(res.values.t, next_x)
                     last_x = next_x
 
-                if res.values.t == next_t or res.flag == StatusEnum.TSTOP_RETURN:
+                if solver_res.values.t == next_t or solver_res.flag == StatusEnum.TSTOP_RETURN:
                     break
 
 
@@ -232,7 +249,17 @@ class ResultBase:
 class Result(ResultBase, ResultMixin):
     pass
 
+class ResultSegmentInterpolant(NamedTuple):
+    interpolant: callable
+    idx0: int
+    idx1: int
+    t0: float
+    t1: float
+    x0: list[float]
+    x1: list[float]
 
+    def __call__(self, t):
+        return self.interpolant(t)
 
 @dataclass
 class ResultInterpolant:
@@ -256,10 +283,10 @@ class ResultInterpolant:
             # element len(result.t), the slice of pairs slice(idx[i], idx[i+1]) 
             # captures the whole segment including the last one. 
 
-            event_idxs = self.event_idxs = np.array([0] + [
+             self.event_idxs = np.array([0] + [
                 root.index for root in result.e
-            ] + [len(result.t)])
-
+            ])# + [len(result.t)])
+        event_idxs = self.event_idxs
         if self.time_bounds is None:
 
             self.time_bounds = np.empty(self.event_idxs.shape)
@@ -273,22 +300,42 @@ class ResultInterpolant:
             self.interval_select = -1
 
         if self.interpolants is None:
+        # TODO figure out how to combine (and possibly reverse direction) state and
+        # parameter jacobian of state equation to reduce number of calls (and distance
+        # at each call), since this is potentially most expensive call -- I guess only
+        # if the ODE depends on inner-loop solver? then split
+        # coefficients
+
+        # expect integrand-term related functions to be cheap functions of state
+        # point-wise along trajectory
+
             self.interpolants = [
-                make_interp_spline(
-                    result.t[idx0:idx1],
-                    [function( result.p, t, x,) 
-                     for t, x in zip(result.t[idx0:idx1], result.x[idx0:idx1])],
-                    k=min(3, idx1-idx0)
+                ResultSegmentInterpolant(
+                    make_interp_spline(
+                        result.t[idx0:idx1],
+                        [function( result.p, t, x,) 
+                         for t, x in zip(result.t[idx0:idx1], result.x[idx0:idx1])],
+                        k=min(3, idx1-idx0)
+                    ),
+                    idx0, idx1,
+                    result.t[idx0], result.t[idx1],
+                    result.x[idx0], result.x[idx1],
                 )
                 for idx0, idx1 in zip(
                     event_idxs[:-1],
-                    event_idxs[1:],
+                    event_idxs[1:]-1,
                 )
+                if result.t[idx1] != result.t[idx0]
             ]
+            breakpoint()
 
     def __call__(self, t):
         interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]
         return self.interpolants[interval_idx](t)
+
+    def __iter__(self):
+        for interp_segment in self.interpolants:
+            yield interp_segment
 
 
 
@@ -313,16 +360,26 @@ class AdjointSystem(System):
     ):
         """
         to support caching jacobians, 
+
+        adjoint solver will use parent simulate but without using events machinery
+        time generator will call update method
         """
         self.state_jac = state_jac
+        self.num_events = 0
 
     def time_generator(self):
+        """
+        """
         last_event = self.result.state_result.e[-1]
-        if last_event.index != len(self.result.state_result.t)-1:
+        if last_event.index == len(self.result.state_result.t)-1:
+            self.update()
             yield self.state_result.t[-1]
-        for event in self.result.state_result.e[::-1]:
+        for event in self.result.state_result.e[-2::-1]:
             self.rootsfound = event.rootsfound
             yield self.state_result.t[event.index]
+        first_event = self.result.state_result.e[0]
+        if first_event.index == 1:
+            pass
 
     def initial_state(self):
         return self.final_lamda
@@ -336,6 +393,14 @@ class AdjointSystem(System):
         )
         self.simulate()
         return super().simulate()
+
+    def update(self, idxp, rootsfound):
+        if idxp != len(self.result.state_result.t):
+            fxm = ...
+
+
+        xtep = ...
+        xtem = ...
 
     def dots(self, t, x, xdot,):# userdata=None,):
         # TODO adjoint system takes jacobian and integrand terms, do matrix multiply and
@@ -359,14 +424,9 @@ class TrajectoryAnalysis:
         # should this return a dataclass? Or just the vector of results?
         integral = 0.
         integrand_interpolant = ResultInterpolant(result=result, function=self.integrand_terms)
-        for segment_interpolant, t0, t1 in zip(
-            integrand_interpolant.interpolants,
-            integrand_interpolant.time_bounds[:-1],
-            integrand_interpolant.time_bounds[1:],
-        ):
-            integrand_antideriv = segment_interpolant.antiderivative()
-            breakpoint()
-            integral += integrand_antideriv(t1) - integrand_antideriv(t0)
+        for segment in integrand_interpolant:
+            integrand_antideriv = segment.interpolant.antiderivative()
+            integral += integrand_antideriv(segment.t1) - integrand_antideriv(segment.t0)
         return self.terminal_terms(result.p, result.t[-1], result.x[-1]) + integral
 
 

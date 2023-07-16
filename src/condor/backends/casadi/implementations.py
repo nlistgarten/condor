@@ -597,7 +597,7 @@ class TrajectoryAnalysis:
                         )
                     ))
                 else:
-                    e_expr =  - at_time - ode_model.t
+                    e_expr =  at_time - ode_model.t
                     at_time_slices.append(sgm.NextTimeFromSlice(
                         casadi.Function(
                             f"{ode_model.__name__}_at_times_{event_idx}",
@@ -700,6 +700,9 @@ class TrajectoryAnalysis:
                     [ijac_expr]
                 ) for ijac_expr_idx, ijac_expr in enumerate(param_integrand_jacs)
         ]
+        # TODO figure out how to combine (and possibly reverse direction) to reduce
+        # number of calls, since this is potentially most expensive call with inner
+        # loop solvers, 
 
         self.lamda_dots = [
             -lamda_jac @ self.lamda - casadi.jacobian(integrand_term, self.x).T

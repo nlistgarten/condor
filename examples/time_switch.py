@@ -22,7 +22,7 @@ class DblInt(co.ODESystem):
     t1 = parameter()
     t2 = parameter()
     # TODO: fix once mode and control work?
-    dot[x] = A@x + B*(
+    dot[x] = A@x*(mode!=2.) + B*(
         1*(mode == 0.)
         -1*(mode == 1.)
     )
@@ -37,6 +37,7 @@ class Switch1(DblInt.Event):
 
 class Switch2(DblInt.Event):
     function = t - t2 - t1
+    mode == 2.
     terminate = True
 
 class Transfer(DblInt.TrajectoryAnalysis):
