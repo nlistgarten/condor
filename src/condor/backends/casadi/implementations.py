@@ -821,6 +821,7 @@ class TrajectoryAnalysis:
             traj_out_integrand_func, traj_out_terminal_term_func,
         )
         self.StateSystem = sgm.System(
+            dim_state = model.state._count,
             initial_state = self.state0,
             dot = state_equation_func,
             jac = state_dot_jac_func,
@@ -836,7 +837,14 @@ class TrajectoryAnalysis:
             num_events = num_events,
             terminating = terminating,
         )
+        self.AdjointSystem = sgm.AdjointSystem(
+            state_jac = state_dot_jac_func,
+            dte_dxs = self.dte_dxs,
+            d2te_dxdts = self.d2te_dxdts,
+            dh_dxs = self.dh_dxs,
+        )
         self.shooting_gradient_method = sgm.ShootingGradientMethod(
+            adjoint_system = self.AdjointSystem,
             p_x0_p_params = p_state0_p_p,
             p_dots_p_params = param_dot_jac_func,
             d_update_d_params = self.dh_dps,
@@ -847,12 +855,6 @@ class TrajectoryAnalysis:
             p_integrand_terms_p_params = param_integrand_jac_funcs,
             p_terminal_terms_p_state = self.lamdaF_funcs,
             p_integrand_terms_p_state = state_integrand_jac_funcs,
-        )
-        self.AdjointSystem = sgm.AdjointSystem(
-            state_jac = state_dot_jac_func,
-            dte_dxs = self.dte_dxs,
-            d2te_dxdts = self.d2te_dxdts,
-            dh_dxs = self.dh_dxs,
         )
 
         self.callback = ca_sgm.ShootingGradientMethod(self)

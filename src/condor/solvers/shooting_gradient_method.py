@@ -1,7 +1,6 @@
-import casadi
 import numpy as np
+#from condor import backend
 from scipy.interpolate import make_interp_spline
-from scipy.optimize import fsolve
 
 from dataclasses import dataclass, field, InitVar
 from scikits.odes.sundials.cvode import CVODE, StatusEnum
@@ -66,7 +65,7 @@ class TimeGeneratorFromSlices:
 
 class System:
     def __init__(
-        self, initial_state, dot, jac, time_generator,
+        self, dim_state, initial_state, dot, jac, time_generator,
         events, updates, num_events, terminating,
     ):
 
@@ -105,6 +104,7 @@ class System:
         # any(rootsfound[terminating]) --> terminates simulation
         self.terminating = terminating
 
+        self.dim_state = dim_state
         self.num_events = len(updates)
         self.make_solver()
 
@@ -119,27 +119,27 @@ class System:
         )
 
     def initial_state(self):
-        return self._initial_state(self.result.p).toarray().squeeze()
+        return np.array(self._initial_state(self.result.p)).squeeze()
 
     def dots(self, t, x, xdot,):# userdata=None,):
-        xdot[:] = self._dot(self.result.p, t, x).toarray().squeeze()
+        xdot[:] = np.array(self._dot(self.result.p, t, x)).squeeze()
 
     def jac(self, t, x, xdot, jac):#
-        jac[...] = self._jac(self.result.p, t, x).toarray().squeeze()
+        jac[...] = np.array(self._jac(self.result.p, t, x)).squeeze()
 
     def events(self, t, x, g):
-        g[:] = self._events(self.result.p, t, x).toarray().squeeze()
+        g[:] = np.array(self._events(self.result.p, t, x)).squeeze()
 
     def update(self, t, x, rootsfound):
-        next_x = x # who is responsible for copying? I suppose simulate
+        next_x = x #np.copy(x) # who is responsible for copying? I suppose simulate
         for root_sign, update in zip(rootsfound, self._updates):
             if root_sign != 0:
                 next_x = update(self.result.p, t, next_x)
-        return next_x.toarray().squeeze()
+        return np.array(next_x).squeeze()
 
     def time_generator(self):
         for t in self._time_generator(self.result.p):
-            yield t.toarray()[0,0]
+            yield np.array(t).reshape(-1)[0]
 
 
     def simulate(self):
@@ -206,8 +206,7 @@ class System:
                     results.e.append(Root(idx, rootsfound))
 
                     next_x = self.update(
-                        solver_res.values.t, np.copy(solver_res.values.y), rootsfound
-
+                        results.t[-1], results.x[-1], rootsfound,
                     )
                     terminate = np.any(rootsfound[self.terminating] != 0)
                     results.t.append(np.copy(solver_res.values.t))
@@ -481,12 +480,13 @@ class AdjointSystem(System):
         return self.final_lamda
 
     def __call__(self, final_lamda, forcing_function, state_jacobian):
-        self.final_lamda = final_lamda
         self.result = AdjointResult(
             system=self,
             state_jacobian=state_jacobian,
             forcing_function=forcing_function
         )
+        self.final_lamda = final_lamda 
+        # I guess this could be put in result.x? then initial_state can pop and return?
         self.simulate()
         return super().simulate()
 
@@ -524,6 +524,7 @@ class TrajectoryAnalysis:
 @dataclass
 class ShootingGradientMethod:
     # per system
+    adjoint_system: AdjointSystem
     p_x0_p_params: callable
     p_dots_p_params: callable # could be cached, or just combined with integrand terms
     # per system's events (length number of events)
@@ -538,13 +539,45 @@ class ShootingGradientMethod:
     p_terminal_terms_p_state: list[callable]
 
 
-    def __call__(self, adjoint_result):
+    def __call__(self, state_result):
         # iterate over each output, generate forcing functions, etc
-        #    simulate adjoint for each one
-        #    iterate over each segment/event for both  state + adjoint
-        #       compute discontinuous portion of gradient associated with each event
-        #       integrate continuous portion of gradient corresponding to pre/suc-ceding
-        #       segment
-        pass
+
+        # TODO figure out combining and splitting to make this more efficient
+        state_jacobian = ResultInterpolant(state_result, self.adjoint_system.state_jac)
+        param_jacobian = ResultInterpolant(state_result, self.p_dots_p_params)
+
+        p = state_result.p
+
+
+
+        for (
+            p_integrand_term_p_params,
+            p_terminal_term_p_params,
+            p_integrand_term_p_state,
+            p_terminal_term_p_state,
+        ) in zip(
+            self.p_integrand_terms_p_params,
+            self.p_terminal_terms_p_params,
+            self.p_integrand_terms_p_state,
+            self.p_terminal_terms_p_state,
+        ):
+            adjoint_forcing = ResultInterpolant(state_result, p_integrand_term_p_state)
+            final_lamda = p_terminal_term_p_state(
+                p, state_result.t[-1], state_result.x[-1]
+            )
+            adjoint_result = self.adjoint_system(
+                final_lamda, adjoint_forcing, state_jacobian
+            )
+
+            adjoint_interp = ResultInterpolant(adjoint_result)
+
+            for 
+
+            #    simulate adjoint for each one
+            #    iterate over each segment/event for both  state + adjoint
+            #       compute discontinuous portion of gradient associated with each event
+            #       integrate continuous portion of gradient corresponding to pre/suc-ceding
+            #       segment
+            pass
 
 
