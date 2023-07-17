@@ -161,25 +161,24 @@ class System:
         """
         results = self.result
         solver = self.solver
-        time_generator = self.time_generator()
-
-        last_t = next(time_generator)
         last_x = self.initial_state()
-
-        results.t.append(last_t)
         results.x.append(last_x)
+
+        time_generator = self.time_generator()
+        last_t = next(time_generator)
+        results.t.append(last_t)
 
         gs = np.empty(self.num_events)
         self.events(last_t, last_x, gs)
-        rootsfound = gs == 0.
+        rootsfound = (gs == 0.).astype(int)
         if np.any(rootsfound):
             # subsequent events use length of time for index, so root index is the index
             # of the updated state to the right of event. -> root coinciding with 
             # initialization has index 1
-            result.e.append(Root(1, rootsfound))
-            last_x = self.update(last_t, last_x, rootsfound)
-            results.t.append(last_t)
-            results.x.append(last_x)
+            last_x = self.update(last_t, np.copy(last_x), rootsfound)
+        results.e.append(Root(1, rootsfound))
+        results.t.append(last_t)
+        results.x.append(last_x)
 
 
         # each iteration of this loop simulates until next generated time
@@ -244,6 +243,13 @@ class ResultBase:
     x: list[list] = field(default_factory=list)
     e: list[Root] = field(default_factory=list)
 
+    def __getitem__(self, key):
+        return self.__class__(
+            *tuple(getattr(self, field.name) for field in fields(self)[:-3]),
+            t=self.t[key], x=self.x[key], e=self.e[key]
+        )
+
+
 
 @dataclass
 class Result(ResultBase, ResultMixin):
@@ -283,9 +289,12 @@ class ResultInterpolant:
             # element len(result.t), the slice of pairs slice(idx[i], idx[i+1]) 
             # captures the whole segment including the last one. 
 
-             self.event_idxs = np.array([0] + [
+            self.event_idxs = np.array([
                 root.index for root in result.e
             ])# + [len(result.t)])
+            if np.any(np.diff(self.event_idxs) < 1):
+                breakpoint()
+
         event_idxs = self.event_idxs
         if self.time_bounds is None:
 
@@ -305,6 +314,7 @@ class ResultInterpolant:
         # at each call), since this is potentially most expensive call -- I guess only
         # if the ODE depends on inner-loop solver? then split
         # coefficients
+        # --> then also combine e.g., adjoint forcing function and jacobian interpolant
 
         # expect integrand-term related functions to be cheap functions of state
         # point-wise along trajectory
@@ -327,7 +337,6 @@ class ResultInterpolant:
                 )
                 if result.t[idx1] != result.t[idx0]
             ]
-            breakpoint()
 
     def __call__(self, t):
         interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]
@@ -367,19 +376,106 @@ class AdjointSystem(System):
         self.state_jac = state_jac
         self.num_events = 0
 
+    def update(self, segment_idx, event):
+        """
+        for adjoint system, update will always get called for t1 of each segment, 
+        """
+        lamda_res = self.result
+        state_res = lamda_res.state_result
+        # might be able to some magic to skip if nothing is done? but might only be for
+        # terminal event anyway? maybe initial?
+        active_update_idxs = np.where(event.rootsfound != 0)[0]
+        lamda_tep = last_lamda = self.result.x[-1]
+        p = state_res.p
+
+
+        if len(active_update_idxs) > 1:
+            # not sure how to handle actual computation for this case, may need to
+            # re-compute each update to get x at each update for correct partials and
+            # time derivatives??
+            breakpoint()
+
+
+        if active_update_idxs:
+            idxp = event.index # positive side of event
+            te = state_res.t[idxp]
+            xtep = state_res.x[idxp]
+            ftep = state_res.system._dot(p, te, xtep)
+
+            idxm = idxp -1
+            if state_res.t[idxm] != te:
+                breakpoint()
+            xtem = state_res.x[idxm]
+            ftem = state_res.system._dot(p, te, xtem)
+
+            delta_fs = ftep - ftem
+            delta_xs = xtep - xtem
+            lamda_dot = np.empty(xtep.shape)
+            self.dots(te, last_lamda, lamda_dot)
+
+            for event_channel in active_update_idxs[::-1]:
+                lamda_tem = (
+                    self.dh_dxs[event_channel](p, te, xtem,).T
+                    - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
+                    + self.d2te_dxdts[event_channel](p, te, xtem).T @ delta_xs.T
+                ) @ last_lamda
+                - 1*(
+                     lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, tem, xtem)
+                ).T
+
+                last_lamda = lamda_tem
+
+
+        if event is result.state_result.e[-1]: # i.e., is terminal:
+            # simulate already added an extra step as a matter of course, so this should
+            # replace those values
+            lamda_res.e[-1].rootsfound = event.rootsfound
+            lamda_res.x[-1] = lamda_tem
+        else:
+            # append event, time, and state
+            lamda_res.e.append(Root(len(lamda_res.t), event.rootsfound))
+            lamda_res.t.append(te)
+            lamda_res.x.append(lamda_tem)
+
+            pass
+
     def time_generator(self):
         """
         """
-        last_event = self.result.state_result.e[-1]
-        if last_event.index == len(self.result.state_result.t)-1:
-            self.update()
-            yield self.state_result.t[-1]
-        for event in self.result.state_result.e[-2::-1]:
-            self.rootsfound = event.rootsfound
-            yield self.state_result.t[event.index]
-        first_event = self.result.state_result.e[0]
-        if first_event.index == 1:
-            pass
+        result = self.result
+        for (
+            segment_idx,
+            event,
+            #jac_segment, forcing_segment,
+        ) in zip(
+            range(len(result.state_result.e)-1, -1, -1),
+            result.state_result.e[::-1],
+            # result.state_jacobian[::-1], result.forcing_function[::-1],
+        ):
+            # the  event corresponds to the t0+ of the segment index which can be used
+            # for selecting the jacobian and forcing segments
+            self.segment_idx = segment_idx
+            yield result.state_result.t[event.index]
+            # nothing about segment_idx will get used the first time (terminal event)
+            # and would be out-of-bounds if if tried -- simulate will use the yielded
+            # time to determine inital condition, then calls next to set endpoint of
+            # next segment then propoagate it.
+
+            # so on first iteration, will not propoagate, will hit first iteration of
+            # simulate's loop and call next-yield. so do terminal update (can optimize
+            # code to reduce computations if needed) then loop.
+            self.update(event)
+
+            # so update for terminal event is right, but could optimize performance for
+            # special cases/maybe need distinct expression for update (to implement
+            # update from from true terminal condition to effect of an immediate update)
+            # then when this yields initial event (i.e., index=1) will THEN propoagate
+            # backwards to initial condition. 
+
+        # then exits above loop, will have just simulated to t0 and handled any possible
+        # update
+        yield np.inf
+
 
     def initial_state(self):
         return self.final_lamda
@@ -394,14 +490,6 @@ class AdjointSystem(System):
         self.simulate()
         return super().simulate()
 
-    def update(self, idxp, rootsfound):
-        if idxp != len(self.result.state_result.t):
-            fxm = ...
-
-
-        xtep = ...
-        xtem = ...
-
     def dots(self, t, x, xdot,):# userdata=None,):
         # TODO adjoint system takes jacobian and integrand terms, do matrix multiply and
         # vector add here. then can ust call jacobian term for jac method
@@ -409,10 +497,13 @@ class AdjointSystem(System):
         # who would own the data for interpolating ? maybe just a new (data) class that
         # also stores the interpolant? then adjointsystem simulate can create it if
         # it'snot provided
-        xdot[:] = -self.result.state_jacobian(t).T @ x - self.result.forcing_function(t)
+        xdot[:] = (
+            -self.result.state_jacobian.interpolants[self.segment_idx](t).T @ x 
+            -self.result.forcing_function.interpolants[self.segment_idx](t)
+        )
 
     def jac(self, t, x, xdot, jac, userdata=None,):
-        jac[...] = -self.result.state_jacobian(t).T
+        jac[...] = -self.result.state_jacobian.interpolants[self.segment_idx](t).T
 
 @dataclass
 class TrajectoryAnalysis:
@@ -448,6 +539,12 @@ class ShootingGradientMethod:
 
 
     def __call__(self, adjoint_result):
+        # iterate over each output, generate forcing functions, etc
+        #    simulate adjoint for each one
+        #    iterate over each segment/event for both  state + adjoint
+        #       compute discontinuous portion of gradient associated with each event
+        #       integrate continuous portion of gradient corresponding to pre/suc-ceding
+        #       segment
         pass
 
 
