@@ -215,7 +215,10 @@ class System:
                     if terminate:
                         return
 
-                    solver.init_step(res.values.t, next_x)
+                    try:
+                        solver.init_step(solver_res.values.t, next_x)
+                    except:
+                        breakpoint()
                     last_x = next_x
 
                 if solver_res.values.t == next_t or solver_res.flag == StatusEnum.TSTOP_RETURN:
@@ -269,7 +272,7 @@ class ResultSegmentInterpolant(NamedTuple):
 @dataclass
 class ResultInterpolant:
     result: Result
-    function: InitVar[callable] = lambda p, t, x: x
+    function: callable = lambda p, t, x: x
     # don't pass interpolants to init?
     # should state_Result be saved or just be an initvar? I back-references are OK so 
     # we can keep it...
@@ -279,9 +282,10 @@ class ResultInterpolant:
     interval_select: int = field(init=False)
     event_idxs: list | None = None
 
-    def __post_init__(self, function):
+    def __post_init__(self):
         # make interpolants
         result = self.result
+        function = self.function
         if self.event_idxs is None:
             # currently expect each root.index to be to the right of each event so is
             # the start of each segment, so zero belongs with this set by adding the 
@@ -322,7 +326,7 @@ class ResultInterpolant:
                 ResultSegmentInterpolant(
                     make_interp_spline(
                         result.t[idx0:idx1],
-                        [function( result.p, t, x,) 
+                        [np.array(function( result.p, t, x,) ).squeeze()
                          for t, x in zip(result.t[idx0:idx1], result.x[idx0:idx1])],
                         k=min(3, idx1-idx0)
                     ),
@@ -332,7 +336,7 @@ class ResultInterpolant:
                 )
                 for idx0, idx1 in zip(
                     event_idxs[:-1],
-                    event_idxs[1:]-1,
+                    event_idxs[1:]#-1,
                 )
                 if result.t[idx1] != result.t[idx0]
             ]
@@ -373,19 +377,29 @@ class AdjointSystem(System):
         time generator will call update method
         """
         self.state_jac = state_jac
-        self.num_events = 0
+        self.dte_dxs, self.d2te_dxdts, self.dh_dxs = dte_dxs, d2te_dxdts, dh_dxs,
+        self.num_events = 1
+        self.terminating = slice(0,0)
+        self.make_solver()
 
-    def update(self, segment_idx, event):
+    def events(self, t, lamda, g):
+        # only called for initial check in simulate
+        g[:] = t - self.solver.options['tstop']
+
+    def update(self, t, lamda, ignore_rootsfound):
         """
         for adjoint system, update will always get called for t1 of each segment, 
         """
         lamda_res = self.result
         state_res = lamda_res.state_result
+        event = state_res.e[self.segment_idx]
         # might be able to some magic to skip if nothing is done? but might only be for
         # terminal event anyway? maybe initial?
         active_update_idxs = np.where(event.rootsfound != 0)[0]
-        lamda_tep = last_lamda = self.result.x[-1]
+        lamda_tep = last_lamda = lamda #self.result.x[-1]
         p = state_res.p
+        state_idxp = event.index # positive side of event
+        te = state_res.t[state_idxp]
 
 
         if len(active_update_idxs) > 1:
@@ -394,14 +408,11 @@ class AdjointSystem(System):
             # time derivatives??
             breakpoint()
 
-
-        if active_update_idxs:
-            idxp = event.index # positive side of event
-            te = state_res.t[idxp]
-            xtep = state_res.x[idxp]
+        if len(active_update_idxs):
+            xtep = state_res.x[state_idxp]
             ftep = state_res.system._dot(p, te, xtep)
 
-            idxm = idxp -1
+            idxm = state_idxp -1
             if state_res.t[idxm] != te:
                 breakpoint()
             xtem = state_res.x[idxm]
@@ -409,34 +420,47 @@ class AdjointSystem(System):
 
             delta_fs = ftep - ftem
             delta_xs = xtep - xtem
-            lamda_dot = np.empty(xtep.shape)
-            self.dots(te, last_lamda, lamda_dot)
+            lamda_dot = np.empty(xtep.size)
+            if event is state_res.e[-1]:
+                # skip for terminal event? actually, must handle separatley -- just call
+                # jacobian functions directly?
+                lamda_tem = last_lamda
+            else:
+                self.dots(te, last_lamda, lamda_dot)
 
-            for event_channel in active_update_idxs[::-1]:
-                lamda_tem = (
-                    self.dh_dxs[event_channel](p, te, xtem,).T
-                    - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
-                    + self.d2te_dxdts[event_channel](p, te, xtem).T @ delta_xs.T
-                ) @ last_lamda
-                - 1*(
-                     lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, tem, xtem)
-                ).T
+                for event_channel in active_update_idxs[::-1]:
+                    lamda_tem = (
+                        self.dh_dxs[event_channel](p, te, xtem,).T
+                        - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
+                        + self.d2te_dxdts[event_channel](p, te, xtem).T @ delta_xs.T
+                    ) @ last_lamda
+                    - 1*(
+                         lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, tem, xtem)
+                    ).T
 
-                last_lamda = lamda_tem
+                    last_lamda = lamda_tem
+        else:
+            lamda_tem = last_lamda
 
 
-        if event is result.state_result.e[-1]: # i.e., is terminal:
+
+        lamda_tem = np.array(lamda_tem).squeeze()
+        return lamda_tem
+        breakpoint()
+        if event is state_res.e[-1]: # i.e., is terminal:
             # simulate already added an extra step as a matter of course, so this should
             # replace those values
-            lamda_res.e[-1].rootsfound = event.rootsfound
-            lamda_res.x[-1] = lamda_tem
+            lamda_res.e[-1] = Root(lamda_res.e[-1].index, event.rootsfound)
+            try:
+                lamda_res.x[-1] = lamda_tem
+            except:
+                breakpoint()
         else:
             # append event, time, and state
             lamda_res.e.append(Root(len(lamda_res.t), event.rootsfound))
             lamda_res.t.append(te)
             lamda_res.x.append(lamda_tem)
 
-            pass
 
     def time_generator(self):
         """
@@ -454,6 +478,9 @@ class AdjointSystem(System):
             # the  event corresponds to the t0+ of the segment index which can be used
             # for selecting the jacobian and forcing segments
             self.segment_idx = segment_idx
+            if segment_idx == 0:
+                self.terminating = [0]
+            print("\n"*10, "HELLO!\nI am yielding",result.state_result.t[event.index], "\n"*10)
             yield result.state_result.t[event.index]
             # nothing about segment_idx will get used the first time (terminal event)
             # and would be out-of-bounds if if tried -- simulate will use the yielded
@@ -463,7 +490,7 @@ class AdjointSystem(System):
             # so on first iteration, will not propoagate, will hit first iteration of
             # simulate's loop and call next-yield. so do terminal update (can optimize
             # code to reduce computations if needed) then loop.
-            self.update(event)
+            #self.update(event)
 
             # so update for terminal event is right, but could optimize performance for
             # special cases/maybe need distinct expression for update (to implement
@@ -473,6 +500,8 @@ class AdjointSystem(System):
 
         # then exits above loop, will have just simulated to t0 and handled any possible
         # update
+        breakpoint()
+        print("\n"*10, "HELLO!\nI am yielding INF","\n"*10)
         yield np.inf
 
 
@@ -488,21 +517,23 @@ class AdjointSystem(System):
         self.final_lamda = final_lamda 
         # I guess this could be put in result.x? then initial_state can pop and return?
         self.simulate()
-        return super().simulate()
+        result = self.result
+        self.result = None
+        return result
 
-    def dots(self, t, x, xdot,):# userdata=None,):
+    def dots(self, t, lamda, lamdadot,):# userdata=None,):
         # TODO adjoint system takes jacobian and integrand terms, do matrix multiply and
         # vector add here. then can ust call jacobian term for jac method
         # then before simulate, could actually construct 
         # who would own the data for interpolating ? maybe just a new (data) class that
         # also stores the interpolant? then adjointsystem simulate can create it if
         # it'snot provided
-        xdot[:] = (
-            -self.result.state_jacobian.interpolants[self.segment_idx](t).T @ x 
+        lamdadot[:] = (
+            -self.result.state_jacobian.interpolants[self.segment_idx](t).T @ lamda
             -self.result.forcing_function.interpolants[self.segment_idx](t)
         )
 
-    def jac(self, t, x, xdot, jac, userdata=None,):
+    def jac(self, t, lamda, lamdadot, jac,):# userdata=None,):
         jac[...] = -self.result.state_jacobian.interpolants[self.segment_idx](t).T
 
 @dataclass
@@ -549,6 +580,9 @@ class ShootingGradientMethod:
         p = state_result.p
 
 
+        jac_rows = []
+
+
 
         for (
             p_integrand_term_p_params,
@@ -561,23 +595,107 @@ class ShootingGradientMethod:
             self.p_integrand_terms_p_state,
             self.p_terminal_terms_p_state,
         ):
+            # simulate adjoint for each one
             adjoint_forcing = ResultInterpolant(state_result, p_integrand_term_p_state)
-            final_lamda = p_terminal_term_p_state(
+            final_lamda = np.array(p_terminal_term_p_state(
                 p, state_result.t[-1], state_result.x[-1]
-            )
+            )).squeeze()
             adjoint_result = self.adjoint_system(
                 final_lamda, adjoint_forcing, state_jacobian
             )
 
+            p_integrand_p_param_interp = ResultInterpolant(
+                state_result, p_integrand_term_p_params
+            )
+
+            breakpoint()
             adjoint_interp = ResultInterpolant(adjoint_result)
+            jac_row = p_terminal_term_p_params(
+                p, state_result.t[-1], state_result.x[-1]
+            )
 
-            for 
+            # iterate over each segment/event for both  state + adjoint
+            for (
+                adjoint_segment, param_jacobian_segment, p_integrand_p_param_segment
+            ) in zip(
+                adjoint_interp.interpolants[::-1],
+                param_jacobian.interpolants,
+                p_integrand_p_param_interp.interpolants,
+            ):
+                # compute discontinuous portion of gradient associated with each event
+                # integrate continuous portion of gradient corresponding to pre/suc-ceding
+                # segment
+                time_data = ...
+                integrand_data = [
+                    adjoint_segment(t).T @ param_jacobian_segment(t) +
+                    p_integrand_p_param_segment(t)
+                    for t in time_data
+                ]
+                integrand_interp = make_interp_spline(
+                    time_data,
+                    integrand_daa
+                )
+                integrand_antider = integrand_interp.antiderivative()
+                jac_row += integrand_antider(time_data[-1]) - integrand_antider(time_data[0])
 
-            #    simulate adjoint for each one
-            #    iterate over each segment/event for both  state + adjoint
-            #       compute discontinuous portion of gradient associated with each event
-            #       integrate continuous portion of gradient corresponding to pre/suc-ceding
-            #       segment
-            pass
+            for lamda_event, state_event in zip(adjoint_result.e[::-1], state_result.e):
+                # had to copy and paste this setup code from adjointsystem.update, not 
+                # sure if that's acceptable given the nature of these variables (mostly
+                # selecting indices, a few hopefully cheap calls to time derivative,
+                # etc)
+                idxp = state_event.index # positive side of event
+                te = state_res.t[idxp]
+                xtep = state_res.x[idxp]
+                ftep = state_res.system._dot(p, te, xtep)
+
+                idxm = idxp -1
+                if state_res.t[idxm] != te:
+                    breakpoint()
+                xtem = state_res.x[idxm]
+                ftem = state_res.system._dot(p, te, xtem)
+
+                delta_fs = ftep - ftem
+                delta_xs = xtep - xtem
+
+                active_update_idxs = np.where(state_event.rootsfound != 0)[0]
+
+                # does initialization have a special case?
+                """
+                if state_event.idx == 1:
+                    jac_row += ...
+                    continue
+                """
+
+                idxm = lamda_event.index
+                idxp = idxm - 1
+                if adjoint_res.t[idxm] != te or adjoint_res.t[idxp] != te:
+                    breakpoint()
+                lamda_tem = adjoint_result.x[idxm]
+                lamda_dot_tem = np.empty(xtep.shape)
+                self.adjoint_system.dots(te, lamda_tem, lamda_dot_tem)
 
 
+                lamda_tep = adjoint_result.x[idxp]
+                lamda_dot_tep = np.empty(xtep.shape)
+                self.adjoint_system.dots(te, lamda_tep, lamda_dot_tep)
+
+                for event_channel in active_update_idxs[::-1]:
+                    jac_row += lamda_tep[None, :] @ (
+                        self.d_update_d_params[event_channel](p, tem, xtem)
+                        + 1*(
+                            delta_fs 
+                        ) @ self.d_event_time_d_params[event_channel](p, tem, xtem)
+                        - delta_xs[:, None] @ self.d2_event_time_d_params_d_t[event_channel](p, tem, xtem).T
+                    ) + 1*(
+                        (
+                            +1*lamda_dot_tep[None, :]
+                            -1*lamda_dot_tem[None, :]
+                        ) @ (delta_xs) @ self.d_event_time_d_params[event_channel](p, tem, xtem)
+                    ) - 1*(
+                        (lamda_tep - lamda_tem)[None, :]  @ self.d_update_d_params[event_channel](p, tem, xtem)
+                        @ (self.d_event_time_d_params[event_channel](p, tem, xtem).T @ self.d_event_time_d_params[event_channel](p, tem, xtem))
+                    )
+
+            jac_rows.append(jac_row)
+
+        return np.stack(jac_rows, axis=0)

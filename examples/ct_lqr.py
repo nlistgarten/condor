@@ -22,9 +22,6 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
 
 ct_sim = DblIntLQR([1, .1])
 LTI_plot(ct_sim)
-plt.show()
-import sys
-sys.exit()
 ct_sim = DblIntLQR([0., 0.,])
 LTI_plot(ct_sim)
 
@@ -53,4 +50,6 @@ print(lqr_are.cost > lqr_sol.objective)
 print("      ARE sol:", K, 
     "\niterative sol:", lqr_sol.K)
 
-
+plt.show()
+import sys
+sys.exit()

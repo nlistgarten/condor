@@ -627,8 +627,6 @@ class TrajectoryAnalysis:
 
         num_events = len(ode_model.Event.subclasses)
 
-        if model_tf is not None:
-            ode_model.Event.subclasses = ode_model.Event.subclasses[:-1]
 
 
 
@@ -646,7 +644,7 @@ class TrajectoryAnalysis:
         self.lamdaF_funcs = [
             casadi.Function(
                 f"{model.__name__}_{traj_name}_lamdaF",
-                self.adjoint_signature[:-1],
+                self.simulation_signature,
                 [lamdaF],
             ) for lamdaF, traj_name in zip(self.lamdaFs, traj_out_names)
         ]
@@ -656,7 +654,7 @@ class TrajectoryAnalysis:
         self.gradF_funcs = [
             casadi.Function(
                 f"{model.__name__}_{traj_name}_gradF",
-                self.adjoint_signature[:-1],
+                self.simulation_signature,
                 [gradF],
             ) for gradF, traj_name in zip(self.gradFs, traj_out_names)
         ]
@@ -757,8 +755,8 @@ class TrajectoryAnalysis:
                 + casadi.jacobian(dte_dp, self.x) @ state_equation_func.expr
             )
 
-            dh_dx = casadi.jacobian(h_expr, self.x)
-            dh_dp = casadi.jacobian(h_expr, self.p)
+            dh_dx = casadi.jacobian(h_expr.expr, self.x)
+            dh_dp = casadi.jacobian(h_expr.expr, self.p)
 
 
             self.dte_dxs.append(
@@ -801,7 +799,7 @@ class TrajectoryAnalysis:
             self.dh_dxs.append(
                 casadi.Function(
                     f"{event.__name__}_dh_dx",
-                    self.simulation_signature + [self.sym_event_channel],
+                    self.simulation_signature,
                     [dh_dx]
                 )
             )
@@ -810,11 +808,14 @@ class TrajectoryAnalysis:
             self.dh_dps.append(
                 casadi.Function(
                     f"{event.__name__}_dh_dp",
-                    self.simulation_signature + [self.sym_event_channel],
+                    self.simulation_signature,
                     [dh_dp]
                 )
             )
             self.dh_dps[-1].expr = dh_dp
+
+        if model_tf is not None:
+            ode_model.Event.subclasses = ode_model.Event.subclasses[:-1]
 
 
         self.trajectory_analysis = sgm.TrajectoryAnalysis(
