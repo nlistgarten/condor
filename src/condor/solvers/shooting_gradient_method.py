@@ -307,9 +307,11 @@ class ResultInterpolant:
         if result.t[-1] < result.t[0]:
             self.time_comparison = self.time_bounds.__le__
             self.interval_select = 0
+            self.time_sort = slice(None, None, -1)
         else:
             self.time_comparison = self.time_bounds.__ge__
             self.interval_select = -1
+            self.time_sort = slice(None)
 
         if self.interpolants is None:
         # TODO figure out how to combine (and possibly reverse direction) state and
@@ -325,9 +327,10 @@ class ResultInterpolant:
             self.interpolants = [
                 ResultSegmentInterpolant(
                     make_interp_spline(
-                        result.t[idx0:idx1],
+                        result.t[idx0:idx1][self.time_sort],
                         [np.array(function( result.p, t, x,) ).squeeze()
-                         for t, x in zip(result.t[idx0:idx1], result.x[idx0:idx1])],
+                         for t, x in zip(result.t[idx0:idx1],
+                                         result.x[idx0:idx1])][self.time_sort],
                         k=min(3, idx1-idx0)
                     ),
                     idx0, idx1,
@@ -356,10 +359,12 @@ class AdjointResultMixin:
     state_jacobian: ResultInterpolant
     forcing_function: ResultInterpolant
     state_result: Result = field(init=False)
+    p : list[float] = field(init=False)
 
     def __post_init__(self):
         # TODO: validate forcing_function.result is the same?
         self.state_result = self.state_jacobian.result
+        self.p = self.state_result.p
 
 
 @dataclass
@@ -518,7 +523,7 @@ class AdjointSystem(System):
         # I guess this could be put in result.x? then initial_state can pop and return?
         self.simulate()
         result = self.result
-        self.result = None
+        #self.result = None
         return result
 
     def dots(self, t, lamda, lamdadot,):# userdata=None,):
@@ -608,11 +613,10 @@ class ShootingGradientMethod:
                 state_result, p_integrand_term_p_params
             )
 
-            breakpoint()
             adjoint_interp = ResultInterpolant(adjoint_result)
-            jac_row = p_terminal_term_p_params(
+            jac_row = np.array(p_terminal_term_p_params(
                 p, state_result.t[-1], state_result.x[-1]
-            )
+            )).squeeze()
 
             # iterate over each segment/event for both  state + adjoint
             for (
@@ -625,15 +629,26 @@ class ShootingGradientMethod:
                 # compute discontinuous portion of gradient associated with each event
                 # integrate continuous portion of gradient corresponding to pre/suc-ceding
                 # segment
-                time_data = ...
+                adjoint_time_data = adjoint_result.t[adjoint_segment.idx0:adjoint_segment.idx1][::-1]
+                state_time_data = state_result.t[param_jacobian_segment.idx0:param_jacobian_segment.idx1]
+
+                # thought it would be faster to use the denser one, but don't achieve
+                # required precision
+                if len(adjoint_time_data) > len(state_time_data):
+                    time_data = adjoint_time_data
+                else:
+                    print("SWITCHING TIME DATA")
+                    time_data = state_time_data
+                time_data = state_time_data
+
                 integrand_data = [
-                    adjoint_segment(t).T @ param_jacobian_segment(t) +
-                    p_integrand_p_param_segment(t)
+                    np.array(adjoint_segment(t).T @ param_jacobian_segment(t) +
+                    p_integrand_p_param_segment(t)).squeeze()
                     for t in time_data
                 ]
                 integrand_interp = make_interp_spline(
                     time_data,
-                    integrand_daa
+                    integrand_data
                 )
                 integrand_antider = integrand_interp.antiderivative()
                 jac_row += integrand_antider(time_data[-1]) - integrand_antider(time_data[0])
@@ -644,15 +659,15 @@ class ShootingGradientMethod:
                 # selecting indices, a few hopefully cheap calls to time derivative,
                 # etc)
                 idxp = state_event.index # positive side of event
-                te = state_res.t[idxp]
-                xtep = state_res.x[idxp]
-                ftep = state_res.system._dot(p, te, xtep)
+                te = state_result.t[idxp]
+                xtep = state_result.x[idxp]
+                ftep = state_result.system._dot(p, te, xtep)
 
                 idxm = idxp -1
-                if state_res.t[idxm] != te:
+                if state_result.t[idxm] != te:
                     breakpoint()
-                xtem = state_res.x[idxm]
-                ftem = state_res.system._dot(p, te, xtem)
+                xtem = state_result.x[idxm]
+                ftem = state_result.system._dot(p, te, xtem)
 
                 delta_fs = ftep - ftem
                 delta_xs = xtep - xtem
@@ -668,7 +683,9 @@ class ShootingGradientMethod:
 
                 idxm = lamda_event.index
                 idxp = idxm - 1
-                if adjoint_res.t[idxm] != te or adjoint_res.t[idxp] != te:
+                if adjoint_result.t[idxm] != adjoint_result.t[idxp]:
+                    breakpoint()
+                if not np.isclose(adjoint_result.t[idxm], te):
                     breakpoint()
                 lamda_tem = adjoint_result.x[idxm]
                 lamda_dot_tem = np.empty(xtep.shape)
@@ -680,21 +697,21 @@ class ShootingGradientMethod:
                 self.adjoint_system.dots(te, lamda_tep, lamda_dot_tep)
 
                 for event_channel in active_update_idxs[::-1]:
-                    jac_row += lamda_tep[None, :] @ (
-                        self.d_update_d_params[event_channel](p, tem, xtem)
+                    jac_row += np.array(lamda_tep[None, :] @ (
+                        self.d_update_d_params[event_channel](p, te, xtem)
                         + 1*(
                             delta_fs 
-                        ) @ self.d_event_time_d_params[event_channel](p, tem, xtem)
-                        - delta_xs[:, None] @ self.d2_event_time_d_params_d_t[event_channel](p, tem, xtem).T
+                        ) @ self.d_event_time_d_params[event_channel](p, te, xtem)
+                        - delta_xs[:, None] @ self.d2_event_time_d_params_d_t[event_channel](p, te, xtem).T
                     ) + 1*(
                         (
                             +1*lamda_dot_tep[None, :]
                             -1*lamda_dot_tem[None, :]
-                        ) @ (delta_xs) @ self.d_event_time_d_params[event_channel](p, tem, xtem)
+                        ) @ (delta_xs) @ self.d_event_time_d_params[event_channel](p, te, xtem)
                     ) - 1*(
-                        (lamda_tep - lamda_tem)[None, :]  @ self.d_update_d_params[event_channel](p, tem, xtem)
-                        @ (self.d_event_time_d_params[event_channel](p, tem, xtem).T @ self.d_event_time_d_params[event_channel](p, tem, xtem))
-                    )
+                        (lamda_tep - lamda_tem)[None, :]  @ self.d_update_d_params[event_channel](p, te, xtem)
+                        @ (self.d_event_time_d_params[event_channel](p, te, xtem).T @ self.d_event_time_d_params[event_channel](p, te, xtem))
+                    )).squeeze()
 
             jac_rows.append(jac_row)
 
