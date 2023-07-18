@@ -116,6 +116,9 @@ class System:
             one_step_compute=True,
             rootfn=self.events,
             nr_rootfns=self.num_events,
+            #atol=1E-12,
+            #rtol=1E-12,
+            rtol=1E-9,
         )
 
     def initial_state(self):
@@ -331,7 +334,8 @@ class ResultInterpolant:
                         [np.array(function( result.p, t, x,) ).squeeze()
                          for t, x in zip(result.t[idx0:idx1],
                                          result.x[idx0:idx1])][self.time_sort],
-                        k=min(3, idx1-idx0)
+                        k=min(3, idx1-idx0),
+                        bc_type=["natural", "natural"],
                     ),
                     idx0, idx1,
                     result.t[idx0], result.t[idx1],
@@ -648,7 +652,8 @@ class ShootingGradientMethod:
                 ]
                 integrand_interp = make_interp_spline(
                     time_data,
-                    integrand_data
+                    integrand_data,
+                    bc_type=["natural", "natural"],
                 )
                 integrand_antider = integrand_interp.antiderivative()
                 jac_row += integrand_antider(time_data[-1]) - integrand_antider(time_data[0])
