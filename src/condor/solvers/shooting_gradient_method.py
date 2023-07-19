@@ -118,7 +118,7 @@ class System:
             nr_rootfns=self.num_events,
             atol=1E-13,
             rtol=1E-12,
-            max_step_size=0.5/8,
+            #max_step_size=0.5/8,
 
             #rtol=1E-9,
             #rtol=1E-10,
@@ -193,6 +193,8 @@ class System:
             next_t = next(time_generator)
             if np.isinf(next_t):
                 break
+            if next_t < 0:
+                breakpoint()
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
             #solver.set_options(max_step_size=np.abs(next_t - last_t))
