@@ -1122,7 +1122,8 @@ def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):
 
     if dt:
         dt_attrs = InnerModelType.__prepare__("DT", (plant.Event,))
-        dt_attrs["function"] = np.sin(plant.t*np.pi/dt)
+        #dt_attrs["function"] = np.sin(plant.t*np.pi/dt)
+        dt_attrs["at_time"] = slice(None, None, dt)
         if dt_plant:
             from scipy.signal import cont2discrete
             if B is None:

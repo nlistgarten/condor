@@ -561,19 +561,24 @@ class TrajectoryAnalysis:
                     if at_time.step is None:
                         raise ValueError
 
-                    e_expr = ca.sign
                     if at_time.start is not None:
                         at_time_start = at_time.start
                     else:
                         at_time_start = 0
 
-                    e_expr = at_time.step*casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)/casasadi.pi
+                    e_expr = at_time.step*casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)/(
+                        casadi.pi*100
+                    )
+                    # self.events(solver_res.values.t, solver_res.values.y, gs)
+                    #e_expr = casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)
+                    e_expr = casadi.fmod(ode_model.t - at_time_start, at_time.step) 
 
+                    # TODO: verify start and stop for at_time slice
                     if at_time_start:
                         e_expr = e_expr * (ode_model.t >= at_time_start)
                         # if there is a start offset, add a linear term to provide a
                         # zero-crossing at first occurance
-                        pre_term = (at_time_start - t) * (ode_model.t <= at_time_start)
+                        pre_term = (at_time_start - ode_model.t) * (ode_model.t <= at_time_start)
                     else:
                         pre_term = 0
 
@@ -581,7 +586,8 @@ class TrajectoryAnalysis:
                         e_expr = e_expr * (ode_model.t <= at_time.stop)
                         # if there is an end-time, hold constant to prevent additional
                         # zero crossings -- hopefully works even if stop is on an event
-                        post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
+                        #post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
+                        post_term = (ode_model.t >= at_time.stop) * casadi.fmod(at_time.stop - at_time_start)
                         at_time_stop = at_time.stop
                     else:
                         post_term = 0

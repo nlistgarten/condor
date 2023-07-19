@@ -15,7 +15,7 @@ dt = 0.5
 DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=dt)
 class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
     initial[x] = [1., 0.1]
-    initial[u] = -K@initial[x]
+    #initial[u] = -K@initial[x]
     Q = np.eye(2)
     R = np.eye(1)
     tf = 32. # 12 iters, 21 calls 1E-8 jac
@@ -36,17 +36,6 @@ class SampledOptLQR(co.OptimizationProblem):
         #method = OptimizationProblem.Method.scipy_trust_constr
 
 
-sim = DblIntSampledLQR([1.00842737, 0.05634044])
-
-sim = DblIntSampledLQR([0., 0.])
-sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
-
-
-
-lqr_sol_samp = SampledOptLQR()
-#sampled_sim = DblIntSampledLQR([0., 0.])
-#sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
-
 Q = DblIntSampledLQR.Q
 R = DblIntSampledLQR.R
 A = dblintA
@@ -55,6 +44,22 @@ B = dblintB
 Ad, Bd = signal.cont2discrete((A, B, None, None), dt)[:2]
 S = linalg.solve_discrete_are(Ad, Bd, Q, R,)
 K = linalg.solve(Bd.T @ S @ Bd + R, Bd.T @ S @ Ad)
+
+#sim = DblIntSampledLQR([1.00842737, 0.05634044])
+sim = DblIntSampledLQR(K)
+
+LTI_plot(sim)
+plt.show()
+
+#sim = DblIntSampledLQR([0., 0.])
+#sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+
+
+
+lqr_sol_samp = SampledOptLQR()
+#sampled_sim = DblIntSampledLQR([0., 0.])
+#sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
+
 
 
 sampled_sim = DblIntSampledLQR(K)

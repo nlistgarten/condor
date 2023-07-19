@@ -15,7 +15,7 @@ class NextTimeFromSlice:
         self.at_time_func = at_time_func
 
     def set_p(self, p):
-        start, stop, step = self.at_time_func(p)
+        start, stop, step = np.array(self.at_time_func(p)).squeeze()
         self.start = start
         self.step = step
         self.stop = stop
@@ -199,6 +199,8 @@ class System:
                 solver_res = solver.step(next_t)
                 if solver_res.flag < 0:
                     breakpoint()
+                #if solver_res.flag > 0:
+                #    breakpoint()
 
                 results.t.append(np.copy(solver_res.values.t))
                 results.x.append(np.copy(solver_res.values.y))
@@ -444,7 +446,7 @@ class AdjointSystem(System):
                         + self.d2te_dxdts[event_channel](p, te, xtem).T @ delta_xs.T
                     ) @ last_lamda
                     - 1*(
-                         lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, tem, xtem)
+                         lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, te, xtem)
                     ).T
 
                     last_lamda = lamda_tem
@@ -489,6 +491,8 @@ class AdjointSystem(System):
             self.segment_idx = segment_idx
             if segment_idx == 0:
                 self.terminating = [0]
+            if event.index == 1:
+                breakpoint()
             print("\n"*10, "HELLO!\nI am yielding",result.state_result.t[event.index], "\n"*10)
             yield result.state_result.t[event.index]
             # nothing about segment_idx will get used the first time (terminal event)
