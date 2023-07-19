@@ -108,7 +108,7 @@ class System:
         self.num_events = len(updates)
         self.make_solver()
 
-    def make_solver(self):
+    def make_solver(self, max_step_size=0.):
         self.solver = CVODE(
             self.dots,
             jacfn=self.jac,
@@ -116,9 +116,10 @@ class System:
             one_step_compute=True,
             rootfn=self.events,
             nr_rootfns=self.num_events,
-            atol=1E-13,
-            rtol=1E-12,
+            #atol=1E-13,
+            #rtol=1E-12,
             #max_step_size=0.5/8,
+            max_step_size=max_step_size,
 
             #rtol=1E-9,
             #rtol=1E-10,
@@ -166,7 +167,6 @@ class System:
         coincides with 
         """
         results = self.result
-        solver = self.solver
         last_x = self.initial_state()
         results.x.append(last_x)
 
@@ -195,6 +195,9 @@ class System:
                 break
             if next_t < 0:
                 breakpoint()
+
+            self.make_solver(np.abs(next_t - last_t)/8)
+            solver = self.solver
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
             #solver.set_options(max_step_size=np.abs(next_t - last_t))
