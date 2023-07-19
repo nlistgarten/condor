@@ -192,15 +192,12 @@ class System:
                 break
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
-            last_t = next_t
 
-            # each iteration of this loop simulates until next event or time stop
+            # each iteration of this loop is one step until next event or time stop
             while True:
                 solver_res = solver.step(next_t)
                 if solver_res.flag < 0:
                     breakpoint()
-                #if solver_res.flag > 0:
-                #    breakpoint()
 
                 results.t.append(np.copy(solver_res.values.t))
                 results.x.append(np.copy(solver_res.values.y))
@@ -229,6 +226,8 @@ class System:
                 if solver_res.values.t == next_t or solver_res.flag == StatusEnum.TSTOP_RETURN:
                     break
 
+
+            last_t = next_t
 
     def __call__(self, p):
         self.result = Result(p=p, system=self)
@@ -390,7 +389,6 @@ class AdjointSystem(System):
         self.state_jac = state_jac
         self.dte_dxs, self.d2te_dxdts, self.dh_dxs = dte_dxs, d2te_dxdts, dh_dxs,
         self.num_events = 1
-        self.terminating = slice(0,0)
         self.make_solver()
 
     def events(self, t, lamda, g):
@@ -491,8 +489,8 @@ class AdjointSystem(System):
             self.segment_idx = segment_idx
             if segment_idx == 0:
                 self.terminating = [0]
-            if event.index == 1:
-                breakpoint()
+            #if event.index == 1:
+            #    breakpoint()
             print("\n"*10, "HELLO!\nI am yielding",result.state_result.t[event.index], "\n"*10)
             yield result.state_result.t[event.index]
             # nothing about segment_idx will get used the first time (terminal event)
@@ -522,6 +520,7 @@ class AdjointSystem(System):
         return self.final_lamda
 
     def __call__(self, final_lamda, forcing_function, state_jacobian):
+        self.terminating = slice(0,0)
         self.result = AdjointResult(
             system=self,
             state_jacobian=state_jacobian,
