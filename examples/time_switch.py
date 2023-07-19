@@ -32,12 +32,16 @@ class DblInt(co.ODESystem):
         dot[tt] = 1.
 
 class Switch1(DblInt.Event):
-    function = t - t1
+    #function = t - t1
+    at_time = t1,
     update[mode] = 1.
 
 class Switch2(DblInt.Event):
-    function = t - t2 - t1
-    mode == 2.
+    #function = t - t2 - t1
+    #mode == 2.
+
+    at_time = t2 + t1,
+    update[mode] = 2.
     terminate = True
 
 class Transfer(DblInt.TrajectoryAnalysis):
@@ -64,8 +68,8 @@ class MinimumTime(co.OptimizationProblem):
         #method = OptimizationProblem.Method.scipy_cg
 
 sim = Transfer(t1=1., t2= 4.,)
-
 jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+
 """
 old:
 eval jacobian for jac_Transfer
@@ -83,6 +87,6 @@ LTI_plot(sim)
 MinimumTime.implementation.set_initial(t1=2.163165480675697, t2=4.361971866705403)
 opt = MinimumTime()
 
-print(jac)
-print(opt._stats)
+#print(jac)
+#print(opt._stats)
 

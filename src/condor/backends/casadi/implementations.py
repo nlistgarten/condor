@@ -545,7 +545,7 @@ class TrajectoryAnalysis:
         model_tf = getattr(model, 'tf', None)
         if model_tf is not None:
             class Terminate(ode_model.Event):
-                at_time = model_tf
+                at_time = model_tf,
                 terminate = True
 
 
@@ -603,12 +603,12 @@ class TrajectoryAnalysis:
                         )
                     ))
                 else:
-                    e_expr =  at_time - ode_model.t
+                    e_expr =  at_time[0] - ode_model.t
                     at_time_slices.append(sgm.NextTimeFromSlice(
                         casadi.Function(
                             f"{ode_model.__name__}_at_times_{event_idx}",
                             [self.p],
-                            [at_time, at_time, casadi.inf]
+                            [at_time[0], at_time[0], casadi.inf]
                         )
                     ))
 
@@ -820,8 +820,10 @@ class TrajectoryAnalysis:
             )
             self.dh_dps[-1].expr = dh_dp
 
+
         if model_tf is not None:
             ode_model.Event.subclasses = ode_model.Event.subclasses[:-1]
+
 
 
         self.trajectory_analysis = sgm.TrajectoryAnalysis(

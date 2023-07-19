@@ -192,21 +192,29 @@ class System:
                 break
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
+            integration_direction = np.sign(next_t - last_t)
 
             # each iteration of this loop is one step until next event or time stop
             while True:
                 solver_res = solver.step(next_t)
-                if solver_res.flag < 0:
+                if (solver_res.flag < 0):
                     breakpoint()
 
                 results.t.append(np.copy(solver_res.values.t))
                 results.x.append(np.copy(solver_res.values.y))
 
                 if solver_res.flag == StatusEnum.ROOT_RETURN:
-                    idx = len(results.t)
                     rootsfound = solver.rootinfo()
-                    results.e.append(Root(idx, rootsfound))
 
+                if solver_res.flag == StatusEnum.TSTOP_RETURN:
+                    # assume this is associated with an event
+                    self.events(results.t[-1], results.x[-1], gs)
+                    min_e = np.abs(gs).min()
+                    rootsfound = (gs == min_e).astype(int)
+
+                if solver_res.flag in (StatusEnum.TSTOP_RETURN, StatusEnum.ROOT_RETURN):
+                    idx = len(results.t)
+                    results.e.append(Root(idx, rootsfound))
                     next_x = self.update(
                         results.t[-1], results.x[-1], rootsfound,
                     )
@@ -223,8 +231,12 @@ class System:
                         breakpoint()
                     last_x = next_x
 
-                if solver_res.values.t == next_t or solver_res.flag == StatusEnum.TSTOP_RETURN:
+                if (
+                    (integration_direction * solver_res.values.t) 
+                    >= (integration_direction * next_t)
+                ) or solver_res.flag == StatusEnum.TSTOP_RETURN:
                     break
+
 
 
             last_t = next_t
@@ -392,8 +404,10 @@ class AdjointSystem(System):
         self.make_solver()
 
     def events(self, t, lamda, g):
-        # only called for initial check in simulate
-        g[:] = t - self.solver.options['tstop']
+        #g[:] = t - self.solver.options['tstop']
+        g[:] = t - self.result.state_result.t[
+            self.result.state_result.e[self.segment_idx].index
+        ]
 
     def update(self, t, lamda, ignore_rootsfound):
         """
@@ -670,6 +684,7 @@ class ShootingGradientMethod:
                 te = state_result.t[idxp]
                 xtep = state_result.x[idxp]
                 ftep = state_result.system._dot(p, te, xtep)
+
 
                 idxm = idxp -1
                 if state_result.t[idxm] != te:

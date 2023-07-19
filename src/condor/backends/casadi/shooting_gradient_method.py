@@ -264,7 +264,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         return self.jac_callback
 
     def eval(self, args):
-        p = casadi.vertcat(*args)
+        p = self.p = casadi.vertcat(*args)
         self.res = self.i.StateSystem(p)
         self.output = self.i.trajectory_analysis(self.res)
         return self.output,
