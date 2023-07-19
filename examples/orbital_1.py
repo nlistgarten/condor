@@ -86,7 +86,7 @@ class MajorBurn(LinCovCW.Event):
     tig = parameter() # time ignition
     tem = parameter() # time end maneuver
 
-    function = t - tig
+    #function = t - tig
     at_time = [tig]
 
     t_d = tem - tig
@@ -139,7 +139,7 @@ class Terminate(LinCovCW.Event):
     terminate = True
     # TODO: how to make a symbol like this just provide the backend repr? or is this
     # correct?
-    function = t - MajorBurn.tem.backend_repr
+    #function = t - MajorBurn.tem.backend_repr
     at_time = [MajorBurn.tem.backend_repr]
 
 
@@ -226,6 +226,12 @@ class TotalDeltaV(co.OptimizationProblem):
 
 hohmann = Hohmann()
 hohmann_sim = Sim(**sim_kwargs, tig=hohmann.tig, tem=hohmann.tf)
+print("\n"*2,"hohmann")
+print(hohmann._stats)
+print((hohmann.tf - hohmann.tig)*hohmann.sim.omega*180/np.pi)
+print(hohmann_sim.tot_Delta_v_disp)
+import sys
+sys.exit()
 
 total_delta_v  = TotalDeltaV(pos_disp_max=1000)
 tot_delta_v_sim = Sim(**sim_kwargs, tig=total_delta_v.tig, tem=total_delta_v.tf)
@@ -235,10 +241,6 @@ tot_delta_v_constrained_sim = Sim(
     **sim_kwargs, tig=total_delta_v_constrained.tig, tem=total_delta_v_constrained.tf
 )
 
-print("\n"*2,"hohmann")
-print(hohmann._stats)
-print((hohmann.tf - hohmann.tig)*hohmann.sim.omega*180/np.pi)
-print(hohmann_sim.tot_Delta_v_disp)
 
 print("\n"*2,"unconstrained Delta v")
 print(total_delta_v._stats)

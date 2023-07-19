@@ -48,11 +48,11 @@ K = linalg.solve(Bd.T @ S @ Bd + R, Bd.T @ S @ Ad)
 #sim = DblIntSampledLQR([1.00842737, 0.05634044])
 sim = DblIntSampledLQR(K)
 
+jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 LTI_plot(sim)
 plt.show()
 
 #sim = DblIntSampledLQR([0., 0.])
-#sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 
 
 

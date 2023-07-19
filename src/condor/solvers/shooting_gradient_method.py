@@ -116,9 +116,12 @@ class System:
             one_step_compute=True,
             rootfn=self.events,
             nr_rootfns=self.num_events,
-            #atol=1E-12,
-            #rtol=1E-12,
-            rtol=1E-9,
+            atol=1E-13,
+            rtol=1E-12,
+            max_step_size=0.5/8,
+
+            #rtol=1E-9,
+            #rtol=1E-10,
         )
 
     def initial_state(self):
@@ -192,6 +195,7 @@ class System:
                 break
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
+            #solver.set_options(max_step_size=np.abs(next_t - last_t))
             integration_direction = np.sign(next_t - last_t)
 
             # each iteration of this loop is one step until next event or time stop
@@ -404,10 +408,10 @@ class AdjointSystem(System):
         self.make_solver()
 
     def events(self, t, lamda, g):
-        #g[:] = t - self.solver.options['tstop']
-        g[:] = t - self.result.state_result.t[
-            self.result.state_result.e[self.segment_idx].index
-        ]
+        g[:] = t - self.solver.options['tstop']
+        #g[:] = t - self.result.state_result.t[
+        #    self.result.state_result.e[self.segment_idx].index
+        #]
 
     def update(self, t, lamda, ignore_rootsfound):
         """
@@ -429,7 +433,8 @@ class AdjointSystem(System):
             # not sure how to handle actual computation for this case, may need to
             # re-compute each update to get x at each update for correct partials and
             # time derivatives??
-            breakpoint()
+            #breakpoint()
+            pass
 
         if len(active_update_idxs):
             xtep = state_res.x[state_idxp]
@@ -465,24 +470,8 @@ class AdjointSystem(System):
         else:
             lamda_tem = last_lamda
 
-
-
         lamda_tem = np.array(lamda_tem).squeeze()
         return lamda_tem
-        breakpoint()
-        if event is state_res.e[-1]: # i.e., is terminal:
-            # simulate already added an extra step as a matter of course, so this should
-            # replace those values
-            lamda_res.e[-1] = Root(lamda_res.e[-1].index, event.rootsfound)
-            try:
-                lamda_res.x[-1] = lamda_tem
-            except:
-                breakpoint()
-        else:
-            # append event, time, and state
-            lamda_res.e.append(Root(len(lamda_res.t), event.rootsfound))
-            lamda_res.t.append(te)
-            lamda_res.x.append(lamda_tem)
 
 
     def time_generator(self):
@@ -660,7 +649,7 @@ class ShootingGradientMethod:
                 else:
                     print("SWITCHING TIME DATA")
                     time_data = state_time_data
-                time_data = state_time_data
+                #time_data = state_time_data
 
                 integrand_data = [
                     np.array(adjoint_segment(t).T @ param_jacobian_segment(t) +
@@ -675,7 +664,7 @@ class ShootingGradientMethod:
                 integrand_antider = integrand_interp.antiderivative()
                 jac_row += integrand_antider(time_data[-1]) - integrand_antider(time_data[0])
 
-            for lamda_event, state_event in zip(adjoint_result.e[::-1], state_result.e):
+            for lamda_event, state_event in zip(adjoint_result.e, state_result.e[::-1]):
                 # had to copy and paste this setup code from adjointsystem.update, not 
                 # sure if that's acceptable given the nature of these variables (mostly
                 # selecting indices, a few hopefully cheap calls to time derivative,
@@ -719,6 +708,10 @@ class ShootingGradientMethod:
                 lamda_dot_tep = np.empty(xtep.shape)
                 self.adjoint_system.dots(te, lamda_tep, lamda_dot_tep)
 
+
+                if state_event.index == 1:
+                    #breakpoint()
+                    jac_row += np.array(lamda_tep[None, :] @ self.p_x0_p_params(p)).squeeze()
                 for event_channel in active_update_idxs[::-1]:
                     jac_row += np.array(lamda_tep[None, :] @ (
                         self.d_update_d_params[event_channel](p, te, xtem)
@@ -735,6 +728,9 @@ class ShootingGradientMethod:
                         (lamda_tep - lamda_tem)[None, :]  @ self.d_update_d_params[event_channel](p, te, xtem)
                         @ (self.d_event_time_d_params[event_channel](p, te, xtem).T @ self.d_event_time_d_params[event_channel](p, te, xtem))
                     )).squeeze()
+
+                    #if state_event.index == 1:
+                    #    breakpoint()
 
             jac_rows.append(jac_row)
 
