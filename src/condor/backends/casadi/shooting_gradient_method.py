@@ -6,7 +6,7 @@ import numpy as np
 from scipy import interpolate
 from scipy.optimize import fsolve
 
-DEBUG_LEVEL = 1
+DEBUG_LEVEL = 0
 
 
 def adjoint_wrapper(f, p, res, segment_slice):
@@ -273,6 +273,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             f"{intermediate.model.__name__}_placeholder",
             [intermediate.p],
             [intermediate.traj_out_expr],
+            dict(allow_free=True),
         )
         self.i = intermediate
         self.construct(name, {})
