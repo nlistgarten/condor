@@ -36,7 +36,11 @@ class CtOptLQR(co.OptimizationProblem):
         exact_hessian = False
         method = OptimizationProblem.Method.scipy_cg
 
+from time import perf_counter
+
+t_start = perf_counter()
 lqr_sol = CtOptLQR()
+t_stop = perf_counter()
 
 S = linalg.solve_continuous_are(dblintA,dblintB, DblIntLQR.Q, DblIntLQR.R)
 K = linalg.solve(DblIntLQR.R, dblintB.T@S)
@@ -50,5 +54,6 @@ print(lqr_are.cost, lqr_sol.objective)
 print(lqr_are.cost > lqr_sol.objective)
 print("      ARE sol:", K, 
     "\niterative sol:", lqr_sol.K)
+print("time to run:", t_stop - t_start)
 
 

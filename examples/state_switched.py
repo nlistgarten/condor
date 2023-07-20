@@ -62,6 +62,13 @@ LTI_plot(sim)
 #plt.show()
 
 MinimumTime.implementation.set_initial(p1=p0[0], p2=p0[1])
+
+from time import perf_counter
+
+t_start = perf_counter()
 opt = MinimumTime()
+t_stop = perf_counter()
+print("time to run:", t_stop - t_start)
+print(opt.p1, opt.p2)
 print(opt._stats)
 
