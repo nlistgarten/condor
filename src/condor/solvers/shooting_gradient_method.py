@@ -67,7 +67,16 @@ class System:
     def __init__(
         self, dim_state, initial_state, dot, jac, time_generator,
         events, updates, num_events, terminating,
+        atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
     ):
+        """
+        if adaptive_max_step, treat max_step_size as the fraction of the next simulation
+        span. Otherwise, use as absolute value.
+        """
+        self.atol=atol
+        self.rtol=rtol
+        self.adaptive_max_step = adaptive_max_step
+        self.max_step_size = max_step_size
 
         # simulation must be terminated with event so must provide everything
 
@@ -108,7 +117,10 @@ class System:
         self.num_events = len(updates)
         self.make_solver()
 
-    def make_solver(self, max_step_size=0.):
+    def make_solver(self, duration=0.):
+        max_step_size = self.max_step_size
+        if self.adaptive_max_step:
+            max_step_size = duration/self.max_step_size
         self.solver = CVODE(
             self.dots,
             jacfn=self.jac,
@@ -119,10 +131,12 @@ class System:
             #atol=1E-13,
             #rtol=1E-12,
             #max_step_size=0.5/8,
+            #atol=1E-16,
             max_step_size=max_step_size,
-
             #rtol=1E-9,
             #rtol=1E-10,
+            atol = self.atol,
+            rtol = self.rtol
         )
 
     def initial_state(self):
@@ -196,7 +210,8 @@ class System:
             if next_t < 0:
                 breakpoint()
 
-            self.make_solver(np.abs(next_t - last_t)/8)
+            if self.adaptive_max_step:
+                self.make_solver(np.abs(next_t - last_t))
             solver = self.solver
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
@@ -356,8 +371,8 @@ class ResultInterpolant:
                         [np.array(function( result.p, t, x,) ).squeeze()
                          for t, x in zip(result.t[idx0:idx1],
                                          result.x[idx0:idx1])][self.time_sort],
-                        k=min(3, idx1-idx0),
-                        bc_type=["natural", "natural"],
+                        #k=min(3, idx1-idx0),
+                        #bc_type=["natural", "natural"],
                     ),
                     idx0, idx1,
                     result.t[idx0], result.t[idx1],
@@ -399,7 +414,8 @@ class AdjointResult(ResultBase, AdjointResultMixin,):
 
 class AdjointSystem(System):
     def __init__(
-            self, state_jac, dte_dxs, d2te_dxdts, dh_dxs,
+        self, state_jac, dte_dxs, d2te_dxdts, dh_dxs,
+        atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
     ):
         """
         to support caching jacobians, 
@@ -407,6 +423,11 @@ class AdjointSystem(System):
         adjoint solver will use parent simulate but without using events machinery
         time generator will call update method
         """
+        self.atol=atol
+        self.rtol=rtol
+        self.adaptive_max_step = adaptive_max_step
+        self.max_step_size = max_step_size
+
         self.state_jac = state_jac
         self.dte_dxs, self.d2te_dxdts, self.dh_dxs = dte_dxs, d2te_dxdts, dh_dxs,
         self.num_events = 1
@@ -457,7 +478,9 @@ class AdjointSystem(System):
             if event is state_res.e[-1]:
                 # skip for terminal event? actually, must handle separatley -- just call
                 # jacobian functions directly?
-                lamda_tem = last_lamda
+                for event_channel in active_update_idxs[::-1]:
+                    lamda_tem = last_lamda + self.dte_dxs[event_channel](p, te, xtem).T @ ftem.T @ last_lamda
+                    last_lamda = lamda_tem
             else:
                 self.dots(te, last_lamda, lamda_dot)
 
@@ -467,7 +490,7 @@ class AdjointSystem(System):
                         - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
                         + self.d2te_dxdts[event_channel](p, te, xtem).T @ delta_xs.T
                     ) @ last_lamda
-                    - 1*(
+                    -1*(
                          lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, te, xtem)
                     ).T
 
@@ -499,7 +522,6 @@ class AdjointSystem(System):
                 self.terminating = [0]
             #if event.index == 1:
             #    breakpoint()
-            print("\n"*10, "HELLO!\nI am yielding",result.state_result.t[event.index], "\n"*10)
             yield result.state_result.t[event.index]
             # nothing about segment_idx will get used the first time (terminal event)
             # and would be out-of-bounds if if tried -- simulate will use the yielded
@@ -520,7 +542,6 @@ class AdjointSystem(System):
         # then exits above loop, will have just simulated to t0 and handled any possible
         # update
         breakpoint()
-        print("\n"*10, "HELLO!\nI am yielding INF","\n"*10)
         yield np.inf
 
 
@@ -652,7 +673,6 @@ class ShootingGradientMethod:
                 if len(adjoint_time_data) > len(state_time_data):
                     time_data = adjoint_time_data
                 else:
-                    print("SWITCHING TIME DATA")
                     time_data = state_time_data
                 #time_data = state_time_data
 
@@ -664,7 +684,7 @@ class ShootingGradientMethod:
                 integrand_interp = make_interp_spline(
                     time_data,
                     integrand_data,
-                    bc_type=["natural", "natural"],
+                    #bc_type=["natural", "natural"],
                 )
                 integrand_antider = integrand_interp.antiderivative()
                 jac_row += integrand_antider(time_data[-1]) - integrand_antider(time_data[0])
@@ -717,22 +737,28 @@ class ShootingGradientMethod:
                 if state_event.index == 1:
                     #breakpoint()
                     jac_row += np.array(lamda_tep[None, :] @ self.p_x0_p_params(p)).squeeze()
-                for event_channel in active_update_idxs[::-1]:
-                    jac_row += np.array(lamda_tep[None, :] @ (
-                        self.d_update_d_params[event_channel](p, te, xtem)
-                        + 1*(
-                            delta_fs 
-                        ) @ self.d_event_time_d_params[event_channel](p, te, xtem)
-                        - delta_xs[:, None] @ self.d2_event_time_d_params_d_t[event_channel](p, te, xtem).T
-                    ) + 1*(
-                        (
-                            +1*lamda_dot_tep[None, :]
-                            -1*lamda_dot_tem[None, :]
-                        ) @ (delta_xs) @ self.d_event_time_d_params[event_channel](p, te, xtem)
-                    ) - 1*(
-                        (lamda_tep - lamda_tem)[None, :]  @ self.d_update_d_params[event_channel](p, te, xtem)
-                        @ (self.d_event_time_d_params[event_channel](p, te, xtem).T @ self.d_event_time_d_params[event_channel](p, te, xtem))
-                    )).squeeze()
+                if state_event is state_result.e[-1]:
+                    for event_channel in active_update_idxs[::-1]:
+                        jac_row += np.array(
+                            -lamda_tep[None, :] @ ftem @ self.d_event_time_d_params[event_channel](p, te, xtem)
+                        ).squeeze()
+                else:
+                    for event_channel in active_update_idxs[::-1]:
+                        jac_row += np.array(lamda_tep[None, :] @ (
+                            self.d_update_d_params[event_channel](p, te, xtem)
+                            + 1*(
+                                delta_fs 
+                            ) @ self.d_event_time_d_params[event_channel](p, te, xtem)
+                            - delta_xs[:, None] @ self.d2_event_time_d_params_d_t[event_channel](p, te, xtem).T
+                        ) + 1*(
+                            (
+                                +1*lamda_dot_tep[None, :]
+                                -1*lamda_dot_tem[None, :]
+                            ) @ (delta_xs) @ self.d_event_time_d_params[event_channel](p, te, xtem)
+                        ) - 1*(
+                            (lamda_tep - lamda_tem)[None, :]  @ self.d_update_d_params[event_channel](p, te, xtem)
+                            @ (self.d_event_time_d_params[event_channel](p, te, xtem).T @ self.d_event_time_d_params[event_channel](p, te, xtem))
+                        )).squeeze()
 
                     #if state_event.index == 1:
                     #    breakpoint()

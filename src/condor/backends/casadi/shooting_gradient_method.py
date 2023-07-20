@@ -211,7 +211,22 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
 
 
-                #jac[idx, :] += 
+                #jac[idx, :] += lamda_te_p[None, :] @ (
+                #    self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
+                #    + 1*(
+                #        delta_fs 
+                #    ) @ self.i.dte_dps[event_channel](p, tem, xtem)
+                #    - delta_xs[:, None] @ self.i.d2te_dpdts[event_channel](p, tem, xtem).T
+                #) + 1*(
+                #    (
+                #        +1*adjoint_sys.state_equation_function(tep, lamda_te_p)[None, :]
+                #        -1*adjoint_sys.state_equation_function(tem, lamda_te_m)[None, :]
+                #    ) @ (delta_xs) @ self.i.dte_dps[event_channel](p, tem, xtem)
+                #) - 1*(
+                #    (lamda_te_p - lamda_te_m)[None, :]  @ self.i.dh_dps[event_channel](p, tem, xtem, event_channel)
+                #    @ (self.i.dte_dps[event_channel](p, tem, xtem).T @ self.i.dte_dps[event_channel](p, tem, xtem))
+                #)
+
                 if event_channel==2 and False:
                     print("event", event_channel)#, jac.toarray())
                     print("measurement time", self.shot.p[-1])

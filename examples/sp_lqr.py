@@ -22,9 +22,9 @@ class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
     #tf = 16. # 9 iters, 20 calls, 1E-7
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
     class Casadi(co.Options):
-        integrator_options = dict(
-            max_step = .5/4,
-        )
+        adjoint_adaptive_max_step_size=False
+        state_max_step_size=0.5/8
+        adjoint_max_step_size=0.5/8
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class SampledOptLQR(co.OptimizationProblem):
@@ -49,6 +49,8 @@ lqr_sol_samp = SampledOptLQR()
 t_stop = perf_counter()
 
 
+#sampled_sim = DblIntSampledLQR([0., 0.])
+#sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
 
 Q = DblIntSampledLQR.Q
 R = DblIntSampledLQR.R
@@ -70,15 +72,14 @@ plt.show()
 
 
 
-#lqr_sol_samp = SampledOptLQR()
 #sampled_sim = DblIntSampledLQR([0., 0.])
 #sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
 
 
 
-#sampled_sim = DblIntSampledLQR(K)
-#jac_cb= sampled_sim.implementation.callback.jac_callback
-#jac_cb(K, [0.])
+sampled_sim = DblIntSampledLQR(K)
+jac_cb= sampled_sim.implementation.callback.jac_callback
+jac_cb(K, [0.])
 
 print(lqr_sol_samp._stats)
 print(lqr_sol_samp.objective < sampled_sim.cost)

@@ -16,6 +16,22 @@ True
 iterative sol: [[0.99994437 1.73191252]]
 time to run: 5.897095435997471
 
+with increased tolerance, CT-LQR
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 0.9746747705969403
+       x: [ 1.000e+00  1.732e+00]
+     nit: 7
+     jac: [-2.325e-06 -8.454e-06]
+    nfev: 14
+    njev: 14
+0.9746747718770562 0.9746747705969403
+True
+      ARE sol: [[1.         1.73205081]] 
+iterative sol: [[0.9999575  1.73195099]]
+time to run: 2.408215404022485
+
 
 sampled LQR
  message: Optimization terminated successfully.
@@ -32,6 +48,35 @@ True
       ARE sol: [[0.65140165 1.31420219]] 
 iterative sol: [[0.66131649 1.32663953]]
 time to run: 14.537590428022668
+
+
+time switch CG:
+time to run: 0.4460119630675763
+2.9999996788483014 2.99999216483854
+[[-65.5, 40.5]]
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 3.008671699433141e-11
+       x: [ 3.000e+00  3.000e+00]
+     nit: 12
+     jac: [-4.048e-06 -7.514e-06]
+    nfev: 22
+    njev: 22
+
+state switch CG
+time to run: 0.4791095880791545
+-3.0000029620072084 0.999999306880576
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 3.660484274143412e-12
+       x: [-3.000e+00  1.000e+00]
+     nit: 9
+     jac: [-1.510e-06 -6.931e-07]
+    nfev: 16
+    njev: 16
+
 
 minimum time:
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
@@ -77,7 +122,8 @@ EXIT: Optimal Solution Found.
 time to run: 0.5835203368915245
 3.0000000000720406 3.0000000008153815
 
-state switched minimum timeiter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
+state switched minimum time
+iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
    0  2.0000000e+00 0.00e+00 2.00e+00   0.0 0.00e+00    -  0.00e+00 0.00e+00   0
 /Users/bmargoli/python/simupy/simupy/block_diagram.py:574: UserWarning: Simulation encountered NaN outputs and quit during update after event channel [1]. This may have been intentional! NaN outputs at time t=4.9103417579638755, state x=[nan nan nan], output y=[nan nan  0.]
   warnings.warn(

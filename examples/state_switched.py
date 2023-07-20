@@ -40,11 +40,11 @@ class Transfer(DblInt.TrajectoryAnalysis):
     tf = 100.
 
     class Casadi(co.Options):
-        integrator_options = dict(
-            max_step = 1.,
-            atol = 1E-15,
-            rtol = 1E-12,
-        )
+        state_max_step_size = 1.
+        state_atol = 1E-15
+        state_rtol = 1E-12
+        adjoint_atol = 1E-15
+        adjoint_rtol = 1E-12
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
@@ -54,7 +54,7 @@ class MinimumTime(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian = False
-        #method = OptimizationProblem.Method.scipy_cg
+        method = OptimizationProblem.Method.scipy_cg
 
 p0 = -4., -1.
 sim = Transfer(*p0)

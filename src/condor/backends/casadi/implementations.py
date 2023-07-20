@@ -469,8 +469,15 @@ def get_state_setter(field, setter_args, default=0.):
 
 
 class TrajectoryAnalysis:
-    def __init__(self, model, use_lam_te_p=True, include_lam_dot=False,
-                 integrator_options={}):
+    def __init__(
+        self, model,
+
+        state_atol=1E-12, state_rtol=1E-6,
+        state_adaptive_max_step_size=False, state_max_step_size = 0,
+
+        adjoint_atol=1E-12, adjoint_rtol=1E-6,
+        adjoint_adaptive_max_step_size=True, adjoint_max_step_size = 8,
+    ):
         self.model = model
         self.ode_model = ode_model = model.inner_to
 
@@ -845,12 +852,20 @@ class TrajectoryAnalysis:
             updates = self.h_exprs,
             num_events = num_events,
             terminating = terminating,
+            atol=state_atol,
+            rtol=state_rtol,
+            adaptive_max_step=state_adaptive_max_step_size,
+            max_step_size=state_max_step_size,
         )
         self.AdjointSystem = sgm.AdjointSystem(
             state_jac = state_dot_jac_func,
             dte_dxs = self.dte_dxs,
             d2te_dxdts = self.d2te_dxdts,
             dh_dxs = self.dh_dxs,
+            atol=adjoint_atol,
+            rtol=adjoint_rtol,
+            adaptive_max_step=adjoint_adaptive_max_step_size,
+            max_step_size=adjoint_max_step_size,
         )
         self.shooting_gradient_method = sgm.ShootingGradientMethod(
             adjoint_system = self.AdjointSystem,
