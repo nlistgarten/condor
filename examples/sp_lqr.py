@@ -36,6 +36,20 @@ class SampledOptLQR(co.OptimizationProblem):
         #method = OptimizationProblem.Method.scipy_trust_constr
 
 
+sim = DblIntSampledLQR([1.00842737, 0.05634044])
+
+sim = DblIntSampledLQR([0., 0.])
+sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+
+
+from time import perf_counter
+
+t_start = perf_counter()
+lqr_sol_samp = SampledOptLQR()
+t_stop = perf_counter()
+
+
+
 Q = DblIntSampledLQR.Q
 R = DblIntSampledLQR.R
 A = dblintA
@@ -56,18 +70,19 @@ plt.show()
 
 
 
-lqr_sol_samp = SampledOptLQR()
+#lqr_sol_samp = SampledOptLQR()
 #sampled_sim = DblIntSampledLQR([0., 0.])
 #sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
 
 
 
-sampled_sim = DblIntSampledLQR(K)
-jac_cb= sampled_sim.implementation.callback.jac_callback
-jac_cb(K, [0.])
+#sampled_sim = DblIntSampledLQR(K)
+#jac_cb= sampled_sim.implementation.callback.jac_callback
+#jac_cb(K, [0.])
 
 print(lqr_sol_samp._stats)
 print(lqr_sol_samp.objective < sampled_sim.cost)
 print(lqr_sol_samp.objective, sampled_sim.cost)
 print("      ARE sol:", K,
     "\niterative sol:", lqr_sol_samp.K)
+print("time to run:", t_stop - t_start)
