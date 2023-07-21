@@ -1,3 +1,68 @@
+with fix for scikits_odes d7c8f0cd34a29ae86fe7163624da81a53dbcc19c
+ct- lqr:
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 0.9746834687930379
+       x: [ 1.000e+00  1.732e+00]
+     nit: 6
+     jac: [-2.432e-06  1.258e-06]
+    nfev: 15
+    njev: 15
+0.9746834673185735 0.9746834687930379
+False
+      ARE sol: [[1.         1.73205081]] 
+iterative sol: [[1.00000017 1.73206144]]
+time to run: 1.2047577609992004
+(about twice as fast)
+
+sampled lqr:
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 0.9900428986048293
+       x: [ 6.613e-01  1.327e+00]
+     nit: 13
+     jac: [ 2.511e-06 -6.112e-07]
+    nfev: 23
+    njev: 23
+True
+0.9900428986048293 0.9901382319424742
+      ARE sol: [[0.65140165 1.31420219]] 
+iterative sol: [[0.66131676 1.3266333 ]]
+time to run: 12.1436151529997
+(vs 14 seconds -- but 2 more nfev and njev, so the simulations are showing some speed)
+
+
+time switch:
+time to run: 0.4090696189996379
+3.000_000_830281426 2.999_995582588982
+[[-65.5001, 40.5001]]
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 1.6362476320676782e-11
+       x: [ 3.000e+00  3.000e+00]
+     nit: 12
+     jac: [-6.629e-06 -5.360e-06]
+    nfev: 22
+    njev: 22
+exact same number of evals, about same time but understandable given small size of problem. But ~half the residual (objective)
+
+state switch:
+time to run: 0.3447912620013085
+-3.0000004416906383 0.9999981661411806
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 1.7944401261517384e-12
+       x: [-3.000e+00  1.000e+00]
+     nit: 11
+     jac: [ 4.752e-07 -2.071e-06]
+    nfev: 13
+    njev: 13
+a bit faster to run, fewer evals (--> more accurate derivative?) and again about half the residual.
+
 with terminal corrections 1abfbb1a23e404af50898f9eaeda19d0292ce6a0
 time switch:
 time to run: 0.8685651909327134
@@ -81,7 +146,7 @@ time to run: 14.537590428022668
 
 time switch CG:
 time to run: 0.4460119630675763
-2.9999996788483014 2.99999216483854
+2.999_999_6788483014 2.999_99216483854
 [[-65.5, 40.5]]
  message: Optimization terminated successfully.
  success: True
