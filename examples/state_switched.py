@@ -16,7 +16,7 @@ class DblInt(co.ODESystem):
     mode = state()
     p1 = parameter()
     p2 = parameter()
-    dot[x] = A@x*(mode!=2.) + B*(
+    dot[x] = A@x + B*(
         1*(mode==0.)
         -1*(mode==1.)
     )
@@ -27,7 +27,7 @@ class Switch1(DblInt.Event):
 
 class Switch2(DblInt.Event):
     function = x[0] - p2
-    update[mode] = 2.
+    #update[mode] = 2.
     terminate = True
 
 class Transfer(DblInt.TrajectoryAnalysis):
@@ -40,7 +40,7 @@ class Transfer(DblInt.TrajectoryAnalysis):
     tf = 100.
 
     class Casadi(co.Options):
-        state_max_step_size = 1.
+        state_max_step_size = 0.25
         state_atol = 1E-15
         state_rtol = 1E-12
         adjoint_atol = 1E-15

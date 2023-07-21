@@ -434,10 +434,9 @@ class AdjointSystem(System):
         self.make_solver()
 
     def events(self, t, lamda, g):
-        g[:] = t - self.solver.options['tstop']
-        #g[:] = t - self.result.state_result.t[
-        #    self.result.state_result.e[self.segment_idx].index
-        #]
+        g[:] = t - self.result.state_result.t[
+            self.result.state_result.e[self.segment_idx].index
+        ]
 
     def update(self, t, lamda, ignore_rootsfound):
         """
@@ -476,10 +475,11 @@ class AdjointSystem(System):
             delta_xs = xtep - xtem
             lamda_dot = np.empty(xtep.size)
             if event is state_res.e[-1]:
+                lamda_tem = last_lamda
                 # skip for terminal event? actually, must handle separatley -- just call
                 # jacobian functions directly?
                 for event_channel in active_update_idxs[::-1]:
-                    lamda_tem = last_lamda + self.dte_dxs[event_channel](p, te, xtem).T @ ftem.T @ last_lamda
+                    lamda_tem = last_lamda - self.dte_dxs[event_channel](p, te, xtem).T @ ftem.T @ last_lamda
                     last_lamda = lamda_tem
             else:
                 self.dots(te, last_lamda, lamda_dot)
@@ -724,15 +724,14 @@ class ShootingGradientMethod:
                     breakpoint()
                 if not np.isclose(adjoint_result.t[idxm], te):
                     breakpoint()
+
                 lamda_tem = adjoint_result.x[idxm]
                 lamda_dot_tem = np.empty(xtep.shape)
                 self.adjoint_system.dots(te, lamda_tem, lamda_dot_tem)
 
-
                 lamda_tep = adjoint_result.x[idxp]
                 lamda_dot_tep = np.empty(xtep.shape)
                 self.adjoint_system.dots(te, lamda_tep, lamda_dot_tep)
-
 
                 if state_event.index == 1:
                     #breakpoint()

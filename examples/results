@@ -1,3 +1,32 @@
+with terminal corrections 1abfbb1a23e404af50898f9eaeda19d0292ce6a0
+time switch:
+time to run: 0.8685651909327134
+2.999999947677332 3.0000006238262453
+[[-65.5, 40.5]]
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 2.1833585276783939e-13
+       x: [ 3.000e+00  3.000e+00]
+     nit: 14
+     jac: [-2.465e-06  5.815e-07]
+    nfev: 27
+    njev: 27
+
+state switch:
+time to run: 0.6207856080727652
+-2.6856887501938513 1.2909457412015444
+ message: Desired error not necessarily achieved due to precision loss.
+ success: False
+  status: 2
+     fun: 0.05548831100176521
+       x: [-2.686e+00  1.291e+00]
+     nit: 2
+     jac: [ 3.192e-01  2.159e-01]
+    nfev: 30
+    njev: 18
+
+
 from main commit 7719955c084e1d2c1b0e1f86e94932f2b7487c76:
 
 continuous-time LQR

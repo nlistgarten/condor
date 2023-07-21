@@ -22,7 +22,7 @@ class DblInt(co.ODESystem):
     t1 = parameter()
     t2 = parameter()
     # TODO: fix once mode and control work?
-    dot[x] = A@x*(mode!=2.) + B*(
+    dot[x] = A@x + B*(
         1*(mode == 0.)
         -1*(mode == 1.)
     )
@@ -41,7 +41,7 @@ class Switch2(DblInt.Event):
     #mode == 2.
 
     at_time = t2 + t1,
-    update[mode] = 2.
+    #update[mode] = 2.
     terminate = True
 
 class Transfer(DblInt.TrajectoryAnalysis):
@@ -52,11 +52,7 @@ class Transfer(DblInt.TrajectoryAnalysis):
     if not with_time_state:
         class Casadi(co.Options):
             state_adaptive_max_step_size = True
-            state_max_step_size = 8
-            state_atol = 1E-15
-            state_rtol = 1E-12
-            adjoint_atol = 1E-15
-            adjoint_rtol = 1E-12
+            state_max_step_size = 4
 
 
 from condor.backends.casadi.implementations import OptimizationProblem
