@@ -210,12 +210,12 @@ class System:
             if next_t < 0:
                 breakpoint()
 
-            if self.adaptive_max_step:
-                self.make_solver(np.abs(next_t - last_t))
             solver = self.solver
+            if self.adaptive_max_step:
+                #self.make_solver(np.abs(next_t - last_t))
+                solver.set_options(max_step_size=np.abs(next_t - last_t)/self.max_step_size)
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
-            #solver.set_options(max_step_size=np.abs(next_t - last_t))
             integration_direction = np.sign(next_t - last_t)
 
             # each iteration of this loop is one step until next event or time stop
@@ -573,6 +573,15 @@ class AdjointSystem(System):
             -self.result.state_jacobian.interpolants[self.segment_idx](t).T @ lamda
             -self.result.forcing_function.interpolants[self.segment_idx](t)
         )
+        return
+        np.matmul(self.result.state_jacobian.interpolants[self.segment_idx](t).T,
+                  -lamda, out=lamdadot)
+        np.add(
+            lamdadot,
+            -self.result.forcing_function.interpolants[self.segment_idx](t),
+            out=lamdadot
+        )
+
 
     def jac(self, t, lamda, lamdadot, jac,):# userdata=None,):
         jac[...] = -self.result.state_jacobian.interpolants[self.segment_idx](t).T

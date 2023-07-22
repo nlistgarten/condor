@@ -46,6 +46,13 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         p = args[0]
         o = args[1]
         jac = self.i.shooting_gradient_method(self.shot.res)
+        #Sim = self.i.model
+        #DV_idx = Sim.trajectory_output.flat_index(Sim.tot_Delta_v_mag)
+        #tig_idx = Sim.parameter.flat_index(Sim.tig)
+        #tem_idx = Sim.parameter.flat_index(Sim.tem)
+        #p = p.toarray().squeeze()
+        #print("params:", p[tig_idx], p[tem_idx])
+        #print("jac:", jac[DV_idx, tig_idx], jac[DV_idx, tem_idx])
         return jac,
 
 class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):

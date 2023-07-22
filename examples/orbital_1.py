@@ -156,13 +156,12 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
     class Casadi(co.Options):
-
-        integrator_options = dict(
-            rtol = 1E-9,
-            atol = 1E-12,
-            nsteps = 10_000,
-            max_step = 30.,
-        )
+        #state_rtol = 1E-9
+        #adjoint_rtol = 1E-9
+        #state_max_step_size = 30.
+        state_adaptive_max_step_size = True
+        state_max_step_size = 4
+        adjoint_max_step_size = 4
 
 
 from scipy.io import loadmat
@@ -223,13 +222,42 @@ class TotalDeltaV(co.OptimizationProblem):
 
 
 ##############
+from time import perf_counter
 
+DV_idx = Sim.trajectory_output.flat_index(Sim.tot_Delta_v_mag)
+tig_idx = Sim.parameter.flat_index(Sim.tig)
+tem_idx = Sim.parameter.flat_index(Sim.tem)
+
+init_sim = Sim(**sim_kwargs, tig=200., tem=500.)
+init_jac = Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
+print("init grad  wrt tig", init_jac[DV_idx, tig_idx])
+print("init grad  wrt tem", init_jac[DV_idx, tem_idx])
+"""
+init grad  wrt tig 0.0209833
+init grad  wrt tem -0.0260249
+"""
+
+hoh_start = perf_counter()
 hohmann = Hohmann()
+hoh_stop = perf_counter()
+
 hohmann_sim = Sim(**sim_kwargs, tig=hohmann.tig, tem=hohmann.tf)
+opt_jac = Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
+
 print("\n"*2,"hohmann")
 print(hohmann._stats)
 print((hohmann.tf - hohmann.tig)*hohmann.sim.omega*180/np.pi)
 print(hohmann_sim.tot_Delta_v_disp)
+print("time:", hoh_stop- hoh_start)
+
+print("opt grad  wrt tig", opt_jac[DV_idx, tig_idx])
+print("opt grad  wrt tem", opt_jac[DV_idx, tem_idx])
+"""
+opt grad  wrt tig -4.48258e-09
+opt grad  wrt tem -1.47125e-09
+"""
+
+
 import sys
 sys.exit()
 
@@ -240,7 +268,6 @@ total_delta_v_constrained  = TotalDeltaV(pos_disp_max=10.)
 tot_delta_v_constrained_sim = Sim(
     **sim_kwargs, tig=total_delta_v_constrained.tig, tem=total_delta_v_constrained.tf
 )
-
 
 print("\n"*2,"unconstrained Delta v")
 print(total_delta_v._stats)

@@ -477,6 +477,8 @@ class TrajectoryAnalysis:
 
         adjoint_atol=1E-12, adjoint_rtol=1E-6,
         adjoint_adaptive_max_step_size=True, adjoint_max_step_size = 8,
+
+        #lmm_type=ADAMS or BDF, possibly also linsolver, etc?
     ):
         self.model = model
         self.ode_model = ode_model = model.inner_to

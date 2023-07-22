@@ -1033,6 +1033,7 @@ class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "i
     modify parameters and initial (local copy)
 
     gets _res, t, state, output (from odesystem) assigned from simulation
+
     """
     trajectory_output = TrajectoryOutputField()
     default_tf = 1_000_000.
