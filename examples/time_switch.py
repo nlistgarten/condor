@@ -83,6 +83,7 @@ LTI_plot(sim)
 
 #plt.show()
 MinimumTime.implementation.set_initial(t1=2.163165480675697, t2=4.361971866705403)
+
 from time import perf_counter
 
 t_start = perf_counter()

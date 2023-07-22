@@ -6,7 +6,7 @@ from scipy.optimize import fsolve
 from condor.solvers.shooting_gradient_method import ResultInterpolant
 
 
-DEBUG_LEVEL = 1
+DEBUG_LEVEL = 0
 
 class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callback):
     def has_jacobian(self):

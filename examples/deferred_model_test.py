@@ -1,5 +1,4 @@
 import condor as co
-from condor.settings import get_settings
 import numpy as np
 
 default_settings = dict(
@@ -9,7 +8,7 @@ default_settings = dict(
     dt_plant=False,
 )
 
-use_settings = get_settings(default_settings)
+use_settings = co.settings.get_settings(default_settings)
 
 dt = use_settings['dt']
 dt_plant = use_settings['dt_plant']

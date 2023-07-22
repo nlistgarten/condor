@@ -1,23 +1,21 @@
 import condor as co
 import numpy as np
-from condor.settings import set_settings
-import importlib
+
 
 def get_LTI(**kwargs):
-    set_settings(kwargs)
-    import deferred_model_test as module
-    importlib.reload(module)
-    return module.LTI
+    mod = co.settings.get_module("deferred_model_test", **kwargs)
+    return mod.LTI
 
-dbl_int = get_LTI(
-    A = np.array([
-        [0, 1],
-        [0, 0],
-    ]),
-    B = np.array([[0,1]]).T
-)
+A = np.array([
+    [0, 1],
+    [0, 0],
+])
+B = np.array([[0,1]]).T
 
-sp_dbl_int = get_LTI(A=dbl_int.A, B=dbl_int.B, dt=.5)
+sp_dbl_int = get_LTI(A=A, B=B, dt=.5)
+
+dbl_int = get_LTI(A=A, B=B)
+
 
 print("\n"*10)
 print("double int events (expected empty):")

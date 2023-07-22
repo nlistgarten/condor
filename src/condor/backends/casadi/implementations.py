@@ -7,11 +7,7 @@ from condor.backends.casadi.utils import flatten, wrap, symbol_class
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 import condor.solvers.shooting_gradient_method as sgm
 import condor.backends.casadi.shooting_gradient_method as ca_sgm
-#from condor.backends.casadi.shooting_gradient_method import (
-#    ShootingGradientMethod, NextTimeFromSlice, System,
-#    TrajectoryAnalysis as EvalTrajectoryAnalysis
-#
-#)
+from condor.backends.casadi.table_lookup import NDSplinesCallback
 
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 
@@ -31,6 +27,17 @@ from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 # but some of the helpers (eg initializer, state settter, etc) generate functions, not
 # just collect expressions.
 
+# TODO figure out how to use names for casadi callback layer
+# TODO function generation is primarily responsibility of callback (e.g., nlpsol takes
+# expressions, not functions)
+# TODO if we provide a backend reference to vertcat, implementations can be
+# backend-agnostic and just provide appropriate flattening + binding of fields! may
+# also/instead create callback even for OptimizationProblem, ExplicitSystem to provide
+# consistent interface
+# --> move some of the helper functions that are tightly coupled to backend to utils, ?
+# and generalize, eg state setter
+# TODO for custom solvers like SGM, table, does the get_jacobian arguments allow you to 
+# avoid computing wrt particular inputs/outputs if possible?
 
 class ExplicitSystem:
     def __init__(self, model):
@@ -48,8 +55,27 @@ class ExplicitSystem:
         )
 
 class Tablelookup:
-    def __init__(self, model):
+    def __init__(self, model, degrees=3,):
         self.model = model
+        self.symbol_inputs = model.input.list_of("backend_repr")
+        self.symbol_outputs = model.output.list_of("backend_repr")
+        self.input_data = [model.input_data.get(match=inp).backend_repr for inp in model.input]
+        self.output_data = np.stack(
+            [model.output_data.get(match=out).backend_repr for out in model.output],
+            axis=-1,
+        )
+        self.degrees = degrees
+        self.callback = NDSplinesCallback(self)
+
+    def __call__(self, model_instance, *args):
+        out = self.callback(casadi.vertcat(*flatten(args)))
+        if isinstance(out, casadi.MX):
+            out = casadi.vertsplit(out)
+        model_instance.bind_field(
+            self.model.output,
+            out,
+        )
+
 
 class InitializerMixin:
     def set_initial(self, *args, **kwargs):
@@ -411,6 +437,7 @@ class OptimizationProblem(InitializerMixin):
                 method=method_string,
                 args = extra_args,
                 constraints = scipy_constraints,
+                #options=dict(disp=True),
             )
             model_instance.bind_field(self.model.variable, min_out.x)
             model_instance.objective = min_out.fun
