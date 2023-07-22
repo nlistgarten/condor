@@ -5,7 +5,7 @@ class Settings:
     def __init__(self):
         # settings is a stack of dicts which should allow arbitrary nested deferred
         # modules
-        self.settings = []
+        self.settings = [{}]
 
     def get_module(self, module, **kwargs):
         """

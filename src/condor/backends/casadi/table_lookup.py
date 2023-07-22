@@ -39,7 +39,7 @@ class NDSplinesJacobianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
 
     def eval(self, local_args):
         array_vals = [
-            interp(local_args[0].toarray().reshape(-1))[0, :]
+            interp(np.array(local_args[0]).reshape(-1))[0, :]
             for interp in self.interpolant
         ]
         return_val = np.stack(array_vals, axis=1)
@@ -68,7 +68,7 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         )
 
     def eval(self, args):
-        return self.interpolant(args[0].toarray().reshape(-1))[0, :],
+        return self.interpolant(np.array(args[0]).reshape(-1))[0, :],
 
     def get_jacobian(self, name, inames, onames, opts):
         interp = [
