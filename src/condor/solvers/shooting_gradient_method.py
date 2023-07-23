@@ -3,7 +3,15 @@ import numpy as np
 from scipy.interpolate import make_interp_spline
 
 from dataclasses import dataclass, field, InitVar
-from scikits.odes.sundials.cvode import CVODE, StatusEnum
+try:
+    from scikits.odes.sundials.cvode import CVODE, StatusEnum
+except ModuleNotFoundError:
+    has_cvode = False
+else:
+    has_cvode = True
+
+from scipy.integrate import ode
+from scipy.optimize import brentq
 from typing import NamedTuple
 
 class Root(NamedTuple):
@@ -128,16 +136,16 @@ class System:
         )
 
     def initial_state(self):
-        return np.array(self._initial_state(self.result.p)).squeeze()
+        return np.array(self._initial_state(self.result.p)).reshape(-1)
 
-    def dots(self, t, x, xdot,):# userdata=None,):
-        xdot[:] = np.array(self._dot(self.result.p, t, x)).squeeze()
+    def dots(self, t, x):
+        return np.array(self._dot(self.result.p, t, x)).reshape(-1)
 
-    def jac(self, t, x, xdot, jac):#
-        jac[...] = np.array(self._jac(self.result.p, t, x)).squeeze()
+    def jac(self, t, x, ):
+        return np.array(self._jac(self.result.p, t, x)).squeeze()
 
-    def events(self, t, x, g):
-        g[:] = np.array(self._events(self.result.p, t, x)).squeeze()
+    def events(self, t, x):
+        return np.array(self._events(self.result.p, t, x)).reshape(-1)
 
     def update(self, t, x, rootsfound):
         next_x = x #np.copy(x) # who is responsible for copying? I suppose simulate
@@ -157,6 +165,25 @@ class System:
         self.result = None
         return result
 
+class SolverDopri5:
+    def __init__(
+        self, system,
+        atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
+    ):
+        self.system = system
+        self.adaptive_max_step = adaptive_max_step
+        self.solver = integrator_class( system.dots,)
+        self.solver.set_integrator(
+            atol = atol,
+            rtol = rtol,
+            max_step=max_step_size,
+        )
+        self.solver.set_solout(self.solout)
+
+    def solout(self, t, x):
+        pass
+
+
 class SolverCVODE:
     def __init__(
         self, system,
@@ -165,16 +192,25 @@ class SolverCVODE:
         self.system = system
         self.adaptive_max_step = adaptive_max_step
         self.solver = CVODE(
-            system.dots,
-            jacfn=system.jac,
+            self.dots,
+            jacfn=self.jac,
             old_api=False,
             one_step_compute=True,
-            rootfn=system.events,
+            rootfn=self.events,
             nr_rootfns=system.num_events,
             max_step_size=max_step_size,
             atol = atol,
-            rtol = rtol
+            rtol = rtol,
         )
+
+    def dots(self, t, x, xdot,):# userdata=None,):
+        xdot[:] = self.system.dots(t, x)
+
+    def jac(self, t, x, xdot, jac):#
+        jac[...] = self.system.jac(t, x)
+
+    def events(self, t, x, g):
+        g[:] = self.system.events(t, x,)
 
     def simulate(self):
         """
@@ -202,8 +238,7 @@ class SolverCVODE:
         last_t = next(time_generator)
         results.t.append(last_t)
 
-        gs = np.empty(system.num_events)
-        system.events(last_t, last_x, gs)
+        gs = system.events(last_t, last_x)
         rootsfound = (gs == 0.).astype(int)
         if np.any(rootsfound):
             # subsequent events use length of time for index, so root index is the index
@@ -244,7 +279,7 @@ class SolverCVODE:
 
                 if solver_res.flag == StatusEnum.TSTOP_RETURN:
                     # assume this is associated with an event
-                    system.events(results.t[-1], results.x[-1], gs)
+                    gs = system.events(results.t[-1], results.x[-1])
                     min_e = np.abs(gs).min()
                     rootsfound = (gs == min_e).astype(int)
 
@@ -254,17 +289,17 @@ class SolverCVODE:
                     next_x = system.update(
                         results.t[-1], results.x[-1], rootsfound,
                     )
-                    terminate = np.any(rootsfound[system.terminating] != 0)
+                    try:
+                        terminate = np.any(rootsfound[system.terminating] != 0)
+                    except:
+                        breakpoint()
                     results.t.append(np.copy(solver_res.values.t))
                     results.x.append(next_x)
 
                     if terminate:
                         return
 
-                    try:
-                        solver.init_step(solver_res.values.t, next_x)
-                    except:
-                        breakpoint()
+                    solver.init_step(solver_res.values.t, next_x)
                     last_x = next_x
 
                 if (
@@ -272,8 +307,6 @@ class SolverCVODE:
                     >= (integration_direction * next_t)
                 ) or solver_res.flag == StatusEnum.TSTOP_RETURN:
                     break
-
-
 
             last_t = next_t
 
@@ -440,10 +473,10 @@ class AdjointSystem(System):
             max_step_size = max_step_size,
         )
 
-    def events(self, t, lamda, g):
-        g[:] = t - self.result.state_result.t[
+    def events(self, t, lamda):
+        return np.array(t - self.result.state_result.t[
             self.result.state_result.e[self.segment_idx].index
-        ]
+        ]).reshape(-1)
 
     def update(self, t, lamda, ignore_rootsfound):
         """
@@ -480,7 +513,6 @@ class AdjointSystem(System):
 
             delta_fs = ftep - ftem
             delta_xs = xtep - xtem
-            lamda_dot = np.empty(xtep.size)
             if event is state_res.e[-1]:
                 lamda_tem = last_lamda
                 # skip for terminal event? actually, must handle separatley -- just call
@@ -489,7 +521,7 @@ class AdjointSystem(System):
                     lamda_tem = last_lamda - self.dte_dxs[event_channel](p, te, xtem).T @ ftem.T @ last_lamda
                     last_lamda = lamda_tem
             else:
-                self.dots(te, last_lamda, lamda_dot)
+                lamda_dot = self.dots(te, last_lamda)
 
                 for event_channel in active_update_idxs[::-1]:
                     lamda_tem = (
@@ -569,18 +601,17 @@ class AdjointSystem(System):
         #self.result = None
         return result
 
-    def dots(self, t, lamda, lamdadot,):# userdata=None,):
+    def dots(self, t, lamda):
         # TODO adjoint system takes jacobian and integrand terms, do matrix multiply and
         # vector add here. then can ust call jacobian term for jac method
         # then before simulate, could actually construct 
         # who would own the data for interpolating ? maybe just a new (data) class that
         # also stores the interpolant? then adjointsystem simulate can create it if
         # it'snot provided
-        lamdadot[:] = (
+        return np.array(
             -self.result.state_jacobian.interpolants[self.segment_idx](t).T @ lamda
             -self.result.forcing_function.interpolants[self.segment_idx](t)
-        )
-        return
+        ).reshape(-1)
         np.matmul(self.result.state_jacobian.interpolants[self.segment_idx](t).T,
                   -lamda, out=lamdadot)
         np.add(
@@ -590,8 +621,8 @@ class AdjointSystem(System):
         )
 
 
-    def jac(self, t, lamda, lamdadot, jac,):# userdata=None,):
-        jac[...] = -self.result.state_jacobian.interpolants[self.segment_idx](t).T
+    def jac(self, t, lamda,):
+        return  -self.result.state_jacobian.interpolants[self.segment_idx](t).T
 
 @dataclass
 class TrajectoryAnalysis:
@@ -742,12 +773,10 @@ class ShootingGradientMethod:
                     breakpoint()
 
                 lamda_tem = adjoint_result.x[idxm]
-                lamda_dot_tem = np.empty(xtep.shape)
-                self.adjoint_system.dots(te, lamda_tem, lamda_dot_tem)
+                lamda_dot_tem = self.adjoint_system.dots(te, lamda_tem)
 
                 lamda_tep = adjoint_result.x[idxp]
-                lamda_dot_tep = np.empty(xtep.shape)
-                self.adjoint_system.dots(te, lamda_tep, lamda_dot_tep)
+                lamda_dot_tep = self.adjoint_system.dots(te, lamda_tep)
 
                 if state_event.index == 1:
                     #breakpoint()
