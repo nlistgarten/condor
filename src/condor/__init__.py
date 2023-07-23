@@ -1070,7 +1070,8 @@ class Event(Model, inner_to = ODESystem):
 
     """
     # TODO: singleton field event.function is very similar to objective in
-    # OptimizationProblem
+    # OptimizationProblem. And at_time. Need to be able to define such singleton
+    # assignment fields by name so there's no clash for repeated symbols. 
     update = MatchedField(ODESystem.state, direction=Direction.output)
     # make[mode_var] = SomeModeSubclass
     # actually, just update it

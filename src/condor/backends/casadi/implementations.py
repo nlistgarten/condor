@@ -500,10 +500,10 @@ class TrajectoryAnalysis:
         self, model,
 
         state_atol=1E-12, state_rtol=1E-6,
-        state_adaptive_max_step_size=False, state_max_step_size = 0,
+        state_adaptive_max_step_size=0., state_max_step_size = 0,
 
         adjoint_atol=1E-12, adjoint_rtol=1E-6,
-        adjoint_adaptive_max_step_size=True, adjoint_max_step_size = 8,
+        adjoint_adaptive_max_step_size=8., adjoint_max_step_size = 0,
 
         #lmm_type=ADAMS or BDF, possibly also linsolver, etc?
     ):

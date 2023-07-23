@@ -67,16 +67,12 @@ class System:
     def __init__(
         self, dim_state, initial_state, dot, jac, time_generator,
         events, updates, num_events, terminating,
-        atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
+        atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
     ):
         """
         if adaptive_max_step, treat max_step_size as the fraction of the next simulation
         span. Otherwise, use as absolute value.
         """
-        self.atol=atol
-        self.rtol=rtol
-        self.adaptive_max_step = adaptive_max_step
-        self.max_step_size = max_step_size
 
         # simulation must be terminated with event so must provide everything
 
@@ -115,28 +111,20 @@ class System:
 
         self.dim_state = dim_state
         self.num_events = len(updates)
-        self.make_solver()
+        self.make_solver(
+            atol=atol,
+            rtol=rtol,
+            adaptive_max_step = adaptive_max_step,
+            max_step_size = max_step_size,
+        )
 
-    def make_solver(self, duration=0.):
-        max_step_size = self.max_step_size
-        if self.adaptive_max_step:
-            max_step_size = duration/self.max_step_size
-        self.solver = CVODE(
-            self.dots,
-            jacfn=self.jac,
-            old_api=False,
-            one_step_compute=True,
-            rootfn=self.events,
-            nr_rootfns=self.num_events,
-            #atol=1E-13,
-            #rtol=1E-12,
-            #max_step_size=0.5/8,
-            #atol=1E-16,
-            max_step_size=max_step_size,
-            #rtol=1E-9,
-            #rtol=1E-10,
-            atol = self.atol,
-            rtol = self.rtol
+    def make_solver(self, atol, rtol, adaptive_max_step, max_step_size):
+        self.system_solver = SolverCVODE(
+            system=self,
+            atol=atol,
+            rtol=rtol,
+            adaptive_max_step = adaptive_max_step,
+            max_step_size = max_step_size,
         )
 
     def initial_state(self):
@@ -162,6 +150,31 @@ class System:
         for t in self._time_generator(self.result.p):
             yield np.array(t).reshape(-1)[0]
 
+    def __call__(self, p):
+        self.result = Result(p=p, system=self)
+        self.system_solver.simulate()
+        result = self.result
+        self.result = None
+        return result
+
+class SolverCVODE:
+    def __init__(
+        self, system,
+        atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
+    ):
+        self.system = system
+        self.adaptive_max_step = adaptive_max_step
+        self.solver = CVODE(
+            system.dots,
+            jacfn=system.jac,
+            old_api=False,
+            one_step_compute=True,
+            rootfn=system.events,
+            nr_rootfns=system.num_events,
+            max_step_size=max_step_size,
+            atol = atol,
+            rtol = rtol
+        )
 
     def simulate(self):
         """
@@ -180,27 +193,28 @@ class System:
         initial and final segments may be singular if an event causes an update that
         coincides with 
         """
-        results = self.result
-        last_x = self.initial_state()
+        system = self.system
+        results = system.result
+        last_x = system.initial_state()
         results.x.append(last_x)
 
-        time_generator = self.time_generator()
+        time_generator = system.time_generator()
         last_t = next(time_generator)
         results.t.append(last_t)
 
-        gs = np.empty(self.num_events)
-        self.events(last_t, last_x, gs)
+        gs = np.empty(system.num_events)
+        system.events(last_t, last_x, gs)
         rootsfound = (gs == 0.).astype(int)
         if np.any(rootsfound):
             # subsequent events use length of time for index, so root index is the index
             # of the updated state to the right of event. -> root coinciding with 
             # initialization has index 1
-            last_x = self.update(last_t, np.copy(last_x), rootsfound)
+            last_x = system.update(last_t, np.copy(last_x), rootsfound)
         results.e.append(Root(1, rootsfound))
         results.t.append(last_t)
         results.x.append(last_x)
 
-
+        solver = self.solver
         # each iteration of this loop simulates until next generated time
         while True:
 
@@ -210,10 +224,8 @@ class System:
             if next_t < 0:
                 breakpoint()
 
-            solver = self.solver
             if self.adaptive_max_step:
-                #self.make_solver(np.abs(next_t - last_t))
-                solver.set_options(max_step_size=np.abs(next_t - last_t)/self.max_step_size)
+                solver.set_options(max_step_size=np.abs(next_t - last_t)/self.adaptive_max_step)
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
             integration_direction = np.sign(next_t - last_t)
@@ -232,17 +244,17 @@ class System:
 
                 if solver_res.flag == StatusEnum.TSTOP_RETURN:
                     # assume this is associated with an event
-                    self.events(results.t[-1], results.x[-1], gs)
+                    system.events(results.t[-1], results.x[-1], gs)
                     min_e = np.abs(gs).min()
                     rootsfound = (gs == min_e).astype(int)
 
                 if solver_res.flag in (StatusEnum.TSTOP_RETURN, StatusEnum.ROOT_RETURN):
                     idx = len(results.t)
                     results.e.append(Root(idx, rootsfound))
-                    next_x = self.update(
+                    next_x = system.update(
                         results.t[-1], results.x[-1], rootsfound,
                     )
-                    terminate = np.any(rootsfound[self.terminating] != 0)
+                    terminate = np.any(rootsfound[system.terminating] != 0)
                     results.t.append(np.copy(solver_res.values.t))
                     results.x.append(next_x)
 
@@ -265,12 +277,6 @@ class System:
 
             last_t = next_t
 
-    def __call__(self, p):
-        self.result = Result(p=p, system=self)
-        self.simulate()
-        result = self.result
-        self.result = None
-        return result
 
 
 @dataclass
@@ -423,15 +429,16 @@ class AdjointSystem(System):
         adjoint solver will use parent simulate but without using events machinery
         time generator will call update method
         """
-        self.atol=atol
-        self.rtol=rtol
-        self.adaptive_max_step = adaptive_max_step
-        self.max_step_size = max_step_size
-
         self.state_jac = state_jac
         self.dte_dxs, self.d2te_dxdts, self.dh_dxs = dte_dxs, d2te_dxdts, dh_dxs,
         self.num_events = 1
-        self.make_solver()
+
+        self.make_solver(
+            atol=atol,
+            rtol=rtol,
+            adaptive_max_step = adaptive_max_step,
+            max_step_size = max_step_size,
+        )
 
     def events(self, t, lamda, g):
         g[:] = t - self.result.state_result.t[
@@ -557,7 +564,7 @@ class AdjointSystem(System):
         )
         self.final_lamda = final_lamda 
         # I guess this could be put in result.x? then initial_state can pop and return?
-        self.simulate()
+        self.system_solver.simulate()
         result = self.result
         #self.result = None
         return result
