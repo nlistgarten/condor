@@ -200,6 +200,8 @@ class SolverSciPy:
         self.gs = new_gs
         results.t.append(np.copy(store_t))
         results.x.append(np.copy(store_x))
+        if np.any(self.rootinfo):
+            return -1
 
     def find_root(self, t, x, new_gs, gs_sign):
         system = self.system
