@@ -37,7 +37,7 @@ class Transfer(DblInt.TrajectoryAnalysis):
     cost = trajectory_output(
         ((x-xd).T @ (x-xd))/2
     )
-    tf = 100.
+    tf = 20.
 
     class Casadi(co.Options):
         state_max_step_size = 0.25

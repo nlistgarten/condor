@@ -159,9 +159,9 @@ class Sim(LinCovCW.TrajectoryAnalysis):
         #state_rtol = 1E-9
         #adjoint_rtol = 1E-9
         #state_max_step_size = 30.
-        state_adaptive_max_step_size = True
-        state_max_step_size = 4
-        adjoint_max_step_size = 4
+        state_adaptive_max_step_size = 8
+        adjoint_adaptive_max_step_size = 8
+        #adjoint_max_step_size = 16
 
 
 from scipy.io import loadmat

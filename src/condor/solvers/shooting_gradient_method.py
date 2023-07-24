@@ -190,12 +190,17 @@ class SolverSciPy:
         # if any sign change, return -1. maybe could determine rootinfo here?
         new_gs = system.events(t, x)
         gs_sign = np.sign(new_gs) - np.sign(self.gs)
-        if (not results.e or results.e[-1].index < len(results.t)-1) and np.any(np.abs(gs_sign) > 0):
+        immediately_after_event = (
+            results.e and results.e[-1].index >= len(results.t)-1
+        )
+        if not immediately_after_event and np.any(np.abs(gs_sign) > 0):
             self.rootinfo = gs_sign
             store_t, store_x = self.find_root(t, x, new_gs, gs_sign)
         else:
             self.rootinfo = None
             store_t, store_x = t, x
+            if results.e and results.e[-1].index == len(results.t) and t != results.t[-1]:
+                store_t = np.copy(results.t[-1])
 
         self.gs = new_gs
         results.t.append(np.copy(store_t))
@@ -292,7 +297,7 @@ class SolverSciPy:
                 # assume we have an event, either a true event or at next_t
 
                 solver_flag =  solver.get_return_code()
-                #== 1: #equivalent to TSTOP
+                #== 1: #equivalent to rootfound
 
 
                 if np.any(self.rootinfo):
@@ -311,13 +316,8 @@ class SolverSciPy:
                 )
                 terminate = np.any(rootsfound[system.terminating] != 0)
 
-                last_t = results.t[-1]
+                last_t = np.copy(results.t[-1])
                 self.gs = system.events(last_t, next_x)
-
-
-
-
-
 
                 if terminate:
                     self.solout(last_t, next_x)
@@ -331,6 +331,9 @@ class SolverSciPy:
                     >= (self.integration_direction * next_t)
                 ):
                     break
+                elif solver_flag == 2 and isinstance(system, AdjointSystem):
+                    breakpoint()
+
 
             last_t = next_t
 
@@ -558,26 +561,29 @@ class ResultInterpolant:
         # expect integrand-term related functions to be cheap functions of state
         # point-wise along trajectory
 
-            self.interpolants = [
-                ResultSegmentInterpolant(
-                    make_interp_spline(
-                        result.t[idx0:idx1][self.time_sort],
-                        [np.array(function( result.p, t, x,) ).squeeze()
-                         for t, x in zip(result.t[idx0:idx1],
-                                         result.x[idx0:idx1])][self.time_sort],
-                        #k=min(3, idx1-idx0),
-                        #bc_type=["natural", "natural"],
-                    ),
-                    idx0, idx1,
-                    result.t[idx0], result.t[idx1],
-                    result.x[idx0], result.x[idx1],
-                )
-                for idx0, idx1 in zip(
-                    event_idxs[:-1],
-                    event_idxs[1:]#-1,
-                )
-                if result.t[idx1] != result.t[idx0]
-            ]
+            try:
+                self.interpolants = [
+                    ResultSegmentInterpolant(
+                        make_interp_spline(
+                            result.t[idx0:idx1][self.time_sort],
+                            [np.array(function( result.p, t, x,) ).squeeze()
+                             for t, x in zip(result.t[idx0:idx1],
+                                             result.x[idx0:idx1])][self.time_sort],
+                            #k=min(3, idx1-idx0),
+                            #bc_type=["natural", "natural"],
+                        ),
+                        idx0, idx1,
+                        result.t[idx0], result.t[idx1],
+                        result.x[idx0], result.x[idx1],
+                    )
+                    for idx0, idx1 in zip(
+                        event_idxs[:-1],
+                        event_idxs[1:]#-1,
+                    )
+                    if result.t[idx1] != result.t[idx0]
+                ]
+            except:
+                breakpoint()
 
     def __call__(self, t):
         interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]

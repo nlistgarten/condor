@@ -19,11 +19,18 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     u = output.u
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
 
+    class Casadi(co.Options):
+        state_rtol=1E-7
+        #adjoint_rtol=1E-9
+
+
+
 
 ct_sim = DblIntLQR([1, .1])
 LTI_plot(ct_sim)
-ct_sim = DblIntLQR([0., 0.,])
-LTI_plot(ct_sim)
+#ct_sim = DblIntLQR([0., 0.,])
+#LTI_plot(ct_sim)
+
 
 
 from condor.backends.casadi.implementations import OptimizationProblem
