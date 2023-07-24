@@ -190,7 +190,7 @@ class SolverSciPy:
         # if any sign change, return -1. maybe could determine rootinfo here?
         new_gs = system.events(t, x)
         gs_sign = np.sign(new_gs) - np.sign(self.gs)
-        if np.any(np.abs(gs_sign) > 0):
+        if (not results.e or results.e[-1].index < len(results.t)-1) and np.any(np.abs(gs_sign) > 0):
             self.rootinfo = gs_sign
             store_t, store_x = self.find_root(t, x, new_gs, gs_sign)
         else:
@@ -217,10 +217,7 @@ class SolverSciPy:
         else:
             time_sort = slice(None, None, -1)
 
-        try:
-            g_spl = make_interp_spline(spline_ts[time_sort], spline_gs[time_sort], k=k)
-        except:
-            breakpoint()
+        g_spl = make_interp_spline(spline_ts[time_sort], spline_gs[time_sort], k=k)
         x_spl = make_interp_spline(spline_ts[time_sort], spline_xs[time_sort], k=k)
         t_events = np.empty(system.num_events)
 
@@ -292,6 +289,9 @@ class SolverSciPy:
 
                 # assume we have an event, either a true event or at next_t
 
+                solver_flag =  solver.get_return_code()
+                #== 1: #equivalent to TSTOP
+
 
                 if np.any(self.rootinfo):
                     rootsfound = self.rootinfo
@@ -307,16 +307,18 @@ class SolverSciPy:
                 next_x = system.update(
                     results.t[-1], results.x[-1], rootsfound,
                 )
-                try:
-                    terminate = np.any(rootsfound[system.terminating] != 0)
-                except:
-                    breakpoint()
+                terminate = np.any(rootsfound[system.terminating] != 0)
 
                 last_t = results.t[-1]
                 self.gs = system.events(last_t, next_x)
-                self.solout(last_t, next_x)
+
+
+
+
+
 
                 if terminate:
+                    self.solout(last_t, next_x)
                     return
 
                 last_x = next_x
