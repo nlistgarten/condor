@@ -10,7 +10,7 @@ except ModuleNotFoundError:
 else:
     has_cvode = True
 
-from scipy.integrate import ode
+from scipy.integrate import ode as scipy_ode
 from scipy.optimize import brentq
 from typing import NamedTuple
 
@@ -127,7 +127,7 @@ class System:
         )
 
     def make_solver(self, atol, rtol, adaptive_max_step, max_step_size):
-        self.system_solver = SolverCVODE(
+        self.system_solver = SolverSciPy( #SolverCVODE(
             system=self,
             atol=atol,
             rtol=rtol,
@@ -165,23 +165,170 @@ class System:
         self.result = None
         return result
 
-class SolverDopri5:
+class SolverSciPy:
     def __init__(
         self, system,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
     ):
         self.system = system
         self.adaptive_max_step = adaptive_max_step
-        self.solver = integrator_class( system.dots,)
-        self.solver.set_integrator(
+        self.solver = scipy_ode( system.dots,)
+        self.int_options = dict(
+            name = "dopri5",
             atol = atol,
             rtol = rtol,
             max_step=max_step_size,
+            nsteps = 1_000,
         )
+        self.solver.set_integrator(**self.int_options)
         self.solver.set_solout(self.solout)
 
     def solout(self, t, x):
-        pass
+        system = self.system
+        results = system.result
+
+        # if any sign change, return -1. maybe could determine rootinfo here?
+        new_gs = system.events(t, x)
+        gs_sign = np.sign(new_gs) - np.sign(self.gs)
+        if np.any(np.abs(gs_sign) > 0):
+            self.rootinfo = gs_sign
+            store_t, store_x = self.find_root(t, x, new_gs, gs_sign)
+        else:
+            self.rootinfo = None
+            store_t, store_x = t, x
+
+        self.gs = new_gs
+        results.t.append(np.copy(store_t))
+        results.x.append(np.copy(store_x))
+
+    def find_root(self, t, x, new_gs, gs_sign):
+        system = self.system
+        results = system.result
+        num_points_since_last_event = len(results.t) - results.e[-1].index + 1
+        k = min(num_points_since_last_event - 1, 3)
+        spline_ts = results.t[-k:] + [t]
+        spline_xs = np.array(results.x[-k:] + [x])
+        spline_gs = np.array([system.events(tt, xx) for tt, xx in zip(
+            spline_ts[:-2], spline_xs[:-2]
+        )] + [self.gs, new_gs])
+
+        if self.integration_direction > 0:
+            time_sort = slice(None)
+        else:
+            time_sort = slice(None, None, -1)
+
+        try:
+            g_spl = make_interp_spline(spline_ts[time_sort], spline_gs[time_sort], k=k)
+        except:
+            breakpoint()
+        x_spl = make_interp_spline(spline_ts[time_sort], spline_xs[time_sort], k=k)
+        t_events = np.empty(system.num_events)
+
+
+
+        for g_idx, g_sign in enumerate(gs_sign):
+            if g_sign:
+                find_function = lambda t: g_spl(t)[g_idx]
+                set_t = brentq(find_function, spline_ts[-2], spline_ts[-1],)
+            else:
+                set_t = spline_ts[-1]
+            t_events[g_idx] = set_t
+
+        min_t = np.min(t_events)
+        if np.any(t_events[np.where(gs_sign != 0)[0]] > min_t):
+            breakpoint()
+
+        return min_t, x_spl(min_t)
+
+
+    def simulate(self):
+        system = self.system
+        results = system.result
+        last_x = system.initial_state()
+
+        time_generator = system.time_generator()
+        last_t = next(time_generator)
+
+        # self.gs  will be used to monitor the event function
+        self.gs = system.events(last_t, last_x)
+        self.solout(last_t, last_x)
+
+        rootsfound = (self.gs == 0.).astype(int)
+        if np.any(rootsfound):
+            # subsequent events use length of time for index, so root index is the index
+            # of the updated state to the right of event. -> root coinciding with 
+            # initialization has index 1
+            last_x = system.update(last_t, np.copy(last_x), rootsfound)
+        results.e.append(Root(1, rootsfound))
+
+
+        solver = self.solver
+
+        # each iteration of this loop simulates until next generated time
+        while True:
+
+            next_t = next(time_generator)
+            self.gs = system.events(last_t, last_x)
+            if np.isinf(next_t):
+                break
+            if next_t < 0:
+                breakpoint()
+
+            if self.adaptive_max_step:
+                self.int_options.update(dict(
+                    max_step=np.abs(next_t - last_t)/self.adaptive_max_step
+                ))
+
+                self.solver.set_integrator(**self.int_options)
+                self.solver.set_solout(self.solout)
+            solver.set_initial_value(last_x, last_t,)
+            self.integration_direction = np.sign(next_t - last_t)
+
+            # each iteration of this loop is one step until next event or time stop
+            while True:
+                solver.integrate(next_t)
+                if not solver.successful():
+                    breakpoint()
+
+                # assume we have an event, either a true event or at next_t
+
+
+                if np.any(self.rootinfo):
+                    rootsfound = self.rootinfo
+
+                else:
+                    # assume this is associated with an event
+                    gs = system.events(results.t[-1], results.x[-1])
+                    min_e = np.abs(gs).min()
+                    rootsfound = (gs == min_e).astype(int)
+
+                idx = len(results.t)
+                results.e.append(Root(idx, rootsfound))
+                next_x = system.update(
+                    results.t[-1], results.x[-1], rootsfound,
+                )
+                try:
+                    terminate = np.any(rootsfound[system.terminating] != 0)
+                except:
+                    breakpoint()
+
+                last_t = results.t[-1]
+                self.gs = system.events(last_t, next_x)
+                self.solout(last_t, next_x)
+
+                if terminate:
+                    return
+
+                last_x = next_x
+                solver.set_initial_value(last_x, last_t,)
+
+                if (
+                    (self.integration_direction * last_t) 
+                    >= (self.integration_direction * next_t)
+                ):
+                    break
+
+            last_t = next_t
 
 
 class SolverCVODE:
@@ -279,6 +426,7 @@ class SolverCVODE:
 
                 if solver_res.flag == StatusEnum.TSTOP_RETURN:
                     # assume this is associated with an event
+                    #does occur on time_switch but not sp_lqr
                     gs = system.events(results.t[-1], results.x[-1])
                     min_e = np.abs(gs).min()
                     rootsfound = (gs == min_e).astype(int)
@@ -305,7 +453,10 @@ class SolverCVODE:
                 if (
                     (integration_direction * solver_res.values.t) 
                     >= (integration_direction * next_t)
-                ) or solver_res.flag == StatusEnum.TSTOP_RETURN:
+                ):
+                    break
+                if solver_res.flag == StatusEnum.TSTOP_RETURN:
+                    #does occur on time_switch but not sp_lqr
                     break
 
             last_t = next_t
