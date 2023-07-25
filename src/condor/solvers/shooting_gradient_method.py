@@ -14,6 +14,8 @@ from scipy.integrate import ode as scipy_ode
 from scipy.optimize import brentq
 from typing import NamedTuple
 
+
+
 class Root(NamedTuple):
     index: int
     rootsfound: list[int]
@@ -76,6 +78,7 @@ class System:
         self, dim_state, initial_state, dot, jac, time_generator,
         events, updates, num_events, terminating,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
+        solver_class = SolverSciPy,
     ):
         """
         if adaptive_max_step, treat max_step_size as the fraction of the next simulation
@@ -124,10 +127,11 @@ class System:
             rtol=rtol,
             adaptive_max_step = adaptive_max_step,
             max_step_size = max_step_size,
+            solver_class = solver_class,
         )
 
-    def make_solver(self, atol, rtol, adaptive_max_step, max_step_size):
-        self.system_solver = SolverSciPy( #SolverCVODE(
+    def make_solver(self, atol, rtol, adaptive_max_step, max_step_size, solver_class):
+        self.system_solver = solver_class( #SolverSciPy( #SolverCVODE(
             system=self,
             atol=atol,
             rtol=rtol,
@@ -164,6 +168,7 @@ class System:
         result = self.result
         self.result = None
         return result
+
 
 class SolverSciPy:
     def __init__(
@@ -301,8 +306,12 @@ class SolverSciPy:
                 # assume we have an event, either a true event or at next_t
 
                 solver_flag =  solver.get_return_code()
-                #== 1: #equivalent to rootfound
+                #== 1: #equivalent to tstop
+                #== 2: #equivalent to rootfound
 
+
+                #if len(results.t) > 10 and np.abs(solver.t - next_t) < 1E-13 and solver.t != next_t:
+                #    breakpoint()
 
                 if np.any(self.rootinfo):
                     rootsfound = self.rootinfo
@@ -341,6 +350,13 @@ class SolverSciPy:
                     >= (self.integration_direction * next_t)
                 ) or np.nextafter(next_t, last_t) == results.t[-1]:
                     break
+
+                if np.any(
+                    (system.events(next_t, results.x[-1]) == 0.).astype(int) 
+                    & rootsfound
+                ):
+                    break
+
                 elif solver_flag == 2 and isinstance(system, AdjointSystem):
                     breakpoint()
 
@@ -477,7 +493,6 @@ class SolverCVODE:
                     break
 
             last_t = next_t
-
 
 
 @dataclass
@@ -625,6 +640,7 @@ class AdjointResult(ResultBase, AdjointResultMixin,):
 class AdjointSystem(System):
     def __init__(
         self, state_jac, dte_dxs, d2te_dxdts, dh_dxs,
+        solver_class = SolverSciPy,
         atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
     ):
         """
@@ -642,6 +658,7 @@ class AdjointSystem(System):
             rtol=rtol,
             adaptive_max_step = adaptive_max_step,
             max_step_size = max_step_size,
+            solver_class = solver_class,
         )
 
     def events(self, t, lamda):
