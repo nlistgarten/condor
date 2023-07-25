@@ -186,6 +186,10 @@ class SolverSciPy:
     def solout(self, t, x):
         system = self.system
         results = system.result
+        # had to do some debugging and figured out a decent pattern for conditional
+        # breakpoints... TODO move to notes or something?
+        #if results.e and results.e[-1].index == 19 and np.abs(results.t[-1] - 56.81341256) < 1.5E-9:
+        #    breakpoint()
 
         # if any sign change, return -1. maybe could determine rootinfo here?
         new_gs = system.events(t, x)
@@ -310,11 +314,17 @@ class SolverSciPy:
                     rootsfound = (gs == min_e).astype(int)
 
                 idx = len(results.t)
+        # had to do some debugging and figured out a decent pattern for conditional
+        # breakpoints... TODO move to notes or something?
+                #if idx == 19 and isinstance(system, AdjointSystem) and np.abs(next_t - 56.81341256) < 1.5E-9:#:21 and results.e[-1].index == 19:
+                ##if idx == 21 and results.e[-1].index == 19:
+                #    breakpoint()
                 results.e.append(Root(idx, rootsfound))
                 next_x = system.update(
                     results.t[-1], results.x[-1], rootsfound,
                 )
                 terminate = np.any(rootsfound[system.terminating] != 0)
+
 
                 last_t = np.copy(results.t[-1])
                 self.gs = system.events(last_t, next_x)
@@ -329,7 +339,7 @@ class SolverSciPy:
                 if (
                     (self.integration_direction * last_t) 
                     >= (self.integration_direction * next_t)
-                ):
+                ) or np.nextafter(next_t, last_t) == results.t[-1]:
                     break
                 elif solver_flag == 2 and isinstance(system, AdjointSystem):
                     breakpoint()
@@ -569,7 +579,7 @@ class ResultInterpolant:
                             [np.array(function( result.p, t, x,) ).squeeze()
                              for t, x in zip(result.t[idx0:idx1],
                                              result.x[idx0:idx1])][self.time_sort],
-                            #k=min(3, idx1-idx0),
+                            k=min(3, idx1-idx0-1), # not needed with adaptive step size!
                             #bc_type=["natural", "natural"],
                         ),
                         idx0, idx1,

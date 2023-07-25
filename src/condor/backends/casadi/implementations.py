@@ -503,7 +503,7 @@ class TrajectoryAnalysis:
         state_adaptive_max_step_size=0., state_max_step_size = 0,
 
         adjoint_atol=1E-12, adjoint_rtol=1E-6,
-        adjoint_adaptive_max_step_size=8., adjoint_max_step_size = 0,
+        adjoint_adaptive_max_step_size=4., adjoint_max_step_size = 0,
 
         #lmm_type=ADAMS or BDF, possibly also linsolver, etc?
     ):

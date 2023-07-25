@@ -156,12 +156,12 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
     class Casadi(co.Options):
-        #state_rtol = 1E-9
-        #adjoint_rtol = 1E-9
-        #state_max_step_size = 30.
-        state_adaptive_max_step_size = 8
+        state_rtol = 1E-9
+        adjoint_rtol = 1E-9
+        state_max_step_size = 30.
+
+        #state_adaptive_max_step_size = 8
         adjoint_adaptive_max_step_size = 8
-        #adjoint_max_step_size = 16
 
 
 from scipy.io import loadmat
@@ -191,7 +191,7 @@ class Hohmann(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian=False
-        #method = OptimizationProblem.Method.scipy_trust_constr
+        method = OptimizationProblem.Method.scipy_trust_constr
 
 
 class TotalDeltaV(co.OptimizationProblem):
