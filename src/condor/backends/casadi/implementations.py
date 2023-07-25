@@ -510,6 +510,11 @@ def recurse_if_else(conditions_actions):
 
 
 class TrajectoryAnalysis:
+
+    class Solver(Enum):
+        CVODE = auto()
+        SciPy = auto()
+
     def __init__(
         self, model,
 
@@ -519,7 +524,10 @@ class TrajectoryAnalysis:
         adjoint_atol=1E-12, adjoint_rtol=1E-6,
         adjoint_adaptive_max_step_size=4., adjoint_max_step_size = 0,
 
-        #lmm_type=ADAMS or BDF, possibly also linsolver, etc?
+        solver = Solver.SciPy
+
+        #lmm_type=ADAMS or BDF, possibly also linsolver, etc? for CVODE?
+        # other options for scipy.ode + event rootfinder?
     ):
         self.model = model
         self.ode_model = ode_model = model.inner_to
@@ -608,7 +616,9 @@ class TrajectoryAnalysis:
         for event_idx, event in enumerate(ode_model.Event.subclasses):
             terminate = getattr(event, 'terminate', False)
             if hasattr(event, 'function') == hasattr(event, 'at_time'):
-                raise ValueError
+                raise ValueError(
+                    f"Event class `{event}` has set both `function` and `at_time`"
+                )
             if hasattr(event, 'function'):
                 e_expr = event.function
             else:
@@ -882,6 +892,11 @@ class TrajectoryAnalysis:
             ode_model.Event.subclasses = ode_model.Event.subclasses[:-1]
 
 
+        if solver is TrajectoryAnalysis.Solver.CVODE:
+            solver_class = sgm.SolverCVODE
+        elif solver is TrajectoryAnalysis.Solver.SciPy:
+            solver_class = sgm.SolverSciPy
+
 
         self.trajectory_analysis = sgm.TrajectoryAnalysis(
             traj_out_integrand_func, traj_out_terminal_term_func,
@@ -906,6 +921,7 @@ class TrajectoryAnalysis:
             rtol=state_rtol,
             adaptive_max_step=state_adaptive_max_step_size,
             max_step_size=state_max_step_size,
+            solver_class = solver_class,
         )
         self.AdjointSystem = sgm.AdjointSystem(
             state_jac = state_dot_jac_func,
@@ -916,6 +932,7 @@ class TrajectoryAnalysis:
             rtol=adjoint_rtol,
             adaptive_max_step=adjoint_adaptive_max_step_size,
             max_step_size=adjoint_max_step_size,
+            solver_class = solver_class,
         )
         self.shooting_gradient_method = sgm.ShootingGradientMethod(
             adjoint_system = self.AdjointSystem,

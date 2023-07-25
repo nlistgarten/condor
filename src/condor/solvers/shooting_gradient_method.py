@@ -15,161 +15,6 @@ from scipy.optimize import brentq
 from typing import NamedTuple
 
 
-
-class Root(NamedTuple):
-    index: int
-    rootsfound: list[int]
-
-class NextTimeFromSlice:
-    def __init__(self, at_time_func):
-        self.at_time_func = at_time_func
-
-    def set_p(self, p):
-        start, stop, step = np.array(self.at_time_func(p)).squeeze()
-        self.start = start
-        self.step = step
-        self.stop = stop
-        self.direction = np.sign(step)
-
-    def before_start(self, t):
-        if self.direction < 0:
-            return t > self.start
-        return t < self.start
-
-    def after_stop(self, t):
-        # if t is exactly stop time, this has already occured
-        if self.direction < 0:
-            return t <= self.stop
-        return t >= self.stop
-
-    def __call__(self, t):
-        if self.before_start(t):
-            return self.start
-        if self.after_stop(t):
-            return self.direction*np.inf
-        # TODO handle negative step -- may need to adjust a few of these
-        return (1+(t-self.start)//self.step)*self.step + self.start
-
-class TimeGeneratorFromSlices:
-    def __init__(self, time_slices, direction=1):
-        self.time_slices = time_slices
-        self.direction = direction
-
-    def __call__(self, p):
-        # TODO handle negative step?
-        for time_slice in self.time_slices:
-            time_slice.set_p(p)
-
-        t = -self.direction*np.inf
-        if self.direction > 0:
-            get_time = min
-        else:
-            get_time = max
-        while True:
-            next_times = [time_slice(t) for time_slice in self.time_slices]
-            t = get_time(next_times)
-            yield t
-            if np.isinf(t):
-                breakpoint()
-
-
-class System:
-    def __init__(
-        self, dim_state, initial_state, dot, jac, time_generator,
-        events, updates, num_events, terminating,
-        atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
-        solver_class = SolverSciPy,
-    ):
-        """
-        if adaptive_max_step, treat max_step_size as the fraction of the next simulation
-        span. Otherwise, use as absolute value.
-        """
-
-        # simulation must be terminated with event so must provide everything
-
-        # result is a temporary instance attribute so system model can pass information
-        # to functions the sundials solvers call -- could be passed via the userdata
-        # option but these functions need wrappers to handle returned values anyway
-        self.result = None
-
-        # these instance attributes encapsolate the business data of a system
-
-        #   functions, see method wrapper for expected signature
-
-        #     for CVODE interface once wrapped
-        self._dot = dot
-        self._jac = jac
-        self._events = events
-        #     list of functions for 
-        self._updates = updates
-
-        #     define initial conditions
-        self._initial_state = initial_state
-        # who owns t0? time generator? for adjoint system, very easy to own all of them.
-        # I guess can just handle single point as a special case instead of assuming all
-        # take the form of an interval? Does this make it easier to allow events that
-        # occur at t0? Then 
-
-        # data for time_generator method -- should this just be a generator class
-        # itself? yes, basically just a sub-name space to the System which should own
-        # the (parameterized) callables. Use wrapper method to define interface, then 
-        # AdjointSystem can re-implement wrapper method to change interface
-        self._time_generator = time_generator
-
-        # list of root indices that are terminating events...
-        # any(rootsfound[terminating]) --> terminates simulation
-        self.terminating = terminating
-
-        self.dim_state = dim_state
-        self.num_events = len(updates)
-        self.make_solver(
-            atol=atol,
-            rtol=rtol,
-            adaptive_max_step = adaptive_max_step,
-            max_step_size = max_step_size,
-            solver_class = solver_class,
-        )
-
-    def make_solver(self, atol, rtol, adaptive_max_step, max_step_size, solver_class):
-        self.system_solver = solver_class( #SolverSciPy( #SolverCVODE(
-            system=self,
-            atol=atol,
-            rtol=rtol,
-            adaptive_max_step = adaptive_max_step,
-            max_step_size = max_step_size,
-        )
-
-    def initial_state(self):
-        return np.array(self._initial_state(self.result.p)).reshape(-1)
-
-    def dots(self, t, x):
-        return np.array(self._dot(self.result.p, t, x)).reshape(-1)
-
-    def jac(self, t, x, ):
-        return np.array(self._jac(self.result.p, t, x)).squeeze()
-
-    def events(self, t, x):
-        return np.array(self._events(self.result.p, t, x)).reshape(-1)
-
-    def update(self, t, x, rootsfound):
-        next_x = x #np.copy(x) # who is responsible for copying? I suppose simulate
-        for root_sign, update in zip(rootsfound, self._updates):
-            if root_sign != 0:
-                next_x = update(self.result.p, t, next_x)
-        return np.array(next_x).squeeze()
-
-    def time_generator(self):
-        for t in self._time_generator(self.result.p):
-            yield np.array(t).reshape(-1)[0]
-
-    def __call__(self, p):
-        self.result = Result(p=p, system=self)
-        self.system_solver.simulate()
-        result = self.result
-        self.result = None
-        return result
-
-
 class SolverSciPy:
     def __init__(
         self, system,
@@ -495,6 +340,162 @@ class SolverCVODE:
             last_t = next_t
 
 
+class Root(NamedTuple):
+    index: int
+    rootsfound: list[int]
+
+
+class NextTimeFromSlice:
+    def __init__(self, at_time_func):
+        self.at_time_func = at_time_func
+
+    def set_p(self, p):
+        start, stop, step = np.array(self.at_time_func(p)).squeeze()
+        self.start = start
+        self.step = step
+        self.stop = stop
+        self.direction = np.sign(step)
+
+    def before_start(self, t):
+        if self.direction < 0:
+            return t > self.start
+        return t < self.start
+
+    def after_stop(self, t):
+        # if t is exactly stop time, this has already occured
+        if self.direction < 0:
+            return t <= self.stop
+        return t >= self.stop
+
+    def __call__(self, t):
+        if self.before_start(t):
+            return self.start
+        if self.after_stop(t):
+            return self.direction*np.inf
+        # TODO handle negative step -- may need to adjust a few of these
+        return (1+(t-self.start)//self.step)*self.step + self.start
+
+
+class TimeGeneratorFromSlices:
+    def __init__(self, time_slices, direction=1):
+        self.time_slices = time_slices
+        self.direction = direction
+
+    def __call__(self, p):
+        # TODO handle negative step?
+        for time_slice in self.time_slices:
+            time_slice.set_p(p)
+
+        t = -self.direction*np.inf
+        if self.direction > 0:
+            get_time = min
+        else:
+            get_time = max
+        while True:
+            next_times = [time_slice(t) for time_slice in self.time_slices]
+            t = get_time(next_times)
+            yield t
+            if np.isinf(t):
+                breakpoint()
+
+
+class System:
+    def __init__(
+        self, dim_state, initial_state, dot, jac, time_generator,
+        events, updates, num_events, terminating,
+        atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
+        solver_class = SolverSciPy,
+    ):
+        """
+        if adaptive_max_step, treat max_step_size as the fraction of the next simulation
+        span. Otherwise, use as absolute value.
+        """
+
+        # simulation must be terminated with event so must provide everything
+
+        # result is a temporary instance attribute so system model can pass information
+        # to functions the sundials solvers call -- could be passed via the userdata
+        # option but these functions need wrappers to handle returned values anyway
+        self.result = None
+
+        # these instance attributes encapsolate the business data of a system
+
+        #   functions, see method wrapper for expected signature
+
+        #     for CVODE interface once wrapped
+        self._dot = dot
+        self._jac = jac
+        self._events = events
+        #     list of functions for 
+        self._updates = updates
+
+        #     define initial conditions
+        self._initial_state = initial_state
+        # who owns t0? time generator? for adjoint system, very easy to own all of them.
+        # I guess can just handle single point as a special case instead of assuming all
+        # take the form of an interval? Does this make it easier to allow events that
+        # occur at t0? Then 
+
+        # data for time_generator method -- should this just be a generator class
+        # itself? yes, basically just a sub-name space to the System which should own
+        # the (parameterized) callables. Use wrapper method to define interface, then 
+        # AdjointSystem can re-implement wrapper method to change interface
+        self._time_generator = time_generator
+
+        # list of root indices that are terminating events...
+        # any(rootsfound[terminating]) --> terminates simulation
+        self.terminating = terminating
+
+        self.dim_state = dim_state
+        self.num_events = len(updates)
+        self.make_solver(
+            atol=atol,
+            rtol=rtol,
+            adaptive_max_step = adaptive_max_step,
+            max_step_size = max_step_size,
+            solver_class = solver_class,
+        )
+
+    def make_solver(self, atol, rtol, adaptive_max_step, max_step_size, solver_class):
+        self.system_solver = solver_class( #SolverSciPy( #SolverCVODE(
+            system=self,
+            atol=atol,
+            rtol=rtol,
+            adaptive_max_step = adaptive_max_step,
+            max_step_size = max_step_size,
+        )
+
+    def initial_state(self):
+        return np.array(self._initial_state(self.result.p)).reshape(-1)
+
+    def dots(self, t, x):
+        return np.array(self._dot(self.result.p, t, x)).reshape(-1)
+
+    def jac(self, t, x, ):
+        return np.array(self._jac(self.result.p, t, x)).squeeze()
+
+    def events(self, t, x):
+        return np.array(self._events(self.result.p, t, x)).reshape(-1)
+
+    def update(self, t, x, rootsfound):
+        next_x = x #np.copy(x) # who is responsible for copying? I suppose simulate
+        for root_sign, update in zip(rootsfound, self._updates):
+            if root_sign != 0:
+                next_x = update(self.result.p, t, next_x)
+        return np.array(next_x).squeeze()
+
+    def time_generator(self):
+        for t in self._time_generator(self.result.p):
+            yield np.array(t).reshape(-1)[0]
+
+    def __call__(self, p):
+        self.result = Result(p=p, system=self)
+        self.system_solver.simulate()
+        result = self.result
+        self.result = None
+        return result
+
+
 @dataclass
 class ResultMixin:
     p: list[float]
@@ -514,7 +515,6 @@ class ResultBase:
         )
 
 
-
 @dataclass
 class Result(ResultBase, ResultMixin):
     pass
@@ -530,6 +530,7 @@ class ResultSegmentInterpolant(NamedTuple):
 
     def __call__(self, t):
         return self.interpolant(t)
+
 
 @dataclass
 class ResultInterpolant:
@@ -619,7 +620,6 @@ class ResultInterpolant:
             yield interp_segment
 
 
-
 @dataclass
 class AdjointResultMixin:
     state_jacobian: ResultInterpolant
@@ -636,6 +636,7 @@ class AdjointResultMixin:
 @dataclass
 class AdjointResult(ResultBase, AdjointResultMixin,):
     pass
+
 
 class AdjointSystem(System):
     def __init__(
@@ -728,7 +729,6 @@ class AdjointSystem(System):
         lamda_tem = np.array(lamda_tem).squeeze()
         return lamda_tem
 
-
     def time_generator(self):
         """
         """
@@ -771,7 +771,6 @@ class AdjointSystem(System):
         breakpoint()
         yield np.inf
 
-
     def initial_state(self):
         return self.final_lamda
 
@@ -808,9 +807,9 @@ class AdjointSystem(System):
             out=lamdadot
         )
 
-
     def jac(self, t, lamda,):
         return  -self.result.state_jacobian.interpolants[self.segment_idx](t).T
+
 
 @dataclass
 class TrajectoryAnalysis:
@@ -998,3 +997,4 @@ class ShootingGradientMethod:
             jac_rows.append(jac_row)
 
         return np.stack(jac_rows, axis=0)
+
