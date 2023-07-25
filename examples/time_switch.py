@@ -21,20 +21,25 @@ class DblInt(co.ODESystem):
 
     t1 = parameter()
     t2 = parameter()
-    # TODO: fix once mode and control work?
-    dot[x] = A@x + B*(
-        1*(mode == 0.)
-        -1*(mode == 1.)
-    )
+    u = control()
+    dot[x] = A@x + B*u
 
     if with_time_state:
         tt = state()
         dot[tt] = 1.
 
+class Accel(DblInt.Mode):
+    condition = mode == 0.
+    action[u] = 1.
+
 class Switch1(DblInt.Event):
     #function = t - t1
     at_time = t1,
     update[mode] = 1.
+
+class Decel(DblInt.Mode):
+    condition = mode == 1.
+    action[u] = -1.
 
 class Switch2(DblInt.Event):
     #function = t - t2 - t1

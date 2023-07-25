@@ -252,6 +252,12 @@ class FreeField(IndependentField, default_direction=Direction.input):
         return self._symbols[-1].backend_repr
 
 
+@dataclass(repr=False)
+class WithDefaultSymbol(FreeSymbol,):
+    default: float = 0.   # TODO union[numeric, expression] or None?
+
+class WithDefaultField(FreeField):
+    pass
 
 @dataclass(repr=False)
 class InitializedSymbol(FreeSymbol,):

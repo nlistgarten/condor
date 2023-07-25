@@ -2,7 +2,7 @@ import numpy as np
 # TODO: figure out how to make this an option/setting like django?
 #from condor.backends import default as backend
 from condor.fields import (
-    Direction, Field, BaseSymbol, IndependentSymbol, FreeSymbol,
+    Direction, Field, BaseSymbol, IndependentSymbol, FreeSymbol, WithDefaultField,
     IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
     BoundedAssignmentField, TrajectoryOutputField,
 )
@@ -1027,9 +1027,7 @@ class ODESystem(Model):
     initial = MatchedField(state)
     parameter = FreeField()
     dot = MatchedField(state)
-    control = FreeField(Direction.internal)
-    output = AssignedField()
-    make = MatchedField(control)
+    control = WithDefaultField(Direction.internal)
 
 
 class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "initial", "state"]):
@@ -1093,7 +1091,7 @@ class Mode(Model, inner_to=ODESystem,):
     deferred subsystems? Yes but only for ODESystems..
     """
     pass
-
+    action = MatchedField(ODESystem.control, direction=Direction.internal)
 
 
 def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):

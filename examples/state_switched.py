@@ -16,14 +16,20 @@ class DblInt(co.ODESystem):
     mode = state()
     p1 = parameter()
     p2 = parameter()
-    dot[x] = A@x + B*(
-        1*(mode==0.)
-        -1*(mode==1.)
-    )
+    u = control()
+    dot[x] = A@x + B*u
+
+class Accel(DblInt.Mode):
+    condition = mode == 0.
+    action[u] = 1.
 
 class Switch1(DblInt.Event):
     function = x[0] - p1
     update[mode] = 1.
+
+class Decel(DblInt.Mode):
+    condition = mode == 1.
+    action[u] = -1.
 
 class Switch2(DblInt.Event):
     function = x[0] - p2

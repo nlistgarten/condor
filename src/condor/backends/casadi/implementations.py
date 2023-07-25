@@ -444,13 +444,15 @@ class OptimizationProblem(InitializerMixin):
             self.x0 = min_out.x
             self.stats = model_instance._stats = min_out
 
-def get_state_setter(field, setter_args, default=0.):
+def get_state_setter(field, setter_args, default=0., subs={}):
     """
-    used for building functions from matched fields to state (should this be
-    generalized?) used for dot, update, initial condition,
+    used for building functions from matched fields to their match (loops over "state"
+    but is generalized for any matched fields)
+    used for dot, update, initial condition,
 
-    field is MatchedField matching to the state
+    field is MatchedField
     default None to pass through
+    setter_args are arguments for generalized 
 
     """
     setter_exprs = []
@@ -485,7 +487,12 @@ def get_state_setter(field, setter_args, default=0.):
                     np.broadcast_to(setter_symbol, state.shape).reshape(-1)
                 )
     #setter_exprs = flatten(setter_exprs)
-    setter_exprs = [casadi.vertcat(*setter_exprs)]
+    setter_exprs = casadi.vertcat(*setter_exprs)
+    for key, val in subs.items():
+        setter_exprs = casadi.substitute(
+            setter_exprs, key, val
+        )
+    setter_exprs = [setter_exprs]
     setter_func = casadi.Function(
         f"{field._model_name}_{field._matched_to._name}_{field._name}",
         setter_args,
@@ -493,6 +500,13 @@ def get_state_setter(field, setter_args, default=0.):
     )
     setter_func.expr = setter_exprs[0]
     return setter_func
+
+def recurse_if_else(conditions_actions):
+    if len(conditions_actions) == 1:
+        return conditions_actions[0][0]
+    condition, action = conditions_actions[-1]
+    remainder = recurse_if_else(conditions_actions[:-1])
+    return casadi.if_else(condition, action, remainder)
 
 
 class TrajectoryAnalysis:
@@ -551,18 +565,24 @@ class TrajectoryAnalysis:
         )
         p_state0_p_p.expr = self.p_state0_p_p_expr
 
-
+        control_subs_pairs = {
+            control.backend_repr: [(control.default,)]
+            for control in ode_model.control
+        }
+        for mode in ode_model.Mode.subclasses:
+            for act in mode.action:
+                control_subs_pairs[act.match.backend_repr].append(
+                    (mode.condition, act.backend_repr)
+                )
+        control_sub_expression = {
+            k: recurse_if_else(v) for k,v in control_subs_pairs.items()
+        }
 
         state_equation_func = get_state_setter(
             ode_model.dot,
-            self.simulation_signature
+            self.simulation_signature,
+            subs = control_sub_expression,
         )
-
-
-        if len(ode_model.output):
-            self.y_expr = casadi.vertcat(*flatten(ode_model.output))
-        else:
-            self.y_expr = state_equation_func.expr
 
         self.e_exprs = []
         self.h_exprs = []
@@ -664,6 +684,7 @@ class TrajectoryAnalysis:
                     event.update,
                     self.simulation_signature,
                     default=None,
+                    subs = control_sub_expression,
                 )
             )
 
