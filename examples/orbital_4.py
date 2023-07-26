@@ -12,7 +12,8 @@ class Terminate(LinCovCW.Event):
     terminate_time = parameter()
     # TODO: how to make a symbol like this just provide the backend repr? or is this
     # correct?
-    function = t - terminate_time
+    #function = t - terminate_time
+    at_time = terminate_time,
 
 class Measurements(LinCovCW.Event):
     rcal = parameter(shape=3)
@@ -40,9 +41,10 @@ class Measurements(LinCovCW.Event):
     meas_dt = parameter()
     meas_t_offset = parameter()
 
-    function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
-    function = meas_dt*ca.sin(np.pi*(t-meas_t_offset)/meas_dt)/np.pi
+    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
+    #function = meas_dt*ca.sin(np.pi*(t-meas_t_offset)/meas_dt)/np.pi
     #function = t - meas_t_offset
+    at_time = (meas_t_offset, None, meas_dt)
 
 
 def add_measurement_params(kwargs):
@@ -96,7 +98,7 @@ scenario_1_kwargs = dict(
     # x is down-track with -x behind, +x in front
     # y is cross-track,
     # z altitude with +z below, -z above
-    initial_x=[-10_000., 0.2, 0., 0., 0., 0.,],
+    initial_x=[-10_000., 200, 0., 0., 0., 0.,],
 )
 
 scenario_2_target = [200., 0., 0.]
@@ -104,7 +106,7 @@ scenario_2_kwargs = dict(
     #The initial relative states (radial, along-track, and cross- track) are x0
     # (1 km; 10 km; 0.2 km; 0 m∕s; −1.7 m∕s; 0.2 m∕s, and the desired final relative 
     # states are xf (0 km; 0.2 km; 0 km; 0 m∕s; 0 m∕s; 0 m∕s). 
-    initial_x=[-2000., 0., 1000., 1.71, 0., 0.,],
+    initial_x=[10_000., 200., 1_000., 1.71, 0., 0.,],
 )
 
 low_cost_kwargs = dict(
@@ -151,7 +153,7 @@ MajorBurn = make_burn(
 Sim = make_sim()
 
 scenario_a_tf = 2000.
-first_tig = 0.1 # TODO: handle this.... 
+first_tig = 0. # TODO: handle this.... 
 scenario_1a = [
     Sim(
         **base_kwargs,
@@ -207,6 +209,7 @@ scenario_kwargs = dict(
 scenario_target = scenario_1_target
 cost_system_kwargs = low_cost_kwargs
 
+
 class Deterministic2Burn1a(co.OptimizationProblem):
     rds = []
     n_burns = len(make_burn.burns)
@@ -227,7 +230,7 @@ class Deterministic2Burn1a(co.OptimizationProblem):
         burn_config[LinCovCW.parameter.get(backend_repr=burn.tem).name] = ts[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tig).name] = ts[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=burn.rd).name] = rds[-1]
-    constraint(scenario_kwargs['terminate_time']-ts[-1], lower_bound=10.)
+    constraint(ts[-1], upper_bound=scenario_kwargs['terminate_time'])
     burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = scenario_kwargs['terminate_time']
     burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = scenario_target
 
@@ -251,6 +254,7 @@ import sys
 sys.exit()
 opt = Deterministic2Burn1a()
 """
+WITH SIMUPY VERSION
 
 trying to do deterministic optimization with extra  burn in middle got stuck on
 [-5076.54, 6.88871, 2582.95, 0.1, 1021.07, -200, 0, 0, 1021.07, 2000]
@@ -301,11 +305,82 @@ de-couple the variables enough the optimizer can find that tig doesn't matter if
 -> 0. And the 1-burn case because less constrained (although, could let the final rd be
 a variable as well and it should be able to work in either case.
 
+
+with new version,
+Deterministic2Burn1AVariable(
+t_2=694.5854379512559,
+pos_2=array([[-7.15808799e+03],
+       [ 2.58572260e-01],
+       [ 2.32135487e+03]]))
+
+
+nom = scenario_1a[1]._res
+x = nom.x
+t = np.array(nom.t)
+x[np.where((t > 690) & (t < 700))[0][0]][:6]
+array([-7.12781868e+03,  2.58437104e-01,  2.32952679e+03,  6.35514913e+00,
+       -2.91236881e-05,  1.70027993e+00])
+
+so again optimizer is just moving around (very closely!) on optimal trajectory which is
+sweet. I possibly let it go longer, and it might have been moving up the trajectory
+which I think makes sense for decreasing cost (but again, it's singular)...
+
+
 """
 
 scenario_b_tf = 12_000.
+scenario_kwargs = dict(
+    **scenario_1_kwargs,
+    terminate_time=scenario_b_tf,
+)
 
 
+MajorBurn = make_burn(
+    rd = LinCovCW.parameter(shape=3), # desired position
+    tig = LinCovCW.parameter(), # time ignition
+    tem = LinCovCW.parameter(), # time end maneuver
+)
+Sim = make_sim()
+
+class Deterministic3Burn1b(co.OptimizationProblem):
+    rds = []
+    n_burns = len(make_burn.burns)
+    burn_config = dict(tig_1=first_tig)
+    ts = [first_tig]
+    for burn_num, burn, next_burn in zip(range(1,n_burns+2), make_burn.burns, make_burn.burns[1:]):
+        ratio = burn_num/n_burns
+        ts.append(variable(
+            name=f"t_{burn_num+1}",
+            initializer=scenario_kwargs['terminate_time']*ratio
+        ))
+        rds.append(variable(
+            name=f"pos_{burn_num+1}",
+            shape=(3,),
+            initializer=np.array(scenario_kwargs["initial_x"][:3])*(1-ratio)+np.array(scenario_target)*ratio
+        ))
+        constraint(ts[-1]-ts[-2], lower_bound=10.)
+        burn_config[LinCovCW.parameter.get(backend_repr=burn.tem).name] = ts[-1]
+        burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tig).name] = ts[-1]
+        burn_config[LinCovCW.parameter.get(backend_repr=burn.rd).name] = rds[-1]
+    constraint(ts[-1], upper_bound=scenario_kwargs['terminate_time'])
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = scenario_kwargs['terminate_time']
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = scenario_target
+
+    sim = Sim(
+        **base_kwargs,
+        **scenario_kwargs,
+        **cost_system_kwargs,
+        **burn_config
+    )
+    objective = sim.final_vel_mag + 3*sim.final_vel_disp
+    for burn_num in range(n_burns):
+        objective += getattr(sim, f"Delta_v_mag_{burn_num+1}") + 3*getattr(sim, f"Delta_v_disp_{burn_num+1}")
+
+    class Casadi(co.Options):
+        exact_hessian=False
+        #method = OptimizationProblem.Method.scipy_trust_constr
+
+opt2 = Deterministic2Burn1b()
 
 #opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
 #opt_sim = Sim(

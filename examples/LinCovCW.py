@@ -128,7 +128,7 @@ def make_burn(rd, tig, tem,):
 
 
 
-    attrs["function"] = t - tig
+    #attrs["function"] = t - tig
     attrs["at_time"] = [tig]
 
     t_d = tem - tig
@@ -156,6 +156,7 @@ def make_burn(rd, tig, tem,):
 
     Delta_v = (T_pv_inv @ rd - T_pv_inv@T_pp @ x[:3, 0]) - x[3:, 0]
     update[Delta_v_mag] = Delta_v_mag + ca.norm_2(Delta_v)
+    #update[Delta_v_mag] = ca.norm_2(Delta_v)
     update[x]  = x + ca.vertcat(Z3, I3) @ (Delta_v)
 
     DG = ca.vertcat(
@@ -176,6 +177,7 @@ def make_burn(rd, tig, tem,):
     sigma_Dv__2 = ca.trace( Mc @ C @ Mc.T)
 
     update[Delta_v_disp] = Delta_v_disp + ca.sqrt(sigma_Dv__2)
+    #update[Delta_v_disp] = ca.sqrt(sigma_Dv__2)
     Burn = co.InnerModelType(burn_name, (LinCovCW.Event,), attrs=attrs)
     burns.append(Burn)
 
@@ -226,12 +228,21 @@ def make_sim(sim_name="Sim"):
     #)
 
     class Casadi(co.Options):
-        integrator_options = dict(
-            max_step = 1.,
-            #atol = 1E-15,
-            #rtol = 1E-12,
-            nsteps = 10000,
-        )
+        state_rtol = 1E-9
+        #state_atol = 1E-15
+        adjoint_rtol = 1E-9
+        #adjoint_atol = 1E-15
+        #state_max_step_size = 30.
+
+        state_adaptive_max_step_size = 4#16
+        adjoint_adaptive_max_step_size = 4
+
+        #integrator_options = dict(
+        #    max_step = 1.,
+        #    #atol = 1E-15,
+        #    #rtol = 1E-12,
+        #    nsteps = 10000,
+        #)
     attrs["Casadi"] = Casadi
 
     Sim = co.InnerModelType(sim_name, (LinCovCW.TrajectoryAnalysis,), attrs=attrs)
