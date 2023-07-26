@@ -21,7 +21,8 @@ V = ca.vertcat(Z3, I3, ca.MX(6,3))
 numeric_constants = False
 class LinCovCW(co.ODESystem):
     if numeric_constants:
-        omega = 0.0011
+        #omega = 0.0011
+        omega = 0.00114
         scal_w = ca.MX.ones(6)
         scal_v = ca.MX.ones(3)
     else:
@@ -156,12 +157,14 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
     class Casadi(co.Options):
-        state_rtol = 1E-9
-        adjoint_rtol = 1E-9
-        state_max_step_size = 30.
+        #state_rtol = 1E-9
+        #state_atol = 1E-15
+        #adjoint_rtol = 1E-9
+        #adjoint_atol = 1E-15
+        #state_max_step_size = 30.
 
-        #state_adaptive_max_step_size = 8
-        adjoint_adaptive_max_step_size = 8
+        state_adaptive_max_step_size = 4#16
+        adjoint_adaptive_max_step_size = 4
 
 
 from scipy.io import loadmat
@@ -180,7 +183,7 @@ class Hohmann(co.OptimizationProblem):
     tig = variable(initializer=200.)
     tf = variable(initializer=500.)
     constraint(tf - tig, lower_bound=30.)
-    constraint(tig, lower_bound=0.)
+    constraint(tig, lower_bound=0.1)
     sim = Sim(
         tig=tig,
         tem=tf,
@@ -244,10 +247,22 @@ hoh_stop = perf_counter()
 hohmann_sim = Sim(**sim_kwargs, tig=hohmann.tig, tem=hohmann.tf)
 opt_jac = Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
 
+
+total_delta_v  = TotalDeltaV(pos_disp_max=1000)
+tot_delta_v_sim = Sim(**sim_kwargs, tig=total_delta_v.tig, tem=total_delta_v.tf)
+
+
+total_delta_v_constrained  = TotalDeltaV(pos_disp_max=10.)
+tot_delta_v_constrained_sim = Sim(
+    **sim_kwargs, tig=total_delta_v_constrained.tig, tem=total_delta_v_constrained.tf
+)
+
 print("\n"*2,"hohmann")
 print(hohmann._stats)
 print((hohmann.tf - hohmann.tig)*hohmann.sim.omega*180/np.pi)
 print(hohmann_sim.tot_Delta_v_disp)
+print(hohmann_sim.final_pos_disp)
+print(hohmann.tig, hohmann.tf)
 print("time:", hoh_stop- hoh_start)
 
 print("opt grad  wrt tig", opt_jac[DV_idx, tig_idx])
@@ -256,18 +271,6 @@ print("opt grad  wrt tem", opt_jac[DV_idx, tem_idx])
 opt grad  wrt tig -4.48258e-09
 opt grad  wrt tem -1.47125e-09
 """
-
-
-import sys
-sys.exit()
-
-total_delta_v  = TotalDeltaV(pos_disp_max=1000)
-tot_delta_v_sim = Sim(**sim_kwargs, tig=total_delta_v.tig, tem=total_delta_v.tf)
-
-total_delta_v_constrained  = TotalDeltaV(pos_disp_max=10.)
-tot_delta_v_constrained_sim = Sim(
-    **sim_kwargs, tig=total_delta_v_constrained.tig, tem=total_delta_v_constrained.tf
-)
 
 print("\n"*2,"unconstrained Delta v")
 print(total_delta_v._stats)
