@@ -746,8 +746,6 @@ class TrajectoryAnalysis:
             [grad_jac],
         )
 
-
-
         state_integrand_jacs = [
             casadi.jacobian(integrand_term, self.x).T
             for integrand_term in integrand_terms
