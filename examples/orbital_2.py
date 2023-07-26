@@ -109,7 +109,7 @@ def make_burn(rd, tig, tem):
             [name.startswith("tem_") for name in LinCovCW.parameter.list_of('name')]
         ))] = tem
 
-    attrs["function"] = t - tig
+    #attrs["function"] = t - tig
     attrs["at_time"] = [tig]
 
     t_d = tem - tig
@@ -183,7 +183,7 @@ class Terminate(LinCovCW.Event):
     terminate = True
     # TODO: how to make a symbol like this just provide the backend repr? or is this
     # correct?
-    function = t - MajorBurn.tem
+    #function = t - MajorBurn.tem
     at_time = [MajorBurn.tem]
 
 
@@ -199,14 +199,7 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
     final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
-    class Casadi(co.Options):
-
-        integrator_options = dict(
-            #rtol = 1E-15,
-            #atol = 1E-18,
-            #nsteps = 10_000,
-            #max_step = 5.,
-        )
+    #class Casadi(co.Options):
 
 
 from scipy.io import loadmat
