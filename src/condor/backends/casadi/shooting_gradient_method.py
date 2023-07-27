@@ -86,13 +86,5 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         self.res = self.i.StateSystem(p)
         self.output = self.i.trajectory_analysis(self.res)
 
-        #Sim = self.i.model
-        #DV_idx = Sim.trajectory_output.flat_index(Sim.tot_Delta_v_mag)
-        #tig_idx = Sim.parameter.flat_index(Sim.tig)
-        #tem_idx = Sim.parameter.flat_index(Sim.tem)
-        #p = p.toarray().squeeze()
-        #print("eval params:", p[tig_idx], p[tem_idx])
-        #print("output:", self.output)
-
         return self.output,
 

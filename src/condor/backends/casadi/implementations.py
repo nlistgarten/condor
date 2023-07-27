@@ -232,9 +232,11 @@ class OptimizationProblem(InitializerMixin):
     def __init__(
         self, model,
         exact_hessian=True,
-        method=Method.ipopt
+        method=Method.ipopt,
+        scipy_trust_constr_options=dict(xtol=1E-8,),
     ):
         self.model = model
+        self.scipy_trust_constr_options = scipy_trust_constr_options
 
         self.f = f = getattr(model, 'objective', 0)
         self.has_p = bool(len(model.parameter))
@@ -438,7 +440,7 @@ class OptimizationProblem(InitializerMixin):
                 args = extra_args,
                 constraints = scipy_constraints,
                 #options=dict(disp=True),
-                options=dict(xtol=1E-3,),
+                options=self.scipy_trust_constr_options,
             )
             model_instance.bind_field(self.model.variable, min_out.x)
             model_instance.objective = min_out.fun
@@ -641,7 +643,7 @@ class TrajectoryAnalysis:
                     e_expr = casadi.fmod(ode_model.t - at_time_start, at_time.step) 
 
                     # TODO: verify start and stop for at_time slice
-                    if at_time_start:
+                    if isinstance(at_time_start, casadi.MX) or at_time_start != 0.:
                         e_expr = e_expr * (ode_model.t >= at_time_start)
                         # if there is a start offset, add a linear term to provide a
                         # zero-crossing at first occurance

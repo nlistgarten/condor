@@ -44,7 +44,7 @@ class Measurements(LinCovCW.Event):
     #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
     #function = meas_dt*ca.sin(np.pi*(t-meas_t_offset)/meas_dt)/np.pi
     #function = t - meas_t_offset
-    at_time = (meas_t_offset, None, meas_dt)
+    at_time = slice(meas_t_offset, None, meas_dt)
 
 
 def add_measurement_params(kwargs):
@@ -199,6 +199,8 @@ scenario_kwargs = dict(
 scenario_target = scenario_1_target
 cost_system_kwargs = nominal_kwargs
 
+base_kwargs['meas_t_offset'] = scenario_b_tf*2
+
 # generate additional burns
 for idx in range(2): 
     MajorBurn = make_burn(
@@ -214,8 +216,9 @@ class OptimizeBurns(co.OptimizationProblem):
     disp_weighting = parameter()
     rds = []
     n_burns = len(make_burn.burns)
-    burn_config = dict(tig_1=first_tig)
+    #tig_1 = variable(initializer=0.)
     ts = [first_tig]
+    burn_config = dict(tig_1=first_tig)
     for burn_num, burn, next_burn in zip(range(1,n_burns+2), make_burn.burns, make_burn.burns[1:]):
         ratio = burn_num/n_burns
         ts.append(variable(
@@ -231,6 +234,15 @@ class OptimizeBurns(co.OptimizationProblem):
         burn_config[LinCovCW.parameter.get(backend_repr=burn.tem).name] = ts[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tig).name] = ts[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=burn.rd).name] = rds[-1]
+
+    print(burn_config)
+
+    #constraint(ts[0], lower_bound=0.)
+    #for tig1, tig2 in zip(ts, ts[1:]):
+    #    constraint(tig2 - tig1, lower_bound=10.)
+    #del tig1
+    #del tig2
+
     constraint(ts[-1], upper_bound=scenario_kwargs['terminate_time'])
     burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = scenario_kwargs['terminate_time']
     burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = scenario_target
@@ -247,7 +259,8 @@ class OptimizeBurns(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian=False
-        #method = OptimizationProblem.Method.scipy_trust_constr
+        method = OptimizationProblem.Method.scipy_trust_constr
+        scipy_trust_constr_options = dict(xtol=0.5)
 
 ##########
 # print basic results
@@ -265,6 +278,85 @@ print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_2a])
 import sys
 sys.exit()
 opt = OptimizeBurns(disp_weighting=0.)
+
+burn_config = {
+    k: (getattr(opt, OptimizeBurns.variable.get(backend_repr=v).name) 
+        if isinstance(v, co.backend.symbol_class)
+        else v)
+    for k, v in OptimizeBurns.burn_config.items()
+}
+base_kwargs['meas_t_offset'] = 1.
+sim = Sim(
+    **base_kwargs,
+    **scenario_kwargs,
+    **cost_system_kwargs,
+    **burn_config
+)
+n_burns = len(make_burn.burns)
+print(f"number of burns: {n_burns}")
+sum_Dv_mag = 0.
+sum_Dv_disp = 0.
+for burn_num in range(1,n_burns+1):
+    Dv_mag = getattr(sim, f"Delta_v_mag_{burn_num}") 
+    Dv_disp = getattr(sim, f"Delta_v_disp_{burn_num}")
+    print(f"burn {burn_num} Dv mag={Dv_mag}  Dv_disp={Dv_disp}")
+    sum_Dv_mag += Dv_mag
+    sum_Dv_disp += Dv_disp
+print(f"station keeping Dv mag: {sim.final_vel_mag} Dv disp: {sim.final_vel_disp}")
+sum_Dv_mag += sim.final_vel_mag
+sum_Dv_disp += sim.final_vel_disp
+print(f"sum Dv mag: {sum_Dv_mag} sum Dv disp: {sum_Dv_disp}")
+
+
+
+"""
+it seems like deterministic optimization works? optimized without measurements and no
+cost on dispersions. printing results:
+all with nominal system
+
+number of burns: 4
+burn 1 Dv mag=0.3153309307059405  Dv_disp=0.7758637078444677
+burn 2 Dv mag=0.14203863154665575  Dv_disp=3.111739412027804
+burn 3 Dv mag=0.00010573804293171246  Dv_disp=3.082904533529533
+burn 4 Dv mag=0.13910781100635025  Dv_disp=0.6227367795704676
+station keeping Dv mag: 0.34438088985547344 Dv disp: 0.8457393966256312
+sum Dv mag: 0.9409640011573517 sum Dv disp: 8.438983829597904
+
+               nit: 83
+              nfev: 79
+              njev: 79
+              nhev: 0
+          cg_niter: 206
+      cg_stop_cond: 4
+    execution_time: 557.3584508895874
+
+number of burns: 3
+burn 1 Dv mag=0.3190782349198173  Dv_disp=0.7753267283700211
+burn 2 Dv mag=0.09632063881042148  Dv_disp=2.09186927785427
+burn 3 Dv mag=0.12307501820671937  Dv_disp=2.4635927604678933
+station keeping Dv mag: 0.3693249362442293 Dv disp: 0.6033972893243764
+sum Dv mag: 0.9077988281811875 sum Dv disp: 5.934186056016561
+               nit: 157
+              nfev: 147
+              njev: 147
+              nhev: 0
+          cg_niter: 465
+    execution_time: 783.8889710903168
+
+number of burns: 2
+burn 1 Dv mag=0.4769377976734905  Dv_disp=0.7763192505627957
+burn 2 Dv mag=4.030104489162445e-05  Dv_disp=1.1096163206930227
+station keeping Dv mag: 0.5278931124949962 Dv disp: 0.7114305651416224
+sum Dv mag: 1.0048712112133782 sum Dv disp: 2.597366136397441
+               nit: 55
+              nfev: 51
+              njev: 51
+              nhev: 0
+          cg_niter: 61
+    execution_time: 172.77766108512878
+
+"""
+
 """
 analysis with "2 burn" -- I think this is actually 3 burns, because I wasn't counting
 station keeping?

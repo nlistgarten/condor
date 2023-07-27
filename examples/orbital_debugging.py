@@ -18,9 +18,10 @@ class Terminate(LinCovCW.Event):
     terminate = True
     # TODO: how to make a symbol like this just provide the backend repr? or is this
     # correct?
-    function = t - MajorBurn.tem
-    at_time = [MajorBurn.tem]
+    #function = t - MajorBurn.tem
+    at_time = [MajorBurn.tem,]
 
+"""
 class Measurements(LinCovCW.Event):
     rcal = parameter(shape=3)
     rcalhat = parameter(shape=3)
@@ -47,11 +48,14 @@ class Measurements(LinCovCW.Event):
     meas_dt = parameter()
     meas_t_offset = parameter()
 
-    function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
+    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
     # this re-normalizes the derivative to be ~1 at the 0-crossings which may or may not
     # be helpful
-    function = meas_dt*ca.sin(np.pi*(t-meas_t_offset)/meas_dt)/np.pi
+    #function = meas_dt*ca.sin(np.pi*(t-meas_t_offset)/meas_dt)/np.pi
     #function = t - meas_t_offset
+    #at_time = [meas_t_offset, None, meas_dt]
+    at_time = [meas_t_offset,]
+"""
 
 sim_kwargs.update(dict(
     meas_dt = 2300.,
@@ -89,12 +93,13 @@ sim_kwargs.update(dict(
 Sim = make_sim()
 
 sim_kwargs.update(dict(
-    tem_1 = 2300.,
-    meas_dt = 200.,
+    tem_1 = 3800.,
+    #meas_dt = 200.,
     #meas_t_offset = 7.5,
-    meas_t_offset = 851.,
+    #meas_t_offset = 851.,
 ))
 tigs = np.arange(600, 1100., 5)
+tigs = np.arange(10, 3000., 5)
 tig_sims= [
     (
         Sim(
@@ -114,6 +119,7 @@ plt.show()
 import sys
 sys.exit()
 
+sim_kwargs.pop('meas_t_offset', None)
 meas_times = np.arange(300, 1100, 5.)
 meas_times = np.arange(300, 900, 5.)
 meas_times = np.arange(2, 202, 5.)
