@@ -438,6 +438,7 @@ class OptimizationProblem(InitializerMixin):
                 args = extra_args,
                 constraints = scipy_constraints,
                 #options=dict(disp=True),
+                options=dict(xtol=1E-3,),
             )
             model_instance.bind_field(self.model.variable, min_out.x)
             model_instance.objective = min_out.fun

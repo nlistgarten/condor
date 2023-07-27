@@ -232,9 +232,9 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
     class Casadi(co.Options):
-        state_rtol = 1E-9
+        #state_rtol = 1E-9
         #state_atol = 1E-15
-        adjoint_rtol = 1E-9
+        #adjoint_rtol = 1E-9
         #adjoint_atol = 1E-15
         #state_max_step_size = 30.
 
@@ -311,4 +311,77 @@ burn time minimization
  barrier_parameter: 2.048000000000001e-09
  barrier_tolerance: 2.048000000000001e-09
              niter: 149
+
+
+with scaling & changing settings for trajectory analysis
+           message: `xtol` termination condition is satisfied.
+           success: True
+            status: 2
+               fun: 1.1974569662175378
+                 x: [ 8.510e-01]
+               nit: 173
+              nfev: 304
+              njev: 304
+              nhev: 0
+          cg_niter: 161
+      cg_stop_cond: 2
+              grad: [ 1.643e+00]
+   lagrangian_grad: [ 5.483e-01]
+            constr: [array([ 8.510e-01]), array([ 7.261e+00])]
+               jac: [<1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>, <1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0, 304]
+       constr_njev: [0, 304]
+       constr_nhev: [0, 0]
+                 v: [array([-1.086e+00]), array([ 2.566e-02])]
+            method: tr_interior_point
+        optimality: 0.5483186407562503
+  constr_violation: 0.0
+    execution_time: 562.644110918045
+         tr_radius: 1.0000000000000005e-09
+    constr_penalty: 1.0
+ barrier_parameter: 2.048000000000001e-09
+ barrier_tolerance: 2.048000000000001e-09
+             niter: 173
+
+changing xtol to 1E-3
+burn time minimization
+           message: `xtol` termination condition is satisfied.
+           success: True
+            status: 2
+               fun: 1.1974578234547488
+                 x: [ 8.510e+02]
+               nit: 84
+              nfev: 132
+              njev: 132
+              nhev: 0
+          cg_niter: 72
+      cg_stop_cond: 2
+              grad: [ 1.643e-03]
+   lagrangian_grad: [ 1.643e-03]
+            constr: [array([ 8.510e+02]), array([ 7.261e+00])]
+               jac: [<1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>, <1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0, 132]
+       constr_njev: [0, 132]
+       constr_nhev: [0, 0]
+                 v: [array([-3.255e-09]), array([ 7.765e-08])]
+            method: tr_interior_point
+        optimality: 0.0016431186701373075
+  constr_violation: 0.0
+    execution_time: 239.6840078830719
+         tr_radius: 0.00010000000000000003
+    constr_penalty: 1.0
+ barrier_parameter: 2.048000000000001e-09
+ barrier_tolerance: 2.048000000000001e-09
+             niter: 84
+
+In [2]: opt.t1
+Out[2]: 851.000523726278
+
+In [3]: opt.t1 - 851
+Out[3]: 0.0005237262779473895
+
 """

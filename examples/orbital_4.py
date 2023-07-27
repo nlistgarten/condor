@@ -153,6 +153,7 @@ MajorBurn = make_burn(
 Sim = make_sim()
 
 scenario_a_tf = 2000.
+scenario_b_tf = 12_000.
 first_tig = 0. # TODO: handle this.... 
 scenario_1a = [
     Sim(
@@ -180,14 +181,6 @@ scenario_2a = [
 ]
 
 
-print([sim.final_pos_disp for sim in scenario_1a])
-print([sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_1a])
-print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_1a])
-
-print([sim.final_pos_disp for sim in scenario_2a])
-print([sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_2a])
-print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_2a])
-
 # the dispersions are the same between scenario 1a and 2a, which makes sense -- just
 # propagating covariance between the first burn and final burn. 1b and 2b look like they
 # introduce more variations I assume because the intermediate burns are doing something
@@ -195,22 +188,30 @@ print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_2a])
 # slightly but not much
 
 
+####################
+# DEFINE THE SCENARIO
+####################
 
-MajorBurn = make_burn(
-    rd = LinCovCW.parameter(shape=3), # desired position
-    tig = LinCovCW.parameter(), # time ignition
-    tem = LinCovCW.parameter(), # time end maneuver
-)
-Sim = make_sim()
 scenario_kwargs = dict(
     **scenario_1_kwargs,
-    terminate_time=scenario_a_tf,
+    terminate_time=scenario_b_tf,
 )
 scenario_target = scenario_1_target
-cost_system_kwargs = low_cost_kwargs
+cost_system_kwargs = nominal_kwargs
+
+# generate additional burns
+for idx in range(2): 
+    MajorBurn = make_burn(
+        rd = LinCovCW.parameter(shape=3), # desired position
+        tig = LinCovCW.parameter(), # time ignition
+        tem = LinCovCW.parameter(), # time end maneuver
+    )
+
+Sim = make_sim()
 
 
-class Deterministic2Burn1a(co.OptimizationProblem):
+class OptimizeBurns(co.OptimizationProblem):
+    disp_weighting = parameter()
     rds = []
     n_burns = len(make_burn.burns)
     burn_config = dict(tig_1=first_tig)
@@ -240,20 +241,33 @@ class Deterministic2Burn1a(co.OptimizationProblem):
         **cost_system_kwargs,
         **burn_config
     )
-    objective = sim.final_vel_mag + 3*sim.final_vel_disp
+    objective = sim.final_vel_mag + disp_weighting*sim.final_vel_disp
     for burn_num in range(n_burns):
-        objective += getattr(sim, f"Delta_v_mag_{burn_num+1}") + 3*getattr(sim, f"Delta_v_disp_{burn_num+1}")
+        objective += getattr(sim, f"Delta_v_mag_{burn_num+1}") + disp_weighting*getattr(sim, f"Delta_v_disp_{burn_num+1}")
 
     class Casadi(co.Options):
         exact_hessian=False
         #method = OptimizationProblem.Method.scipy_trust_constr
 
+##########
+# print basic results
+#########
+
+print([sim.final_pos_disp for sim in scenario_1a])
+print([sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_1a])
+print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_1a])
+
+print([sim.final_pos_disp for sim in scenario_2a])
+print([sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_2a])
+print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_2a])
 
 
 import sys
 sys.exit()
-opt = Deterministic2Burn1a()
+opt = OptimizeBurns(disp_weighting=0.)
 """
+analysis with "2 burn" -- I think this is actually 3 burns, because I wasn't counting
+station keeping?
 WITH SIMUPY VERSION
 
 trying to do deterministic optimization with extra  burn in middle got stuck on
@@ -325,10 +339,92 @@ so again optimizer is just moving around (very closely!) on optimal trajectory w
 sweet. I possibly let it go longer, and it might have been moving up the trajectory
 which I think makes sense for decreasing cost (but again, it's singular)...
 
+with 3 burns, I think trust_constr eventually worked? got an objective value similar to
+ipopt but actually closed
+In [4]: opt2.variable
+Out[4]: 
+Deterministic3Burn1AVariable(t_2=735.3199620174034, pos_2=array([[-6896.48148127],
+       [  257.20017037],
+       [ 2387.2343194 ]]), t_3=1257.515572589859, pos_3=array([[-3350.07016741],
+       [  193.4188517 ],
+       [ 2397.86145275]]))
+
+In [5]: opt2.objective
+Out[5]: 18.563590917695457
+
+In [6]: opt2._stats
+Out[6]: 
+           message: `xtol` termination condition is satisfied.
+           success: True
+            status: 2
+               fun: 18.563590917695457
+                 x: [ 7.353e+02 -6.896e+03  2.572e+02  2.387e+03  1.258e+03
+                     -3.350e+03  1.934e+02  2.398e+03]
+               nit: 407
+              nfev: 403
+              njev: 403
+              nhev: 0
+          cg_niter: 1054
+      cg_stop_cond: 2
+              grad: [-2.428e-03  7.880e-04  1.923e-03 -1.018e-03 -1.407e-03
+                     -4.959e-04 -1.296e-03 -2.436e-03]
+   lagrangian_grad: [-2.428e-03  7.880e-04  1.923e-03 -1.018e-03 -1.407e-03
+                     -4.959e-04 -1.296e-03 -2.436e-03]
+            constr: [array([ 7.353e+02,  5.222e+02,  1.258e+03])]
+               jac: [<3x8 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 4 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0]
+       constr_njev: [0]
+       constr_nhev: [0]
+                 v: [array([ 4.613e-09, -3.896e-09,  2.555e-09])]
+            method: tr_interior_point
+        optimality: 0.002435981079436409
+  constr_violation: 0.0
+    execution_time: 2439.46755194664
+         tr_radius: 5.272835838258389e-09
+    constr_penalty: 1.0
+ barrier_parameter: 2.048000000000001e-09
+ barrier_tolerance: 2.048000000000001e-09
+             niter: 407
+
+
+may have also worked for 4 total burn case? fixed t1, but could have let it be free
+no cost on dispersion, objective is 30% worse than with free t1 from paper
+           message: `gtol` termination condition is satisfied.
+           success: True
+            status: 1
+               fun: 0.9077987770809444
+                 x: [ 4.597e+03 -5.166e+03  1.209e+02  3.698e+02  7.183e+03
+                     -5.498e+03 -9.271e+01  2.684e+02]
+               nit: 195
+              nfev: 184
+              njev: 184
+              nhev: 0
+          cg_niter: 599
+      cg_stop_cond: 4
+              grad: [ 4.063e-09  5.255e-10  1.230e-09 -1.564e-09  2.034e-09
+                      9.449e-10  1.213e-09 -2.280e-09]
+   lagrangian_grad: [ 4.063e-09  5.255e-10  1.230e-09 -1.564e-09  2.034e-09
+                      9.449e-10  1.213e-09 -2.280e-09]
+            constr: [array([ 4.597e+03,  2.586e+03,  7.183e+03])]
+               jac: [<3x8 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 4 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0]
+       constr_njev: [0]
+       constr_nhev: [0]
+                 v: [array([-4.466e-13, -7.947e-13,  4.251e-13])]
+            method: tr_interior_point
+        optimality: 4.0630590995652806e-09
+  constr_violation: 0.0
+    execution_time: 870.5520279407501
+         tr_radius: 1005602.9416134846
+    constr_penalty: 1.0
+ barrier_parameter: 2.048000000000001e-09
+ barrier_tolerance: 2.048000000000001e-09
+             niter: 195
 
 """
 
-scenario_b_tf = 12_000.
 scenario_kwargs = dict(
     **scenario_1_kwargs,
     terminate_time=scenario_b_tf,
@@ -342,13 +438,13 @@ MajorBurn = make_burn(
 )
 Sim = make_sim()
 
-class Deterministic3Burn1b(co.OptimizationProblem):
+class Deterministic3Burn1a(co.OptimizationProblem):
     rds = []
     n_burns = len(make_burn.burns)
     burn_config = dict(tig_1=first_tig)
     ts = [first_tig]
     for burn_num, burn, next_burn in zip(range(1,n_burns+2), make_burn.burns, make_burn.burns[1:]):
-        ratio = burn_num/n_burns
+        ratio = burn_num/(n_burns+1)
         ts.append(variable(
             name=f"t_{burn_num+1}",
             initializer=scenario_kwargs['terminate_time']*ratio
@@ -380,7 +476,7 @@ class Deterministic3Burn1b(co.OptimizationProblem):
         exact_hessian=False
         #method = OptimizationProblem.Method.scipy_trust_constr
 
-opt2 = Deterministic2Burn1b()
+opt2 = Deterministic3Burn1a()
 
 #opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
 #opt_sim = Sim(

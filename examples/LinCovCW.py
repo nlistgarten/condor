@@ -228,9 +228,9 @@ def make_sim(sim_name="Sim"):
     #)
 
     class Casadi(co.Options):
-        state_rtol = 1E-9
+        #state_rtol = 1E-9
         #state_atol = 1E-15
-        adjoint_rtol = 1E-9
+        #adjoint_rtol = 1E-9
         #adjoint_atol = 1E-15
         #state_max_step_size = 30.
 
@@ -326,4 +326,6 @@ def deriv_check_plots(indep_var, output_vars, sims, title_prefix=''):
         axes[1].plot(xgrid, jac[:, ord_idx, xidx], '--', label='SGM')
         axes[1].grid(True)
         axes[1].legend()
+
+
 
