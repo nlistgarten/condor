@@ -16,7 +16,7 @@ class DblInt(co.ODESystem):
     mode = state()
     p1 = parameter()
     p2 = parameter()
-    u = control()
+    u = modal()
     dot[x] = A@x + B*u
 
 class Accel(DblInt.Mode):

@@ -194,11 +194,15 @@ class SolverSciPy:
                     (self.integration_direction * last_t) 
                     >= (self.integration_direction * next_t)
                 ) or np.nextafter(next_t, last_t) == results.t[-1]:
+                    # ideally this one gets triggered by an at_time event
+                    # subsequent case is really only if integrator terminated (and
+                    # thinks successful) but closest event 
+
                     break
 
-                if np.any(
-                    (system.events(next_t, results.x[-1]) == 0.).astype(int) 
-                    & rootsfound
+                if solver_flag ==1 and np.any(
+                    (system.events(next_t, results.x[-1]) == 0.)
+                    & rootsfound.astype(bool)
                 ):
                     break
 

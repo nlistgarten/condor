@@ -1027,7 +1027,7 @@ class ODESystem(Model):
     initial = MatchedField(state)
     parameter = FreeField()
     dot = MatchedField(state)
-    control = WithDefaultField(Direction.internal)
+    modal = WithDefaultField(Direction.internal)
 
 
 class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "initial", "state"]):
@@ -1091,7 +1091,7 @@ class Mode(Model, inner_to=ODESystem,):
     deferred subsystems? Yes but only for ODESystems..
     """
     pass
-    action = MatchedField(ODESystem.control, direction=Direction.internal)
+    action = MatchedField(ODESystem.modal, direction=Direction.internal)
 
 
 def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):

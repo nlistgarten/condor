@@ -21,7 +21,7 @@ class DblInt(co.ODESystem):
 
     t1 = parameter()
     t2 = parameter()
-    u = control()
+    u = modal()
     dot[x] = A@x + B*u
 
     if with_time_state:

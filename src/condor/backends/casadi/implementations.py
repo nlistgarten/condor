@@ -229,11 +229,12 @@ class OptimizationProblem(InitializerMixin):
         scipy_trust_constr = auto()
         scipy_slsqp = auto()
 
+    scipy_trust_constr_option_defaults = dict(xtol=1E-8,)
     def __init__(
         self, model,
         exact_hessian=True,
         method=Method.ipopt,
-        scipy_trust_constr_options=dict(xtol=1E-8,),
+        scipy_trust_constr_options=dict(),
     ):
         self.model = model
         self.scipy_trust_constr_options = scipy_trust_constr_options
@@ -578,7 +579,7 @@ class TrajectoryAnalysis:
 
         control_subs_pairs = {
             control.backend_repr: [(control.default,)]
-            for control in ode_model.control
+            for control in ode_model.modal
         }
         for mode in ode_model.Mode.subclasses:
             for act in mode.action:
