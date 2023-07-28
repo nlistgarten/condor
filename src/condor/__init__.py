@@ -641,6 +641,9 @@ class Model(metaclass=ModelType):
             input_kwargs[input_name] = input_val
         input_kwargs.update(kwargs)
         self.input_kwargs = {name: input_kwargs[name] for name in cls.input_names}
+        for key in kwargs:
+            if key not in self.input_kwargs:
+                raise ValueError("Unexpected keyword argument {key} in {cls.__name__}")
 
         # TODO: check bounds on model inputs?
 
