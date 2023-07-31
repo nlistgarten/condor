@@ -501,6 +501,7 @@ def get_state_setter(field, setter_args, default=0., subs={}):
         f"{field._model_name}_{field._matched_to._name}_{field._name}",
         setter_args,
         setter_exprs,
+        dict(allow_free=True,),
     )
     setter_func.expr = setter_exprs[0]
     return setter_func
@@ -556,7 +557,8 @@ class TrajectoryAnalysis:
         traj_out_integrand_func = casadi.Function(
             f"{model.__name__}_trajectory_output_integrand",
             self.simulation_signature,
-            [self.traj_out_integrand]
+            [self.traj_out_integrand],
+            dict(allow_free=True,),
         )
 
         terminal_terms = flatten(model.trajectory_output.list_of('terminal_term'))
@@ -564,7 +566,8 @@ class TrajectoryAnalysis:
         traj_out_terminal_term_func = casadi.Function(
             f"{model.__name__}_trajectory_output_terminal_term",
             self.simulation_signature,
-            [self.traj_out_terminal_term]
+            [self.traj_out_terminal_term],
+            dict(allow_free=True,),
         )
 
 
@@ -574,6 +577,7 @@ class TrajectoryAnalysis:
             f"{model.__name__}_x0_jacobian",
             [self.p],
             [self.p_state0_p_p_expr],
+            dict(allow_free=True,),
         )
         p_state0_p_p.expr = self.p_state0_p_p_expr
 
@@ -743,11 +747,13 @@ class TrajectoryAnalysis:
             f"{ode_model.__name__}_state_jacobian",
             self.simulation_signature,
             [lamda_jac.T],
+            dict(allow_free=True,),
         )
         param_dot_jac_func = casadi.Function(
             f"{ode_model.__name__}_param_jacobian",
             self.simulation_signature,
             [grad_jac],
+            dict(allow_free=True,),
         )
 
         state_integrand_jacs = [
@@ -759,6 +765,7 @@ class TrajectoryAnalysis:
                     f"{ode_model.__name__}_state_integrand_jac_{ijac_expr_idx}",
                     self.simulation_signature,
                     [ijac_expr],
+                    dict(allow_free=True,),
                 ) for ijac_expr_idx, ijac_expr in enumerate(state_integrand_jacs)
         ]
 
@@ -791,6 +798,7 @@ class TrajectoryAnalysis:
                 f"{model.__name__}_{traj_name}_lamda_dot",
                 self.adjoint_signature,
                 [lamda_dot],
+                dict(allow_free=True,),
             ) for lamda_dot, traj_name in zip(self.lamda_dots, traj_out_names)
         ]
         self.grad_dot_funcs = [
@@ -798,6 +806,7 @@ class TrajectoryAnalysis:
                 f"{model.__name__}_{traj_name}_grad_dot",
                 self.adjoint_signature,
                 [grad_dot],
+                dict(allow_free=True,),
             ) for grad_dot, traj_name in zip(self.grad_dots, traj_out_names)
         ]
 
@@ -903,6 +912,10 @@ class TrajectoryAnalysis:
         self.trajectory_analysis = sgm.TrajectoryAnalysis(
             traj_out_integrand_func, traj_out_terminal_term_func,
         )
+        self.e_exprs = casadi.vertcat(*self.e_exprs)
+        for key, val in control_sub_expression.items():
+            self.e_exprs = casadi.substitute(self.e_exprs, key, val)
+
         self.StateSystem = sgm.System(
             dim_state = model.state._count,
             initial_state = self.state0,
@@ -914,7 +927,8 @@ class TrajectoryAnalysis:
             events = casadi.Function(
                 f"{ode_model.__name__}_event",
                 self.simulation_signature,
-                [casadi.vertcat(*self.e_exprs)],
+                [self.e_exprs],
+                dict(allow_free=True,),
             ),
             updates = self.h_exprs,
             num_events = num_events,
