@@ -59,6 +59,9 @@ class SolverSciPy:
         self.gs = new_gs
         results.t.append(np.copy(store_t))
         results.x.append(np.copy(store_x))
+        if system.dynamic_output:
+            results.y.append(system.dynamic_output(results.p, t, x))
+
         if np.any(self.rootinfo):
             return -1
 
@@ -266,6 +269,7 @@ class SolverCVODE:
         time_generator = system.time_generator()
         last_t = next(time_generator)
         results.t.append(last_t)
+        # TODO: add dynamic_output feature
 
         gs = system.events(last_t, last_x)
         rootsfound = (gs == 0.).astype(int)
@@ -407,6 +411,7 @@ class System:
     def __init__(
         self, dim_state, initial_state, dot, jac, time_generator,
         events, updates, num_events, terminating,
+        dynamic_output = None,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
         solver_class = SolverSciPy,
     ):
@@ -432,6 +437,7 @@ class System:
         self._events = events
         #     list of functions for 
         self._updates = updates
+        self.dynamic_output = dynamic_output
 
         #     define initial conditions
         self._initial_state = initial_state
@@ -510,6 +516,7 @@ class ResultBase:
     system: System
     t: list[float] = field(default_factory=list)
     x: list[list] = field(default_factory=list)
+    y: list[list] = field(default_factory=list)
     e: list[Root] = field(default_factory=list)
 
     def __getitem__(self, key):
@@ -668,6 +675,7 @@ class AdjointSystem(System):
         self.state_jac = state_jac
         self.dte_dxs, self.d2te_dxdts, self.dh_dxs = dte_dxs, d2te_dxdts, dh_dxs,
         self.num_events = 1
+        self.dynamic_output = None
 
         self.make_solver(
             atol=atol,

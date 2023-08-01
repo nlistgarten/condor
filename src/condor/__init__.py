@@ -963,6 +963,7 @@ class ODESystem(Model):
     parameter = FreeField()
     dot = MatchedField(state)
     modal = WithDefaultField(Direction.internal)
+    dynamic_output = AssignedField(Direction.internal)
 
 
 class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "initial", "state"]):

@@ -924,6 +924,17 @@ class TrajectoryAnalysis:
         )
         self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
 
+        if len(ode_model.dynamic_output):
+            self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
+            self.y_expr = substitute(self.y_expr, control_sub_expression)
+            self.dynamic_output_func = casadi.Function(
+                f"{ode_model.__name__}_dynamic_output",
+                self.simulation_signature,
+                [self.y_expr],
+            )
+        else:
+            self.dynamic_output_func = None
+
         self.StateSystem = sgm.System(
             dim_state = model.state._count,
             initial_state = self.state0,
@@ -941,6 +952,7 @@ class TrajectoryAnalysis:
             updates = self.h_exprs,
             num_events = num_events,
             terminating = terminating,
+            dynamic_output = self.dynamic_output_func,
             atol=state_atol,
             rtol=state_rtol,
             adaptive_max_step=state_adaptive_max_step_size,
