@@ -492,10 +492,7 @@ def get_state_setter(field, setter_args, default=0., subs={}):
                 )
     #setter_exprs = flatten(setter_exprs)
     setter_exprs = casadi.vertcat(*setter_exprs)
-    for key, val in subs.items():
-        setter_exprs = casadi.substitute(
-            setter_exprs, key, val
-        )
+    setter_exprs = substitute(setter_exprs, subs)
     setter_exprs = [setter_exprs]
     setter_func = casadi.Function(
         f"{field._model_name}_{field._matched_to._name}_{field._name}",
@@ -505,6 +502,13 @@ def get_state_setter(field, setter_args, default=0., subs={}):
     )
     setter_func.expr = setter_exprs[0]
     return setter_func
+
+def substitute(expr, subs):
+    for key, val in subs.items():
+        expr = casadi.substitute(
+            expr, key, val
+        )
+    return expr
 
 def recurse_if_else(conditions_actions):
     if len(conditions_actions) == 1:
@@ -842,16 +846,18 @@ class TrajectoryAnalysis:
             dh_dx = casadi.jacobian(h_expr.expr, self.x)
             dh_dp = casadi.jacobian(h_expr.expr, self.p)
 
-
+            dte_dx = substitute(dte_dx, control_sub_expression)
             self.dte_dxs.append(
                 casadi.Function(
                     f"{event.__name__}_dte_dx",
                     self.simulation_signature,
-                    [dte_dx]
+                    [dte_dx],
                 )
             )
             self.dte_dxs[-1].expr = dte_dx
 
+
+            dte_dp = substitute(dte_dp, control_sub_expression)
             self.dte_dps.append(
                 casadi.Function(
                     f"{event.__name__}_dte_dp",
@@ -861,6 +867,7 @@ class TrajectoryAnalysis:
             )
             self.dte_dps[-1].expr = dte_dp
 
+            d2te_dxdt = substitute(d2te_dxdt, control_sub_expression)
             self.d2te_dxdts.append(
                 casadi.Function(
                     f"{event.__name__}_d2te_dxdt",
@@ -870,6 +877,7 @@ class TrajectoryAnalysis:
             )
             self.d2te_dxdts[-1].expr = d2te_dxdt
 
+            d2te_dpdt = substitute(d2te_dpdt, control_sub_expression)
             self.d2te_dpdts.append(
                 casadi.Function(
                     f"{event.__name__}_d2te_dpdt",
@@ -880,6 +888,7 @@ class TrajectoryAnalysis:
             self.d2te_dpdts[-1].expr = d2te_dpdt
 
 
+            dh_dx = substitute(dh_dx, control_sub_expression)
             self.dh_dxs.append(
                 casadi.Function(
                     f"{event.__name__}_dh_dx",
@@ -889,6 +898,7 @@ class TrajectoryAnalysis:
             )
             self.dh_dxs[-1].expr = dh_dx
 
+            dh_dp = substitute(dh_dp, control_sub_expression)
             self.dh_dps.append(
                 casadi.Function(
                     f"{event.__name__}_dh_dp",
@@ -912,9 +922,7 @@ class TrajectoryAnalysis:
         self.trajectory_analysis = sgm.TrajectoryAnalysis(
             traj_out_integrand_func, traj_out_terminal_term_func,
         )
-        self.e_exprs = casadi.vertcat(*self.e_exprs)
-        for key, val in control_sub_expression.items():
-            self.e_exprs = casadi.substitute(self.e_exprs, key, val)
+        self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
 
         self.StateSystem = sgm.System(
             dim_state = model.state._count,
