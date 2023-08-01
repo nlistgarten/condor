@@ -1002,6 +1002,11 @@ class TrajectoryAnalysis:
                 np.array(res.x).T,
                 wrap=True,
             )
+            model_instance.bind_field(
+                self.ode_model.dynamic_output,
+                np.array(res.y).T,
+                wrap=True,
+            )
 
         model_instance.bind_field(
             self.model.trajectory_output,
