@@ -665,7 +665,7 @@ class TrajectoryAnalysis:
                         # if there is an end-time, hold constant to prevent additional
                         # zero crossings -- hopefully works even if stop is on an event
                         #post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
-                        post_term = (ode_model.t >= at_time.stop) * casadi.fmod(at_time.stop - at_time_start)
+                        post_term = (ode_model.t >= at_time.stop) * casadi.fmod(at_time.stop - at_time_start, at_time.step)
                         at_time_stop = at_time.stop
                     else:
                         post_term = 0

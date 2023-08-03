@@ -83,7 +83,7 @@ class SolverSciPy:
 
         g_spl = make_interp_spline(spline_ts[time_sort], spline_gs[time_sort], k=k)
         x_spl = make_interp_spline(spline_ts[time_sort], spline_xs[time_sort], k=k)
-        t_events = np.empty(system.num_events)
+        t_events = np.full(system.num_events, np.inf)
 
 
 
@@ -98,6 +98,7 @@ class SolverSciPy:
         min_t = np.min(t_events)
         if np.any(t_events[np.where(gs_sign != 0)[0]] > min_t):
             breakpoint()
+        self.rootinfo[t_events > min_t] = 0
 
         return min_t, x_spl(min_t)
 
