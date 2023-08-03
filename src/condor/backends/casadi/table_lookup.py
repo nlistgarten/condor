@@ -28,16 +28,16 @@ class NDSplinesHessianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         self.construct(name, {})
         self.interpolant = interpolant
 
-    def get_sparsity_in(self,i):
-        if i==0: # nominal input
-            return casadi.Sparsity.dense(self.primary_shape[1])
-        elif i==1: # nominal output
-            return casadi.Sparsity(self.primary_shape[0], 1)
-        elif i == 2:
-            return casadi.Sparsity(self.antiderivative_callback.primary_shape)
+    # def get_sparsity_in(self,i):
+    #     if i==0: # nominal input
+    #         return casadi.Sparsity.dense(self.primary_shape[1])
+    #     elif i==1: # nominal output
+    #         return casadi.Sparsity(self.primary_shape[0], 1)
+    #     elif i == 2:
+    #         return casadi.Sparsity(self.antiderivative_callback.primary_shape)
 
-    def get_sparsity_out(self,i):
-        return casadi.Sparsity.dense(self.primary_shape)
+    # def get_sparsity_out(self,i):
+    #     return casadi.Sparsity.dense(self.primary_shape)
 
     def eval(self, local_args):
         breakpoint()
