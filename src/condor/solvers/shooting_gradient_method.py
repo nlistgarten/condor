@@ -84,7 +84,11 @@ class SolverSciPy:
 
         g_spl = make_interp_spline(spline_ts[time_sort], spline_gs[time_sort], k=k)
         x_spl = make_interp_spline(spline_ts[time_sort], spline_xs[time_sort], k=k)
-        t_events = np.full(system.num_events, spline_ts[-1])
+        t_events = np.empty(system.num_events)
+
+        #ts_for_g = np.linspace(*spline_ts[-2:], 4)
+        #spline_gs = np.array([system.events(tt, x_spl(tt)) for tt in ts_for_g])
+        #g_spl = make_interp_spline(ts_for_g[time_sort], spline_gs[time_sort], k=k)
 
         g_der = g_spl.derivative()
 
@@ -95,6 +99,8 @@ class SolverSciPy:
                 find_prime = lambda t: g_der(t)[g_idx]
                 set_t = brentq(find_function, spline_ts[-2], spline_ts[-1],)
                 #set_t = newton(find_function, spline_ts[-2], find_prime, tol=1E-12)
+            else:
+                set_t = spline_ts[-1]
             t_events[g_idx] = set_t
 
         min_t = np.min(t_events)
