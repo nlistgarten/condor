@@ -24,9 +24,20 @@ class NDSplinesHessianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
             anti_deriv_interp.ydim * anti_deriv_interp.xdim,
             anti_deriv_interp.xdim
         )
+        self.func = antiderivative.func.jacobian()
         self.construct(name, {})
         self.interpolant = interpolant
-        self.func = antiderivative.func.jacobian()
+
+    def get_sparsity_in(self,i):
+        if i==0: # nominal input
+            return casadi.Sparsity.dense(self.primary_shape[1])
+        elif i==1: # nominal output
+            return casadi.Sparsity(self.primary_shape[0], 1)
+        elif i == 2:
+            return casadi.Sparsity(self.antiderivative_callback.primary_shape)
+
+    def get_sparsity_out(self,i):
+        return casadi.Sparsity.dense(self.primary_shape)
 
     def eval(self, local_args):
         breakpoint()
@@ -58,6 +69,15 @@ class NDSplinesJacobianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
 
         self.construct(name, {})
         self.interpolant = interpolant
+
+    def get_sparsity_in(self,i):
+        if i==0: # nominal input
+            return casadi.Sparsity.dense(self.primary_shape[1])
+        elif i==1: # nominal output
+            return casadi.Sparsity(self.primary_shape[0], 1)
+
+    def get_sparsity_out(self,i):
+        return casadi.Sparsity.dense(self.primary_shape)
 
     def eval(self, local_args):
         array_vals = [
