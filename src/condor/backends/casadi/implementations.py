@@ -529,6 +529,8 @@ class TrajectoryAnalysis:
 
         state_atol=1E-12, state_rtol=1E-6,
         state_adaptive_max_step_size=0., state_max_step_size = 0,
+        # TODO add options for scipy solver name (dopri5 or dop853) and settings for the
+        # rootfinder, including choosing between brentq and newton
 
         adjoint_atol=1E-12, adjoint_rtol=1E-6,
         adjoint_adaptive_max_step_size=4., adjoint_max_step_size = 0,

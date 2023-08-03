@@ -7,6 +7,13 @@ from enum import Enum
 from condor.backends.default import backend
 from condor.backends import BackendSymbolData
 
+# TODO **kwarg expansion for a field (with a filter?)
+# TODO copy all parameters (with a filter?) from one model
+# --> together, a very convenient way to connect a system with many variables
+# use a dict and/or dummy system to define an "interface" which can be used to filter
+# OR: pass a system itself? works for settings.conf, not sure if it's very convenient
+# to implement generally (same as abandoned deferred subsystem idea)
+
 def asdict(obj):
     return dict(
         (field.name, getattr(obj, field.name)) for field in fields(obj) if field.init

@@ -11,7 +11,7 @@ else:
     has_cvode = True
 
 from scipy.integrate import ode as scipy_ode
-from scipy.optimize import brentq
+from scipy.optimize import brentq, newton
 from typing import NamedTuple
 
 
@@ -25,6 +25,7 @@ class SolverSciPy:
         self.solver = scipy_ode( system.dots,)
         self.int_options = dict(
             name = "dopri5",
+            #name = "dop853",
             atol = atol,
             rtol = rtol,
             max_step=max_step_size,
@@ -83,21 +84,20 @@ class SolverSciPy:
 
         g_spl = make_interp_spline(spline_ts[time_sort], spline_gs[time_sort], k=k)
         x_spl = make_interp_spline(spline_ts[time_sort], spline_xs[time_sort], k=k)
-        t_events = np.full(system.num_events, np.inf)
+        t_events = np.full(system.num_events, spline_ts[-1])
 
+        g_der = g_spl.derivative()
 
 
         for g_idx, g_sign in enumerate(gs_sign):
             if g_sign:
                 find_function = lambda t: g_spl(t)[g_idx]
+                find_prime = lambda t: g_der(t)[g_idx]
                 set_t = brentq(find_function, spline_ts[-2], spline_ts[-1],)
-            else:
-                set_t = spline_ts[-1]
+                #set_t = newton(find_function, spline_ts[-2], find_prime, tol=1E-12)
             t_events[g_idx] = set_t
 
         min_t = np.min(t_events)
-        if np.any(t_events[np.where(gs_sign != 0)[0]] > min_t):
-            breakpoint()
         self.rootinfo[t_events > min_t] = 0
 
         return min_t, x_spl(min_t)
@@ -150,7 +150,9 @@ class SolverSciPy:
             while True:
                 solver.integrate(next_t)
                 if not solver.successful():
+                    results.e.append(Root(len(results.t), np.zeros(system.num_events)))
                     breakpoint()
+                    return
 
                 # assume we have an event, either a true event or at next_t
 
