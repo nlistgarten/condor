@@ -218,7 +218,7 @@ class ModelType(type):
         # TODO: is it better to do inner model magic in InnerModelType.__prepare__?
 
 
-        print("end prepare for", model_name, cls_dict)
+        print("end prepare for", model_name,)# cls_dict)
         return cls_dict
 
     def __call__(cls, *args, **kwargs):
@@ -278,7 +278,6 @@ class ModelType(type):
                 print(f"{attr_name} was defined on outer of {name}")
 
         print("CondorModelType.__new__ for", name, bases, kwargs)
-        print(attrs)
 
 
 
@@ -389,7 +388,7 @@ class ModelType(type):
                 # TODO: from the output of a subsystem? Does this case matter?
 
                 if not known_symbol_type:
-                    print("unknown symbol type", attr_name, attr_val)
+                    print("unknown symbol type", attr_name)#, attr_val)
                     # Hit by ODESystem.t, is that okay?
                     # TODO: maybe DONT pass these on. they don't work to use in the
                     # another model since they don't get bound correctly, then just have
@@ -701,7 +700,7 @@ class InnerModelType(ModelType):
 
     def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
         print("\nInnerModelType.__new__ for class", cls,"name", name, "bases", bases,
-              "original", original_class, "\nkwargs:", kwargs, "\nattrs:", attrs, "\n")
+              "original", original_class, "\nkwargs:", kwargs,"\n")# "\nattrs:", attrs, "\n")
         # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
         # (inner model template)
