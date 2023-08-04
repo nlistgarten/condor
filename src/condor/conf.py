@@ -18,7 +18,12 @@ class Settings:
         self.settings.pop()
         return mod
 
-    def get_settings(self, defaults):
+    def get_settings(self, *args, **defaults):
+        if args and defaults or len(args) > 1:
+            raise ValueError
+        if args:
+            defaults = args[0]
+
         # TODO: defensive check on unused self.settings? Or maybe it's a feature to
         # allow unused settings so a big dict can be used for a project
 

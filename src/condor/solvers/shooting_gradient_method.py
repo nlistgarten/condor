@@ -12,7 +12,7 @@ else:
 
 from scipy.integrate import ode as scipy_ode
 from scipy.optimize import brentq, newton
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 
 class SolverSciPy:
@@ -559,11 +559,11 @@ class ResultInterpolant:
     # don't pass interpolants to init?
     # should state_Result be saved or just be an initvar? I back-references are OK so 
     # we can keep it...
-    interpolants: list[callable] | None = None # field(init=False)
-    time_bounds: list[float] | None = None # field(init=False)
+    interpolants: Optional[list[callable]] = None # field(init=False)
+    time_bounds: Optional[list[float]] = None # field(init=False)
     time_comparison: callable = field(init=False) # method
     interval_select: int = field(init=False)
-    event_idxs: list | None = None
+    event_idxs: Optional[list] = None
 
     def __post_init__(self):
         # make interpolants
