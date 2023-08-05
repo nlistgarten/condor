@@ -596,9 +596,11 @@ class TrajectoryAnalysis:
                 control_subs_pairs[act.match.backend_repr].append(
                     (mode.condition, act.backend_repr)
                 )
-        control_sub_expression = {
-            k: recurse_if_else(v) for k,v in control_subs_pairs.items()
-        }
+        control_sub_expression = {}
+        for k,v in control_subs_pairs.items():
+            control_sub_expression[k] = substitute(
+                recurse_if_else(v), control_sub_expression
+            )
 
         state_equation_func = get_state_setter(
             ode_model.dot,
