@@ -65,6 +65,8 @@ class Newton:
         while True:
             if itr >= self.max_iter:
                 print("newton failed, max iters reached")
+                print(f"x: {x}\np: {p}")
+                breakpoint()
                 break
 
             # eval residuals func

@@ -14,6 +14,46 @@ from condor.backends import BackendSymbolData
 # OR: pass a system itself? works for settings.conf, not sure if it's very convenient
 # to implement generally (same as abandoned deferred subsystem idea)
 
+# TODO could intercept models created within the class and create an API for the pattern
+# of creating input field elements to a super-system based on input field elements that
+# the sub-system require that aren't matching outputs of previous sub-systems (exact
+# name matching or define dictionary where key is current subsystem input name and value
+# is previous subsytem output name to connect) and 
+# want to do something like 
+"""
+class AnyTopeofModel(co....):
+    some specific setup
+    
+    subsystem_ref_1 = create_subsystem(SomeNormalModel, **aliases)
+    # adds attributes for holding all input, and then useful subsets. ref has outputs
+
+"""
+# so this is a field, and it has to know about its parent class -- or we make parameter
+# the only input field for all models and output as a required output field with others
+# specified. output field maintains order of other fields elements ast hey are defined
+# -- maybe output is either the built-in or a special field that combines other fields?
+# so implicit and explicit still exist for algebraic but they are really accessed
+# through the combo field.
+
+# this is basically deferred model?
+# aliases allow complete & explicit control of what connects to subsystem
+
+
+# don't need to include API for specifying which subsystems connect to which -- just
+# create a new model for each open chain, can only create a closed-loop by wrapping with
+# algebraic system or optimization problem & alias to variables/implicit_output
+# I guess could also have API to terminate outputs so they don't get promoted. Is this
+# just literally promotes=*?
+
+
+# TODO defensive chek to make sure trajectory analysis doesn't over write odemodel
+# dynamic output? 
+# todo inner_to is only for ode system. should backref have a better name than
+# `inner_to`? Maybe even ODESystem....
+
+# keyword expand modals? 
+
+
 def asdict(obj):
     return dict(
         (field.name, getattr(obj, field.name)) for field in fields(obj) if field.init
@@ -138,7 +178,7 @@ class Field:
         if self._resolve_name:
             return f"<{self.__class__.__name__}: {self._resolve_name}>"
 
-    def get(self, **kwargs):
+    def get(self, *args, **kwargs):
         """
         return list of field symbols where every field matches kwargs
         if only one, return symbol without list wrapper
@@ -147,6 +187,11 @@ class Field:
         # very few times, so hopefully don't need to stress too much about
         # implementation
         # would be nice to be able to follow references, etc. can match be used?
+        if len(args) == 1 and not kwargs:
+            field_value = args[0]
+            if isinstance(field_value, backend.symbol_class):
+                kwargs.update(backend_repr=field_value)
+
         items = []
         for item in self._symbols:
             this_item = True

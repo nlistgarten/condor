@@ -199,10 +199,10 @@ scenario_kwargs = dict(
 scenario_target = scenario_1_target
 cost_system_kwargs = nominal_kwargs
 
-base_kwargs['meas_t_offset'] = scenario_b_tf*2
+#base_kwargs['meas_t_offset'] = scenario_b_tf*2
 
 # generate additional burns
-for idx in range(2): 
+for idx in range(1): 
     MajorBurn = make_burn(
         rd = LinCovCW.parameter(shape=3), # desired position
         tig = LinCovCW.parameter(), # time ignition
@@ -216,26 +216,26 @@ class OptimizeBurns(co.OptimizationProblem):
     disp_weighting = parameter()
     rds = []
     n_burns = len(make_burn.burns)
-    #tig_1 = variable(initializer=0.)
-    ts = [first_tig]
-    burn_config = dict(tig_1=first_tig)
+    t_1 = variable(initializer=1.)
+    ts = [t_1]
+    burn_config = dict(tig_1=t_1)
+    constraint(t_1, lower_bound=0.)
     for burn_num, burn, next_burn in zip(range(1,n_burns+2), make_burn.burns, make_burn.burns[1:]):
         ratio = burn_num/n_burns
+        rds.append(variable(
+            name=f"target_pos_{burn_num}",
+            shape=(3,),
+            initializer=np.array(scenario_kwargs["initial_x"][:3])*(1-ratio)+np.array(scenario_target)*ratio
+        ))
         ts.append(variable(
             name=f"t_{burn_num+1}",
             initializer=scenario_kwargs['terminate_time']*ratio
         ))
-        rds.append(variable(
-            name=f"pos_{burn_num+1}",
-            shape=(3,),
-            initializer=np.array(scenario_kwargs["initial_x"][:3])*(1-ratio)+np.array(scenario_target)*ratio
-        ))
         constraint(ts[-1]-ts[-2], lower_bound=10.)
+        burn_config[LinCovCW.parameter.get(backend_repr=burn.rd).name] = rds[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=burn.tem).name] = ts[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tig).name] = ts[-1]
-        burn_config[LinCovCW.parameter.get(backend_repr=burn.rd).name] = rds[-1]
 
-    print(burn_config)
 
     #constraint(ts[0], lower_bound=0.)
     #for tig1, tig2 in zip(ts, ts[1:]):
@@ -244,8 +244,9 @@ class OptimizeBurns(co.OptimizationProblem):
     #del tig2
 
     constraint(ts[-1], upper_bound=scenario_kwargs['terminate_time'])
-    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = scenario_kwargs['terminate_time']
     burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = scenario_target
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = scenario_kwargs['terminate_time']
+    print(burn_config)
 
     sim = Sim(
         **base_kwargs,
@@ -285,7 +286,7 @@ burn_config = {
         else v)
     for k, v in OptimizeBurns.burn_config.items()
 }
-base_kwargs['meas_t_offset'] = 1.
+#base_kwargs['meas_t_offset'] = 1.
 sim = Sim(
     **base_kwargs,
     **scenario_kwargs,
@@ -299,7 +300,8 @@ sum_Dv_disp = 0.
 for burn_num in range(1,n_burns+1):
     Dv_mag = getattr(sim, f"Delta_v_mag_{burn_num}") 
     Dv_disp = getattr(sim, f"Delta_v_disp_{burn_num}")
-    print(f"burn {burn_num} Dv mag={Dv_mag}  Dv_disp={Dv_disp}")
+    tig = getattr(sim, f"tig_{burn_num}")
+    print(f"burn {burn_num} at time {tig} Dv mag={Dv_mag}  Dv_disp={Dv_disp}")
     sum_Dv_mag += Dv_mag
     sum_Dv_disp += Dv_disp
 print(f"station keeping Dv mag: {sim.final_vel_mag} Dv disp: {sim.final_vel_disp}")
@@ -315,13 +317,12 @@ cost on dispersions. printing results:
 all with nominal system
 
 number of burns: 4
-burn 1 Dv mag=0.3153309307059405  Dv_disp=0.7758637078444677
-burn 2 Dv mag=0.14203863154665575  Dv_disp=3.111739412027804
-burn 3 Dv mag=0.00010573804293171246  Dv_disp=3.082904533529533
-burn 4 Dv mag=0.13910781100635025  Dv_disp=0.6227367795704676
+burn 1 at time 0.0 Dv mag=0.3153309307059405  Dv_disp=0.7758637078444677
+burn 2 at time 3177.8613106217754 Dv mag=0.14203863154665575  Dv_disp=3.111739412027804
+burn 3 at time 6006.860129115569 Dv mag=0.00010573804293171246  Dv_disp=3.082904533529533
+burn 4 at time 8936.682407426808 Dv mag=0.13910781100635025  Dv_disp=0.6227367795704676
 station keeping Dv mag: 0.34438088985547344 Dv disp: 0.8457393966256312
 sum Dv mag: 0.9409640011573517 sum Dv disp: 8.438983829597904
-
                nit: 83
               nfev: 79
               njev: 79
@@ -329,11 +330,13 @@ sum Dv mag: 0.9409640011573517 sum Dv disp: 8.438983829597904
           cg_niter: 206
       cg_stop_cond: 4
     execution_time: 557.3584508895874
-
+                 x: [ 3.178e+03 -7.822e+03 -1.173e+02  8.452e+02  6.007e+03
+                     -5.116e+03  1.046e+02  2.467e+02  8.937e+03 -2.342e+03
+                     -6.541e+01  8.439e+02]
 number of burns: 3
-burn 1 Dv mag=0.3190782349198173  Dv_disp=0.7753267283700211
-burn 2 Dv mag=0.09632063881042148  Dv_disp=2.09186927785427
-burn 3 Dv mag=0.12307501820671937  Dv_disp=2.4635927604678933
+burn 1 at time 0.0 Dv mag=0.3190782349198173  Dv_disp=0.7753267283700211
+burn 2 at time 4597.286167918477 Dv mag=0.09632063881042148  Dv_disp=2.09186927785427
+burn 3 at time 7183.471779707452 Dv mag=0.12307501820671937  Dv_disp=2.4635927604678933
 station keeping Dv mag: 0.3693249362442293 Dv disp: 0.6033972893243764
 sum Dv mag: 0.9077988281811875 sum Dv disp: 5.934186056016561
                nit: 157
@@ -342,10 +345,12 @@ sum Dv mag: 0.9077988281811875 sum Dv disp: 5.934186056016561
               nhev: 0
           cg_niter: 465
     execution_time: 783.8889710903168
+                 x: [ 4.597e+03 -5.166e+03  1.209e+02  3.699e+02  7.183e+03
+                     -5.498e+03 -9.270e+01  2.684e+02]
 
 number of burns: 2
-burn 1 Dv mag=0.4769377976734905  Dv_disp=0.7763192505627957
-burn 2 Dv mag=4.030104489162445e-05  Dv_disp=1.1096163206930227
+burn 1 at time 0.0 Dv mag=0.4769377976734905  Dv_disp=0.7763192505627957
+burn 2 at time 6005.014128295938 Dv mag=4.030104489162445e-05  Dv_disp=1.1096163206930227
 station keeping Dv mag: 0.5278931124949962 Dv disp: 0.7114305651416224
 sum Dv mag: 1.0048712112133782 sum Dv disp: 2.597366136397441
                nit: 55
@@ -354,6 +359,58 @@ sum Dv mag: 1.0048712112133782 sum Dv disp: 2.597366136397441
               nhev: 0
           cg_niter: 61
     execution_time: 172.77766108512878
+                 x: [ 6.005e+03 -5.102e+03  1.131e+02 -7.700e+01]
+
+
+free t1 found a much better answer that matches the paper SOCP sort of
+number of burns: 3
+burn 1 at time 1209.2894545866598 Dv mag=0.33766356512284995  Dv_disp=0.8092825243719685
+burn 2 at time 4874.401911309868 Dv mag=0.030531473412992758  Dv_disp=0.9324664218268841
+burn 3 at time 7780.871126412133 Dv mag=0.04809948465444022  Dv_disp=0.8153536524167068
+station keeping Dv mag: 0.2962967042513561 Dv disp: 0.5804081468585136
+sum Dv mag: 0.712591227441639 sum Dv disp: 3.137510745474073
+               nit: 111
+              nfev: 101
+              njev: 101
+              nhev: 0
+          cg_niter: 402
+    execution_time: 402.08212018013
+                 x: [ 1.209e+03 -5.691e+03  3.252e+01  7.442e+02  4.874e+03
+                     -4.935e+03 -3.871e+01  4.180e+02  7.781e+03]
+
+more burns isn't better with a coast
+number of burns: 4
+burn 1 at time 15.058356538734472 Dv mag=0.3207376172108785  Dv_disp=0.5994442544823134
+burn 2 at time 3216.4773005350257 Dv mag=0.13587308145536162  Dv_disp=1.6161122192921535
+burn 3 at time 6044.639240368033 Dv mag=3.813559192315825e-05  Dv_disp=1.6485758290639116
+burn 4 at time 8923.919031666028 Dv mag=0.13875794652737028  Dv_disp=0.6249323665270865
+station keeping Dv mag: 0.34797000880727824 Dv disp: 0.8391191198047925
+sum Dv mag: 0.9433767895928119 sum Dv disp: 5.328183789170257
+               nit: 106
+              nfev: 102
+              njev: 102
+              nhev: 0
+          cg_niter: 265
+    execution_time: 864.384425163269
+
+with stochastic aware:
+umber of burns: 3
+burn 1 at time 31.082632071856537 Dv mag=0.21903784717380712  Dv_disp=0.5527441482614776
+burn 2 at time 4151.451077246527 Dv mag=0.5520327023769721  Dv_disp=0.18215686105777934
+burn 3 at time 7872.1051405466915 Dv mag=0.5732367858859878  Dv_disp=0.4712048659592569
+station keeping Dv mag: 0.23714228875344903 Dv disp: 0.5865132804600679
+sum Dv mag: 1.581449624190216 sum Dv disp: 1.7926191557385818
+               nit: 46
+              nfev: 43
+              njev: 43
+              nhev: 0
+          cg_niter: 77
+      cg_stop_cond: 2
+    execution_time: 21758.865051031113
+                 x: [ 3.108e+01 -6.730e+03 -7.218e+01  3.660e+02  4.151e+03
+                     -3.466e+03 -1.066e+02  3.646e+02  7.872e+03]
+was running 3 opts simultaneously, I think I killed my memory. Seemed to finish pretty
+quick after that.
 
 """
 

@@ -72,6 +72,7 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         self.i = intermediate
         self.construct(name, {})
         self.from_implementation = False
+        self.p = None
 
     def get_jacobian(self, name, inames, onames, opts):
         if DEBUG_LEVEL:
@@ -82,9 +83,10 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         return self.jac_callback
 
     def eval(self, args):
-        p = self.p = casadi.vertcat(*args)
-        self.res = self.i.StateSystem(p)
-        self.output = self.i.trajectory_analysis(self.res)
-
+        p  = casadi.vertcat(*args)
+        if self.p is None or not np.all(self.p == p):
+            self.p = p
+            self.res = self.i.StateSystem(p)
+            self.output = self.i.trajectory_analysis(self.res)
         return self.output,
 

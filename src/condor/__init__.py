@@ -639,7 +639,10 @@ class Model(metaclass=ModelType):
                 raise ValueError(f"Argument {input_name} has value {input_val} from args and {kwargs[input_name]} from kwargs")
             input_kwargs[input_name] = input_val
         input_kwargs.update(kwargs)
-        self.input_kwargs = {name: input_kwargs[name] for name in cls.input_names}
+        try:
+            self.input_kwargs = {name: input_kwargs[name] for name in cls.input_names}
+        except KeyError as e:
+            raise ValueError(f"Could not find keyword arguments {e.args} in {cls.__name__}")
         for key in kwargs:
             if key not in self.input_kwargs:
                 raise ValueError(f"Unexpected keyword argument {key} in {cls.__name__}")
