@@ -611,36 +611,47 @@ class ResultInterpolant:
                     np.array(function(result.p, t, x)).squeeze() 
                     for t, x in zip(result.t[idx0:idx1], result.x[idx0:idx1])
                 ] for idx0, idx1 in zip(event_idxs[:-1], event_idxs[1:])]
-
-                self.interpolants = [
-                    ResultSegmentInterpolant(
-                       make_interp_spline( result.t[idx0], [coeff_data[0]], k=0,),
-                        idx0, idx1,
-                        result.t[idx0], result.t[idx1],
-                        result.x[idx0], result.x[idx1],
-                    )
-                    if np.all(np.diff(coeff_data, axis=0) == 0.)
-                    else ResultSegmentInterpolant(
-                       make_interp_spline(
-                           result.t[idx0:idx1][self.time_sort],
-                           coeff_data[self.time_sort],
-                           k=min(3, idx1-idx0-1), # not needed with adaptive step size!
-                           #bc_type=["natural", "natural"],
-                       ),
-                        idx0, idx1,
-                        result.t[idx0], result.t[idx1],
-                        result.x[idx0], result.x[idx1],
-                    )
-                    for idx0, idx1, coeff_data in zip(
-                        event_idxs[:-1],
-                        event_idxs[1:],#-1,
-                        all_coeff_data
-                    )
-                    #if result.t[idx1] != result.t[idx0]
-                ]
             except Exception as my_e:
                 print(my_e)
                 breakpoint()
+
+            self.interpolants = []
+            for idx0, idx1, coeff_data in zip(
+                event_idxs[:-1],
+                event_idxs[1:],#-1,
+                all_coeff_data
+            ):
+                if np.all(np.diff(coeff_data, axis=0) == 0.):
+
+                    try:
+                        interp = ResultSegmentInterpolant(
+                           make_interp_spline( result.t[idx0], [coeff_data[0]], k=0,),
+                            idx0, idx1,
+                            result.t[idx0], result.t[idx1],
+                            result.x[idx0], result.x[idx1],
+                        )
+                    except Exception as my_e:
+                        print(my_e)
+                        breakpoint()
+
+                else:
+                    try:
+                        interp = ResultSegmentInterpolant(
+                           make_interp_spline(
+                               result.t[idx0:idx1][self.time_sort],
+                               coeff_data[self.time_sort],
+                               k=min(3, idx1-idx0-1), # not needed with adaptive step size!
+                               #bc_type=["natural", "natural"],
+                           ),
+                            idx0, idx1,
+                            result.t[idx0], result.t[idx1],
+                            result.x[idx0], result.x[idx1],
+                        )
+                    except Exception as my_e:
+                        print(my_e)
+                        breakpoint()
+                self.interpolants.append(interp)
+                #if result.t[idx1] != result.t[idx0]
 
     def __call__(self, t):
         interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]
