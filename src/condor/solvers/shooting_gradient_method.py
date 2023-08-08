@@ -61,7 +61,7 @@ class SolverSciPy:
         results.t.append(np.copy(store_t))
         results.x.append(np.copy(store_x))
         if system.dynamic_output:
-            results.y.append(np.array(system.dynamic_output(results.p, t, x)).reshape(-1))
+            results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
 
         if np.any(self.rootinfo):
             return -1
