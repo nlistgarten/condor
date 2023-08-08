@@ -53,13 +53,13 @@ class SolverSciPy:
             store_t, store_x = self.find_root(t, x, new_gs, gs_sign)
         else:
             self.rootinfo = None
-            store_t, store_x = t, x
+            store_t, store_x = t, np.copy(x)
             if results.e and results.e[-1].index == len(results.t) and t != results.t[-1]:
-                store_t = np.copy(results.t[-1])
+                store_t = results.t[-1]
 
         self.gs = new_gs
-        results.t.append(np.copy(store_t))
-        results.x.append(np.copy(store_x))
+        results.t.append(store_t)
+        results.x.append(store_x)
         if system.dynamic_output:
             results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
 
@@ -126,7 +126,7 @@ class SolverSciPy:
             # subsequent events use length of time for index, so root index is the index
             # of the updated state to the right of event. -> root coinciding with 
             # initialization has index 1
-            last_x = system.update(last_t, np.copy(last_x), rootsfound)
+            last_x = system.update(last_t, last_x, rootsfound)
         results.e.append(Root(1, rootsfound))
 
 
@@ -192,7 +192,7 @@ class SolverSciPy:
                 terminate = np.any(rootsfound[system.terminating] != 0)
 
 
-                last_t = np.copy(results.t[-1])
+                last_t = results.t[-1]
                 self.gs = system.events(last_t, next_x)
 
                 if terminate:
