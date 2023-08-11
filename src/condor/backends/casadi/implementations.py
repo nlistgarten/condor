@@ -233,12 +233,12 @@ class OptimizationProblem(InitializerMixin):
     scipy_trust_constr_option_defaults = dict(xtol=1E-8,)
     def __init__(
         self, model,
-        exact_hessian=True,
+        exact_hessian=True, # False -> ipopt alias for limited memory
         method=Method.ipopt,
-        scipy_trust_constr_options=dict(),
+        **options,
     ):
         self.model = model
-        self.scipy_trust_constr_options = scipy_trust_constr_options
+        self.scipy_trust_constr_options = options
 
         self.f = f = getattr(model, 'objective', 0)
         self.has_p = bool(len(model.parameter))
@@ -265,13 +265,12 @@ class OptimizationProblem(InitializerMixin):
 
             self.ipopt_opts = ipopt_opts = dict(
                 print_time= False,
-                ipopt = dict(
-                    print_level=5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
-                    #tol=1E-14, # tighter tol for sensitivty
-                    #accept_every_trial_step="yes",
-                    #max_iter=1000,
-                    #constr_viol_tol=10.,
-                ),
+                ipopt = options,
+                #print_level=5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
+                #tol=1E-14, # tighter tol for sensitivty
+                #accept_every_trial_step="yes",
+                #max_iter=1000,
+                #constr_viol_tol=10.,
                 bound_consistency=True,
                 #clip_inactive_lam=True,
                 #calc_lam_x=False,
