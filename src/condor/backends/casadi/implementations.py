@@ -169,9 +169,10 @@ class AlgebraicSystem(InitializerMixin):
         bound_behavior=BoundBehavior.p1,
         line_search_contraction = 0.5, # 1.0 -> no line search?
         line_search_criteria=LineSearchCriteria.armijo,
-        eror_on_failure=False,
+        error_on_fail=False,
     ):
         rootfinder_options = dict(
+            error_on_fail = error_on_fail,
         )
         self.x = casadi.vertcat(*flatten(model.implicit_output))
         self.g0 = casadi.vertcat(*flatten(model.residual))
