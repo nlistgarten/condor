@@ -6,13 +6,14 @@ from condor.solvers.newton import Newton
 
 class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
 
-    def __init__(self, name, x, p, g0, g1, lbx, ubx, x0, rootfinder_options, initializer):
+    def __init__(self, name, x, p, g0, g1, lbx, ubx, x0, rootfinder_options, initializer, enforce_bounds=True):
         casadi.Callback.__init__(self)
         self.name = name
         self.initializer = initializer
         self.x0 = x0
         self.lbx = np.array(lbx)
         self.ubx = np.array(ubx)
+        self.enforce_bounds = enforce_bounds
 
         self.newton = Newton(
             x,
@@ -55,9 +56,14 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
         self.x0[lbx_violations] = self.lbx[lbx_violations]
         self.x0[ubx_violations] = self.ubx[ubx_violations]
 
-        self.x0 = self.newton(self.x0, p)
-        self.resid, out_exp = self.resid_func(self.x0, p)
-        out_exp = out_exp.toarray().reshape(-1)
+        if self.enforce_bounds:
+            self.x0 = self.newton(self.x0, p)
+            self.resid, out_exp = self.resid_func(self.x0, p)
+            out_exp = out_exp.toarray().reshape(-1)
+        else:
+            self.x0, out_exp = self.rootfinder(self.x0, p)
+            self.x0 = self.x0.toarray().reshape(-1)
+            out_exp = out_exp.toarray().reshape(-1)
 
         return tuple([*self.x0, *out_exp])
 
