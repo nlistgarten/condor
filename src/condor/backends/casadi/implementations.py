@@ -270,6 +270,7 @@ class OptimizationProblem(InitializerMixin):
                     #tol=1E-14, # tighter tol for sensitivty
                     #accept_every_trial_step="yes",
                     #max_iter=1000,
+                    #constr_viol_tol=10.,
                 ),
                 bound_consistency=True,
                 #clip_inactive_lam=True,
@@ -388,8 +389,11 @@ class OptimizationProblem(InitializerMixin):
 
         if self.method is OptimizationProblem.Method.ipopt:
             call_args = dict(
-                x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg
+                x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg, 
+
             )
+            if self.has_p:
+                call_args["p"] = p
 
             out = self.optimizer(**call_args)
             if not self.has_p or not isinstance(args[0], symbol_class):
