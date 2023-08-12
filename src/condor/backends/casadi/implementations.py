@@ -175,6 +175,7 @@ class AlgebraicSystem(InitializerMixin):
         line_search_contraction = 0.5, # 1.0 -> no line search?
         line_search_criteria=LineSearchCriteria.armijo,
         error_on_fail=False,
+        enforce_bounds=False,
     ):
         rootfinder_options = dict(
             error_on_fail=error_on_fail,
@@ -200,6 +201,7 @@ class AlgebraicSystem(InitializerMixin):
             self.initial_at_construction,
             rootfinder_options,
             self.initializer_func,
+            enforce_bounds=enforce_bounds,
         )
 
     def __call__(self, model_instance, *args, **kwargs):
