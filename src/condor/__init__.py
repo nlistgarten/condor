@@ -86,6 +86,7 @@ class CondorClassDict(dict):
             key = key.replace(count_suffix, f"_{count}")
             breakpoint()
 
+# TODO: a way to update options
 class Options:
     """
     Class mix-in to flag back-end options. Define an inner class on the model that
