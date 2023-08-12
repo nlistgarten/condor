@@ -27,7 +27,7 @@ class MySystem(co.ODESystem):
     dot[x] = A@x #(A - B @ K) @ x
     dot[C] = A@C + C@A.T
     # dot naming, although have to do more work to minimize other setattr's 
-    output.y = C.T @ C
+    dynamic_output.y = C.T @ C
 
     print("ending user code for LTI class")
 

@@ -11,8 +11,8 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
         self.name = name
         self.initializer = initializer
         self.x0 = x0
-        self.lbx = np.array(lbx)
-        self.ubx = np.array(ubx)
+        self.lbx = np.array(lbx).reshape(-1)
+        self.ubx = np.array(ubx).reshape(-1)
 
         self.newton = Newton(
             x,

@@ -43,15 +43,20 @@ class ExplicitSystem:
     def __init__(self, model):
         symbol_inputs = model.input.list_of("backend_repr")
         symbol_outputs = model.output.list_of("backend_repr")
+
+        symbol_inputs = [casadi.vertcat(*symbol_inputs)]
+        symbol_outputs = [casadi.vertcat(*symbol_outputs)]
+
         name_inputs = model.input.list_of('name')
         name_outputs = model.output.list_of('name')
         self.model = model
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
     def __call__(self, model_instance, *args):
-        # TODO: can probably wrap then flatten instead of incomplete flatten?
+        out = self.func(casadi.vertcat(*flatten(args)))
         model_instance.bind_field(
-            self.model.output, self.func(*args)
+            self.model.output, 
+            out,
         )
 
 class Tablelookup:
@@ -800,32 +805,6 @@ class TrajectoryAnalysis:
         # number of calls, since this is potentially most expensive call with inner
         # loop solvers, 
 
-        self.lamda_dots = [
-            -lamda_jac @ self.lamda - casadi.jacobian(integrand_term, self.x).T
-            for integrand_term in integrand_terms
-        ]
-        self.grad_dots = [
-            self.lamda.T @ grad_jac + casadi.jacobian(integrand_term, self.p)
-            for integrand_term in integrand_terms
-        ]
-
-        self.lamda_dot_funcs = [
-            casadi.Function(
-                f"{model.__name__}_{traj_name}_lamda_dot",
-                self.adjoint_signature,
-                [lamda_dot],
-                dict(allow_free=True,),
-            ) for lamda_dot, traj_name in zip(self.lamda_dots, traj_out_names)
-        ]
-        self.grad_dot_funcs = [
-            casadi.Function(
-                f"{model.__name__}_{traj_name}_grad_dot",
-                self.adjoint_signature,
-                [grad_dot],
-                dict(allow_free=True,),
-            ) for grad_dot, traj_name in zip(self.grad_dots, traj_out_names)
-        ]
-
         # lamda updates
         # grad updates
         self.dte_dxs = []
@@ -1002,8 +981,6 @@ class TrajectoryAnalysis:
         self.callback.from_implementation = True
         out = self.callback(casadi.vertcat(*flatten(args)))
         self.callback.from_implementation = False
-        if isinstance(out, casadi.MX):
-            out = casadi.vertsplit(out)
 
         if hasattr(self.callback, 'res'):
             res = self.callback.res
