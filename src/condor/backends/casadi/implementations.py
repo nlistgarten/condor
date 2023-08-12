@@ -172,7 +172,7 @@ class AlgebraicSystem(InitializerMixin):
         error_on_fail=False,
     ):
         rootfinder_options = dict(
-            error_on_fail = error_on_fail,
+            error_on_fail=error_on_fail,
         )
         self.x = casadi.vertcat(*flatten(model.implicit_output))
         self.g0 = casadi.vertcat(*flatten(model.residual))
@@ -660,7 +660,7 @@ class TrajectoryAnalysis:
                     e_expr = casadi.fmod(ode_model.t - at_time_start, at_time.step) 
 
                     # TODO: verify start and stop for at_time slice
-                    if isinstance(at_time_start, casadi.MX) or at_time_start != 0.:
+                    if isinstance(at_time_start, symbol_class) or at_time_start != 0.:
                         e_expr = e_expr * (ode_model.t >= at_time_start)
                         # if there is a start offset, add a linear term to provide a
                         # zero-crossing at first occurance
@@ -689,12 +689,16 @@ class TrajectoryAnalysis:
                         )
                     ))
                 else:
-                    e_expr =  at_time[0] - ode_model.t
+                    if isinstance(at_time[0], co.BaseSymbol):
+                        at_time0 = at_time[0].backend_repr
+                    else:
+                        at_time0 = at_time[0]
+                    e_expr = at_time0 - ode_model.t
                     at_time_slices.append(sgm.NextTimeFromSlice(
                         casadi.Function(
                             f"{ode_model.__name__}_at_times_{event_idx}",
                             [self.p],
-                            [at_time[0], at_time[0], casadi.inf]
+                            [at_time0, at_time0, casadi.inf]
                         )
                     ))
 
