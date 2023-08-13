@@ -49,9 +49,6 @@ def flatten(symbols):
         # if it's a field, get all of the symbolic representations
         symbols = symbols.list_of("backend_repr")
 
-    if not symbols:
-        return symbols
-
     if isinstance(symbols, symbol_class):
         # if it's a single 
         symbol = symbols

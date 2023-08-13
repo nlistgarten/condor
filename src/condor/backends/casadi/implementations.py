@@ -253,10 +253,10 @@ class OptimizationProblem(InitializerMixin):
         self.x = x = casadi.vertcat(*flatten(model.variable))
         self.g = g = casadi.vertcat(*flatten(model.constraint))
 
-        self.lbx = lbx = flatten(model.variable.list_of("lower_bound"))
-        self.ubx = ubx = flatten(model.variable.list_of("upper_bound"))
-        self.lbg = lbg = flatten(model.constraint.list_of("lower_bound"))
-        self.ubg = ubg = flatten(model.constraint.list_of("upper_bound"))
+        self.lbx = lbx = casadi.vcat(flatten(model.variable.list_of("lower_bound")))
+        self.ubx = ubx = casadi.vcat(flatten(model.variable.list_of("upper_bound")))
+        self.lbg = lbg = casadi.vcat(flatten(model.constraint.list_of("lower_bound")))
+        self.ubg = ubg = casadi.vcat(flatten(model.constraint.list_of("upper_bound")))
 
         self.nlp_args = dict(f=f, x=x, g=g)
         initializer_args = [self.x]
