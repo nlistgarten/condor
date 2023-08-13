@@ -533,7 +533,8 @@ class TrajectoryAnalysis:
 
     class Solver(Enum):
         CVODE = auto()
-        SciPy = auto()
+        dopri5 = auto()
+        dop853 = auto()
 
     def __init__(
         self, model,
@@ -546,7 +547,8 @@ class TrajectoryAnalysis:
         adjoint_atol=1E-12, adjoint_rtol=1E-6,
         adjoint_adaptive_max_step_size=4., adjoint_max_step_size = 0,
 
-        solver = Solver.SciPy
+        state_solver = Solver.dopri5,
+        adjoint_solver = Solver.dopri5,
 
         #lmm_type=ADAMS or BDF, possibly also linsolver, etc? for CVODE?
         # other options for scipy.ode + event rootfinder?
@@ -906,10 +908,16 @@ class TrajectoryAnalysis:
             ode_model.Event.subclasses = ode_model.Event.subclasses[:-1]
 
 
-        if solver is TrajectoryAnalysis.Solver.CVODE:
-            solver_class = sgm.SolverCVODE
-        elif solver is TrajectoryAnalysis.Solver.SciPy:
-            solver_class = sgm.SolverSciPy
+        set_solvers = []
+        for solver in [state_solver, adjoint_solver]:
+            if solver is TrajectoryAnalysis.Solver.CVODE:
+                solver_class = sgm.SolverCVODE
+            elif solver is TrajectoryAnalysis.Solver.dopri5:
+                solver_class = sgm.SolverSciPyDopri5
+            elif solver is TrajectoryAnalysis.Solver.dop853:
+                solver_class = sgm.SolverSciPyDop853
+            set_solvers.append(solver_class)
+        state_solver_class, adjoint_solver_class = set_solvers
 
 
         self.trajectory_analysis = sgm.TrajectoryAnalysis(
@@ -950,7 +958,7 @@ class TrajectoryAnalysis:
             rtol=state_rtol,
             adaptive_max_step=state_adaptive_max_step_size,
             max_step_size=state_max_step_size,
-            solver_class = solver_class,
+            solver_class = state_solver_class,
         )
         self.AdjointSystem = sgm.AdjointSystem(
             state_jac = state_dot_jac_func,
@@ -961,7 +969,7 @@ class TrajectoryAnalysis:
             rtol=adjoint_rtol,
             adaptive_max_step=adjoint_adaptive_max_step_size,
             max_step_size=adjoint_max_step_size,
-            solver_class = solver_class,
+            solver_class = adjoint_solver_class,
         )
         self.shooting_gradient_method = sgm.ShootingGradientMethod(
             adjoint_system = self.AdjointSystem,

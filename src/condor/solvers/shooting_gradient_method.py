@@ -14,8 +14,8 @@ from scipy.integrate import ode as scipy_ode
 from scipy.optimize import brentq, newton
 from typing import NamedTuple, Optional
 
-
-class SolverSciPy:
+class SolverSciPyBase:
+    SOLVER_NAME = None
     def __init__(
         self, system,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
@@ -24,8 +24,7 @@ class SolverSciPy:
         self.adaptive_max_step = adaptive_max_step
         self.solver = scipy_ode( system.dots,)
         self.int_options = dict(
-            name = "dopri5",
-            #name = "dop853",
+            name = self.SOLVER_NAME,
             atol = atol,
             rtol = rtol,
             max_step=max_step_size,
@@ -225,6 +224,13 @@ class SolverSciPy:
             last_t = next_t
 
 
+class SolverSciPyDopri5(SolverSciPyBase):
+    SOLVER_NAME = "dopri5"
+
+class SolverSciPyDop853(SolverSciPyBase):
+    SOLVER_NAME = "dop853"
+
+
 class SolverCVODE:
     def __init__(
         self, system,
@@ -422,7 +428,7 @@ class System:
         events, updates, num_events, terminating,
         dynamic_output = None,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
-        solver_class = SolverSciPy,
+        solver_class = SolverSciPyDopri5,
     ):
         """
         if adaptive_max_step, treat max_step_size as the fraction of the next simulation
@@ -683,7 +689,7 @@ class AdjointResult(ResultBase, AdjointResultMixin,):
 class AdjointSystem(System):
     def __init__(
         self, state_jac, dte_dxs, d2te_dxdts, dh_dxs,
-        solver_class = SolverSciPy,
+        solver_class = SolverSciPyDopri5,
         atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
     ):
         """
