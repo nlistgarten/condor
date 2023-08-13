@@ -969,7 +969,11 @@ class ODESystem(Model):
     dynamic_output = AssignedField(Direction.internal)
 
 
-class TrajectoryAnalysis(Model, inner_to=ODESystem, copy_fields=["parameter", "initial", "state"]):
+class TrajectoryAnalysis(
+        Model,
+        inner_to=ODESystem,
+        copy_fields=["parameter", "initial", "state", "dynamic_output"]
+):
     """
     this is what simulates an ODE system
     tf parameter 

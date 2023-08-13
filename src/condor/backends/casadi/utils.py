@@ -72,10 +72,17 @@ def flatten(symbols):
 
 
 def wrap(field, values):
-    if isinstance(values, symbol_class):
-        return casadi.vertsplit(values)
     size_cum_sum = np.cumsum([0] + field.list_of('size'))
-    # TODO: need to make sure 
+    if isinstance(values, symbol_class):
+        values = casadi.vertsplit(values)
+
+        return tuple([
+            values[start_idx]
+            if symbol.size == 1
+            else casadi.vcat(values[start_idx:end_idx]).reshape(symbol.shape)
+
+            for start_idx, end_idx, symbol in zip(size_cum_sum, size_cum_sum[1:], field)
+        ])
 
     if isinstance(values, (float, int, casadi.DM,)):# or len(field) != len(values):
         if not isinstance(values, (float, int, casadi.DM,)) and len(field) != len(values):
