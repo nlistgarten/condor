@@ -241,11 +241,15 @@ class OptimizationProblem(InitializerMixin):
     def __init__(
         self, model,
         exact_hessian=True, # False -> ipopt alias for limited memory
+        keep_feasible = True, # flag that goes to scipy trust constr linear constraints
         method=Method.ipopt,
         **options,
     ):
         self.model = model
-        self.scipy_trust_constr_options = options
+        self.options = options
+
+        self.keep_feasible = keep_feasible
+
 
         self.f = f = getattr(model, 'objective', 0)
         self.has_p = bool(len(model.parameter))
@@ -253,10 +257,10 @@ class OptimizationProblem(InitializerMixin):
         self.x = x = casadi.vertcat(*flatten(model.variable))
         self.g = g = casadi.vertcat(*flatten(model.constraint))
 
-        self.lbx = lbx = casadi.vcat(flatten(model.variable.list_of("lower_bound")))
-        self.ubx = ubx = casadi.vcat(flatten(model.variable.list_of("upper_bound")))
-        self.lbg = lbg = casadi.vcat(flatten(model.constraint.list_of("lower_bound")))
-        self.ubg = ubg = casadi.vcat(flatten(model.constraint.list_of("upper_bound")))
+        self.lbx = lbx = casadi.vcat(flatten(model.variable.list_of("lower_bound"))).toarray().reshape(-1)
+        self.ubx = ubx = casadi.vcat(flatten(model.variable.list_of("upper_bound"))).toarray().reshape(-1)
+        self.lbg = lbg = casadi.vcat(flatten(model.constraint.list_of("lower_bound"))).toarray().reshape(-1)
+        self.ubg = ubg = casadi.vcat(flatten(model.constraint.list_of("upper_bound"))).toarray().reshape(-1)
 
         self.nlp_args = dict(f=f, x=x, g=g)
         initializer_args = [self.x]
@@ -428,7 +432,7 @@ class OptimizationProblem(InitializerMixin):
                             A = self.linear_jac_func(*extra_args).sparse(),
                             ub = self.linear_ub,
                             lb = self.linear_lb,
-                            keep_feasible=True,
+                            keep_feasible=self.keep_feasible,
                         )
                     )
                 if self.num_nonlinear_g:
@@ -452,7 +456,7 @@ class OptimizationProblem(InitializerMixin):
                 args = extra_args,
                 constraints = scipy_constraints,
                 #options=dict(disp=True),
-                options=self.scipy_trust_constr_options,
+                options=self.options,
             )
             model_instance.bind_field(self.model.variable, min_out.x)
             model_instance.objective = min_out.fun
