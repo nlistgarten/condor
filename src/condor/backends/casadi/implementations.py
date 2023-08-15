@@ -320,7 +320,11 @@ class OptimizationProblem(InitializerMixin):
                 scipy_constraints = []
 
                 nonlinear_flags = [
-                    casadi.depends_on(g_jac, self.x) for g_jac in g_jacs
+                    casadi.depends_on(g_jac, self.x) or casadi.depends_on(g_expr, self.p)
+                    for g_jac, g_expr in zip(g_jacs, g_split)
+                    # could ignore dependence on parameters, but to be consistent with
+                    # ipopt specification require parameters within function not in
+                    # bounds
                 ]
 
                 # process nonlinear constraints
@@ -1005,11 +1009,12 @@ class TrajectoryAnalysis:
                 np.array(res.x).T,
                 wrap=True,
             )
-            model_instance.bind_field(
-                self.model.dynamic_output,
-                np.array(res.y).T,
-                wrap=True,
-            )
+            if np.array(res.y).size:
+                model_instance.bind_field(
+                    self.model.dynamic_output,
+                    np.array(res.y).T,
+                    wrap=True,
+                )
 
         model_instance.bind_field(
             self.model.trajectory_output,
