@@ -269,6 +269,8 @@ class Burn1(co.OptimizationProblem):
     class Casadi(co.Options):
         exact_hessian=False
         method = OptimizationProblem.Method.scipy_trust_constr
+        gtol = 1E-3
+        xtol = 1E-3
 
 opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
 opt_sim = Sim(

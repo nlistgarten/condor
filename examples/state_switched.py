@@ -51,6 +51,8 @@ class Transfer(DblInt.TrajectoryAnalysis):
         state_rtol = 1E-12
         adjoint_atol = 1E-15
         adjoint_rtol = 1E-12
+        state_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
+        adjoint_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
 
 from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):

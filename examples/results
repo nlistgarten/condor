@@ -1,3 +1,212 @@
+orbital checks 3f156b3d779053a85765b7fe23e9aa19d4c7ebcf
+orbital 1
+hohmann
+           message: `gtol` termination condition is satisfied.
+           success: True
+            status: 1
+               fun: 0.2850000000002871
+                 x: [ 8.410e+01  2.840e+03]
+               nit: 31
+              nfev: 21
+              njev: 21
+              nhev: 0
+          cg_niter: 32
+      cg_stop_cond: 1
+              grad: [ 7.090e-10 -2.129e-10]
+   lagrangian_grad: [ 5.908e-10 -2.167e-10]
+            constr: [array([ 2.756e+03,  8.410e+01])]
+               jac: [<2x2 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 3 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0]
+       constr_njev: [0]
+       constr_nhev: [0]
+                 v: [array([-3.757e-12, -1.220e-10])]
+            method: tr_interior_point
+        optimality: 5.90770181681498e-10
+  constr_violation: 0.0
+    execution_time: 9.659825801849365
+         tr_radius: 478515625.0
+    constr_penalty: 1.0
+ barrier_parameter: 1.0240000000000006e-08
+ barrier_tolerance: 1.0240000000000006e-08
+             niter: 31
+179.99991416987746
+25493.366133786385
+11488.12223081889
+84.09738462221331 2839.87910003586
+time: 9.9697382989998
+opt grad  wrt tig 7.09006e-10
+opt grad  wrt tem -2.12934e-10
+
+
+ unconstrained Delta v
+           message: `gtol` termination condition is satisfied.
+           success: True
+            status: 1
+               fun: 0.5941437859549465
+                 x: [ 9.280e+01  2.259e+03]
+               nit: 27
+              nfev: 21
+              njev: 21
+              nhev: 0
+          cg_niter: 25
+      cg_stop_cond: 4
+              grad: [-4.658e-09 -2.242e-09]
+   lagrangian_grad: [-5.185e-09 -2.265e-09]
+            constr: [array([ 2.166e+03,  9.280e+01]), array([-9.686e+02])]
+               jac: [<2x2 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 3 stored elements in Compressed Sparse Row format>, <1x2 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 2 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0, 21]
+       constr_njev: [0, 21]
+       constr_nhev: [0, 0]
+                 v: [array([-2.397e-11, -5.511e-10]), array([ 5.286e-11])]
+            method: tr_interior_point
+        optimality: 5.185299538189361e-09
+  constr_violation: 0.0
+    execution_time: 19.929666757583618
+         tr_radius: 341763764.17411375
+    constr_penalty: 1.0
+ barrier_parameter: 5.120000000000003e-08
+ barrier_tolerance: 5.120000000000003e-08
+             niter: 27
+141.47817234313015
+31.365512427750986
+
+
+ constrained Delta v
+           message: `gtol` termination condition is satisfied.
+           success: True
+            status: 1
+               fun: 1.8877211716982683
+                 x: [ 1.900e-03  9.476e+02]
+               nit: 58
+              nfev: 51
+              njev: 51
+              nhev: 0
+          cg_niter: 52
+      cg_stop_cond: 4
+              grad: [ 1.441e-03 -2.894e-03]
+   lagrangian_grad: [ 2.670e-09  1.125e-10]
+            constr: [array([ 9.476e+02,  1.900e-03]), array([-3.419e-06])]
+               jac: [<2x2 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 3 stored elements in Compressed Sparse Row format>, <1x2 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 2 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0, 51]
+       constr_njev: [0, 51]
+       constr_nhev: [0, 0]
+                 v: [array([-1.395e-09, -1.413e-03]), array([ 3.015e-01])]
+            method: tr_interior_point
+        optimality: 2.669573372161339e-09
+  constr_violation: 0.0
+    execution_time: 53.08360195159912
+         tr_radius: 71879699.27453585
+    constr_penalty: 1.0
+ barrier_parameter: 1.2800000000000007e-06
+ barrier_tolerance: 1.2800000000000007e-06
+             niter: 58
+61.896326223756404
+9.999996580549904
+
+orbital 2
+ minimize position dispersions:
+           message: `gtol` termination condition is satisfied.
+           success: True
+            status: 1
+               fun: 12.914982069765916
+                 x: [ 1.090e+03]
+               nit: 12
+              nfev: 4
+              njev: 4
+              nhev: 0
+          cg_niter: 3
+      cg_stop_cond: 0
+              grad: [-6.970e-06]
+   lagrangian_grad: [ 1.833e-09]
+            constr: [array([ 1.090e+03])]
+               jac: [<1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0]
+       constr_njev: [0]
+       constr_nhev: [0]
+                 v: [array([ 6.972e-06])]
+            method: tr_interior_point
+        optimality: 1.8332020120859744e-09
+  constr_violation: 0.0
+    execution_time: 1.5087459087371826
+         tr_radius: 390625.0
+    constr_penalty: 1.0
+ barrier_parameter: 2.560000000000001e-07
+ barrier_tolerance: 2.560000000000001e-07
+             niter: 12
+
+
+
+ minimize Delta-v dispersions:
+           message: `gtol` termination condition is satisfied.
+           success: True
+            status: 1
+               fun: 41.9533590868339
+                 x: [ 6.100e+02]
+               nit: 24
+              nfev: 16
+              njev: 16
+              nhev: 0
+          cg_niter: 15
+      cg_stop_cond: 1
+              grad: [ 1.340e-05]
+   lagrangian_grad: [-2.046e-11]
+            constr: [array([ 6.100e+02])]
+               jac: [<1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0]
+       constr_njev: [0]
+       constr_nhev: [0]
+                 v: [array([-1.340e-05])]
+            method: tr_interior_point
+        optimality: 2.0460322458769895e-11
+  constr_violation: 0.0
+    execution_time: 8.019183874130249
+         tr_radius: 547187.6906881843
+    constr_penalty: 1.0
+ barrier_parameter: 2.560000000000001e-07
+ barrier_tolerance: 2.560000000000001e-07
+             niter: 24
+
+orbital 3 -- probably just need better orbital debugging to look at plots of gradients burn time minimization
+           message: `xtol` termination condition is satisfied.
+           success: True
+            status: 2
+               fun: 1.1974578234547488
+                 x: [ 8.510e+02]
+               nit: 84
+              nfev: 132
+              njev: 132
+              nhev: 0
+          cg_niter: 72
+      cg_stop_cond: 2
+              grad: [ 1.643e-03]
+   lagrangian_grad: [ 1.643e-03]
+            constr: [array([ 8.510e+02]), array([ 7.261e+00])]
+               jac: [<1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>, <1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0, 132]
+       constr_njev: [0, 132]
+       constr_nhev: [0, 0]
+                 v: [array([-3.255e-09]), array([ 7.765e-08])]
+            method: tr_interior_point
+        optimality: 0.0016431186701373075
+  constr_violation: 0.0
+    execution_time: 269.34243512153625
+         tr_radius: 0.00010000000000000003
+    constr_penalty: 1.0
+ barrier_parameter: 2.048000000000001e-09
+ barrier_tolerance: 2.048000000000001e-09
+             niter: 84
+
+
+
 with fix for scikits_odes d7c8f0cd34a29ae86fe7163624da81a53dbcc19c
 ct- lqr:
  message: Optimization terminated successfully.
