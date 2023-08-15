@@ -767,7 +767,7 @@ class AdjointSystem(System):
                         - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
                         + self.d2te_dxdts[event_channel](p, te, xtem).T @ delta_xs.T
                     ) @ last_lamda
-                    -1*(
+                    -0*(
                          lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, te, xtem)
                     ).T
 
