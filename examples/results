@@ -1,4 +1,6 @@
 orbital checks 3f156b3d779053a85765b7fe23e9aa19d4c7ebcf
+orbital debugging showing SGM failing to get any derivative wrt measurement time
+
 orbital 1
 hohmann
            message: `gtol` termination condition is satisfied.

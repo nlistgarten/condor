@@ -21,7 +21,6 @@ class Terminate(LinCovCW.Event):
     #function = t - MajorBurn.tem
     at_time = [MajorBurn.tem,]
 
-"""
 class Measurements(LinCovCW.Event):
     rcal = parameter(shape=3)
     rcalhat = parameter(shape=3)
@@ -55,7 +54,6 @@ class Measurements(LinCovCW.Event):
     #function = t - meas_t_offset
     #at_time = [meas_t_offset, None, meas_dt]
     at_time = [meas_t_offset,]
-"""
 
 sim_kwargs.update(dict(
     meas_dt = 2300.,
@@ -91,38 +89,19 @@ sim_kwargs.update(dict(
 #Sim.implementation.callback.get_jacobian(f'jac_{Sim.implementation.callback.name}', None, None, {})
 
 Sim = make_sim()
-
+output_vars = Sim.Delta_v_mag_1, Sim.Delta_v_disp_1, Sim.final_pos_disp
 sim_kwargs.update(dict(
     tem_1 = 3800.,
     #meas_dt = 200.,
     #meas_t_offset = 7.5,
     #meas_t_offset = 851.,
 ))
-tigs = np.arange(600, 1100., 5)
-tigs = np.arange(10, 3000., 5)
-tig_sims= [
-    (
-        Sim(
-            tig_1=tig,
-            #meas_t_offset = 851,
-            **sim_kwargs
-        ),
-         Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
-    )
-    for tig in tigs
-]
-indep_var = Sim.tig_1
-output_vars = Sim.Delta_v_mag_1, Sim.Delta_v_disp_1, Sim.final_pos_disp
-deriv_check_plots(indep_var, output_vars, tig_sims, title_prefix='tig')
 
-plt.show()
-import sys
-sys.exit()
 
 sim_kwargs.pop('meas_t_offset', None)
 meas_times = np.arange(300, 1100, 5.)
 meas_times = np.arange(300, 900, 5.)
-meas_times = np.arange(2, 202, 5.)
+meas_times = np.arange(2, 202, 20.)
 meas_sims= [
     (
         Sim(
@@ -135,7 +114,29 @@ meas_sims= [
     for meas_time in meas_times
 ]
 indep_var = Sim.meas_t_offset
-deriv_check_plots(indep_var, output_vars, meas_sims, title_prefix='mt')
+deriv_check_plots(Sim.meas_t_offset, output_vars, meas_sims, title_prefix='mt')
+plt.show()
+import sys
+sys.exit()
+
+
+tigs = np.arange(600, 1100., 5)
+tigs = np.arange(10, 3000., 5)
+tig_sims= [
+    (
+        Sim(
+            tig_1=tig,
+            meas_t_offset = 851.,
+            **sim_kwargs
+        ),
+         Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
+    )
+    for tig in tigs
+]
+indep_var = Sim.tig_1
+
+
+deriv_check_plots(Sim.tig_1, output_vars, tig_sims, title_prefix='tig')
 
 plt.show()
 import sys
