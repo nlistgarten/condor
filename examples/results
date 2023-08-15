@@ -1,3 +1,5 @@
+zeroing out lamda_dot from lamda
+
 orbital checks 3f156b3d779053a85765b7fe23e9aa19d4c7ebcf
 orbital debugging showing SGM failing to get any derivative wrt measurement time
 
@@ -207,6 +209,19 @@ orbital 3 -- probably just need better orbital debugging to look at plots of gra
  barrier_tolerance: 2.048000000000001e-09
              niter: 84
 
+this got a little bit worse -- ? maybe? maybe not.
+time to run: 0.3405105210003967
+2.999999678848303 2.9999921648385457
+[[-65.5, 40.5]]
+ message: Optimization terminated successfully.
+ success: True
+  status: 0
+     fun: 3.0086716944601576e-11
+       x: [ 3.000e+00  3.000e+00]
+     nit: 12
+     jac: [-4.048e-06 -7.514e-06]
+    nfev: 22
+    njev: 22
 
 
 with fix for scikits_odes d7c8f0cd34a29ae86fe7163624da81a53dbcc19c

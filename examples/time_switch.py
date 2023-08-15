@@ -56,8 +56,10 @@ class Transfer(DblInt.TrajectoryAnalysis):
 
     if not with_time_state:
         class Casadi(co.Options):
-            state_adaptive_max_step_size = True
-            state_max_step_size = 4
+            state_adaptive_max_step_size = 4
+            #state_max_step_size = 4
+            #state_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
+            #adjoint_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
 
 
 from condor.backends.casadi.implementations import OptimizationProblem
