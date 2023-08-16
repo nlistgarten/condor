@@ -1020,9 +1020,13 @@ class ShootingGradientMethod:
                     jac_row += np.array(lamda_tep[None, :] @ self.p_x0_p_params(p)).squeeze()
                 if state_event is state_result.e[-1]:
                     for event_channel in active_update_idxs[::-1]:
+                        dte_dp = self.dte_dps[event_channel](p, te, xtem)
+                        Delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
+                        Delta_lamdas = (lamda_tem - lamda_tep)
                         jac_row += np.array(
-                            -lamda_tep[None, :] @ ftem @ self.dte_dps[event_channel](p, te, xtem)
+                            -lamda_tep[None, :] @ ftem @ dte_dp
                         ).squeeze()
+                        #breakpoint()
                 else:
                     for event_channel in active_update_idxs[::-1]:
                         dh_dp = self.dh_dps[event_channel](p, te, xtem)
@@ -1032,6 +1036,9 @@ class ShootingGradientMethod:
                         Delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
                         Delta_lamdas = (lamda_tem - lamda_tep)
                         dte_dp_dagger = dte_dp.T/(dte_dp @ dte_dp.T)
+
+                        dte_dx = adjoint_result.system.dte_dxs[event_channel](p, te, xtem)
+                        dte_dx_dagger = dte_dx.T/(dte_dx @ dte_dx.T)
                         jac_row += np.array(
                             lamda_tep[None, :] @ ( dh_dp +  delta_fs @ dte_dp )
                             # terms from active dynamics derivative and first term of
@@ -1039,12 +1046,16 @@ class ShootingGradientMethod:
                             - ( Delta_lamda_dots[None, :] @ (delta_xs) @ dte_dp)
                             + (
                                 Delta_lamdas[None, :]  @ (
-                                    #dh_dt 
+                                    dh_dt 
                                     + dh_dp @ dte_dp_dagger
                                     # next two terms might be
-                                    #+ dh_dx @ ftep - ftem
+                                    + (dh_dx @ ftep - ftem )
+                                    # breaks part of orbital 1 but makes measurement
+                                    # time have non-zero derivative... doesn't agree
+                                    # with numerical but it's somethi
                                     # OR
-                                    # (dh_dx - eye) @ dte_dx.DAGGER
+                                    - (dh_dx - np.eye(state_result.system.dim_state)) @ dte_dx_dagger
+                                    - delta_fs 
                                 ) @ dte_dp
                             ) + (
                                 Delta_lamdas[None, :] @ delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
