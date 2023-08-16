@@ -1,10 +1,49 @@
 zeroing out lamda_dot from lamda
 
+Number of nonzeros in equality constraint Jacobian...:        4
+Number of nonzeros in inequality constraint Jacobian.:        0
+Number of nonzeros in Lagrangian Hessian.............:        0
+
+Total number of variables............................:        2
+                     variables with only lower bounds:        0
+                variables with lower and upper bounds:        2
+                     variables with only upper bounds:        0
+Total number of equality constraints.................:        2
+Total number of inequality constraints...............:        0
+        inequality constraints with only lower bounds:        0
+   inequality constraints with lower and upper bounds:        0
+        inequality constraints with only upper bounds:        0
+
+iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
+   0  0.0000000e+00 1.55e+06 0.00e+00   0.0 0.00e+00    -  0.00e+00 0.00e+00   0
+   1  0.0000000e+00 7.22e+03 2.26e+03  -0.3 2.26e+03    -  9.87e-01 1.00e+00h  1
+   2  0.0000000e+00 2.63e+00 0.00e+00  -2.2 1.38e+01    -  9.90e-01 1.00e+00h  1
+
+Number of Iterations....: 2
+
+                                   (scaled)                 (unscaled)
+Objective...............:   0.0000000000000000e+00    0.0000000000000000e+00
+Dual infeasibility......:   0.0000000000000000e+00    0.0000000000000000e+00
+Constraint violation....:   3.9982864938865398e-01    2.6311239302158356e+00
+Variable bound violation:   0.0000000000000000e+00    0.0000000000000000e+00
+Complementarity.........:   0.0000000000000000e+00    0.0000000000000000e+00
+Overall NLP error.......:   3.9982864938865398e-01    2.6311239302158356e+00
+
+
+Number of objective function evaluations             = 3
+Number of objective gradient evaluations             = 3
+Number of equality constraint evaluations            = 3
+Number of inequality constraint evaluations          = 0
+Number of equality constraint Jacobian evaluations   = 3
+Number of inequality constraint Jacobian evaluations = 0
+Number of Lagrangian Hessian evaluations             = 0
+Total seconds in IPOPT                               = 29.344
+
 orbital checks 3f156b3d779053a85765b7fe23e9aa19d4c7ebcf
 orbital debugging showing SGM failing to get any derivative wrt measurement time
 
 orbital 1
-hohmann
+ hohmann
            message: `gtol` termination condition is satisfied.
            success: True
             status: 1
@@ -28,7 +67,7 @@ hohmann
             method: tr_interior_point
         optimality: 5.90770181681498e-10
   constr_violation: 0.0
-    execution_time: 9.659825801849365
+    execution_time: 8.587608814239502
          tr_radius: 478515625.0
     constr_penalty: 1.0
  barrier_parameter: 1.0240000000000006e-08
@@ -38,7 +77,7 @@ hohmann
 25493.366133786385
 11488.12223081889
 84.09738462221331 2839.87910003586
-time: 9.9697382989998
+time: 8.874380575001851
 opt grad  wrt tig 7.09006e-10
 opt grad  wrt tem -2.12934e-10
 
@@ -68,7 +107,7 @@ opt grad  wrt tem -2.12934e-10
             method: tr_interior_point
         optimality: 5.185299538189361e-09
   constr_violation: 0.0
-    execution_time: 19.929666757583618
+    execution_time: 17.792963981628418
          tr_radius: 341763764.17411375
     constr_penalty: 1.0
  barrier_parameter: 5.120000000000003e-08
@@ -103,7 +142,7 @@ opt grad  wrt tem -2.12934e-10
             method: tr_interior_point
         optimality: 2.669573372161339e-09
   constr_violation: 0.0
-    execution_time: 53.08360195159912
+    execution_time: 45.939208984375
          tr_radius: 71879699.27453585
     constr_penalty: 1.0
  barrier_parameter: 1.2800000000000007e-06
