@@ -688,7 +688,7 @@ class AdjointResult(ResultBase, AdjointResultMixin,):
 
 class AdjointSystem(System):
     def __init__(
-        self, state_jac, dte_dxs, d2te_dxdts, dh_dxs,
+        self, state_jac, dte_dxs, d2te_dtdx, dh_dxs,
         solver_class = SolverSciPyDopri5,
         atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
     ):
@@ -699,7 +699,7 @@ class AdjointSystem(System):
         time generator will call update method
         """
         self.state_jac = state_jac
-        self.dte_dxs, self.d2te_dxdts, self.dh_dxs = dte_dxs, d2te_dxdts, dh_dxs,
+        self.dte_dxs, self.d2te_dtdx, self.dh_dxs = dte_dxs, d2te_dtdx, dh_dxs,
         self.num_events = 1
         self.dynamic_output = None
 
@@ -765,7 +765,7 @@ class AdjointSystem(System):
                     lamda_tem = (
                         self.dh_dxs[event_channel](p, te, xtem,).T
                         - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
-                        #+ self.d2te_dxdts[event_channel](p, te, xtem).T @ delta_xs.T
+                        #+ self.d2te_dtdx[event_channel](p, te, xtem).T @ delta_xs.T
                     ) @ last_lamda
                     -0*(
                          lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, te, xtem)
@@ -883,9 +883,9 @@ class ShootingGradientMethod:
     p_x0_p_params: callable
     p_dots_p_params: callable # could be cached, or just combined with integrand terms
     # per system's events (length number of events)
-    d_update_d_params: list[callable]
-    d_event_time_d_params: list[callable]
-    d2_event_time_d_params_d_t: list[callable]
+    dh_dps: list[callable]
+    dte_dps: list[callable]
+    d2te_dtdp: list[callable]
 
     # of length number of (trajectory) outputs
     p_integrand_terms_p_params: list[callable]
@@ -1020,24 +1020,24 @@ class ShootingGradientMethod:
                 if state_event is state_result.e[-1]:
                     for event_channel in active_update_idxs[::-1]:
                         jac_row += np.array(
-                            -lamda_tep[None, :] @ ftem @ self.d_event_time_d_params[event_channel](p, te, xtem)
+                            -lamda_tep[None, :] @ ftem @ self.dte_dps[event_channel](p, te, xtem)
                         ).squeeze()
                 else:
                     for event_channel in active_update_idxs[::-1]:
                         jac_row += np.array(lamda_tep[None, :] @ (
-                            self.d_update_d_params[event_channel](p, te, xtem)
+                            self.dh_dps[event_channel](p, te, xtem)
                             + 1*(
                                 delta_fs 
-                            ) @ self.d_event_time_d_params[event_channel](p, te, xtem)
-                            - delta_xs[:, None] @ self.d2_event_time_d_params_d_t[event_channel](p, te, xtem).T
+                            ) @ self.dte_dps[event_channel](p, te, xtem)
+                            - delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
                         ) + 1*(
                             (
                                 +1*lamda_dot_tep[None, :]
                                 -1*lamda_dot_tem[None, :]
-                            ) @ (delta_xs) @ self.d_event_time_d_params[event_channel](p, te, xtem)
+                            ) @ (delta_xs) @ self.dte_dps[event_channel](p, te, xtem)
                         ) - 1*(
-                            (lamda_tep - lamda_tem)[None, :]  @ self.d_update_d_params[event_channel](p, te, xtem)
-                            @ (self.d_event_time_d_params[event_channel](p, te, xtem).T @ self.d_event_time_d_params[event_channel](p, te, xtem))
+                            (lamda_tep - lamda_tem)[None, :]  @ self.dh_dps[event_channel](p, te, xtem)
+                            @ (self.dte_dps[event_channel](p, te, xtem).T @ self.dte_dps[event_channel](p, te, xtem))
                         )).squeeze()
 
                     #if state_event.index == 1:

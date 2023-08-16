@@ -820,11 +820,11 @@ class TrajectoryAnalysis:
         # lamda updates
         # grad updates
         self.dte_dxs = []
-        self.d2te_dxdts = []
+        self.d2te_dtdx = []
         self.dh_dxs = []
 
         self.dte_dps = []
-        self.d2te_dpdts = []
+        self.d2te_dtdp = []
         self.dh_dps = []
 
         for event, e_expr, h_expr in zip(
@@ -871,24 +871,24 @@ class TrajectoryAnalysis:
             self.dte_dps[-1].expr = dte_dp
 
             d2te_dxdt = substitute(d2te_dxdt, control_sub_expression)
-            self.d2te_dxdts.append(
+            self.d2te_dtdx.append(
                 casadi.Function(
                     f"{event.__name__}_d2te_dxdt",
                     self.simulation_signature,
                     [d2te_dxdt]
                 )
             )
-            self.d2te_dxdts[-1].expr = d2te_dxdt
+            self.d2te_dtdx[-1].expr = d2te_dxdt
 
             d2te_dpdt = substitute(d2te_dpdt, control_sub_expression)
-            self.d2te_dpdts.append(
+            self.d2te_dtdp.append(
                 casadi.Function(
                     f"{event.__name__}_d2te_dpdt",
                     self.simulation_signature,
                     [d2te_dpdt]
                 )
             )
-            self.d2te_dpdts[-1].expr = d2te_dpdt
+            self.d2te_dtdp[-1].expr = d2te_dpdt
 
 
             dh_dx = substitute(dh_dx, control_sub_expression)
@@ -971,7 +971,7 @@ class TrajectoryAnalysis:
         self.AdjointSystem = sgm.AdjointSystem(
             state_jac = state_dot_jac_func,
             dte_dxs = self.dte_dxs,
-            d2te_dxdts = self.d2te_dxdts,
+            d2te_dtdx = self.d2te_dtdx,
             dh_dxs = self.dh_dxs,
             atol=adjoint_atol,
             rtol=adjoint_rtol,
@@ -983,9 +983,9 @@ class TrajectoryAnalysis:
             adjoint_system = self.AdjointSystem,
             p_x0_p_params = p_state0_p_p,
             p_dots_p_params = param_dot_jac_func,
-            d_update_d_params = self.dh_dps,
-            d_event_time_d_params = self.dte_dps,
-            d2_event_time_d_params_d_t = self.d2te_dpdts,
+            dh_dps = self.dh_dps,
+            dte_dps = self.dte_dps,
+            d2te_dtdp = self.d2te_dtdp,
 
             p_terminal_terms_p_params = self.gradF_funcs,
             p_integrand_terms_p_params = param_integrand_jac_funcs,
