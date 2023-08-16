@@ -1049,18 +1049,23 @@ class ShootingGradientMethod:
                                     dh_dt 
                                     + dh_dp @ dte_dp_dagger
                                     # next two terms might be
-                                    + (dh_dx @ ftep - ftem )
                                     # breaks part of orbital 1 but makes measurement
                                     # time have non-zero derivative... doesn't agree
                                     # with numerical but it's somethi
                                     # OR
-                                    - (dh_dx - np.eye(state_result.system.dim_state)) @ dte_dx_dagger
-                                    - delta_fs 
+                                    #- (dh_dx - np.eye(state_result.system.dim_state)) @ dte_dx_dagger
                                 ) @ dte_dp
-                            ) + (
+                            )  + (
                                 Delta_lamdas[None, :] @ delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
                             )
+
                         ).squeeze()
+
+                        if event_channel == 2:
+                            jac_row += np.array(Delta_lamdas[None, :]  @ (
+                                    + (dh_dx @ ftep - ftem ) - delta_fs 
+                                ) @ dte_dp #@ dte_dp_dagger
+                            ).squeeze()
 
                     #if state_event.index == 1:
                     #    breakpoint()

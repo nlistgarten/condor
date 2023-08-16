@@ -88,6 +88,7 @@ sim_kwargs.update(dict(
 #        )
 #Sim.implementation.callback.get_jacobian(f'jac_{Sim.implementation.callback.name}', None, None, {})
 
+
 Sim = make_sim()
 output_vars = Sim.Delta_v_mag_1, Sim.Delta_v_disp_1, Sim.final_pos_disp
 sim_kwargs.update(dict(
@@ -105,7 +106,7 @@ meas_times = np.arange(2, 202, 20.)
 meas_sims= [
     (
         Sim(
-            tig_1=901.,
+            tig_1=151.,
             meas_t_offset = meas_time,
             **sim_kwargs
         ),
@@ -114,14 +115,16 @@ meas_sims= [
     for meas_time in meas_times
 ]
 indep_var = Sim.meas_t_offset
-deriv_check_plots(Sim.meas_t_offset, output_vars, meas_sims, title_prefix='mt')
-plt.show()
-import sys
-sys.exit()
+xx, yy = deriv_check_plots(Sim.meas_t_offset, output_vars, meas_sims, title_prefix='mt')
 
 
-tigs = np.arange(600, 1100., 5)
-tigs = np.arange(10, 3000., 5)
+#plt.show()
+#import sys
+#sys.exit()
+
+
+tigs = np.arange(600, 1100., 20)
+#tigs = np.arange(10, 3000., 5)
 tig_sims= [
     (
         Sim(
@@ -138,9 +141,9 @@ indep_var = Sim.tig_1
 
 deriv_check_plots(Sim.tig_1, output_vars, tig_sims, title_prefix='tig')
 
-plt.show()
-import sys
-sys.exit()
+#plt.show()
+#import sys
+#sys.exit()
 
 
 
@@ -159,24 +162,25 @@ MinorBurn = make_burn(
     tem = MajorBurn.tem, # time end maneuver
 )
 
-class Sim2(LinCovCW.TrajectoryAnalysis):
-    # TODO: add final burn Delta v (assume final relative v is 0, can get magnitude and
-    # dispersion)
-    tot_Delta_v_mag = trajectory_output(Delta_v_mag)
-    tot_Delta_v_disp = trajectory_output(Delta_v_disp)
+#class Sim2(LinCovCW.TrajectoryAnalysis):
+#    # TODO: add final burn Delta v (assume final relative v is 0, can get magnitude and
+#    # dispersion)
+#    tot_Delta_v_mag = trajectory_output(Delta_v_mag)
+#    tot_Delta_v_disp = trajectory_output(Delta_v_disp)
+#
+#    Mr = ca.horzcat(I3, ca.MX(3,9))
+#    sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
+#    final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
-    Mr = ca.horzcat(I3, ca.MX(3,9))
-    sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
-    final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
+#Sim2.implementation.callback.get_jacobian(f'jac_{Sim2.implementation.callback.name}', None, None, {})
+Sim2 = make_sim()
 
-Sim2.implementation.callback.get_jacobian(f'jac_{Sim2.implementation.callback.name}', None, None, {})
-
-tigs = np.arange(600, 1100., 5)
+tigs = np.arange(600, 1100., 20)
 sims= [
     (
         Sim2(
             tig_2=tig,
-            meas_t_offset = 851,
+            meas_t_offset = 1500.,
             **sim_kwargs
         ),
         Sim2.implementation.callback.jac_callback(Sim2.implementation.callback.p, [])
@@ -184,12 +188,12 @@ sims= [
     for tig in tigs
 ]
 sims2 = sims
-tig2_idx = Sim2.parameter.flat_index(Sim2.tig_2)
-deriv_check_plots(tigs, tig2_idx, sims2)
+deriv_check_plots(Sim2.tig_2, output_vars, sims2, title_prefix='mcc tig')
 """
 turning debug_level to 0 for shooting_gradient_method moves from 200s to 190s.
 
 """
+plt.show()
 
 import sys
 sys.exit()

@@ -326,6 +326,7 @@ def deriv_check_plots(indep_var, output_vars, sims, title_prefix=''):
         axes[1].plot(xgrid, jac[:, ord_idx, xidx], '--', label='SGM')
         axes[1].grid(True)
         axes[1].legend()
+    return xgrid, ordinates
 
 
 
