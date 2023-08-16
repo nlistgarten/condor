@@ -826,6 +826,7 @@ class TrajectoryAnalysis:
         self.dte_dps = []
         self.d2te_dtdp = []
         self.dh_dps = []
+        self.dh_dts = []
 
         for event, e_expr, h_expr in zip(
             ode_model.Event.subclasses, self.e_exprs, self.h_exprs
@@ -848,6 +849,7 @@ class TrajectoryAnalysis:
 
             dh_dx = casadi.jacobian(h_expr.expr, self.x)
             dh_dp = casadi.jacobian(h_expr.expr, self.p)
+            dh_dt = casadi.jacobian(h_expr.expr, ode_model.t)
 
             dte_dx = substitute(dte_dx, control_sub_expression)
             self.dte_dxs.append(
@@ -910,6 +912,17 @@ class TrajectoryAnalysis:
                 )
             )
             self.dh_dps[-1].expr = dh_dp
+
+
+            dh_dt = substitute(dh_dt, control_sub_expression)
+            self.dh_dts.append(
+                casadi.Function(
+                    f"{event.__name__}_dh_dt",
+                    self.simulation_signature,
+                    [dh_dt]
+                )
+            )
+            self.dh_dts[-1].expr = dh_dt
 
 
         if model_tf is not None:
@@ -984,6 +997,7 @@ class TrajectoryAnalysis:
             p_x0_p_params = p_state0_p_p,
             p_dots_p_params = param_dot_jac_func,
             dh_dps = self.dh_dps,
+            dh_dts = self.dh_dts,
             dte_dps = self.dte_dps,
             d2te_dtdp = self.d2te_dtdp,
 

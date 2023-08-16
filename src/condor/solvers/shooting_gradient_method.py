@@ -884,6 +884,7 @@ class ShootingGradientMethod:
     p_dots_p_params: callable # could be cached, or just combined with integrand terms
     # per system's events (length number of events)
     dh_dps: list[callable]
+    dh_dts: list[callable]
     dte_dps: list[callable]
     d2te_dtdp: list[callable]
 
@@ -1024,21 +1025,31 @@ class ShootingGradientMethod:
                         ).squeeze()
                 else:
                     for event_channel in active_update_idxs[::-1]:
-                        jac_row += np.array(lamda_tep[None, :] @ (
-                            self.dh_dps[event_channel](p, te, xtem)
-                            + 1*(
-                                delta_fs 
-                            ) @ self.dte_dps[event_channel](p, te, xtem)
-                            - delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
-                        ) + 1*(
-                            (
-                                +1*lamda_dot_tep[None, :]
-                                -1*lamda_dot_tem[None, :]
-                            ) @ (delta_xs) @ self.dte_dps[event_channel](p, te, xtem)
-                        ) - 1*(
-                            (lamda_tep - lamda_tem)[None, :]  @ self.dh_dps[event_channel](p, te, xtem)
-                            @ (self.dte_dps[event_channel](p, te, xtem).T @ self.dte_dps[event_channel](p, te, xtem))
-                        )).squeeze()
+                        dh_dp = self.dh_dps[event_channel](p, te, xtem)
+                        dh_dt = self.dh_dts[event_channel](p, te, xtem)
+                        dh_dx = adjoint_result.system.dh_dxs[event_channel](p, te, xtem,)
+                        dte_dp = self.dte_dps[event_channel](p, te, xtem)
+                        Delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
+                        Delta_lamdas = (lamda_tem - lamda_tep)
+                        dte_dp_dagger = dte_dp.T/(dte_dp @ dte_dp.T)
+                        jac_row += np.array(
+                            lamda_tep[None, :] @ ( dh_dp +  delta_fs @ dte_dp )
+                            # terms from active dynamics derivative and first term of
+                            # product rule for state update -- same as for lamda update
+                            - ( Delta_lamda_dots[None, :] @ (delta_xs) @ dte_dp)
+                            + (
+                                Delta_lamdas[None, :]  @ (
+                                    #dh_dt 
+                                    + dh_dp @ dte_dp_dagger
+                                    # next two terms might be
+                                    #+ dh_dx @ ftep - ftem
+                                    # OR
+                                    # (dh_dx - eye) @ dte_dx.DAGGER
+                                ) @ dte_dp
+                            ) + (
+                                Delta_lamdas[None, :] @ delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
+                            )
+                        ).squeeze()
 
                     #if state_event.index == 1:
                     #    breakpoint()
