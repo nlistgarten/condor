@@ -217,6 +217,40 @@ orbital 2
              niter: 24
 
 orbital 3 -- probably just need better orbital debugging to look at plots of gradients burn time minimization
+
+ measurement time minimization
+           message: `xtol` termination condition is satisfied.
+           success: True
+            status: 2
+               fun: 7.2611805268544085
+                 x: [ 8.510e+02]
+               nit: 88
+              nfev: 140
+              njev: 140
+              nhev: 0
+          cg_niter: 76
+      cg_stop_cond: 2
+              grad: [-5.372e-03]
+   lagrangian_grad: [-5.372e-03]
+            constr: [array([ 8.510e+02]), array([ 7.261e+00])]
+               jac: [<1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>, <1x1 sparse matrix of type '<class 'numpy.float64'>'
+                    	with 1 stored elements in Compressed Sparse Row format>]
+       constr_nfev: [0, 140]
+       constr_njev: [0, 140]
+       constr_nhev: [0, 0]
+                 v: [array([ 1.008e-08]), array([-3.847e-06])]
+            method: tr_interior_point
+        optimality: 0.0053720960507766076
+  constr_violation: 0.0
+    execution_time: 250.54488492012024
+         tr_radius: 0.00010000000000000003
+    constr_penalty: 1.0
+ barrier_parameter: 2.048000000000001e-09
+ barrier_tolerance: 2.048000000000001e-09
+             niter: 88
+
+burn time minimization
            message: `xtol` termination condition is satisfied.
            success: True
             status: 2
@@ -300,19 +334,19 @@ time to run: 12.1436151529997
 
 
 time switch:
-time to run: 0.4090696189996379
-3.000_000_830281426 2.999_995582588982
-[[-65.5001, 40.5001]]
+time to run: 0.6632084919983754
+2.9999996788483005 2.9999921648385275
+[[-65.5, 40.5]]
  message: Optimization terminated successfully.
  success: True
   status: 0
-     fun: 1.6362476320676782e-11
+     fun: 3.008671708973335e-11
        x: [ 3.000e+00  3.000e+00]
      nit: 12
-     jac: [-6.629e-06 -5.360e-06]
+     jac: [-4.048e-06 -7.514e-06]
     nfev: 22
     njev: 22
-exact same number of evals, about same time but understandable given small size of problem. But ~half the residual (objective)
+# jacobian and residual got a little worse :(
 
 state switch:
 time to run: 0.3447912620013085

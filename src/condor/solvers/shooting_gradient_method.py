@@ -1038,7 +1038,17 @@ class ShootingGradientMethod:
                         dte_dp_dagger = dte_dp.T/(dte_dp @ dte_dp.T)
 
                         dte_dx = adjoint_result.system.dte_dxs[event_channel](p, te, xtem)
-                        dte_dx_dagger = dte_dx.T/(dte_dx @ dte_dx.T)
+                        #dte_dx_dagger = dte_dx.T/(dte_dx @ dte_dx.T)
+                        dte_dx_dagger = np.linalg.pinv(dte_dx)
+
+                        # TODO performance optimization for the switches for the Delta
+                        # lamda terms (discovered from orbital burn and measurements)
+                        # not sure if pinv is best, if it's possible to write a logical
+                        # check efficiently, or just use vector inner product functions,
+                        # etc
+
+                        update_divergence = (dh_dp@dte_dp.T)
+
                         jac_row += np.array(
                             lamda_tep[None, :] @ ( dh_dp +  delta_fs @ dte_dp )
                             # terms from active dynamics derivative and first term of
@@ -1055,17 +1065,27 @@ class ShootingGradientMethod:
                                     # OR
                                     #- (dh_dx - np.eye(state_result.system.dim_state)) @ dte_dx_dagger
                                 ) @ dte_dp
-                            )  + (
+                            ) + (
+                                Delta_lamdas[None, :] 
+                                @ ( (dh_dx @ ftep - ftem) - delta_fs)
+                                @ dte_dp * (1 - np.linalg.pinv(update_divergence) @ update_divergence)
+                            ) + (
                                 Delta_lamdas[None, :] @ delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
                             )
 
                         ).squeeze()
 
-                        if event_channel == 2:
-                            jac_row += np.array(Delta_lamdas[None, :]  @ (
-                                    + (dh_dx @ ftep - ftem ) - delta_fs 
-                                ) @ dte_dp #@ dte_dp_dagger
-                            ).squeeze()
+# measurement update prototypes
+# # this seems to work... trick is to select out dh_dp = 0...
+# term1 = Delta_lamdas[None, :]  @ ( (dh_dx @ ftep - ftem) -delta_fs) @ dte_dp #@ dte_dp_dagger
+# term2 = dh_dp@dte_dp_dagger @ dte_dp
+# term1 @ (np.eye(218) - np.linalg.pinv(term2) @ term2)
+# 
+# Delta_lamdas[None, :]  @ ( (dh_dx @ ftep - ftem) -delta_fs) @ (np.eye(218) - dh_dp@dte_dp_dagger @ dte_dp)
+# 
+# term1 = (dh_dp@dte_dp.T)
+# switch = 1-np.linalg.pinv(term1)@term1
+
 
                     #if state_event.index == 1:
                     #    breakpoint()

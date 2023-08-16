@@ -244,7 +244,6 @@ class Sim(LinCovCW.TrajectoryAnalysis):
 sim_kwargs.update(dict(
     tem_1 = 2300.,
     meas_dt = 2300.,
-    meas_t_offset = 851.,
 ))
 
 
@@ -254,6 +253,7 @@ class Burn1(co.OptimizationProblem):
     sigma_Dv_weight = parameter()
     mag_Dv_weight = parameter()
     sim = Sim(
+        meas_t_offset = 851.,
         tig_1=t1,
         **sim_kwargs
 
@@ -272,9 +272,45 @@ class Burn1(co.OptimizationProblem):
         gtol = 1E-3
         xtol = 1E-3
 
+class Meas1(co.OptimizationProblem):
+    t1 = variable(initializer=0.)
+    sigma_r_weight = parameter()
+    sigma_Dv_weight = parameter()
+    mag_Dv_weight = parameter()
+    sim = Sim(
+        meas_t_offset = t1,
+        tig_1=851.,
+        **sim_kwargs
+
+    )
+
+    constraint(t1, lower_bound=00., upper_bound=sim_kwargs['tem_1']-30.)
+    constraint(sim.final_pos_disp, upper_bound=10.)
+    objective = (
+        sigma_Dv_weight*sim.tot_Delta_v_disp
+        + sigma_r_weight*sim.final_pos_disp
+        + mag_Dv_weight*sim.tot_Delta_v_mag
+    )
+    class Casadi(co.Options):
+        exact_hessian=False
+        method = OptimizationProblem.Method.scipy_trust_constr
+        gtol = 1E-3
+        xtol = 1E-3
+
+opt = Meas1(sigma_Dv_weight=0, mag_Dv_weight=0, sigma_r_weight=1)
+opt_sim = Sim(
+        tig_1=851.,
+        meas_t_offset = opt.t1,
+        **sim_kwargs
+)
+
+print("\n"*3,"measurement time minimization")
+print(opt._stats)
+
 opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
 opt_sim = Sim(
         tig_1=opt.t1,
+        meas_t_offset = 851.,
         **sim_kwargs
 )
 

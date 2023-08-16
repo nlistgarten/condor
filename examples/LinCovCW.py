@@ -287,7 +287,7 @@ sim_kwargs.update(dict(
 
 
 from scipy.interpolate import make_interp_spline
-def deriv_check_plots(indep_var, output_vars, sims, title_prefix=''):
+def deriv_check_plots(indep_var, output_vars, sims, title_prefix='', interp_k =2):
     sims1 = [simout[0] for simout in sims]
     jac = np.stack([simout[1] for simout in sims])
     #Dv_mags = [sim.tot_Delta_v_mag for sim in sims1]
@@ -316,7 +316,7 @@ def deriv_check_plots(indep_var, output_vars, sims, title_prefix=''):
     #breakpoint()
     #ord_idxs = [Dv_mag_idx, Dv_disp_idx, pos_disp_idx]
     for ord_idx, ord_name, ord_val in zip(ord_idxs, ordinate_names, ordinates):
-        interp = make_interp_spline(xgrid, ord_val)
+        interp = make_interp_spline(xgrid, ord_val, k=interp_k)
         derinterp = interp.derivative()
         fig, axes = plt.subplots(2, constrained_layout=True, sharex=True)
         plt.suptitle(' '.join([title_prefix, ord_name]))
