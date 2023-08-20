@@ -102,11 +102,12 @@ sim_kwargs.update(dict(
 sim_kwargs.pop('meas_t_offset', None)
 meas_times = np.arange(300, 1100, 5.)
 meas_times = np.arange(300, 900, 5.)
-meas_times = np.arange(2, 202, 20.)
+meas_times = np.arange(0., 150., 20.)
+meas_times = np.r_[1:151:20, 153:203:20]
 meas_sims= [
     (
         Sim(
-            tig_1=151.,
+            tig_1=152.,
             meas_t_offset = meas_time,
             **sim_kwargs
         ),
@@ -122,24 +123,24 @@ xx, yy = deriv_check_plots(Sim.meas_t_offset, output_vars, meas_sims, title_pref
 #import sys
 #sys.exit()
 
+if False:
+    tigs = np.arange(600, 1100., 20)
+    #tigs = np.arange(10, 3000., 5)
+    tig_sims= [
+        (
+            Sim(
+                tig_1=tig,
+                meas_t_offset = 851.,
+                **sim_kwargs
+            ),
+             Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
+        )
+        for tig in tigs
+    ]
+    indep_var = Sim.tig_1
 
-tigs = np.arange(600, 1100., 20)
-#tigs = np.arange(10, 3000., 5)
-tig_sims= [
-    (
-        Sim(
-            tig_1=tig,
-            meas_t_offset = 851.,
-            **sim_kwargs
-        ),
-         Sim.implementation.callback.jac_callback(Sim.implementation.callback.p, [])
-    )
-    for tig in tigs
-]
-indep_var = Sim.tig_1
 
-
-deriv_check_plots(Sim.tig_1, output_vars, tig_sims, title_prefix='tig')
+    deriv_check_plots(Sim.tig_1, output_vars, tig_sims, title_prefix='tig')
 
 #plt.show()
 #import sys
@@ -175,7 +176,7 @@ MinorBurn = make_burn(
 #Sim2.implementation.callback.get_jacobian(f'jac_{Sim2.implementation.callback.name}', None, None, {})
 Sim2 = make_sim()
 
-tigs = np.arange(600, 1100., 20)
+tigs = np.arange(600, 1100., 75)
 sims= [
     (
         Sim2(

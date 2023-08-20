@@ -887,6 +887,7 @@ class ShootingGradientMethod:
     dh_dts: list[callable]
     dte_dps: list[callable]
     d2te_dtdp: list[callable]
+    jac_updates: list[callable]
 
     # of length number of (trajectory) outputs
     p_integrand_terms_p_params: list[callable]
@@ -1049,31 +1050,37 @@ class ShootingGradientMethod:
 
                         update_divergence = (dh_dp@dte_dp.T)
 
-                        jac_row += np.array(
-                            lamda_tep[None, :] @ ( dh_dp +  delta_fs @ dte_dp )
-                            # terms from active dynamics derivative and first term of
-                            # product rule for state update -- same as for lamda update
-                            - ( Delta_lamda_dots[None, :] @ (delta_xs) @ dte_dp)
-                            + (
-                                Delta_lamdas[None, :]  @ (
-                                    dh_dt 
-                                    + dh_dp @ dte_dp_dagger
-                                    # next two terms might be
-                                    # breaks part of orbital 1 but makes measurement
-                                    # time have non-zero derivative... doesn't agree
-                                    # with numerical but it's somethi
-                                    # OR
-                                    #- (dh_dx - np.eye(state_result.system.dim_state)) @ dte_dx_dagger
-                                ) @ dte_dp
-                            ) + (
-                                Delta_lamdas[None, :] 
-                                @ ( (dh_dx @ ftep - ftem) - delta_fs)
-                                @ dte_dp * (1 - np.linalg.pinv(update_divergence) @ update_divergence)
-                            ) + (
-                                Delta_lamdas[None, :] @ delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
-                            )
 
+                        old_jac_row = np.array(
+                                lamda_tep[None, :] @ ( dh_dp +  delta_fs @ dte_dp )
+                                # terms from active dynamics derivative and first term of
+                                # product rule for state update -- same as for lamda update
+                                - ( Delta_lamda_dots[None, :] @ (delta_xs) @ dte_dp)
+                                + (
+                                    Delta_lamdas[None, :]  @ (
+                                        dh_dt 
+                                        + dh_dp @ dte_dp_dagger
+                                        # next two terms might be
+                                        # breaks part of orbital 1 but makes measurement
+                                        # time have non-zero derivative... doesn't agree
+                                        # with numerical but it's somethi
+                                        # OR
+                                        #- (dh_dx - np.eye(state_result.system.dim_state)) @ dte_dx_dagger
+                                    ) @ dte_dp
+                                ) + (
+                                    Delta_lamdas[None, :] 
+                                    @ ( (dh_dx @ ftep - ftem) - delta_fs)
+                                    @ dte_dp * (1 - np.linalg.pinv(update_divergence) @ update_divergence)
+                                ) + (
+                                    Delta_lamdas[None, :] @ delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
+                                )
+
+                            ).squeeze()
+                        jac_row += np.array(
+                            self.jac_updates[event_channel](p, xtem, te, lamda_tep)
                         ).squeeze()
+                        pass
+
 
 # measurement update prototypes
 # # this seems to work... trick is to select out dh_dp = 0...

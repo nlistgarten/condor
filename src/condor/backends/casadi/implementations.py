@@ -828,6 +828,8 @@ class TrajectoryAnalysis:
         self.dh_dps = []
         self.dh_dts = []
 
+        self.jac_updates = []
+
         for event, e_expr, h_expr in zip(
             ode_model.Event.subclasses, self.e_exprs, self.h_exprs
         ):
@@ -850,6 +852,60 @@ class TrajectoryAnalysis:
             dh_dx = casadi.jacobian(h_expr.expr, self.x)
             dh_dp = casadi.jacobian(h_expr.expr, self.p)
             dh_dt = casadi.jacobian(h_expr.expr, ode_model.t)
+
+
+            te = ode_model.t
+
+            xtem = self.x
+            xtep = h_expr(self.p, te, xtem)
+
+            ftem = state_equation_func(self.p, te, xtem)
+            ftep = state_equation_func(self.p, te, xtep)
+            delta_fs = ftep - ftem
+            delta_xs = xtep - xtem
+
+            lamda_tep = self.lamda
+            lamda_tem = ( dh_dx.T - dte_dx.T @ delta_fs.T) @ lamda_tep
+
+            delta_lamdas = lamda_tem - lamda_tep
+
+            # TODO update for forcing function
+            lamda_dot_tem = -state_dot_jac_func(self.p, te, xtem).T @ lamda_tem
+            lamda_dot_tep = -state_dot_jac_func(self.p, te, xtep).T @ lamda_tep
+
+            delta_lamda_dots = lamda_dot_tem - lamda_dot_tep
+
+            dte_dp_dagger = casadi.pinv(dte_dp)
+            dte_dx_dagger = casadi.pinv(dte_dx)
+
+            time_deriv = lambda expr: casadi.jacobian(expr, ode_model.t) + casadi.jacobian(expr, self.x) @ dte_dx_dagger + casadi.jacobian(expr, self.p) @ dte_dp_dagger
+
+            update_divergence = (dh_dp@dte_dp.T)
+            jac_update = (
+                (lamda_tep.T @ ( dh_dp + delta_fs @ dte_dp))
+                - (delta_lamda_dots.T @ delta_xs @ dte_dp)
+                #+ (delta_lamdas.T @ time_deriv(delta_xs) @ dte_dp)
+
+                + (delta_lamdas.T @ (
+                    dh_dp @ dte_dp_dagger
+                    + (dh_dx @ ftep - ftep) * (
+                        1 - casadi.pinv(update_divergence) @ update_divergence
+                    )
+                )@ dte_dp)
+
+                #+ (delta_lamdas.T @ delta_xs @ time_deriv(dte_dp).T)
+            )
+            #jac_update = substitute(jac_update, control_sub_expression)
+
+            self.jac_updates.append(
+                casadi.Function(
+                    f"{event.__name__}_jac_update",
+                    self.adjoint_signature,
+                    [jac_update],
+                )
+            )
+
+
 
             dte_dx = substitute(dte_dx, control_sub_expression)
             self.dte_dxs.append(
@@ -1000,6 +1056,7 @@ class TrajectoryAnalysis:
             dh_dts = self.dh_dts,
             dte_dps = self.dte_dps,
             d2te_dtdp = self.d2te_dtdp,
+            jac_updates = self.jac_updates,
 
             p_terminal_terms_p_params = self.gradF_funcs,
             p_integrand_terms_p_params = param_integrand_jac_funcs,
