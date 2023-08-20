@@ -883,14 +883,21 @@ class TrajectoryAnalysis:
             update_divergence = (dh_dp@dte_dp.T)
             jac_update = (
                 (lamda_tep.T @ ( dh_dp + delta_fs @ dte_dp))
-                - (delta_lamda_dots.T @ delta_xs @ dte_dp)
-                #+ (delta_lamdas.T @ time_deriv(delta_xs) @ dte_dp)
 
+                #- (delta_lamda_dots.T @ delta_xs @ dte_dp)
+                #+ time_deriv(delta_lamdas).T @ delta_xs @ dte_dp
+                + ((
+                    casadi.jacobian(lamda_tem, self.p) @ dte_dp_dagger
+                    + casadi.jacobian(lamda_tem, self.x) @ ftep
+                    + ( dh_dx.T - dte_dx.T @ delta_fs.T) @ lamda_dot_tep
+                    - lamda_dot_tep
+                #).T @ delta_xs @ dte_dp)
+                ).T @ xtem @ dte_dp)
+
+                #+ (delta_lamdas.T @ time_deriv(delta_xs) @ dte_dp)
                 + (delta_lamdas.T @ (
                     dh_dp @ dte_dp_dagger
-                    + (dh_dx @ ftep - ftep) * (
-                        1 - casadi.pinv(update_divergence) @ update_divergence
-                    )
+                    + (dh_dx @ ftep - ftep)
                 )@ dte_dp)
 
                 #+ (delta_lamdas.T @ delta_xs @ time_deriv(dte_dp).T)
