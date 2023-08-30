@@ -1,6 +1,7 @@
 import numpy as np
 #from condor import backend
 from scipy.interpolate import make_interp_spline
+from scipy.linalg import expm
 
 from dataclasses import dataclass, field, InitVar
 try:
@@ -730,6 +731,7 @@ class AdjointSystem(System):
         p = state_res.p
         state_idxp = event.index # positive side of event
         te = state_res.t[state_idxp]
+        eyen = np.eye(state_res.x[0].shape[0])
 
 
         if len(active_update_idxs) > 1:
@@ -762,14 +764,25 @@ class AdjointSystem(System):
                 lamda_dot = self.dots(te, last_lamda)
 
                 for event_channel in active_update_idxs[::-1]:
+                    #lamda_tem = (
+                    #    eyen
+                    #    - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
+                    #) @ expm(
+                    #    self.dh_dxs[event_channel](p, te, xtem,).T
+                    #    - eyen
+                    #) @ last_lamda
+
                     lamda_tem = (
-                        self.dh_dxs[event_channel](p, te, xtem,).T
+                        eyen
                         - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
-                        #+ self.d2te_dtdx[event_channel](p, te, xtem).T @ delta_xs.T
+                    ) @ (
+                        self.dh_dxs[event_channel](p, te, xtem,).T
                     ) @ last_lamda
-                    -0*(
-                         lamda_dot[None, :] @ (delta_xs) @ self.dte_dxs[event_channel](p, te, xtem)
-                    ).T
+
+                    #lamda_tem = (
+                    #    self.dh_dxs[event_channel](p, te, xtem,).T
+                    #    - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
+                    #) @ last_lamda
 
                     last_lamda = lamda_tem
         else:
