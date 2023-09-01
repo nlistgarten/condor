@@ -887,7 +887,7 @@ class TrajectoryAnalysis:
 
             jac_update = (
                 lamda_tep.T @ dh_dp
-                + lamda_tep.T @ ( ftep - ftem) @ dte_dp 
+                + lamda_tep.T @ ( ftep - dh_dx @ ftem ) @ dte_dp 
                 #- lamda_tem.T @ ftem
             )
 
