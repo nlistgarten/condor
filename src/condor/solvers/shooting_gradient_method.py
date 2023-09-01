@@ -690,6 +690,7 @@ class AdjointResult(ResultBase, AdjointResultMixin,):
 class AdjointSystem(System):
     def __init__(
         self, state_jac, dte_dxs, d2te_dtdx, dh_dxs,
+        #adjoint_updates,
         solver_class = SolverSciPyDopri5,
         atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
     ):
@@ -703,6 +704,7 @@ class AdjointSystem(System):
         self.dte_dxs, self.d2te_dtdx, self.dh_dxs = dte_dxs, d2te_dtdx, dh_dxs,
         self.num_events = 1
         self.dynamic_output = None
+        #self.adjoint_updates = adjoint_updates
 
         self.make_solver(
             atol=atol,
@@ -773,10 +775,11 @@ class AdjointSystem(System):
                     #) @ last_lamda
 
                     lamda_tem = (
-                        eyen
-                        - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
-                    ) @ (
                         self.dh_dxs[event_channel](p, te, xtem,).T
+                        - self.dte_dxs[event_channel](p, te, xtem).T @ (
+                            ftep.T
+                            - ftem.T @ self.dh_dxs[event_channel](p, te, xtem,).T
+                        )
                     ) @ last_lamda
 
                     #lamda_tem = (

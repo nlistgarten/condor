@@ -862,7 +862,7 @@ class TrajectoryAnalysis:
 
             lamda_tep = self.lamda
             eyen = casadi.MX.eye(lamda_tep.shape[0])
-            lamda_tem = ( eyen  - dte_dx.T @ delta_fs.T) @ dh_dx.T @ lamda_tep
+            lamda_tem = (( eyen + dte_dx.T @ ftem.T) @  dh_dx.T - dte_dx.T @ ftep.T )@ lamda_tep
 
             delta_lamdas = (lamda_tem - lamda_tep)
 
@@ -884,177 +884,13 @@ class TrajectoryAnalysis:
             time_deriv = lambda expr: casadi.jacobian(expr, ode_model.t) + casadi.jacobian(expr, self.x) @ dte_dx_dagger + casadi.jacobian(expr, self.p) @ dte_dp_dagger
 
             update_divergence = (dh_dp@dte_dp.T)
-            """
-            jac_update = (
-                (lamda_tep.T @ ( dh_dp + delta_fs @ dte_dp))
-                - (
-                    (lamda_tep - lamda_tem).T @ delta_xs @ dte_dp
-                    + lamda_tem.T @ (
-                        dh_dp @ dte_dp_dagger
-                        + (dh_dx - eyen) @ (ftep - ftem)
-
-                    ) @ dte_dp
-                )
-
-
-                ##- (delta_lamda_dots.T @ delta_xs @ dte_dp)
-                ##+ time_deriv(delta_lamdas).T @ delta_xs @ dte_dp
-                #- ((
-                #    casadi.jacobian(lamda_tem, self.p) @ dte_dp_dagger
-                #    + casadi.jacobian(lamda_tem, self.x) @ ftep
-                #    + ( dh_dx.T - dte_dx.T @ delta_fs.T) @ lamda_dot_tep
-                #    - lamda_dot_tep
-                ##).T @ xtem
-                ##) @ dte_dp
-                #).T@ delta_xs @ dte_dp)
-                ##).T @ xtem @ dte_dp)
-
-                ##+ (delta_lamdas.T @ time_deriv(delta_xs) @ dte_dp)
-                #- ( (
-                #    lamda_tep.T @ (dh_dp @ dte_dp_dagger + dh_dx @ ftep )
-                #    #- lamda_tem.T @ ftem)
-                #)@ dte_dp)
-
-                #- (delta_lamdas.T @ delta_xs @ time_deriv(dte_dp).T)
-            )
-            #"""
-
-
-            """
-            jac_update = (
-                (lamda_tep.T @ ( dh_dp + delta_fs @ dte_dp))
-                #+ (
-                #    casadi.jacobian(delta_lamdas, self.p) @ dte_dp_dagger
-                #    #delta_lamda_dots
-                #    + casadi.jacobian(delta_lamdas, self.x) @ delta_fs
-                #    #+ ( dh_dx.T - dte_dx.T @ delta_fs.T - ) @ lamda_dot_tem
-                #    + casadi.jacobian(delta_lamdas, self.lamda) @ delta_lamda_dots
-                #    - delta_lamda_dots
-                #    #- lamda_dot_tem
-                #    #- lamda_dot_tep
-                #).T @ (
-                #    #delta_fs
-                #    dh_dp @ dte_dp_dagger
-                #    + dh_dx @ (ftep - ftem)
-                #    - delta_fs
-                #    #- ftep + ftem
-                #    #- ftem
-                #    #- ftem
-                #    #- ftep
-                #) @ dte_dp
-
-                #- (delta_lamda_dots.T @ delta_xs @ dte_dp)
-                #+ time_deriv(delta_lamdas).T @ delta_xs @ dte_dp
-                - (( 0.
-                    + casadi.jacobian(delta_lamdas, self.p) @ dte_dp_dagger
-                    #delta_lamda_dots
-                    #- casadi.jacobian(delta_lamdas, self.x) @ ftep
-                    #- casadi.jacobian(delta_lamdas, self.x) @ delta_fs
-                    #- casadi.jacobian(delta_lamdas, self.x) @ delta_fs
-                    #+ ( dh_dx.T - dte_dx.T @ delta_fs.T - ) @ lamda_dot_tem
-                    + casadi.jacobian(delta_lamdas, self.lamda) @ lamda_dot_tep # delta_lamda_dots
-                    #+ delta_lamda_dots
-                    #+ lamda_dot_tem
-                    #- lamda_dot_tep
-                ).T @ delta_xs @ dte_dp)
-                #).T @ xtem @ dte_dp)
-
-                #- (
-                #    casadi.jacobian(delta_lamdas, self.p) @ dte_dp_dagger 
-                #).T @ xtep @ dte_dp
-
-                #+ delta_lamdas.T @ delta_fs @ dte_dp
-
-                #+ (delta_lamdas.T @ time_deriv(delta_xs) @ dte_dp)
-                - (lamda_tep.T @ (0.
-                    #+ delta_fs
-                    - dh_dp @ dte_dp_dagger
-                    + dh_dx @ (
-                        ftep 
-                    #    #- ftem
-                    )
-                    #- delta_fs
-                    #- ftep + ftem
-                    - ftem
-                    #- ftem
-                    #- ftep
-                )@ dte_dp)
-
-                #+ (delta_lamdas.T @ delta_xs @ time_deriv(dte_dp).T)
-            )
-            #"""
-
-            """ 
-            # original symbolic version of what appears to work for all current examples
-            jac_update = (
-                (lamda_tep.T @ ( dh_dp + delta_fs @ dte_dp))
-                - (delta_lamda_dots.T @ delta_xs @ dte_dp)
-                #+ (delta_lamdas.T @ time_deriv(delta_xs) @ dte_dp)
-
-                + (delta_lamdas.T @ (
-                    dh_dp @ dte_dp_dagger
-                    + (dh_dx @ ftep - ftep) * (
-                        1 - casadi.pinv(update_divergence) @ update_divergence
-                    )
-                )@ dte_dp)
-
-                #+ (delta_lamdas.T @ delta_xs @ time_deriv(dte_dp).T)
-            )
-            #"""
-
-            #""" 
-            # trying to do a cohesive version but did not get something that covered all
-            # cases
-            dirac_coeff = (
-                lamda_tep
-                - lamda_tem
-            ).T @ delta_xs @ dte_dp
-            #dirac_coeff = (
-            #    lamda_tep
-            #    - lamda_tem
-            #).T @ xtep @ dte_dp
-            coeff_deriv = 0*(
-                casadi.jacobian(dirac_coeff, ode_model.t)
-                -casadi.jacobian(dirac_coeff, self.x) @ (
-                    ftep
-                    - ftem
-                )
-                +casadi.jacobian(dirac_coeff, self.p) @ dte_dp_dagger
-                -casadi.jacobian(dirac_coeff, self.lamda) @ (
-                    lamda_dot_tep
-                    -lamda_dot_tem
-                    #lamda_tem - lamda_tep
-                )
-            )
 
             jac_update = (
-                (lamda_tep.T @ ( dh_dp + delta_fs @ dte_dp))
-                + coeff_deriv.T
-                #- (delta_lamda_dots.T @ delta_xs @ dte_dp)
-                #+ (delta_lamdas.T @ time_deriv(delta_xs) @ dte_dp)
-                #+ ((
-                #    casadi.jacobian(lamda_tem, self.p) @ dte_dp_dagger
-                #    + casadi.jacobian(lamda_tem, self.x) @ ftep
-                #    + ( dh_dx.T - dte_dx.T @ delta_fs.T) @ lamda_dot_tep
-                #    #- lamda_dot_tem
-                #    - lamda_dot_tem
-                #).T @ delta_xs @ dte_dp)#/2
-
-                #- (delta_lamdas.T @ (
-                #    dh_dp @ dte_dp_dagger
-                #    + dh_dx @ ftep 
-                #    - ftem
-                #)@ dte_dp)
-
-                #+ (delta_lamdas.T @ delta_xs @ time_deriv(dte_dp).T)
+                lamda_tep.T @ dh_dp
+                + lamda_tep.T @ ( ftep - ftem) @ dte_dp 
+                #- lamda_tem.T @ ftem
             )
-            #"""
 
-            #jac_update = (
-            #    (lamda_tep.T @ (
-            #        (eyen - dh_dx ) @ dh_dp 
-            #        + dh_dx @ (eyen - delta_fs @ dte_dx) @ delta_fs @ dte_dp))
-            #)
             jac_update = substitute(jac_update, control_sub_expression)
 
             self.jac_updates.append(
