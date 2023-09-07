@@ -1041,7 +1041,7 @@ class ShootingGradientMethod:
                         Delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
                         Delta_lamdas = (lamda_tem - lamda_tep)
                         jac_row += np.array(
-                            -lamda_tep[None, :] @ ftem @ dte_dp
+                            lamda_tep[None, :] @ ftem @ dte_dp
                         ).squeeze()
                         #breakpoint()
                 else:

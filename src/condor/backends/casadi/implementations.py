@@ -838,7 +838,7 @@ class TrajectoryAnalysis:
             dg_dp = casadi.jacobian(e_expr, self.p)
 
             dte_dx = dg_dx/(dg_dx@state_equation_func.expr)
-            dte_dp = dg_dp/(dg_dx@state_equation_func.expr + dg_dt)
+            dte_dp = -dg_dp/(dg_dx@state_equation_func.expr + dg_dt)
 
             d2te_dxdt = (
                 casadi.jacobian(dte_dx, ode_model.t)
@@ -887,8 +887,8 @@ class TrajectoryAnalysis:
 
             jac_update = (
                 lamda_tep.T @ dh_dp
-                + lamda_tep.T @ ( ftep - dh_dx @ ftem ) @ dte_dp 
-                #- lamda_tem.T @ ftem
+                - lamda_tep.T @ ( ftep - dh_dx @ ftem ) @ dte_dp 
+                #- lamda_tem.T @ ftem @ dte_dp
             )
 
             jac_update = substitute(jac_update, control_sub_expression)
