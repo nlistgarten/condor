@@ -719,6 +719,7 @@ class AdjointSystem(System):
             self.result.state_result.e[self.segment_idx].index
         ]).reshape(-1)
 
+
     def update(self, t, lamda, ignore_rootsfound):
         """
         for adjoint system, update will always get called for t1 of each segment, 
@@ -733,7 +734,6 @@ class AdjointSystem(System):
         p = state_res.p
         state_idxp = event.index # positive side of event
         te = state_res.t[state_idxp]
-        eyen = np.eye(state_res.x[0].shape[0])
 
 
         if len(active_update_idxs) > 1:
@@ -755,37 +755,27 @@ class AdjointSystem(System):
 
             delta_fs = ftep - ftem
             delta_xs = xtep - xtem
+
+
             if event is state_res.e[-1]:
                 lamda_tem = last_lamda
-                # skip for terminal event? actually, must handle separatley -- just call
-                # jacobian functions directly?
+                # TODO: add full transversality condition
                 for event_channel in active_update_idxs[::-1]:
-                    lamda_tem = last_lamda - self.dte_dxs[event_channel](p, te, xtem).T @ ftem.T @ last_lamda
+                    dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
+                    lamda_tem = last_lamda - dte_dxT @ ftem.T @ last_lamda
                     last_lamda = lamda_tem
             else:
                 lamda_dot = self.dots(te, last_lamda)
 
                 for event_channel in active_update_idxs[::-1]:
-                    #lamda_tem = (
-                    #    eyen
-                    #    - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
-                    #) @ expm(
-                    #    self.dh_dxs[event_channel](p, te, xtem,).T
-                    #    - eyen
-                    #) @ last_lamda
-
+                    dh_dx = self.dh_dxs[event_channel](p, te, xtem,)
+                    dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
                     lamda_tem = (
-                        self.dh_dxs[event_channel](p, te, xtem,).T
-                        - self.dte_dxs[event_channel](p, te, xtem).T @ (
-                            ftep.T
-                            - ftem.T @ self.dh_dxs[event_channel](p, te, xtem,).T
-                        )
+                        dh_dx.T
+                        - dte_dxT @ (
+                            ftep - dh_dx @ ftem
+                        ).T
                     ) @ last_lamda
-
-                    #lamda_tem = (
-                    #    self.dh_dxs[event_channel](p, te, xtem,).T
-                    #    - self.dte_dxs[event_channel](p, te, xtem).T @ delta_fs.T
-                    #) @ last_lamda
 
                     last_lamda = lamda_tem
         else:
@@ -1012,13 +1002,6 @@ class ShootingGradientMethod:
 
                 active_update_idxs = np.where(state_event.rootsfound != 0)[0]
 
-                # does initialization have a special case?
-                """
-                if state_event.idx == 1:
-                    jac_row += ...
-                    continue
-                """
-
                 idxm = lamda_event.index
                 idxp = idxm - 1
                 if adjoint_result.t[idxm] != adjoint_result.t[idxp]:
@@ -1026,11 +1009,7 @@ class ShootingGradientMethod:
                 if not np.isclose(adjoint_result.t[idxm], te):
                     breakpoint()
 
-                lamda_tem = adjoint_result.x[idxm]
-                lamda_dot_tem = self.adjoint_system.dots(te, lamda_tem)
-
                 lamda_tep = adjoint_result.x[idxp]
-                lamda_dot_tep = self.adjoint_system.dots(te, lamda_tep)
 
                 if state_event.index == 1:
                     #breakpoint()
@@ -1038,8 +1017,6 @@ class ShootingGradientMethod:
                 if state_event is state_result.e[-1]:
                     for event_channel in active_update_idxs[::-1]:
                         dte_dp = self.dte_dps[event_channel](p, te, xtem)
-                        Delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
-                        Delta_lamdas = (lamda_tem - lamda_tep)
                         jac_row += np.array(
                             lamda_tep[None, :] @ ftem @ dte_dp
                         ).squeeze()
@@ -1047,71 +1024,16 @@ class ShootingGradientMethod:
                 else:
                     for event_channel in active_update_idxs[::-1]:
                         dh_dp = self.dh_dps[event_channel](p, te, xtem)
-                        dh_dt = self.dh_dts[event_channel](p, te, xtem)
                         dh_dx = adjoint_result.system.dh_dxs[event_channel](p, te, xtem,)
                         dte_dp = self.dte_dps[event_channel](p, te, xtem)
-                        Delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
-                        Delta_lamdas = (lamda_tem - lamda_tep)
-                        dte_dp_dagger = dte_dp.T/(dte_dp @ dte_dp.T)
 
-                        dte_dx = adjoint_result.system.dte_dxs[event_channel](p, te, xtem)
-                        #dte_dx_dagger = dte_dx.T/(dte_dx @ dte_dx.T)
-                        dte_dx_dagger = np.linalg.pinv(dte_dx)
-
-                        # TODO performance optimization for the switches for the Delta
-                        # lamda terms (discovered from orbital burn and measurements)
-                        # not sure if pinv is best, if it's possible to write a logical
-                        # check efficiently, or just use vector inner product functions,
-                        # etc
-
-                        update_divergence = (dh_dp@dte_dp.T)
-
-
-                        old_jac_row = np.array(
-                                lamda_tep[None, :] @ ( dh_dp +  delta_fs @ dte_dp )
-                                # terms from active dynamics derivative and first term of
-                                # product rule for state update -- same as for lamda update
-                                - ( Delta_lamda_dots[None, :] @ (delta_xs) @ dte_dp)
-                                + (
-                                    Delta_lamdas[None, :]  @ (
-                                        dh_dt 
-                                        + dh_dp @ dte_dp_dagger
-                                        # next two terms might be
-                                        # breaks part of orbital 1 but makes measurement
-                                        # time have non-zero derivative... doesn't agree
-                                        # with numerical but it's somethi
-                                        # OR
-                                        #- (dh_dx - np.eye(state_result.system.dim_state)) @ dte_dx_dagger
-                                    ) @ dte_dp
-                                ) + (
-                                    Delta_lamdas[None, :] 
-                                    @ ( (dh_dx @ ftep - ftem) - delta_fs)
-                                    @ dte_dp * (1 - np.linalg.pinv(update_divergence) @ update_divergence)
-                                ) + (
-                                    Delta_lamdas[None, :] @ delta_xs[:, None] @ self.d2te_dtdp[event_channel](p, te, xtem).T
-                                )
-
-                            ).squeeze()
                         jac_row += np.array(
-                            self.jac_updates[event_channel](p, xtem, te, lamda_tep)
+                            lamda_tep[None, :] @ (
+                                dh_dp
+                                - (ftep - dh_dx @ ftem ) @ dte_dp
+                            )
                         ).squeeze()
-                        pass
 
-
-# measurement update prototypes
-# # this seems to work... trick is to select out dh_dp = 0...
-# term1 = Delta_lamdas[None, :]  @ ( (dh_dx @ ftep - ftem) -delta_fs) @ dte_dp #@ dte_dp_dagger
-# term2 = dh_dp@dte_dp_dagger @ dte_dp
-# term1 @ (np.eye(218) - np.linalg.pinv(term2) @ term2)
-# 
-# Delta_lamdas[None, :]  @ ( (dh_dx @ ftep - ftem) -delta_fs) @ (np.eye(218) - dh_dp@dte_dp_dagger @ dte_dp)
-# 
-# term1 = (dh_dp@dte_dp.T)
-# switch = 1-np.linalg.pinv(term1)@term1
-
-
-                    #if state_event.index == 1:
-                    #    breakpoint()
 
             jac_rows.append(jac_row)
 
