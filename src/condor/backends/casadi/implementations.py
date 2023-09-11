@@ -820,15 +820,10 @@ class TrajectoryAnalysis:
         # lamda updates
         # grad updates
         self.dte_dxs = []
-        self.d2te_dtdx = []
         self.dh_dxs = []
 
         self.dte_dps = []
-        self.d2te_dtdp = []
         self.dh_dps = []
-        self.dh_dts = []
-
-        self.jac_updates = []
 
         for event, e_expr, h_expr in zip(
             ode_model.Event.subclasses, self.e_exprs, self.h_exprs
@@ -840,16 +835,12 @@ class TrajectoryAnalysis:
             dte_dx = dg_dx/(dg_dx@state_equation_func.expr)
             dte_dp = -dg_dp/(dg_dx@state_equation_func.expr + dg_dt)
 
-            d2te_dxdt = (
-                casadi.jacobian(dte_dx, ode_model.t)
-                + casadi.jacobian(dte_dx, self.x) @ state_equation_func.expr
-            )
 
             dh_dx = casadi.jacobian(h_expr.expr, self.x)
             dh_dp = casadi.jacobian(h_expr.expr, self.p)
-            dh_dt = casadi.jacobian(h_expr.expr, ode_model.t)
 
 
+            """
             te = ode_model.t
 
             xtem = self.x
@@ -872,23 +863,9 @@ class TrajectoryAnalysis:
 
             delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
 
-            dte_dp_dagger = casadi.pinv(dte_dp)
-            dte_dx_dagger = casadi.pinv(dte_dx)
-
-            d2te_dpdt = (
-                casadi.jacobian(dte_dp, ode_model.t)
-                + casadi.jacobian(dte_dp, self.p) @ dte_dp_dagger
-                + casadi.jacobian(dte_dp, self.x) @ state_equation_func.expr
-            )
-
-            time_deriv = lambda expr: casadi.jacobian(expr, ode_model.t) + casadi.jacobian(expr, self.x) @ dte_dx_dagger + casadi.jacobian(expr, self.p) @ dte_dp_dagger
-
-            update_divergence = (dh_dp@dte_dp.T)
-
             jac_update = (
                 lamda_tep.T @ dh_dp
                 - lamda_tep.T @ ( ftep - dh_dx @ ftem ) @ dte_dp 
-                #- lamda_tem.T @ ftem @ dte_dp
             )
 
             jac_update = substitute(jac_update, control_sub_expression)
@@ -900,6 +877,7 @@ class TrajectoryAnalysis:
                     [jac_update],
                 )
             )
+            """
 
 
 
@@ -924,26 +902,6 @@ class TrajectoryAnalysis:
             )
             self.dte_dps[-1].expr = dte_dp
 
-            d2te_dxdt = substitute(d2te_dxdt, control_sub_expression)
-            self.d2te_dtdx.append(
-                casadi.Function(
-                    f"{event.__name__}_d2te_dxdt",
-                    self.simulation_signature,
-                    [d2te_dxdt]
-                )
-            )
-            self.d2te_dtdx[-1].expr = d2te_dxdt
-
-            d2te_dpdt = substitute(d2te_dpdt, control_sub_expression)
-            self.d2te_dtdp.append(
-                casadi.Function(
-                    f"{event.__name__}_d2te_dpdt",
-                    self.simulation_signature,
-                    [d2te_dpdt]
-                )
-            )
-            self.d2te_dtdp[-1].expr = d2te_dpdt
-
 
             dh_dx = substitute(dh_dx, control_sub_expression)
             self.dh_dxs.append(
@@ -964,17 +922,6 @@ class TrajectoryAnalysis:
                 )
             )
             self.dh_dps[-1].expr = dh_dp
-
-
-            dh_dt = substitute(dh_dt, control_sub_expression)
-            self.dh_dts.append(
-                casadi.Function(
-                    f"{event.__name__}_dh_dt",
-                    self.simulation_signature,
-                    [dh_dt]
-                )
-            )
-            self.dh_dts[-1].expr = dh_dt
 
 
         if model_tf is not None:
@@ -1036,7 +983,6 @@ class TrajectoryAnalysis:
         self.AdjointSystem = sgm.AdjointSystem(
             state_jac = state_dot_jac_func,
             dte_dxs = self.dte_dxs,
-            d2te_dtdx = self.d2te_dtdx,
             dh_dxs = self.dh_dxs,
             atol=adjoint_atol,
             rtol=adjoint_rtol,
@@ -1049,10 +995,7 @@ class TrajectoryAnalysis:
             p_x0_p_params = p_state0_p_p,
             p_dots_p_params = param_dot_jac_func,
             dh_dps = self.dh_dps,
-            dh_dts = self.dh_dts,
             dte_dps = self.dte_dps,
-            d2te_dtdp = self.d2te_dtdp,
-            jac_updates = self.jac_updates,
 
             p_terminal_terms_p_params = self.gradF_funcs,
             p_integrand_terms_p_params = param_integrand_jac_funcs,

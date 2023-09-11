@@ -689,8 +689,7 @@ class AdjointResult(ResultBase, AdjointResultMixin,):
 
 class AdjointSystem(System):
     def __init__(
-        self, state_jac, dte_dxs, d2te_dtdx, dh_dxs,
-        #adjoint_updates,
+        self, state_jac, dte_dxs, dh_dxs,
         solver_class = SolverSciPyDopri5,
         atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
     ):
@@ -701,7 +700,7 @@ class AdjointSystem(System):
         time generator will call update method
         """
         self.state_jac = state_jac
-        self.dte_dxs, self.d2te_dtdx, self.dh_dxs = dte_dxs, d2te_dtdx, dh_dxs,
+        self.dte_dxs, self.dh_dxs = dte_dxs, dh_dxs,
         self.num_events = 1
         self.dynamic_output = None
         #self.adjoint_updates = adjoint_updates
@@ -753,9 +752,6 @@ class AdjointSystem(System):
             xtem = state_res.x[idxm]
             ftem = state_res.system._dot(p, te, xtem)
 
-            delta_fs = ftep - ftem
-            delta_xs = xtep - xtem
-
 
             if event is state_res.e[-1]:
                 lamda_tem = last_lamda
@@ -771,12 +767,8 @@ class AdjointSystem(System):
                     dh_dx = self.dh_dxs[event_channel](p, te, xtem,)
                     dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
                     lamda_tem = (
-                        dh_dx.T
-                        - dte_dxT @ (
-                            ftep - dh_dx @ ftem
-                        ).T
+                        dh_dx.T - dte_dxT @ ( ftep - dh_dx @ ftem).T
                     ) @ last_lamda
-
                     last_lamda = lamda_tem
         else:
             lamda_tem = last_lamda
@@ -890,10 +882,7 @@ class ShootingGradientMethod:
     p_dots_p_params: callable # could be cached, or just combined with integrand terms
     # per system's events (length number of events)
     dh_dps: list[callable]
-    dh_dts: list[callable]
     dte_dps: list[callable]
-    d2te_dtdp: list[callable]
-    jac_updates: list[callable]
 
     # of length number of (trajectory) outputs
     p_integrand_terms_p_params: list[callable]
@@ -996,9 +985,6 @@ class ShootingGradientMethod:
                     breakpoint()
                 xtem = state_result.x[idxm]
                 ftem = state_result.system._dot(p, te, xtem)
-
-                delta_fs = ftep - ftem
-                delta_xs = xtep - xtem
 
                 active_update_idxs = np.where(state_event.rootsfound != 0)[0]
 
