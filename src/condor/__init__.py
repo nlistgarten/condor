@@ -8,6 +8,7 @@ from condor.fields import (
 )
 from condor.backends.default import backend
 from condor.conf import settings
+from dataclasses import asdict
 """
 Backend:
 [x] provide symbol_generator for creating backend symbol repr
@@ -317,6 +318,7 @@ class ModelType(type):
         input_names = []
         output_names = []
         inner_models = []
+        sub_models = {}
 
         # TODO: better reserve word check? see check attr name below
         orig_attrs = {k:v for k,v in attrs.items() if not k.startswith("__")}
@@ -330,6 +332,7 @@ class ModelType(type):
             internal_fields = internal_fields,
             independent_fields = independent_fields,
             inner_models = [],
+            sub_models = sub_models,
             __original_attrs__ = orig_attrs,
         ))
 
@@ -361,6 +364,8 @@ class ModelType(type):
                     output_fields.append(attr_val)
                 if attr_val._direction == Direction.internal:
                     internal_fields.append(attr_val)
+            if isinstance(attr_val.__class__, cls):
+                sub_models[attr_name] = attr_val
             if isinstance(attr_val, backend.symbol_class):
                 # from a IndependentField
                 known_symbol_type = False
@@ -390,6 +395,7 @@ class ModelType(type):
 
                 if not known_symbol_type:
                     print("unknown symbol type", attr_name)#, attr_val)
+                    #sub_models[attr_name] = attr_val
                     # Hit by ODESystem.t, is that okay?
                     # TODO: maybe DONT pass these on. they don't work to use in the
                     # another model since they don't get bound correctly, then just have
@@ -663,6 +669,14 @@ class Model(metaclass=ModelType):
             for out_name in field.list_of('name')
         }
 
+
+        for sub_model_ref_name, sub_model in cls.sub_models.items():
+            # TODO: how to have models cache previous results so this is always free?
+            # Can imagine a parent model with multiple instances of the exact same
+            # sub-model called with different parameters. Would need to memoize at least
+            # that many calls, possibly more.
+            print(f"have sub_model {sub_model} in model {cls}")
+
     def bind_input_fields(self):
         cls = self.__class__
         all_values = list(self.input_kwargs.values())
@@ -673,7 +687,6 @@ class Model(metaclass=ModelType):
             values = all_values[slice_start: slice_end]
             slice_start = slice_end
             self.bind_field(field, values, symbols_to_instance=True, wrap=False)
-
 
     def bind_field(self, field, values, symbols_to_instance=True, wrap=True):
         dataclass_kwarg = {}
@@ -692,6 +705,55 @@ class Model(metaclass=ModelType):
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
+
+    def recursive_bind(model_instance):
+        model = model_instance.__class__
+        print(f"binding sub-models on {model}")
+        model_assignments = {}
+
+        fields = [
+            field
+            for field in model.input_fields + model.output_fields
+            if isinstance(field, IndependentField)
+        ]
+        for field in fields:
+            model_instance_field = getattr(model_instance, field._name)
+            model_instance_field_dict = asdict(model_instance_field)
+            model_assignments.update({
+                elem.backend_repr: val
+                for elem, val in zip(field, model_instance_field_dict.values())
+            })
+
+        for sub_model_ref_name, sub_model_instance in model.sub_models.items():
+            sub_model = sub_model_instance.__class__
+            print(f"binding sub-model {sub_model} on {model}")
+            sub_model_kwargs = {}
+
+            for field in sub_model.input_fields:
+                bound_field = getattr(sub_model_instance, field._name)
+                bound_field_dict = asdict(bound_field)
+                for k,v in bound_field_dict.items():
+                    if not isinstance(v, backend.symbol_class):
+                        sub_model_kwargs[k] = v
+                    else:
+                        value_found = False
+                        for kk, vv in model_assignments.items():
+                            if backend.utils.symbol_is(v, kk):
+                                value_found = True
+                                break
+                        sub_model_kwargs[k] = vv
+                        if not value_found:
+                            # TODO: this is the only casadi specific thing :)
+                            sub_model_kwargs[k] = backend.utils.evalf(
+                                v, model_assignments
+                            )
+
+            bound_sub_model = sub_model(**sub_model_kwargs)
+            setattr(model_instance, sub_model_ref_name, bound_sub_model)
+            bound_sub_model.recursive_bind()
+
+
+
 
 
 class InnerModelType(ModelType):

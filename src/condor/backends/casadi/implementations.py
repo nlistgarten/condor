@@ -3,7 +3,9 @@ import condor as co
 import numpy as np
 from enum import Enum, auto
 from dataclasses import dataclass
-from condor.backends.casadi.utils import flatten, wrap, symbol_class
+from condor.backends.casadi.utils import (
+    flatten, wrap, symbol_class, substitute, recurse_if_else
+)
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 import condor.solvers.shooting_gradient_method as sgm
 import condor.backends.casadi.shooting_gradient_method as ca_sgm
@@ -53,10 +55,11 @@ class ExplicitSystem:
         self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
 
     def __call__(self, model_instance, *args):
-        out = self.func(casadi.vertcat(*flatten(args)))
+        self.args = casadi.vertcat(*flatten(args))
+        self.out = self.func(self.args)
         model_instance.bind_field(
             self.model.output, 
-            out,
+            self.out,
         )
 
 class Tablelookup:
@@ -522,20 +525,6 @@ def get_state_setter(field, setter_args, default=0., subs={}):
     setter_func.expr = setter_exprs[0]
     return setter_func
 
-def substitute(expr, subs):
-    for key, val in subs.items():
-        expr = casadi.substitute(
-            expr, key, val
-        )
-    return expr
-
-def recurse_if_else(conditions_actions):
-    if len(conditions_actions) == 1:
-        return conditions_actions[0][0]
-    condition, action = conditions_actions[-1]
-    remainder = recurse_if_else(conditions_actions[:-1])
-    return casadi.if_else(condition, action, remainder)
-
 
 class TrajectoryAnalysis:
 
@@ -878,8 +867,6 @@ class TrajectoryAnalysis:
                 )
             )
             """
-
-
 
             dte_dx = substitute(dte_dx, control_sub_expression)
             self.dte_dxs.append(

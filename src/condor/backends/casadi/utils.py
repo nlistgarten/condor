@@ -6,6 +6,29 @@ import numpy as np
 # use AlgebraicSystem or ODESystem)
 symbol_class = casadi.MX
 
+def substitute(expr, subs):
+    for key, val in subs.items():
+        expr = casadi.substitute(
+            expr, key, val
+        )
+    return expr
+
+def recurse_if_else(conditions_actions):
+    if len(conditions_actions) == 1:
+        return conditions_actions[0][0]
+    condition, action = conditions_actions[-1]
+    remainder = recurse_if_else(conditions_actions[:-1])
+    return casadi.if_else(condition, action, remainder)
+
+def symbol_is(a, b):
+    return (a == b).is_one()
+
+def evalf(expr, backend_repr2value):
+    if not isinstance(expr, list):
+        expr = [expr]
+    func = casadi.Function("temp_func", list(backend_repr2value.keys()), expr,)
+    return func(*backend_repr2value.values())
+
 class CasadiFunctionCallbackMixin:
     """Base class for wrapping a Function with a Callback"""
 

@@ -196,7 +196,7 @@ class Field:
         for item in self._symbols:
             this_item = True
             for field_name, field_value in kwargs.items():
-                this_item = this_item & (getattr(item, field_name) is field_value)
+                this_item = this_item and (getattr(item, field_name) is field_value)
                 if not this_item:
                     break
             if this_item:
