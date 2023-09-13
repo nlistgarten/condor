@@ -677,6 +677,9 @@ class Model(metaclass=ModelType):
             # that many calls, possibly more.
             print(f"have sub_model {sub_model} in model {cls}")
 
+        self.bind_submodels()
+
+
     def bind_input_fields(self):
         cls = self.__class__
         all_values = list(self.input_kwargs.values())
@@ -706,7 +709,7 @@ class Model(metaclass=ModelType):
     def __repr__(self):
         return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
 
-    def recursive_bind(model_instance):
+    def bind_submodels(model_instance):
         model = model_instance.__class__
         print(f"binding sub-models on {model}")
         model_assignments = {}
@@ -750,7 +753,7 @@ class Model(metaclass=ModelType):
 
             bound_sub_model = sub_model(**sub_model_kwargs)
             setattr(model_instance, sub_model_ref_name, bound_sub_model)
-            bound_sub_model.recursive_bind()
+            #bound_sub_model.recursive_bind()
 
 
 
