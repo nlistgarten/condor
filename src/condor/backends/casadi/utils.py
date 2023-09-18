@@ -21,7 +21,7 @@ def recurse_if_else(conditions_actions):
     return casadi.if_else(condition, action, remainder)
 
 def symbol_is(a, b):
-    return (a == b).is_one()
+    return (a.shape == b.shape) and (a == b).is_one()
 
 def evalf(expr, backend_repr2value):
     if not isinstance(expr, list):
