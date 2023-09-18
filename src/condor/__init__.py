@@ -670,13 +670,8 @@ class Model(metaclass=ModelType):
             for out_name in field.list_of('name')
         }
 
+        self.bind_submodels()
 
-        for sub_model_ref_name, sub_model in cls.sub_models.items():
-            # TODO: how to have models cache previous results so this is always free?
-            # Can imagine a parent model with multiple instances of the exact same
-            # sub-model called with different parameters. Would need to memoize at least
-            # that many calls, possibly more.
-            print(f"have sub_model {sub_model} in model {cls}")
 
     def bind_input_fields(self):
         cls = self.__class__
@@ -707,7 +702,11 @@ class Model(metaclass=ModelType):
     def __repr__(self):
         return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
 
-    def recursive_bind(model_instance):
+    def bind_submodels(model_instance):
+        # TODO: how to have models cache previous results so this is always free?
+        # Can imagine a parent model with multiple instances of the exact same
+        # sub-model called with different parameters. Would need to memoize at least
+        # that many calls, possibly more.
         model = model_instance.__class__
         print(f"binding sub-models on {model}")
         model_assignments = {}
@@ -751,7 +750,7 @@ class Model(metaclass=ModelType):
 
             bound_sub_model = sub_model(**sub_model_kwargs)
             setattr(model_instance, sub_model_ref_name, bound_sub_model)
-            bound_sub_model.recursive_bind()
+            #bound_sub_model.recursive_bind()
 
 
 
