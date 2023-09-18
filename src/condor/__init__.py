@@ -9,6 +9,7 @@ from condor.fields import (
 from condor.backends.default import backend
 from condor.conf import settings
 from dataclasses import asdict
+from condor._version import __version__
 """
 Backend:
 [x] provide symbol_generator for creating backend symbol repr

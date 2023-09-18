@@ -1,19 +1,32 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "condor"
-version = "0.0.1"
-authors = [
-  { name="Benjamin W. L. Margolis", email="benjamin.margolis@nasa.gov" },
-  { name="Kenneth R. Lyons", email="kenneth.r.lyons@nasa.gov" },
-]
 description = "A package for disciplined systems modeling on a deadline"
 readme = "README.rst"
-requires-python = ">=3.7"
+dynamic = ["version"]
+authors = [
+    { name="Benjamin W. L. Margolis", email="benjamin.margolis@nasa.gov" },
+    { name="Kenneth R. Lyons", email="kenneth.r.lyons@nasa.gov" },
+]
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
 
+dependencies = [
+    "numpy",
+    "scipy",
+    "casadi",
+    "ndsplines",
+    "sympy",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools_scm]
+write_to = "src/condor/_version.py"
