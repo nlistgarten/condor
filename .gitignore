@@ -4,3 +4,4 @@ reports/
 *.egg-info/
 .venv/
 _version.py
+_build/
