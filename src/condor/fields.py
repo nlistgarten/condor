@@ -275,7 +275,6 @@ class FreeSymbol(IndependentSymbol):
     # Then if bounds are here, must follow broadcasting rules
 
     def __post_init__(self):
-        print("doing a post init broadcast")
         super().__post_init__()
         self.upper_bound = np.broadcast_to(self.upper_bound, self.shape)
         self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
@@ -398,11 +397,8 @@ class AssignedField(Field, default_direction=Direction.output):
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
-            print('skipping private _')
             super().__setattr__(name, value)
         else:
-            print("setting special for", self, ".", name, "=", value)
-            print(f"owner={self._model_name}")
             # TODO: resolve circular imports so we can use dataclass
             symbol_data = backend.get_symbol_data(value)
             self.create_symbol(
@@ -449,11 +445,8 @@ class MatchedField(Field,):
         super().__init__(**kwargs)
         self._matched_to = matched_to
         self._init_kwargs.update(dict(matched_to=matched_to))
-        print("matched to", matched_to)
 
     def __setitem__(self, key, value):
-        print("setting item for", self, ":", key, "=", value)
-        print(f"owner={self._model_name}")
         if isinstance(key, backend.symbol_class):
             match = self._matched_to.get(backend_repr=key)
             if isinstance(match, list):

@@ -161,7 +161,6 @@ class ModelType(type):
 
     @classmethod
     def __prepare__(cls, model_name, bases, **kwds):
-        print("CondorModelType.__prepare__  for", model_name)
         sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
         cls_dict = CondorClassDict(**sup_dict)
 
@@ -221,11 +220,9 @@ class ModelType(type):
         # TODO: is it better to do inner model magic in InnerModelType.__prepare__?
 
 
-        print("end prepare for", model_name,)# cls_dict)
         return cls_dict
 
     def __call__(cls, *args, **kwargs):
-        print("CondorModelType.__call__ for", cls)
         return super().__call__(*args, **kwargs)
 
     def __repr__(cls):
@@ -279,9 +276,6 @@ class ModelType(type):
                 # Or allow silent passage of redone variables? eg copying
                 # but copying is a special case that can be guarded...
                 print(f"{attr_name} was defined on outer of {name}")
-
-        print("CondorModelType.__new__ for", name, bases, kwargs)
-
 
 
         # perform as much processing as possible before caller super().__new__
@@ -395,7 +389,8 @@ class ModelType(type):
                 # TODO: from the output of a subsystem? Does this case matter?
 
                 if not known_symbol_type:
-                    print("unknown symbol type", attr_name)#, attr_val)
+                    #print("unknown symbol type", attr_name)#, attr_val)
+                    pass
                     #sub_models[attr_name] = attr_val
                     # Hit by ODESystem.t, is that okay?
                     # TODO: maybe DONT pass these on. they don't work to use in the
@@ -427,7 +422,6 @@ class ModelType(type):
                 # assignment in the class
                 if not symbol.name:
                     symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
-                    print("setting name for", symbol.name)
 
         for matched_field in matched_fields:
             for matched_symbol in matched_field:
@@ -708,7 +702,6 @@ class Model(metaclass=ModelType):
         # sub-model called with different parameters. Would need to memoize at least
         # that many calls, possibly more.
         model = model_instance.__class__
-        print(f"binding sub-models on {model}")
         model_assignments = {}
 
         fields = [
@@ -726,7 +719,6 @@ class Model(metaclass=ModelType):
 
         for sub_model_ref_name, sub_model_instance in model.sub_models.items():
             sub_model = sub_model_instance.__class__
-            print(f"binding sub-model {sub_model} on {model}")
             sub_model_kwargs = {}
 
             for field in sub_model.input_fields:
@@ -765,8 +757,6 @@ class InnerModelType(ModelType):
         cls.subclasses.append(subclass)
 
     def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
-        print("\nInnerModelType.__new__ for class", cls,"name", name, "bases", bases,
-              "original", original_class, "\nkwargs:", kwargs,"\n")# "\nattrs:", attrs, "\n")
         # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
         # (inner model template)

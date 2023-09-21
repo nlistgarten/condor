@@ -49,9 +49,7 @@ class Newton:
 
         # obj for linesearch, TODO: performance testing for sumsqr vs norm_2
         #resids_norm = casadi.sumsqr(resids)
-        #print("using sumsqr")
         resids_norm = casadi.norm_2(resids)
-        print("using norm2")
         self.ls_f = wrap_ls_func(casadi.Function("ls_f", [x, p], [resids_norm]))
         self.ls_fprime = wrap_ls_func(
             casadi.Function("ls_fprime", [x, p], [casadi.jacobian(resids_norm, x)])
@@ -116,7 +114,6 @@ class Newton:
                 # alpha, fc, fout = line_search_armijo(
                 #     self.ls_f, x, dxb, gx, fx, args=(p,), c1=0.1, alpha0=1
                 # )
-                print("line search step:", alpha)
 
                 if alpha is None:
                     # TODO: performance tuning, alpha = 0 [x = x], alpha = 1 [x=xb],
