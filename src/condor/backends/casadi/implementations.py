@@ -41,18 +41,43 @@ from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 # TODO for custom solvers like SGM, table, does the get_jacobian arguments allow you to 
 # avoid computing wrt particular inputs/outputs if possible?
 
+
+class DeferredSystem:
+    def __init__(self, model):
+        symbol_inputs = model.input.list_of("backend_repr")
+        symbol_outputs = model.output.list_of("backend_repr")
+
+        self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
+        self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
+
+        name_inputs = model.input.list_of('name')
+        name_outputs = model.output.list_of('name')
+        self.model = model
+        self.func =  casadi.Function(
+            model.__name__, symbol_inputs, symbol_outputs, dict(allow_free=True,),
+        )
+
+    def __call__(self, model_instance, *args):
+        model_instance.bind_field(
+            self.model.output, 
+            self.symbol_outputs[0],
+        )
+
 class ExplicitSystem:
     def __init__(self, model):
         symbol_inputs = model.input.list_of("backend_repr")
         symbol_outputs = model.output.list_of("backend_repr")
 
-        symbol_inputs = [casadi.vertcat(*symbol_inputs)]
-        symbol_outputs = [casadi.vertcat(*symbol_outputs)]
+        self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
+        self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
 
         name_inputs = model.input.list_of('name')
         name_outputs = model.output.list_of('name')
         self.model = model
-        self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
+        #self.func =  casadi.Function(model.__name__, self.symbol_inputs, self.symbol_outputs)
+        self.func =  casadi.Function(
+            model.__name__, self.symbol_inputs, self.symbol_outputs, dict(allow_free=True,),
+        )
 
     def __call__(self, model_instance, *args):
         self.args = casadi.vertcat(*flatten(args))

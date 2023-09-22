@@ -795,6 +795,13 @@ class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
     """
     pass
 
+class DeferredSystem(Model):
+    """
+    output is an explicit function of input
+    """
+    input = FreeField()
+    output = FreeField(Direction.output)
+
 # TODO: Move to "contrib" or something?
 class ExplicitSystem(Model):
     """
