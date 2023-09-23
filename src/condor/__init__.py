@@ -115,10 +115,10 @@ class CondorClassDict(dict):
                 self.meta.internal_fields.append(attr_val)
         if isinstance(attr_val.__class__, ModelType):
             if attr_val.name:
-                sub_models[attr_val.name] = attr_val
-                return super().__setitem__(attr_val.name, attr_val)
+                self.meta.sub_models[attr_val.name] = attr_val
+                super().__setitem__(attr_val.name, attr_val)
             else:
-                sub_models[attr_name] = attr_val
+                self.meta.sub_models[attr_name] = attr_val
         if isinstance(attr_val, backend.symbol_class):
             # from a IndependentField
             known_symbol_type = False
@@ -365,6 +365,9 @@ class ModelType(type):
                 # warning/error raise)
                 # Or allow silent passage of redone variables? eg copying
                 # but copying is a special case that can be guarded...
+
+                # TODO: if we put copy fields in meta can we trace through and not warn
+                # on this case?
                 print(f"{attr_name} was defined on outer of {name}")
 
 
@@ -648,7 +651,7 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
             in_bases = True
             break
 
-    if (attr_name in super_attrs) or in_bases:
+    if (attr_name in super_attrs and super_attrs[attr_name] is not attr_val) or in_bases:
         clash_source = None
         if in_bases:
             clash_source = base
