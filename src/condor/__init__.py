@@ -81,11 +81,12 @@ class ModelMetaData:
 # appears in __new__ as attrs
 class CondorClassDict(dict):
     def __init__(self, *args, model_name='', copy_fields=[], **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
         self.from_outer = {}
         self.meta = ModelMetaData()
         self.model_name=model_name,
         self.copy_fields = copy_fields
+
 
     def set_outer(self, **from_outer):
         self.from_outer = from_outer
@@ -93,6 +94,25 @@ class CondorClassDict(dict):
             v for k, v in from_outer.items()
             if isinstance(v, IndependentField) and k not in self.copy_fields
         ])
+
+    def dynamic_link(self, **kwargs):
+        """
+        replace the string values of a dictionary with the actual object with that
+        address
+
+        dynamic_link(xx='state.x')
+
+        returns a dictionary where the key 'xx' points to the state with name 'x'
+        """
+
+        for k, v in kwargs.items():
+            path_list = v.split('.')
+            use_val = self.__getitem__(path_list[0])
+            for path_step in path_list[1:]:
+                use_val = getattr(use_val, path_step)
+            kwargs[k] = use_val
+
+        return kwargs
 
     def __getitem__(self, *args, **kwargs):
         #breakpoint()
@@ -423,6 +443,11 @@ class ModelType(type):
                 backend_options[attr_name] =  attr_val
                 continue
 
+            if callable(attr_val) and attr_val == attrs.dynamic_link:
+                # don't pass dynamic_link -- don't think we want this but maybe we do
+                continue
+
+
             if isinstance(attr_val, backend.symbol_class):
                 # from a IndependentField
                 known_symbol_type = False
@@ -432,6 +457,7 @@ class ModelType(type):
                     if isinstance(symbol, BaseSymbol):
                         known_symbol_type = True
                         attr_val = symbol
+                        break
                         # pass attr if field is bound (_model is a constructed Model
                         # class, not None), otherwise will get added later after more
                         # processing

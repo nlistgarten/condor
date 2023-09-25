@@ -196,7 +196,16 @@ class Field:
         for item in self._symbols:
             this_item = True
             for field_name, field_value in kwargs.items():
-                this_item = this_item and (getattr(item, field_name) is field_value)
+                item_value = getattr(item, field_name)
+                if isinstance(item_value, backend.symbol_class):
+                    if not isinstance(field_value, backend.symbol_class):
+                        this_item = False
+                        break
+                    this_item = this_item and backend.utils.symbol_is(
+                        item_value, field_value
+                    )
+                else:
+                    this_item = this_item and item_value == field_value
                 if not this_item:
                     break
             if this_item:
@@ -235,6 +244,9 @@ class Field:
     def __len__(self):
         return len(self._symbols)
 
+    def __getattr__(self, with_name):
+        return self.get(name=with_name).backend_repr
+
 
 def make_class_name(components):
     separate_words = ' '.join([comp.replace('_', ' ') for comp in components])
@@ -265,6 +277,7 @@ class IndependentField(Field):
     Mixin for fields which generate a symbol that are assigned to a class attribute
     during model definition.
     """
+
     pass
 
 
@@ -413,8 +426,6 @@ class AssignedField(Field, default_direction=Direction.output):
             )
             #super().__setattr__(name, self._symbols[-1])
 
-    def __getattr__(self, name):
-        return self.get(name=name).backend_repr
 
 
 @dataclass(repr=False)
