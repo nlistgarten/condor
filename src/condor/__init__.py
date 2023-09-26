@@ -457,7 +457,6 @@ class ModelType(type):
                     if isinstance(symbol, BaseSymbol):
                         known_symbol_type = True
                         attr_val = symbol
-                        break
                         # pass attr if field is bound (_model is a constructed Model
                         # class, not None), otherwise will get added later after more
                         # processing
