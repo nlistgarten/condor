@@ -147,9 +147,11 @@ class CondorClassDict(dict):
                 # not a list (empty or len > 1)
                 if isinstance(symbol, BaseSymbol):
                     known_symbol_type = True
-                    if symbol.name and symbol.name != attr_name:
-                        raise NameError(f"Symbol on {free_field} has name {symbol.name} but assigned to {attr_name}")
-                    if attr_name:
+                    #if symbol.name and symbol.name != attr_name:
+                    #    raise NameError(f"Symbol on {free_field} has name {symbol.name} but assigned to {attr_name}")
+                    if symbol.name:
+                        pass
+                    elif attr_name:
                         symbol.name = attr_name
                     else:
                         symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
@@ -637,6 +639,10 @@ class ModelType(type):
         if implementation is not None:
             cls.finalize_input_fields(new_cls)
             new_cls.implementation = implementation(new_cls, **backend_option)
+
+        for field in attrs.meta.independent_fields:
+            for symbol_idx, symbol in enumerate(field):
+                setattr(new_cls, symbol.name, symbol)
 
         return new_cls
 

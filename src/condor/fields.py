@@ -1,7 +1,7 @@
 
 # TODO: figure out python version minimum
 
-from dataclasses import dataclass, make_dataclass, fields
+from dataclasses import dataclass, make_dataclass, fields, asdict as dataclass_asdict
 import numpy as np
 from enum import Enum
 from condor.backends.default import backend
@@ -204,6 +204,11 @@ class Field:
                     this_item = this_item and backend.utils.symbol_is(
                         item_value, field_value
                     )
+                elif isinstance(item_value, BaseSymbol):
+                    if item_value.__class__ is not field_value.__class__:
+                        this_item = False
+                        break
+                    this_item = this_item and item_value is field_value
                 else:
                     this_item = this_item and item_value == field_value
                 if not this_item:
@@ -235,6 +240,7 @@ class Field:
             name,
             fields,
             bases=(FieldValues,),
+            namespace=dict(asdict=dataclass_asdict),
         )
 
     def __iter__(self):
@@ -261,6 +267,7 @@ class FrontendSymbolData:
     field_type: Field
     backend_repr: backend.symbol_class
     name: str = ''
+
 
 @dataclass
 class BaseSymbol(FrontendSymbolData, BackendSymbolData,):

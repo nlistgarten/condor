@@ -58,7 +58,8 @@ from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
     p1 = variable()
     p2 = variable()
-    objective = Transfer(p1, p2).cost
+    sim = Transfer(p1, p2)
+    objective = sim.cost
 
     class Casadi(co.Options):
         exact_hessian = False
