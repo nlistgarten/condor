@@ -78,8 +78,6 @@ class ModelMetaData:
     inner_models: list = field(default_factory=list)
     sub_models: dict = field(default_factory=dict)
 
-    bind_sub_models: bool = True
-
 # appears in __new__ as attrs
 class CondorClassDict(dict):
     def __init__(self, *args, model_name='', copy_fields=[], **kwargs):
@@ -381,9 +379,12 @@ class ModelType(type):
         # outer model
         #attrs_from_outer = attrs.pop('__from_outer__', {})
         attrs_from_outer = attrs.from_outer #getattr(attrs, 'from_outer', {})
+        sub_models = attrs.meta.sub_models
         for attr_name, attr_val in attrs_from_outer.items():
             if attrs[attr_name] is attr_val:
                 attrs.pop(attr_name)
+                if sub_models.get(attr_name, None) is attr_val:
+                    sub_models.pop(attr_name)
             else:
                 # TODO: make this a warning/error? add test (really for all
                 # warning/error raise)
@@ -411,10 +412,6 @@ class ModelType(type):
         inner_to=kwargs.pop('inner_to', None)
         inner_through=kwargs.pop('inner_through', None)
         copy_fields=kwargs.pop('copy_fields', [])
-        if inner_through:
-            attrs.meta.bind_sub_models = inner_through.original_class._meta.bind_sub_models
-        else:
-            attrs.meta.bind_sub_models = kwargs.pop('bind_sub_models', True)
 
         backend_options = {}
         matched_fields = []
@@ -601,7 +598,6 @@ class ModelType(type):
                         use_bases,
                         attr_val.__original_attrs__,
                         inner_to = new_cls,
-                        bind_sub_models = attr_val._meta.bind_sub_models,
                         original_class = attr_val,
                         copy_fields = attr_val.__copy_fields__,
                     )
@@ -740,8 +736,7 @@ class Model(metaclass=ModelType):
             for out_name in field.list_of('name')
         }
 
-        if cls._meta.bind_sub_models:
-            self.bind_sub_models()
+        self.bind_submodels()
 
 
     def bind_input_fields(self):
@@ -773,7 +768,7 @@ class Model(metaclass=ModelType):
     def __repr__(self):
         return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
 
-    def bind_sub_models(model_instance):
+    def bind_submodels(model_instance):
         # TODO: how to have models cache previous results so this is always free?
         # Can imagine a parent model with multiple instances of the exact same
         # sub-model called with different parameters. Would need to memoize at least
@@ -828,7 +823,7 @@ class Model(metaclass=ModelType):
 
 
 
-#
+
 class InnerModelType(ModelType):
     def __iter__(cls):
         for subclass in cls.subclasses:
@@ -837,9 +832,7 @@ class InnerModelType(ModelType):
     def register(cls, subclass):
         cls.subclasses.append(subclass)
 
-    def __new__(
-        cls, name, bases, attrs, inner_to=None, original_class = None, bind_sub_models=True,  **kwargs
-    ):
+    def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
         # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
         # (inner model template)
@@ -1114,9 +1107,7 @@ class ODESystem(Model):
 class TrajectoryAnalysis(
         Model,
         inner_to=ODESystem,
-        copy_fields=["parameter", "initial", "state", "dynamic_output"],
-        bind_sub_models=False,
-
+        copy_fields=["parameter", "initial", "state", "dynamic_output"]
 ):
     """
     this is what simulates an ODE system
