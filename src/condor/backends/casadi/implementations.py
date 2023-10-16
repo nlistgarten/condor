@@ -666,11 +666,15 @@ class TrajectoryAnalysis:
 
         for event_idx, event in enumerate(ode_model.Event.subclasses):
             terminate = getattr(event, 'terminate', False)
-            if hasattr(event, 'function') == hasattr(event, 'at_time'):
+            if (
+                getattr(event, 'function', None) is not None
+            ) == (
+                getattr(event, 'at_time', None) is not None
+            ):
                 raise ValueError(
                     f"Event class `{event}` has set both `function` and `at_time`"
                 )
-            if hasattr(event, 'function'):
+            if getattr(event, 'function', None) is not None:
                 e_expr = event.function
             else:
                 at_time = event.at_time

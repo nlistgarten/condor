@@ -115,7 +115,6 @@ class CondorClassDict(dict):
         return kwargs
 
     def __getitem__(self, *args, **kwargs):
-        #breakpoint()
         return super().__getitem__(*args, **kwargs)
 
     def __setitem__(self, attr_name, attr_val):
@@ -181,21 +180,10 @@ class CondorClassDict(dict):
 
 
         return super().__setitem__(attr_name, attr_val)
-        # could be used to allow magic name update for symbols, Code below takes a
-        # declared variable of the name `some_var__count__` and replaces it with 
-        # `some_var_0` so you can assign variables in a loop and get unique accessors.
-        # but name can get passed to FreeSymbols, and that is more explicit.
-        count_suffix = '__count__'
-        if key.endswith(count_suffix):
-            base_name = key.split(count_suffix)[0]
-            count = 0
-            for ekey in self:
-                if ekey.startswith(base_name):
-                    count += 1
-            key = key.replace(count_suffix, f"_{count}")
-            breakpoint()
 
-# TODO: a way to update options
+
+# TODO: a way to update options -- options should become attributes on implementation
+# that are used on every call
 class Options:
     """
     Class mix-in to flag back-end options. Define an inner class on the model that
@@ -461,7 +449,8 @@ class ModelType(type):
                     # not a list (empty or len > 1)
                     if isinstance(symbol, BaseSymbol):
                         known_symbol_type = True
-                        attr_val = symbol
+                        if attr_name not in bases[-1].__dict__:
+                            attr_val = symbol
                         # pass attr if field is bound (_model is a constructed Model
                         # class, not None), otherwise will get added later after more
                         # processing
@@ -811,17 +800,12 @@ class Model(metaclass=ModelType):
                                 break
                         sub_model_kwargs[k] = vv
                         if not value_found:
-                            # TODO: this is the only casadi specific thing :)
                             sub_model_kwargs[k] = backend.utils.evalf(
                                 v, model_assignments
                             )
 
             bound_sub_model = sub_model(**sub_model_kwargs)
             setattr(model_instance, sub_model_ref_name, bound_sub_model)
-            #bound_sub_model.recursive_bind()
-
-
-
 
 
 class InnerModelType(ModelType):
@@ -1153,6 +1137,10 @@ class Event(Model, inner_to = ODESystem):
     # actually, just update it
     #make = MatchedField(ODESystem.finite_state)
     # terminate = True -> return nan instead of update?
+
+    function = None
+    at_time = None
+
     def __init_subclass__(cls, dt=0., **kwargs):
         if dt:
             cls.function
@@ -1168,7 +1156,6 @@ class Mode(Model, inner_to=ODESystem,):
     do inheritance for ODESystems which is otherwise hard? Can this be used instead of
     deferred subsystems? Yes but only for ODESystems..
     """
-    pass
     action = MatchedField(ODESystem.modal, direction=Direction.internal)
 
 
