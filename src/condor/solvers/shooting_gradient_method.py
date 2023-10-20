@@ -34,6 +34,14 @@ class SolverSciPyBase:
         self.solver.set_integrator(**self.int_options)
         self.solver.set_solout(self.solout)
 
+    def store_result(self, store_t, store_x):
+        system = self.system
+        results = system.result
+        results.t.append(store_t)
+        results.x.append(store_x)
+        if system.dynamic_output:
+            results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
+
     def solout(self, t, x):
         system = self.system
         results = system.result
@@ -58,11 +66,7 @@ class SolverSciPyBase:
                 store_t = results.t[-1]
 
         self.gs = new_gs
-        results.t.append(store_t)
-        results.x.append(store_x)
-        if system.dynamic_output:
-            results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
-
+        self.store_result(store_t, store_x)
         if np.any(self.rootinfo):
             return -1
 
@@ -196,7 +200,7 @@ class SolverSciPyBase:
                 self.gs = system.events(last_t, next_x)
 
                 if terminate:
-                    self.solout(last_t, next_x)
+                    self.store_result(last_t, next_x)
                     return
 
                 last_x = next_x
