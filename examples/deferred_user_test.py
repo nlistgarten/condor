@@ -2,9 +2,6 @@ import condor as co
 import numpy as np
 
 
-def get_LTI(**kwargs):
-    mod = co.settings.get_module("deferred_model_test", **kwargs)
-    return mod.LTI
 
 A = np.array([
     [0, 1],
@@ -12,9 +9,12 @@ A = np.array([
 ])
 B = np.array([[0,1]]).T
 
-sp_dbl_int = get_LTI(A=A, B=B, dt=.5)
+sp_mod = co.settings.get_module("deferred_model_test", A=A, B=B, dt=.5)
+sp_dbl_int = sp_mod.LTI
 
-dbl_int = get_LTI(A=A, B=B)
+
+ct_mod = co.settings.get_module("deferred_model_test", A=A, B=B)
+dbl_int = ct_mod.LTI
 
 
 print("\n"*10)
