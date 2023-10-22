@@ -1079,6 +1079,7 @@ class ODESystem(Model):
     # TODO: don't like hacks to simupy to make it work... especially the success
     # checking stuff -- is that neccessary anymore?
 
+    tf = None
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
     initial = MatchedField(state)
