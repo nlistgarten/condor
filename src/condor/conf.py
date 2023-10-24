@@ -1,4 +1,5 @@
 import importlib
+import sys
 settings = {}
 
 class Settings:
@@ -13,8 +14,13 @@ class Settings:
         kwargs are settings to use
         """
         self.settings.append(kwargs)
-        mod = importlib.import_module(module)
-        importlib.reload(mod)
+        print(kwargs)
+
+        if module not in sys.modules:
+            mod = importlib.import_module(module)
+        else:
+            mod = sys.modules[module]
+            mod = importlib.reload(mod)
         self.settings.pop()
         return mod
 
