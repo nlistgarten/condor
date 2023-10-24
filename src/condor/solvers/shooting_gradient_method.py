@@ -545,10 +545,33 @@ class ResultBase:
             t=self.t[key], x=self.x[key], e=self.e[key]
         )
 
+    def save(self, filename,):
+        e_idxs = [e.index for e in self.e]
+        e_roots = [e.rootsfound for e in self.e]
+        np.savez(filename,
+            e_idxs = e_idxs,
+            e_roots = e_roots,
+            t=self.t,
+            x=self.x,
+            y=self.y,
+            p=self.p,
+        )
+
+    @classmethod
+    def load(cls, filename):
+        data = dict(np.load(filename))
+        data['e'] = [
+            Root(index=ei, rootsfound=er)
+            for ei, er in zip(data.pop('e_idxs'), data.pop('e_roots'))
+        ]
+        return cls(system=None, **data)
+
+
 
 @dataclass
 class Result(ResultBase, ResultMixin):
     pass
+
 
 class ResultSegmentInterpolant(NamedTuple):
     interpolant: callable
@@ -600,11 +623,11 @@ class ResultInterpolant:
             self.time_bounds[-1] = result.t[-1]
         if result.t[-1] < result.t[0]:
             self.time_comparison = self.time_bounds.__le__
-            self.interval_select = 0
+            self.interval_select = -1
             self.time_sort = slice(None, None, -1)
         else:
             self.time_comparison = self.time_bounds.__ge__
-            self.interval_select = -1
+            self.interval_select = 0
             self.time_sort = slice(None)
 
         if self.interpolants is None:
@@ -666,6 +689,8 @@ class ResultInterpolant:
 
     def __call__(self, t):
         interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]
+        if interval_idx == len(self.time_bounds) -1:
+            interval_idx -= 1
         return self.interpolants[interval_idx](t)
 
     def __iter__(self):
