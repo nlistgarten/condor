@@ -372,11 +372,16 @@ class TrajectoryOutputField(IndependentField, default_direction=Direction.output
         # TODO: undo inner_to refactor from  0195013ddf58dc1fa8f589d99671ba231ab846a6
 
 
+        if isinstance(terminal_term, BaseSymbol):
+            terminal_term = terminal_term.backend_repr
+        if isinstance(integrand, BaseSymbol):
+            integrand = integrand.backend_repr
 
         if isinstance(terminal_term, backend.symbol_class):
             # comstant terminal terms are handled below
             shape_data = backend.get_symbol_data(terminal_term)
             kwargs['terminal_term'] = terminal_term
+
 
         if isinstance(integrand, backend.symbol_class):
             if 'terminal_term' in kwargs:
