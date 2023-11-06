@@ -109,8 +109,9 @@ def wrap(field, values):
             breakpoint()
         values = np.atleast_1d(values).reshape(-1)
 
+    values = np.array(values)#.reshape(-1)
     return tuple([
-        values[start_idx]
+        values[start_idx]#.reshape((1,-1))[0,0]
         if symbol.size == 1
 
         else values[start_idx:end_idx].reshape(symbol.shape)
