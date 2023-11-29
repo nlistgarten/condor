@@ -284,14 +284,16 @@ class SolverCVODE:
         system = self.system
         results = system.result
         last_x = system.initial_state()
-        results.x.append(last_x)
+
 
         time_generator = system.time_generator()
         last_t = next(time_generator)
-        results.t.append(last_t)
         # TODO: add dynamic_output feature
 
         gs = system.events(last_t, last_x)
+        results.x.append(last_x)
+        results.t.append(last_t)
+
         rootsfound = (gs == 0.).astype(int)
         if np.any(rootsfound):
             # subsequent events use length of time for index, so root index is the index
@@ -310,7 +312,8 @@ class SolverCVODE:
             if np.isinf(next_t):
                 break
             if next_t < 0:
-                breakpoint()
+                #breakpoint()
+                pass
 
             if self.adaptive_max_step:
                 solver.set_options(max_step_size=np.abs(next_t - last_t)/self.adaptive_max_step)
@@ -351,6 +354,8 @@ class SolverCVODE:
                     results.x.append(next_x)
 
                     if terminate:
+                        results.t.append(np.copy(solver_res.values.t))
+                        results.x.append(next_x)
                         return
 
                     solver.init_step(solver_res.values.t, next_x)
@@ -669,11 +674,21 @@ class ResultInterpolant:
                         breakpoint()
 
                 else:
+                    ts = result.t[idx0:idx1][self.time_sort]
+                    coefs = coeff_data[self.time_sort]
+
+                    shift_offset = 0
+                    for count, orig_idx in enumerate(np.where(np.diff(ts) <= 0)[0]):
+                        idx = count+orig_idx
+                        ts = ts[:idx] + ts[idx+1:]
+                        coefs = coefs[:idx] + coefs[idx+1:]
+                        print(f"stripping non-decreasing {ts[idx]} -- creating result interpolant")
+
                     try:
                         interp = ResultSegmentInterpolant(
                            make_interp_spline(
-                               result.t[idx0:idx1][self.time_sort],
-                               coeff_data[self.time_sort],
+                               ts,
+                               coefs,
                                k=min(3, idx1-idx0-1), # not needed with adaptive step size!
                                #bc_type=["natural", "natural"],
                            ),
@@ -684,6 +699,7 @@ class ResultInterpolant:
                     except Exception as my_e:
                         print(my_e)
                         breakpoint()
+                        pass
                 self.interpolants.append(interp)
                 #if result.t[idx1] != result.t[idx0]
 
@@ -990,6 +1006,15 @@ class ShootingGradientMethod:
                     p_integrand_p_param_segment(t)).squeeze()
                     for t in time_data
                 ]
+                #idxs = np.where(np.diff(time_data) < 0)[0]
+                for count, orig_idx in enumerate(np.where(np.diff(time_data) <= 0)[0]):
+                    idx = count+orig_idx
+                    time_data = time_data[:idx] + time_data[idx+1:]
+                    integrand_data = integrand_data[:idx] + integrand_data[idx+1:]
+                    print(f"stripping non-decreasing {time_data[idx]} -- calling SGM")
+                #if idxs:
+                #    breakpoint()
+                #    pass
                 integrand_interp = make_interp_spline(
                     time_data,
                     integrand_data,
