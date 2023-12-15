@@ -77,6 +77,7 @@ class ModelMetaData:
 
     inner_models: list = field(default_factory=list)
     sub_models: dict = field(default_factory=dict)
+    bind_submodels: bool = True
 
 # appears in __new__ as attrs
 class CondorClassDict(dict):
@@ -330,7 +331,7 @@ class ModelType(type):
         else:
             return f"<{cls.__name__}>"
 
-    def __new__(cls, name, bases, attrs, **kwargs):
+    def __new__(cls, name, bases, attrs, bind_submodels=True, **kwargs):
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement.
         # case 2: ____ - library code that defines fields, etc that user code inherits
@@ -368,6 +369,7 @@ class ModelType(type):
         #attrs_from_outer = attrs.pop('__from_outer__', {})
         attrs_from_outer = attrs.from_outer #getattr(attrs, 'from_outer', {})
         sub_models = attrs.meta.sub_models
+        attrs.meta.bind_submodels = bind_submodels
         for attr_name, attr_val in attrs_from_outer.items():
             if attrs[attr_name] is attr_val:
                 attrs.pop(attr_name)
@@ -782,6 +784,9 @@ class Model(metaclass=ModelType):
                 for elem, val in zip(field, model_instance_field_dict.values())
             })
 
+        if not model._meta.bind_submodels:
+            return
+
         for sub_model_ref_name, sub_model_instance in model._meta.sub_models.items():
             sub_model = sub_model_instance.__class__
             sub_model_kwargs = {}
@@ -1110,6 +1115,7 @@ class TrajectoryAnalysis(
     # adding an accumulator state and adding the updates to each event? Maybe that
     # doesn't make sense...
 
+
 # TODO: need to exlcude fields, particularly dot, initial, etc.
 # define which fields get lifted completely, which become "read only" (can't generate
 # new state) etc.
@@ -1129,6 +1135,19 @@ class Event(Model, inner_to = ODESystem):
     two events at 0 and 1. This means an at_time of a single value of t_e is equiavelent
     to slice(t_e, t_e, None)
 
+
+    How to bind numerical evaluation of model?
+    During trajectory analysis model construction, currently existing events get copied
+    to a local namespace and implementations are created, <trajectory analysis model
+    name>.Events.<event model name>.
+    I guess this is done by defining new  __new__ on TA, and calling super? Or do I need
+    those hooks after all?
+    Event implementation is owned by TA implementation, maybe in sub-name space to avoid
+    extraneous implementation constructions.
+    then when trajectory analysis is evaluated and bound, add events... somewhere. Maybe
+    the _res.e elements get replaced by the evaluated Event models (so one for each
+    occurance of the event)??? function isn't necessary, so maybe get an index instead.
+
     """
     # TODO: singleton field event.function is very similar to objective in
     # OptimizationProblem. And at_time. Need to be able to define such singleton
@@ -1142,9 +1161,6 @@ class Event(Model, inner_to = ODESystem):
     function = None
     at_time = None
 
-    def __init_subclass__(cls, dt=0., **kwargs):
-        if dt:
-            cls.function
 
 # this should just provide the capabiility to overwrite make (or whatever sets control)
 # and dot based on condition...
