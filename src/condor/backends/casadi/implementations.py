@@ -261,6 +261,7 @@ class OptimizationProblem(InitializerMixin):
 
     class Method(Enum):
         ipopt = auto()
+        qrsqp = auto()
         scipy_cg = auto()
         scipy_trust_constr = auto()
         scipy_slsqp = auto()
@@ -305,15 +306,16 @@ class OptimizationProblem(InitializerMixin):
             self.ipopt_opts = ipopt_opts = dict(
                 print_time= False,
                 ipopt = options,
-                #print_level=5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
+                # print_level = 0-2: nothing, 3-4: summary, 5: iter table (default)
                 #tol=1E-14, # tighter tol for sensitivty
                 #accept_every_trial_step="yes",
                 #max_iter=1000,
                 #constr_viol_tol=10.,
+
                 bound_consistency=True,
-                #clip_inactive_lam=True,
-                #calc_lam_x=False,
-                #calc_lam_p=False,
+                clip_inactive_lam=True,
+                calc_lam_x=False,
+                calc_lam_p=False,
             )
             # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
             # to try to get sensitivity from ipopt. so far no...
@@ -328,6 +330,33 @@ class OptimizationProblem(InitializerMixin):
                 self.nlp_args,
                 self.ipopt_opts,
             )
+        elif self.method is OptimizationProblem.Method.qrsqp:
+
+            self.qrsqp_opts = dict(
+                qpsol='qrqp',
+                qpsol_options=dict(
+                    #print_iter=False,
+                    #error_on_fail=False,
+                ),
+
+                #qpsol='osqp',
+
+                verbose=False,
+                tol_pr=1E-16,
+                tol_du=1E-16,
+                #print_iteration=False,
+                print_time=False,
+                #hessian_approximation= "limited-memory",
+                print_status=False,
+            )
+
+            self.optimizer = casadi.nlpsol(
+                model.__name__,
+                'sqpmethod',
+                self.nlp_args,
+                self.qrsqp_opts
+            )
+
         else:
             self.optimizer = None
             self.f_func = casadi.Function(
@@ -429,7 +458,10 @@ class OptimizationProblem(InitializerMixin):
                 )
             self.x0 = self.x0.toarray().reshape(-1)
 
-        if self.method is OptimizationProblem.Method.ipopt:
+        if self.method in (
+            OptimizationProblem.Method.ipopt,
+            OptimizationProblem.Method.qrsqp,
+        ):
             call_args = dict(
                 x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg, 
 
@@ -443,7 +475,7 @@ class OptimizationProblem(InitializerMixin):
 
             model_instance.bind_field(self.model.variable, out["x"])
             model_instance.bind_field(self.model.constraint, out["g"])
-            model_instance.objective = out["f"].toarray()[0,0]
+            model_instance.objective = np.array(out["f"]).squeeze()
             self.stats = model_instance._stats = self.optimizer.stats()
         else:
             if self.has_p:
@@ -758,9 +790,6 @@ class TrajectoryAnalysis:
             )
 
         num_events = len(ode_model.Event.subclasses)
-
-
-
 
         self.adjoint_signature = [
             self.p,
