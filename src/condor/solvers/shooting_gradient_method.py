@@ -653,12 +653,13 @@ class ResultInterpolant:
             except Exception as my_e:
                 print(my_e)
                 breakpoint()
+                pass
 
             self.interpolants = []
             for idx0, idx1, coeff_data in zip(
                 event_idxs[:-1],
-                event_idxs[1:],#-1,
-                all_coeff_data
+                event_idxs[1:],
+                all_coeff_data,
             ):
                 if np.all(np.diff(coeff_data, axis=0) == 0.):
 
@@ -802,8 +803,9 @@ class AdjointSystem(System):
                 lamda_tem = last_lamda
                 # TODO: add full transversality condition
                 for event_channel in active_update_idxs[::-1]:
+                    dh_dx = self.dh_dxs[event_channel](p, te, xtem,)
                     dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
-                    lamda_tem = last_lamda - dte_dxT @ ftem.T @ last_lamda
+                    lamda_tem = (dh_dx.T - dte_dxT @ ( dh_dx @ ftem).T) @ last_lamda
                     last_lamda = lamda_tem
             else:
                 lamda_dot = self.dots(te, last_lamda)
@@ -1055,24 +1057,17 @@ class ShootingGradientMethod:
                     #breakpoint()
                     jac_row += np.array(lamda_tep[None, :] @ self.p_x0_p_params(p)).squeeze()
                 if state_event is state_result.e[-1]:
-                    for event_channel in active_update_idxs[::-1]:
-                        dte_dp = self.dte_dps[event_channel](p, te, xtem)
-                        jac_row += np.array(
-                            lamda_tep[None, :] @ ftem @ dte_dp
-                        ).squeeze()
-                        #breakpoint()
-                else:
-                    for event_channel in active_update_idxs[::-1]:
-                        dh_dp = self.dh_dps[event_channel](p, te, xtem)
-                        dh_dx = adjoint_result.system.dh_dxs[event_channel](p, te, xtem,)
-                        dte_dp = self.dte_dps[event_channel](p, te, xtem)
+                    ftep = np.zeros_like(ftep)
+                for event_channel in active_update_idxs[::-1]:
+                    dh_dp = self.dh_dps[event_channel](p, te, xtem)
+                    dh_dx = adjoint_result.system.dh_dxs[event_channel](p, te, xtem,)
+                    dte_dp = self.dte_dps[event_channel](p, te, xtem)
 
-                        jac_row += np.array(
-                            lamda_tep[None, :] @ (
-                                dh_dp
-                                - (ftep - dh_dx @ ftem ) @ dte_dp
-                            )
-                        ).squeeze()
+                    jac_row += np.array(
+                        lamda_tep[None, :] @ (
+                            dh_dp - (ftep - dh_dx @ ftem ) @ dte_dp
+                        )
+                    ).squeeze()
 
 
             jac_rows.append(jac_row)
