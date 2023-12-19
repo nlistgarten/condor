@@ -1052,7 +1052,8 @@ class TrajectoryAnalysis:
 
     def __call__(self, model_instance, *args):
         self.callback.from_implementation = True
-        out = self.callback(casadi.vertcat(*flatten(args)))
+        self.args = casadi.vertcat(*flatten(args))
+        self.out = self.callback(self.args)
         self.callback.from_implementation = False
 
         if hasattr(self.callback, 'res'):
@@ -1073,6 +1074,6 @@ class TrajectoryAnalysis:
 
         model_instance.bind_field(
             self.model.trajectory_output,
-            out,
+            self.out,
         )
 
