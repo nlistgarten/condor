@@ -658,7 +658,20 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
         # fields?
         return
 
-    if getattr(attr_val, 'backend_repr', None) == super_attrs.get(attr_name, None):
+
+    attr_val_backend = getattr(attr_val, 'backend_repr', None)
+    clash_value = super_attrs.get(attr_name, None)
+
+    if (
+        (
+            isinstance(attr_val_backend, backend.symbol_class)
+            and isinstance(clash_value, backend.symbol_class)
+        )
+    ):
+        if backend.utils.symbol_is(attr_val_backend, clash_value):
+            return
+
+    elif attr_val_backend == clash_value:
         return
 
     # TODO: if user-defined field starts with _, raise value error?
