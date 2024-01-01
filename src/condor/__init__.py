@@ -81,12 +81,19 @@ class ModelMetaData:
 
 # appears in __new__ as attrs
 class CondorClassDict(dict):
-    def __init__(self, *args, model_name='', copy_fields=[], **kwargs):
+    def __init__(self, *args, model_name='', copy_fields=[], inner_to=None,  **kwargs):
         super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
         self.from_outer = {}
         self.meta = ModelMetaData()
         self.model_name=model_name,
         self.copy_fields = copy_fields
+        self.inner_to = inner_to
+        if inner_to is None:
+            self.inner_independent_fields = []
+        else:
+            self.inner_independent_fields = inner_to._meta.independent_fields
+        self.kwargs = kwargs
+        self.args = args
 
 
     def set_outer(self, **from_outer):
@@ -142,7 +149,8 @@ class CondorClassDict(dict):
         if isinstance(attr_val, backend.symbol_class):
             # from a IndependentField
             known_symbol_type = False
-            for free_field in self.meta.independent_fields:
+
+            for free_field in self.meta.independent_fields + self.inner_independent_fields:
                 symbol = free_field.get(backend_repr=attr_val)
                 # not a list (empty or len > 1)
                 if isinstance(symbol, BaseSymbol):
@@ -261,7 +269,8 @@ class ModelType(type):
         cls_dict = CondorClassDict(
             model_name=model_name,
             copy_fields = kwds.pop('copy_fields', []),
-            **sup_dict
+            inner_to = kwds.pop('inner_to', None),
+            **sup_dict,
         )
 
         # TODO: may need to search MRO resolution, not just bases, which without mixins
@@ -304,10 +313,19 @@ class ModelType(type):
                     # field?
                     if attr_name in base.__copy_fields__:
                         field_class = attr_val.__class__
-                        field_init_kwargs = attr_val._init_kwargs.copy()
+                        v_init_kwargs = attr_val._init_kwargs.copy()
+                        for init_k, init_v  in attr_val._init_kwargs.items():
+                            if isinstance(init_v, Field):
+                                # TODO not sure this will be the best way to remap connected
+                                # fields based on inheritance, but maybe sufficient?
+                                if not init_v._name in base.__copy_fields__ and _base.inner_to and init_v._name in base.inner_to.__dict__:
+                                    get_from = base.inner_to.__dict__
+                                else:
+                                    get_from = cls_dict
+                                v_init_kwargs[init_k] = get_from[init_v._name]
                         # I know it has no field references
                         copied_field = attr_val.inherit(
-                            model_name, field_type_name=attr_name, **field_init_kwargs
+                            model_name, field_type_name=attr_name, **v_init_kwargs
                         )
                         copied_field._symbols = [sym for sym in attr_val]
                         copied_field._count += sum(copied_field.list_of('size'))
@@ -1186,6 +1204,7 @@ class Mode(Model, inner_to=ODESystem,):
     do inheritance for ODESystems which is otherwise hard? Can this be used instead of
     deferred subsystems? Yes but only for ODESystems..
     """
+    condition = None
     action = MatchedField(ODESystem.modal, direction=Direction.internal)
 
 
