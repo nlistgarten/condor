@@ -335,8 +335,8 @@ class OptimizationProblem(InitializerMixin):
             self.qrsqp_opts = dict(
                 qpsol='qrqp',
                 qpsol_options=dict(
-                    #print_iter=False,
-                    #error_on_fail=False,
+                    print_iter=False,
+                    error_on_fail=False,
                 ),
 
                 #qpsol='osqp',
@@ -658,7 +658,7 @@ class TrajectoryAnalysis:
             control.backend_repr: [(control.default,)]
             for control in ode_model.modal
         }
-        for mode in ode_model.Mode.subclasses:
+        for mode in ode_model.Mode._meta.subclasses:
             for act in mode.action:
                 control_subs_pairs[act.match.backend_repr].append(
                     (mode.condition, act.backend_repr)
@@ -696,7 +696,7 @@ class TrajectoryAnalysis:
                 terminate = True
 
 
-        for event_idx, event in enumerate(ode_model.Event.subclasses):
+        for event_idx, event in enumerate(ode_model.Event._meta.subclasses):
             terminate = getattr(event, 'terminate', False)
             if (
                 getattr(event, 'function', None) is not None
@@ -789,7 +789,7 @@ class TrajectoryAnalysis:
                 )
             )
 
-        num_events = len(ode_model.Event.subclasses)
+        num_events = len(ode_model.Event._meta.subclasses)
 
         self.adjoint_signature = [
             self.p,
@@ -873,7 +873,7 @@ class TrajectoryAnalysis:
         self.dh_dps = []
 
         for event, e_expr, h_expr in zip(
-            ode_model.Event.subclasses, self.e_exprs, self.h_exprs
+            ode_model.Event._meta.subclasses, self.e_exprs, self.h_exprs
         ):
             dg_dx = casadi.jacobian(e_expr, self.x)
             dg_dt = casadi.jacobian(e_expr, ode_model.t)
@@ -970,7 +970,7 @@ class TrajectoryAnalysis:
 
 
         if model_tf is not None:
-            ode_model.Event.subclasses = ode_model.Event.subclasses[:-1]
+            ode_model.Event._meta.subclasses = ode_model.Event._meta.subclasses[:-1]
 
 
         set_solvers = []

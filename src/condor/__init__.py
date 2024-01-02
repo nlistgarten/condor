@@ -8,7 +8,7 @@ from condor.fields import (
 )
 from condor.backends.default import backend
 from condor.conf import settings
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from condor._version import __version__
 """
 Backend:
@@ -79,6 +79,13 @@ class ModelMetaData:
     sub_models: dict = field(default_factory=dict)
     bind_submodels: bool = True
 
+    subclasses: list = field(init=False)
+
+    def __post_init__(self):
+        self.subclasses = []
+
+
+
 # appears in __new__ as attrs
 class CondorClassDict(dict):
     def __init__(self, *args, model_name='', copy_fields=[], inner_to=None,  **kwargs):
@@ -91,7 +98,7 @@ class CondorClassDict(dict):
         if inner_to is None:
             self.inner_independent_fields = []
         else:
-            self.inner_independent_fields = inner_to._meta.independent_fields
+            self.inner_independent_fields = [f for f in inner_to._meta.independent_fields]
         self.kwargs = kwargs
         self.args = args
 
@@ -539,7 +546,9 @@ class ModelType(type):
 
 
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
-        new_cls._meta = attrs.meta
+        # TODO: I'm surprised that this is necessary to avoid duplciating the mutable
+        # default subclasses list; but this works on the cases I have
+        new_cls._meta = replace(attrs.meta)
 
         # creating an InnerClass
         # inner_to kwarg is added to InnerModel  template definition or for subclasses
@@ -575,6 +584,10 @@ class ModelType(type):
             inner_through.register(new_cls)
             new_cls.inner_through = inner_through
             new_cls.inner_to = inner_through.inner_to
+
+        elif bases and bases[0] is not Model:
+            bases[0].register(new_cls)
+
 
         # Bind Fields and InnerModels -- require reference to constructed Model
         for attr_name, attr_val in attrs.items():
@@ -661,6 +674,10 @@ class ModelType(type):
     def finalize_input_fields(cls):
         for input_field in cls._meta.input_fields:
             input_field.create_dataclass()
+
+
+    def register(cls, subclass):
+        cls._meta.subclasses.append(subclass)
 
 
 def check_attr_name(attr_name, attr_val, super_attrs, bases):
@@ -849,9 +866,6 @@ class InnerModelType(ModelType):
         for subclass in cls.subclasses:
             yield subclass
 
-    def register(cls, subclass):
-        cls.subclasses.append(subclass)
-
     def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
         # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
@@ -865,7 +879,6 @@ class InnerModelType(ModelType):
 
         if case2:
             new_cls.original_class = original_class
-            new_cls.subclasses = []
             # reference to original class so uer sub-classes inherit directly, see below
 
         if case3:
