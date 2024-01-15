@@ -80,9 +80,18 @@ class ModelMetaData:
     bind_submodels: bool = True
 
     subclasses: list = field(init=False)
+    inner_to: object = None
 
     def __post_init__(self):
         self.subclasses = []
+
+    @property
+    def all_fields(self):
+        return self.input_fields + self.output_fields + self.internal_fields
+
+    @property
+    def dependent_fields(self):
+        return [f for f in self.all_fields if f not in self.independent_fields]
 
 
 
@@ -91,7 +100,7 @@ class CondorClassDict(dict):
     def __init__(self, *args, model_name='', copy_fields=[], inner_to=None,  **kwargs):
         super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
         self.from_outer = {}
-        self.meta = ModelMetaData()
+        self.meta = ModelMetaData(inner_to=inner_to)
         self.model_name=model_name,
         self.copy_fields = copy_fields
         self.inner_to = inner_to
@@ -874,6 +883,7 @@ class InnerModelType(ModelType):
         case1 = name == "InnerModel"
         case2 = inner_to is not None and original_class is not None
         case3 = not case1 and not case2
+
         if case1 or case2:
             new_cls = super().__new__(cls, name, bases, attrs, inner_to=inner_to, **kwargs)
 
@@ -903,6 +913,7 @@ class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
     InnerModel by sub-classing from <outer_model>.<inner_model template>
     """
     pass
+
 
 class DeferredSystem(Model):
     """
