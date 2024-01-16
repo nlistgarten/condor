@@ -74,6 +74,9 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
         self.from_implementation = False
         self.p = None
 
+    def has_jacobian(self):
+        return self.i.can_sgm
+
     def get_jacobian(self, name, inames, onames, opts):
         if DEBUG_LEVEL:
             print("\n"*10, f"getting jacobian for {self} . {name}", sep="\n")

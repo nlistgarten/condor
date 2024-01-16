@@ -539,7 +539,7 @@ def get_state_setter(field, setter_args, default=0., subs={}):
 
     """
     setter_exprs = []
-    if isinstance(setter_args, symbol_class):
+    if not isinstance(setter_args, list):
         setter_args = [setter_args]
 
     for state in field._matched_to:
@@ -610,9 +610,11 @@ class TrajectoryAnalysis:
         self.model = model
         self.ode_model = ode_model = model.inner_to
 
-        self.p = casadi.vertcat(*flatten(model.parameter))
         self.x = casadi.vertcat(*flatten(model.state))
         self.lamda = symbol_class.sym("lambda", model.state._count)
+
+        self.p = casadi.vertcat(*flatten(model.parameter))
+
         self.simulation_signature = [
             self.p,
             self.ode_model.t,
@@ -622,6 +624,7 @@ class TrajectoryAnalysis:
         self.traj_out_expr = casadi.vertcat(*flatten(
             model.trajectory_output
         ))
+        self.can_sgm = isinstance(self.p, casadi.MX) and isinstance(self.traj_out_expr, casadi.MX)
 
         traj_out_names = model.trajectory_output.list_of('name')
 
@@ -645,14 +648,6 @@ class TrajectoryAnalysis:
 
 
         self.state0 = get_state_setter(model.initial, self.p,)
-        self.p_state0_p_p_expr = casadi.jacobian(self.state0.expr, self.p)
-        p_state0_p_p = casadi.Function(
-            f"{model.__name__}_x0_jacobian",
-            [self.p],
-            [self.p_state0_p_p_expr],
-            dict(allow_free=True,),
-        )
-        p_state0_p_p.expr = self.p_state0_p_p_expr
 
         control_subs_pairs = {
             control.backend_repr: [(control.default,)]
@@ -673,6 +668,13 @@ class TrajectoryAnalysis:
             ode_model.dot,
             self.simulation_signature,
             subs = control_sub_expression,
+        )
+        lamda_jac = casadi.jacobian(state_equation_func.expr, self.x).T
+        state_dot_jac_func = casadi.Function(
+            f"{ode_model.__name__}_state_jacobian",
+            self.simulation_signature,
+            [lamda_jac.T],
+            dict(allow_free=True,),
         )
 
         self.e_exprs = []
@@ -695,8 +697,14 @@ class TrajectoryAnalysis:
                 at_time = model_tf,
                 terminate = True
 
+        events = [ e for e in ode_model.Event._meta.subclasses ]
 
-        for event_idx, event in enumerate(ode_model.Event._meta.subclasses):
+        if model_tf is not None:
+            ode_model.Event._meta.subclasses = ode_model.Event._meta.subclasses[:-1]
+
+        num_events = len(events)
+
+        for event_idx, event in enumerate(events):
             terminate = getattr(event, 'terminate', False)
             if (
                 getattr(event, 'function', None) is not None
@@ -789,7 +797,74 @@ class TrajectoryAnalysis:
                 )
             )
 
-        num_events = len(ode_model.Event._meta.subclasses)
+
+        set_solvers = []
+        for solver in [state_solver, adjoint_solver]:
+            if solver is TrajectoryAnalysis.Solver.CVODE:
+                solver_class = sgm.SolverCVODE
+            elif solver is TrajectoryAnalysis.Solver.dopri5:
+                solver_class = sgm.SolverSciPyDopri5
+            elif solver is TrajectoryAnalysis.Solver.dop853:
+                solver_class = sgm.SolverSciPyDop853
+            set_solvers.append(solver_class)
+        state_solver_class, adjoint_solver_class = set_solvers
+
+
+        self.trajectory_analysis = sgm.TrajectoryAnalysis(
+            traj_out_integrand_func, traj_out_terminal_term_func,
+        )
+        #self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
+
+        if len(ode_model.dynamic_output):
+            self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
+            self.y_expr = substitute(self.y_expr, control_sub_expression)
+            self.dynamic_output_func = casadi.Function(
+                f"{ode_model.__name__}_dynamic_output",
+                self.simulation_signature,
+                [self.y_expr],
+            )
+        else:
+            self.dynamic_output_func = None
+
+        self.StateSystem = sgm.System(
+            dim_state = model.state._count,
+            initial_state = self.state0,
+            dot = state_equation_func,
+            jac = state_dot_jac_func,
+            time_generator = sgm.TimeGeneratorFromSlices(
+                at_time_slices
+            ),
+            events = casadi.Function(
+                f"{ode_model.__name__}_event",
+                self.simulation_signature,
+                [substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)],
+                dict(allow_free=True,),
+            ),
+            updates = self.h_exprs,
+            num_events = num_events,
+            terminating = terminating,
+            dynamic_output = self.dynamic_output_func,
+            atol=state_atol,
+            rtol=state_rtol,
+            adaptive_max_step=state_adaptive_max_step_size,
+            max_step_size=state_max_step_size,
+            solver_class = state_solver_class,
+        )
+
+        self.callback = ca_sgm.ShootingGradientMethod(self)
+
+        if not self.can_sgm:
+            return
+
+        self.p_state0_p_p_expr = casadi.jacobian(self.state0.expr, self.p)
+
+        p_state0_p_p = casadi.Function(
+            f"{model.__name__}_x0_jacobian",
+            [self.p],
+            [self.p_state0_p_p_expr],
+            dict(allow_free=True,),
+        )
+        p_state0_p_p.expr = self.p_state0_p_p_expr
 
         self.adjoint_signature = [
             self.p,
@@ -820,15 +895,8 @@ class TrajectoryAnalysis:
             ) for gradF, traj_name in zip(self.gradFs, traj_out_names)
         ]
 
-        lamda_jac = casadi.jacobian(state_equation_func.expr, self.x).T
         grad_jac = casadi.jacobian(state_equation_func.expr, self.p)
 
-        state_dot_jac_func = casadi.Function(
-            f"{ode_model.__name__}_state_jacobian",
-            self.simulation_signature,
-            [lamda_jac.T],
-            dict(allow_free=True,),
-        )
         param_dot_jac_func = casadi.Function(
             f"{ode_model.__name__}_param_jacobian",
             self.simulation_signature,
@@ -873,7 +941,7 @@ class TrajectoryAnalysis:
         self.dh_dps = []
 
         for event, e_expr, h_expr in zip(
-            ode_model.Event._meta.subclasses, self.e_exprs, self.h_exprs
+            events, self.e_exprs, self.h_exprs
         ):
             dg_dx = casadi.jacobian(e_expr, self.x)
             dg_dt = casadi.jacobian(e_expr, ode_model.t)
@@ -968,63 +1036,6 @@ class TrajectoryAnalysis:
             )
             self.dh_dps[-1].expr = dh_dp
 
-
-        if model_tf is not None:
-            ode_model.Event._meta.subclasses = ode_model.Event._meta.subclasses[:-1]
-
-
-        set_solvers = []
-        for solver in [state_solver, adjoint_solver]:
-            if solver is TrajectoryAnalysis.Solver.CVODE:
-                solver_class = sgm.SolverCVODE
-            elif solver is TrajectoryAnalysis.Solver.dopri5:
-                solver_class = sgm.SolverSciPyDopri5
-            elif solver is TrajectoryAnalysis.Solver.dop853:
-                solver_class = sgm.SolverSciPyDop853
-            set_solvers.append(solver_class)
-        state_solver_class, adjoint_solver_class = set_solvers
-
-
-        self.trajectory_analysis = sgm.TrajectoryAnalysis(
-            traj_out_integrand_func, traj_out_terminal_term_func,
-        )
-        self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
-
-        if len(ode_model.dynamic_output):
-            self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
-            self.y_expr = substitute(self.y_expr, control_sub_expression)
-            self.dynamic_output_func = casadi.Function(
-                f"{ode_model.__name__}_dynamic_output",
-                self.simulation_signature,
-                [self.y_expr],
-            )
-        else:
-            self.dynamic_output_func = None
-
-        self.StateSystem = sgm.System(
-            dim_state = model.state._count,
-            initial_state = self.state0,
-            dot = state_equation_func,
-            jac = state_dot_jac_func,
-            time_generator = sgm.TimeGeneratorFromSlices(
-                at_time_slices
-            ),
-            events = casadi.Function(
-                f"{ode_model.__name__}_event",
-                self.simulation_signature,
-                [self.e_exprs],
-                dict(allow_free=True,),
-            ),
-            updates = self.h_exprs,
-            num_events = num_events,
-            terminating = terminating,
-            dynamic_output = self.dynamic_output_func,
-            atol=state_atol,
-            rtol=state_rtol,
-            adaptive_max_step=state_adaptive_max_step_size,
-            max_step_size=state_max_step_size,
-            solver_class = state_solver_class,
-        )
         self.AdjointSystem = sgm.AdjointSystem(
             state_jac = state_dot_jac_func,
             dte_dxs = self.dte_dxs,
@@ -1048,7 +1059,6 @@ class TrajectoryAnalysis:
             p_integrand_terms_p_state = state_integrand_jac_funcs,
         )
 
-        self.callback = ca_sgm.ShootingGradientMethod(self)
 
     def __call__(self, model_instance, *args):
         self.callback.from_implementation = True
