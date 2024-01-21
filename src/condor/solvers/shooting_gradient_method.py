@@ -15,7 +15,17 @@ from scipy.integrate import ode as scipy_ode
 from scipy.optimize import brentq, newton
 from typing import NamedTuple, Optional
 
-class SolverSciPyBase:
+class SolverMixin:
+    def store_result(self, store_t, store_x):
+        system = self.system
+        results = system.result
+        results.t.append(store_t)
+        results.x.append(store_x)
+        if system.dynamic_output:
+            results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
+
+
+class SolverSciPyBase(SolverMixin):
     SOLVER_NAME = None
     def __init__(
         self, system,
@@ -33,14 +43,6 @@ class SolverSciPyBase:
         )
         self.solver.set_integrator(**self.int_options)
         self.solver.set_solout(self.solout)
-
-    def store_result(self, store_t, store_x):
-        system = self.system
-        results = system.result
-        results.t.append(store_t)
-        results.x.append(store_x)
-        if system.dynamic_output:
-            results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
 
     def solout(self, t, x):
         system = self.system
@@ -132,6 +134,11 @@ class SolverSciPyBase:
             # initialization has index 1
             last_x = system.update(last_t, last_x, rootsfound)
         results.e.append(Root(1, rootsfound))
+
+        terminate = np.any(rootsfound[system.terminating] != 0)
+        if terminate:
+            self.store_result(last_t, last_x)
+            return
 
 
         solver = self.solver
@@ -236,7 +243,7 @@ class SolverSciPyDop853(SolverSciPyBase):
     SOLVER_NAME = "dop853"
 
 
-class SolverCVODE:
+class SolverCVODE(SolverMixin):
     def __init__(
         self, system,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
@@ -291,8 +298,7 @@ class SolverCVODE:
         # TODO: add dynamic_output feature
 
         gs = system.events(last_t, last_x)
-        results.x.append(last_x)
-        results.t.append(last_t)
+        self.store_result(last_t, last_x)
 
         rootsfound = (gs == 0.).astype(int)
         if np.any(rootsfound):
@@ -301,8 +307,11 @@ class SolverCVODE:
             # initialization has index 1
             last_x = system.update(last_t, np.copy(last_x), rootsfound)
         results.e.append(Root(1, rootsfound))
-        results.t.append(last_t)
-        results.x.append(last_x)
+        self.store_result(last_t, last_x)
+        terminate = np.any(rootsfound[system.terminating] != 0)
+        if terminate:
+            return
+
 
         solver = self.solver
         # each iteration of this loop simulates until next generated time
@@ -327,8 +336,9 @@ class SolverCVODE:
                 if (solver_res.flag < 0):
                     breakpoint()
 
-                results.t.append(np.copy(solver_res.values.t))
-                results.x.append(np.copy(solver_res.values.y))
+                self.store_result(
+                    np.copy(solver_res.values.t), np.copy(solver_res.values.y)
+                )
 
                 if solver_res.flag == StatusEnum.ROOT_RETURN:
                     rootsfound = solver.rootinfo()
@@ -350,12 +360,16 @@ class SolverCVODE:
                         terminate = np.any(rootsfound[system.terminating] != 0)
                     except:
                         breakpoint()
-                    results.t.append(np.copy(solver_res.values.t))
-                    results.x.append(next_x)
+                    self.store_result(
+                        np.copy(solver_res.values.t),
+                        next_x
+                    )
 
                     if terminate:
-                        results.t.append(np.copy(solver_res.values.t))
-                        results.x.append(next_x)
+                        self.store_result(
+                            np.copy(solver_res.values.t),
+                            next_x
+                        )
                         return
 
                     solver.init_step(solver_res.values.t, next_x)
