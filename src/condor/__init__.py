@@ -134,6 +134,8 @@ class CondorClassDict(dict):
             use_val = self.__getitem__(path_list[0])
             for path_step in path_list[1:]:
                 use_val = getattr(use_val, path_step)
+            if isinstance(use_val, FreeField):
+                use_val = use_val(name=k)
             kwargs[k] = use_val
 
         return kwargs
