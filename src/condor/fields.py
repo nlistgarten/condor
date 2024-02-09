@@ -268,6 +268,9 @@ class FrontendSymbolData:
     backend_repr: backend.symbol_class
     name: str = ''
 
+    def flat_index(self):
+        return self.field_type.flat_index(self)
+
 
 @dataclass
 class BaseSymbol(FrontendSymbolData, BackendSymbolData,):
