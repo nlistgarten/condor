@@ -730,6 +730,7 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
             not (
                 getattr(attr_val, '_inherits_from', None) == getattr(base, attr_name)
                 or attr_val == getattr(base, attr_name)
+                or isinstance(attr_val, backend.symbol_class)
             )
         ):
             in_bases = True
