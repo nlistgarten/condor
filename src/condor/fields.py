@@ -6,6 +6,8 @@ import numpy as np
 from enum import Enum
 from condor.backends.default import backend
 from condor.backends import BackendSymbolData
+import importlib
+import sys
 
 # TODO **kwarg expansion for a field (with a filter?)
 # TODO copy all parameters (with a filter?) from one model
@@ -153,6 +155,15 @@ class Field:
         else:
             self._model_name = model.__name__
         self._set_resolve_name()
+
+    def bind_dataclass(self):
+        mod_name = self._model.__module__
+        self._dataclass.__module__ = mod_name
+        if mod_name not in sys.modules:
+            mod_obj = importlib.import_module(mod_name)
+        else:
+            mod_obj = sys.modules[mod_name]
+        setattr(mod_obj, self._dataclass.__name__, self._dataclass)
 
     def inherit(self, model_name, field_type_name, **kwargs):
         """

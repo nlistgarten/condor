@@ -676,6 +676,9 @@ class ModelType(type):
             cls.finalize_input_fields(new_cls)
             new_cls.implementation = implementation(new_cls, **backend_option)
 
+            for field in attrs.meta.all_fields:
+                field.bind_dataclass()
+
         for field in attrs.meta.independent_fields:
             for symbol_idx, symbol in enumerate(field):
                 setattr(new_cls, symbol.name, symbol)
