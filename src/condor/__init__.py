@@ -881,6 +881,22 @@ class InnerModelType(ModelType):
         for subclass in cls.subclasses:
             yield subclass
 
+    @classmethod
+    def __prepare__(cls, model_name, bases, inner_to=None, original_class=None, **kwds):
+        case1 = model_name == "InnerModel"
+        case2 = inner_to is not None and original_class is not None
+        case3 = not case1 and not case2
+
+        if case1 or case2:
+            return super().__prepare__(
+                model_name, bases, inner_to=inner_to, **kwds
+            )
+
+        if case3:
+            return bases[0].original_class.__prepare__(
+                model_name, bases, inner_to=inner_to, **kwds
+            )
+
     def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
         # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
