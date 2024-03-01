@@ -692,7 +692,6 @@ class ResultInterpolant:
                     ts = result.t[idx0:idx1][self.time_sort]
                     coefs = coeff_data[self.time_sort]
 
-                    shift_offset = 0
                     for count, orig_idx in enumerate(np.where(np.diff(ts) <= 0)[0]):
                         idx = count+orig_idx
                         ts = ts[:idx] + ts[idx+1:]
@@ -719,9 +718,7 @@ class ResultInterpolant:
                 #if result.t[idx1] != result.t[idx0]
 
     def __call__(self, t):
-        interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]
-        if interval_idx == len(self.time_bounds) -1:
-            interval_idx -= 1
+        interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]-1
         return self.interpolants[interval_idx](t)
 
     def __iter__(self):
