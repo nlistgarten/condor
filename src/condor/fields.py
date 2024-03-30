@@ -439,6 +439,8 @@ class AssignedField(Field, default_direction=Direction.output):
             super().__setattr__(name, value)
         else:
             # TODO: resolve circular imports so we can use dataclass
+            if isinstance(value, BaseSymbol):
+                value = value.backend_repr
             symbol_data = backend.get_symbol_data(value)
             self.create_symbol(
                 name=name,
@@ -488,13 +490,17 @@ class MatchedField(Field,):
             match = self._matched_to.get(backend_repr=key)
             if isinstance(match, list):
                 raise ValueError
-            symbol_data = backend.get_symbol_data(value)
-            self.create_symbol(
-                name=None,
-                match=match,
-                backend_repr=value,
-                **asdict(symbol_data)
-            )
+        elif isinstance(key, BaseSymbol):
+            match = key
+        else:
+            raise ValueError
+        symbol_data = backend.get_symbol_data(value)
+        self.create_symbol(
+            name=None,
+            match=match,
+            backend_repr=value,
+            **asdict(symbol_data)
+        )
 
     def __getitem__(self, key):
         """
