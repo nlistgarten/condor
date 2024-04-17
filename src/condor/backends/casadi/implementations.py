@@ -529,7 +529,7 @@ class OptimizationProblem(InitializerMixin):
             self.x0 = min_out.x
             self.stats = model_instance._stats = min_out
 
-def get_state_setter(field, setter_args, default=0., subs={}):
+def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={}):
     """
     used for building functions from matched fields to their match (loops over "state"
     but is generalized for any matched fields)
@@ -544,7 +544,9 @@ def get_state_setter(field, setter_args, default=0., subs={}):
     if not isinstance(setter_args, list):
         setter_args = [setter_args]
 
-    for state in field._matched_to:
+    if setter_targets is None:
+        setter_targets = [state for state in field._matched_to]
+    for state in setter_targets:
         setter_symbol = field.get(match=state)
         if isinstance(setter_symbol, list) and len(setter_symbol) == 0:
             if default is not None:
@@ -563,7 +565,12 @@ def get_state_setter(field, setter_args, default=0., subs={}):
             )
         else:
             # symbol_class is always a matrix, and broadcast_to cannot handle (n,) to (n,1)
-            if state.shape[1] == 1:
+            setter_symbol = np.array(setter_symbol)
+            if (state.size ==1 and setter_symbol.size ==1) or state.shape == setter_symbol.shape:
+                setter_exprs.append(
+                    setter_symbol.reshape((state.size,1))
+                )
+            elif state.shape[1] == 1:
                 setter_exprs.append(
                     np.broadcast_to(setter_symbol, state.size).reshape(-1)
                 )
