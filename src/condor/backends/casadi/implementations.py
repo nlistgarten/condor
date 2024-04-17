@@ -207,6 +207,8 @@ class AlgebraicSystem(InitializerMixin):
     ):
         rootfinder_options = dict(
             error_on_fail=error_on_fail,
+            abstol=atol,
+            abstolStep=rtol,
         )
         self.x = casadi.vertcat(*flatten(model.implicit_output))
         self.g0 = casadi.vertcat(*flatten(model.residual))
