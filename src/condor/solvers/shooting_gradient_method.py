@@ -617,6 +617,7 @@ class ResultInterpolant:
     time_comparison: callable = field(init=False) # method
     interval_select: int = field(init=False)
     event_idxs: Optional[list] = None
+    max_deg: int = 3
 
     def __post_init__(self):
         # make interpolants
@@ -703,7 +704,7 @@ class ResultInterpolant:
                            make_interp_spline(
                                ts,
                                coefs,
-                               k=min(3, idx1-idx0-1), # not needed with adaptive step size!
+                               k=min(self.max_deg, idx1-idx0-1), # not needed with adaptive step size!
                                #bc_type=["natural", "natural"],
                            ),
                             idx0, idx1,
