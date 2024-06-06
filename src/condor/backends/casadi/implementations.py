@@ -263,6 +263,7 @@ class OptimizationProblem(InitializerMixin):
 
     class Method(Enum):
         ipopt = auto()
+        snopt = auto()
         qrsqp = auto()
         scipy_cg = auto()
         scipy_trust_constr = auto()
@@ -331,6 +332,13 @@ class OptimizationProblem(InitializerMixin):
                 "ipopt",
                 self.nlp_args,
                 self.ipopt_opts,
+            )
+        elif self.method is OptimizationProblem.Method.snopt:
+            self.optimizer = casadi.nlpsol(
+                model.__name__,
+                "snopt",
+                self.nlp_args,
+                #self.ipopt_opts,
             )
         elif self.method is OptimizationProblem.Method.qrsqp:
 
@@ -462,6 +470,7 @@ class OptimizationProblem(InitializerMixin):
 
         if self.method in (
             OptimizationProblem.Method.ipopt,
+            OptimizationProblem.Method.snopt,
             OptimizationProblem.Method.qrsqp,
         ):
             call_args = dict(
