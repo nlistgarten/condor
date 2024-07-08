@@ -270,11 +270,24 @@ class OptimizationProblem(InitializerMixin):
         scipy_slsqp = auto()
 
     scipy_trust_constr_option_defaults = dict(xtol=1E-8,)
+
+    def make_warm_start(self, x0=None, lam_g0=None, lam_x0=None):
+        if x0 is not None:
+            self.x0 = x0
+        if lam_g0 is not None:
+            self.lam_g0 = lam_g0
+        if lam_x0 is not None:
+            self.lam_x0 = lam_x0
+
     def __init__(
         self, model,
         exact_hessian=True, # False -> ipopt alias for limited memory
         keep_feasible = True, # flag that goes to scipy trust constr linear constraints
         method=Method.ipopt,
+        calc_lam_x = False, 
+        # ipopt specific, default = False may help with computing sensitivity. To do
+        # proper warm start, need to provide lam_x and lam_g so I assume need calc_lam_x
+        # = True
         **options,
     ):
         self.model = model
@@ -300,12 +313,14 @@ class OptimizationProblem(InitializerMixin):
             initializer_args += [self.p]
             self.nlp_args["p"] = p
         self.parse_initializers(model.variable, initializer_args)
+
         self.x0 = self.initial_at_construction.copy()
+        self.lam_g0 = None
+        self.lam_x0 = None
         #self.variable_at_construction.copy()
 
         self.method = method
         if self.method is OptimizationProblem.Method.ipopt:
-
             self.ipopt_opts = ipopt_opts = dict(
                 print_time= False,
                 ipopt = options,
@@ -317,7 +332,7 @@ class OptimizationProblem(InitializerMixin):
 
                 bound_consistency=True,
                 clip_inactive_lam=True,
-                calc_lam_x=False,
+                calc_lam_x=calc_lam_x,
                 calc_lam_p=False,
             )
             # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
@@ -475,8 +490,13 @@ class OptimizationProblem(InitializerMixin):
         ):
             call_args = dict(
                 x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg, 
-
             )
+            if self.options["warm_start_init_point"]:
+                if self.lam_x0 is not None:
+                    call_args.update(lam_x0= self.lam_x0)
+                if self.lam_g0 is not None:
+                    call_args.update(lam_g0= self.lam_g0)
+
             if self.has_p:
                 call_args["p"] = p
 
@@ -488,6 +508,9 @@ class OptimizationProblem(InitializerMixin):
             model_instance.bind_field(self.model.constraint, out["g"])
             model_instance.objective = np.array(out["f"]).squeeze()
             self.stats = model_instance._stats = self.optimizer.stats()
+            self.out = model_instance._out = out
+            self.lam_g0 = out["lam_g"]
+            self.lam_x0 = out["lam_x"]
         else:
             if self.has_p:
                 extra_args = (p,)
@@ -1093,10 +1116,13 @@ class TrajectoryAnalysis:
                 np.array(res.x).T,
                 wrap=True,
             )
-            if np.array(res.y).size:
+            if self.dynamic_output_func:
+                yy = np.empty((model_instance.t.size, self.model.dynamic_output._count))
+                for idx, (t, x) in enumerate(zip(res.t, res.x)):
+                    yy[idx, None] = self.dynamic_output_func(res.p, t, x).T
                 model_instance.bind_field(
                     self.model.dynamic_output,
-                    np.array(res.y).T,
+                    yy.T,
                     wrap=True,
                 )
 
