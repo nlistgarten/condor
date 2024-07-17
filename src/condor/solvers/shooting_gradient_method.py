@@ -16,13 +16,14 @@ from scipy.optimize import brentq, newton
 from typing import NamedTuple, Optional
 
 class SolverMixin:
-    def store_result(self, store_t, store_x):
+    def store_result(self, store_t, store_x, store_y=False):
         system = self.system
         results = system.result
         results.t.append(store_t)
         results.x.append(store_x)
-        if system.dynamic_output:
+        if system.dynamic_output and store_y:
             results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
+
 
 
 class SolverSciPyBase(SolverMixin):
