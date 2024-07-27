@@ -282,7 +282,10 @@ class ModelType(type):
 
 
     @classmethod
-    def __prepare__(cls, model_name, bases, **kwds):
+    def __prepare__(cls, model_name, bases, name="", **kwds):
+        if name:
+            model_name = name
+
         sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
         cls_dict = CondorClassDict(
             model_name=model_name,
@@ -367,7 +370,7 @@ class ModelType(type):
         else:
             return f"<{cls.__name__}>"
 
-    def __new__(cls, name, bases, attrs, bind_submodels=True, **kwargs):
+    def __new__(cls, model_name, bases, attrs, bind_submodels=True, name="", **kwargs):
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement.
         # case 2: ____ - library code that defines fields, etc that user code inherits
@@ -386,6 +389,9 @@ class ModelType(type):
         # modifying/adding (no deletion? need mixins to pre-build pieces?) to parent
         # classes.  case 4
         # fields would need to combine _symbols
+
+        if not name:
+            name = model_name
 
 
         # TODO: thought hooks might be necessary for inner model/deferred subsystems,
@@ -914,17 +920,17 @@ class InnerModelType(ModelType):
                 model_name, bases, inner_to=inner_to, **kwds
             )
 
-    def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
+    def __new__(cls, model_name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
         # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
         # (inner model template)
         # case 3: subclass of inherited inner model -- user defined model
-        case1 = name == "InnerModel"
+        case1 = model_name == "InnerModel"
         case2 = inner_to is not None and original_class is not None
         case3 = not case1 and not case2
 
         if case1 or case2:
-            new_cls = super().__new__(cls, name, bases, attrs, inner_to=inner_to, **kwargs)
+            new_cls = super().__new__(cls, model_name, bases, attrs, inner_to=inner_to, **kwargs)
 
         if case2:
             new_cls.original_class = original_class
@@ -937,7 +943,7 @@ class InnerModelType(ModelType):
             original_class = inner_through.original_class
             # subclass original class, inheriting
             # will inherit inner_to from original_class
-            new_cls = original_class.__class__(name, (original_class,), attrs,
+            new_cls = original_class.__class__(model_name, (original_class,), attrs,
                                                inner_through=inner_through, **kwargs)
 
         return new_cls
