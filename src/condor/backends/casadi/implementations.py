@@ -1148,3 +1148,113 @@ class TrajectoryAnalysis:
             self.out,
         )
 
+
+
+class CasadiFunctionCallback(casadi.Callback):
+    """Base class for wrapping a Function with a Callback
+    """
+
+    def __init__(self, placeholder_func, wrapper_func, implementation, jacobian_of=None,  opts={}):
+        casadi.Callback.__init__(self)
+        self.wrapper_func = wrapper_func
+        self.placeholder_func = placeholder_func
+        self.jacobian = None
+        self.jacobian_of = jacobian_of
+        self.implementation = implementation
+        self.opts = opts
+
+    def init(self):
+        pass
+
+    def finalize(self):
+        pass
+
+    def get_n_in(self):
+        return self.placeholder_func.n_in()
+
+    def get_n_out(self):
+        return self.placeholder_func.n_out()
+
+    def eval(self, args):
+        try:
+            out = self.wrapper_func(
+                *wrap(self.implementation.model.input, args[0])
+            )
+        except Exception as e:
+            breakpoint()
+            pass
+        if self.jacobian_of:
+            jac_out = np.concatenate(
+                flatten(out)
+            ).reshape(self.get_sparsity_out(0).shape)
+            return jac_out,
+        return casadi.vertcat(*flatten(out)),
+        return [out] if self.get_n_out() == 1 else out
+        #return out,
+        return casadi.vertcat(*flatten(out)),
+        return [out] if self.get_n_out() == 1 else out
+
+    def get_sparsity_in(self, i):
+        if self.jacobian_of is None or i < self.jacobian_of.get_n_in():
+            return self.placeholder_func.sparsity_in(i)
+        elif i < self.jacobian_of.get_n_in() + self.jacobian_of.get_n_out():
+            # nominal outputs are 0
+            return casadi.Sparsity(*self.jacobian_of.get_sparsity_out(
+                i-self.jacobian_of.get_n_in()
+            ).shape)
+        else:
+            raise ValueError
+
+    def get_sparsity_out(self, i):
+        return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
+
+    def has_jacobian(self):
+        return self.jacobian is not None
+
+    def get_jacobian(self, name, inames, onames, opts):
+        return self.jacobian
+
+
+class ExternalSolverModel:
+    def __init__(self, model):
+        self.model = model
+        self.wrapper = model.__external_wrapper__
+        self.input = casadi.vertcat(*flatten(model.input))
+        self.output = casadi.vertcat(*flatten(model.output))
+        self.placeholder_func = casadi.Function(
+            f"{model.__name__}_placeholder",
+            [self.input],
+            [self.output],
+            dict(allow_free=True,),
+        )
+        self.callback = CasadiFunctionCallback(
+            self.placeholder_func, self.wrapper.function, self, jacobian_of=None
+        )
+        if hasattr(self.wrapper, "jacobian"):
+            self.callback.jacobian = CasadiFunctionCallback(
+                self.placeholder_func.jacobian(),
+                self.wrapper.jacobian,
+                implementation=self,
+                jacobian_of=self.callback
+            )
+
+            self.callback.jacobian.construct(
+                self.callback.jacobian.placeholder_func.name(),
+                self.callback.jacobian.opts
+            )
+        self.callback.construct(
+            self.callback.placeholder_func.name(),
+            self.callback.opts
+        )
+
+
+
+    def __call__(self, model_instance, *args):
+        use_args = casadi.vertcat(*flatten(args))
+        out = self.callback(use_args)
+        if isinstance(out, casadi.MX):
+            out = casadi.vertsplit(out)
+        model_instance.bind_field(
+            self.model.output,
+            out,
+        )
