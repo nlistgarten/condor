@@ -807,11 +807,12 @@ class Model(metaclass=ModelType):
 
         # generally implementations are responsible for binding computed values.
         # implementations know about models, models don't know about implementations
-        self.output_kwargs = output_kwargs = {
-            out_name: getattr(self, out_name)
-            for field in cls._meta.output_fields
-            for out_name in field.list_of('name')
-        }
+        if False:
+            self.output_kwargs = output_kwargs = {
+                out_name: getattr(self, out_name)
+                for field in cls._meta.output_fields
+                for out_name in field.list_of('name')
+            }
 
         self.bind_submodels()
 

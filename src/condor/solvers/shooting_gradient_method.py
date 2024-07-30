@@ -31,6 +31,7 @@ class SolverSciPyBase(SolverMixin):
     def __init__(
         self, system,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
+        nsteps=10_000.,
     ):
         self.system = system
         self.adaptive_max_step = adaptive_max_step
@@ -40,7 +41,7 @@ class SolverSciPyBase(SolverMixin):
             atol = atol,
             rtol = rtol,
             max_step=max_step_size,
-            nsteps = 10_000,
+            nsteps = 100_000,
         )
         self.solver.set_integrator(**self.int_options)
         self.solver.set_solout(self.solout)

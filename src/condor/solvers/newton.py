@@ -78,7 +78,16 @@ class Newton:
             J = self.fprime(x, p)
 
             # newton step calculation J @ d = -f
-            dx = linalg.solve(J, -f)
+            try:
+                dx = linalg.solve(J, -f)
+            except linalg.LinAlgError as e:
+                print("solver failed, jacobian is singular. itr:", itr,)
+                break
+            except ValueError as e:
+                print("some other error. itr:", itr)
+                breakpoint()
+                pass
+                break
 
             # TODO check stall
 

@@ -279,6 +279,13 @@ class OptimizationProblem(InitializerMixin):
         if lam_x0 is not None:
             self.lam_x0 = lam_x0
 
+    default_options = {
+        Method.ipopt: dict(
+            warm_start_init_point=False,
+        ),
+    }
+
+
     def __init__(
         self, model,
         exact_hessian=True, # False -> ipopt alias for limited memory
@@ -291,7 +298,8 @@ class OptimizationProblem(InitializerMixin):
         **options,
     ):
         self.model = model
-        self.options = options
+        self.options = self.default_options.get(method, dict()).copy()
+        self.options.update(options)
 
         self.keep_feasible = keep_feasible
 
@@ -301,6 +309,18 @@ class OptimizationProblem(InitializerMixin):
         self.p = p = casadi.vertcat(*flatten(model.parameter))
         self.x = x = casadi.vertcat(*flatten(model.variable))
         self.g = g = casadi.vertcat(*flatten(model.constraint))
+
+
+        self.objective_func = casadi.Function(
+            f"{model.__name__}_objective",
+            [self.x, self.p],
+            [self.f],
+        )
+        self.constraint_func = casadi.Function(
+            f"{model.__name__}_constraint",
+            [self.x, self.p],
+            [g],
+        )
 
         self.lbx = lbx = casadi.vcat(flatten(model.variable.list_of("lower_bound"))).toarray().reshape(-1)
         self.ubx = ubx = casadi.vcat(flatten(model.variable.list_of("upper_bound"))).toarray().reshape(-1)
@@ -384,11 +404,7 @@ class OptimizationProblem(InitializerMixin):
 
         else:
             self.optimizer = None
-            self.f_func = casadi.Function(
-                f"{model.__name__}_objective",
-                [self.x, self.p],
-                [self.f],
-            )
+            self.f_func = self.objective_func
             self.f_jac_func = casadi.Function(
                 f"{model.__name__}_objective_jac",
                 [self.x, self.p],
@@ -857,7 +873,8 @@ class TrajectoryAnalysis:
         #self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
 
         if len(ode_model.dynamic_output):
-            self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
+            #self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
+            self.y_expr = casadi.vertcat(*flatten(model.dynamic_output))
             self.y_expr = substitute(self.y_expr, control_sub_expression)
             self.dynamic_output_func = casadi.Function(
                 f"{ode_model.__name__}_dynamic_output",
