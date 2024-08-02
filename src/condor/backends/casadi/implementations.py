@@ -1184,9 +1184,11 @@ class CasadiFunctionCallback(casadi.Callback):
             breakpoint()
             pass
         if self.jacobian_of:
+            if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
+                return out,
             jac_out = np.concatenate(
                 flatten(out)
-            ).reshape(self.get_sparsity_out(0).shape)
+            ).reshape(self.get_sparsity_out(0).shape[::-1]).T
             return jac_out,
         return casadi.vertcat(*flatten(out)),
         return [out] if self.get_n_out() == 1 else out

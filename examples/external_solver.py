@@ -131,8 +131,8 @@ class TableLookup(co.ExternalSolverWrapper, ):
         ]
         # TODO -- original implementation did not have transpose, but generic version
         # needs it
-        return_val = np.stack(array_vals, axis=1).T
-        return casadi.DM(return_val),
+        return_val = np.stack(array_vals, axis=1)
+        return casadi.DM(return_val)
 
 
 data_yy = dict(
