@@ -411,8 +411,9 @@ class OptimizationProblem(InitializerMixin):
                 [casadi.jacobian(self.f, self.x)],
             )
 
+            g_split = casadi.vertsplit(self.g)
+
             if self.method is OptimizationProblem.Method.scipy_trust_constr:
-                g_split = casadi.vertsplit(self.g)
                 g_jacs = [casadi.jacobian(g, self.x) for g in g_split]
 
                 scipy_constraints = []
@@ -484,6 +485,47 @@ class OptimizationProblem(InitializerMixin):
                         lb for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
                         if not is_nonlinear
                     ])
+
+            elif self.method is OptimizationProblem.Method.scipy_slsqp:
+                self.con = []
+                for g, lbg, ubg in zip(g_split, self.lbg, self.ubg):
+                    if lbg == ubg:
+                        g_func = casadi.Function(
+                            f"{model.__name__}_nonlinear_constraint",
+                            [self.x, self.p],
+                            [g - lbg],
+                        )
+                        g_jac_func =  casadi.Function(
+                            f"{model.__name__}_nonlinear_constraint_jac",
+                            [self.x, self.p],
+                            [casadi.jacobian(g - lbg, self.x)],
+                        )
+                        self.con.append(dict(type="eq", fun=g_func, jac=g_jac_func))
+                    else:
+                        if lbg > -np.inf:
+                            g_func = casadi.Function(
+                                f"{model.__name__}_nonlinear_constraint",
+                                [self.x, self.p],
+                                [g - lbg],
+                            )
+                            g_jac_func =  casadi.Function(
+                                f"{model.__name__}_nonlinear_constraint_jac",
+                                [self.x, self.p],
+                                [casadi.jacobian(g - lbg, self.x)],
+                            )
+                            self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
+                        if ubg < np.inf:
+                            g_func = casadi.Function(
+                                f"{model.__name__}_nonlinear_constraint",
+                                [self.x, self.p],
+                                [ubg - g],
+                            )
+                            g_jac_func =  casadi.Function(
+                                f"{model.__name__}_nonlinear_constraint_jac",
+                                [self.x, self.p],
+                                [casadi.jacobian(ubg - g, self.x)],
+                            )
+                            self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
 
 
     def __call__(self, model_instance, *args):
@@ -561,6 +603,8 @@ class OptimizationProblem(InitializerMixin):
                             lb=self.nonlinear_lb, ub=self.nonlinear_ub
                         )
                     )
+            elif self.method is OptimizationProblem.Method.scipy_slsqp:
+                scipy_constraints = self.con
 
             min_out = minimize(
                 lambda *args: self.f_func(*args).toarray().squeeze(),
