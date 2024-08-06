@@ -526,6 +526,9 @@ class OptimizationProblem(InitializerMixin):
                                 [casadi.jacobian(ubg - g, self.x)],
                             )
                             self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
+                    for con in self.con:
+                        cas_func = con["fun"]
+                        con["fun"] = lambda x, p: cas_func(x, p).toarray().squeeze()
 
 
     def __call__(self, model_instance, *args):
@@ -605,6 +608,7 @@ class OptimizationProblem(InitializerMixin):
                     )
             elif self.method is OptimizationProblem.Method.scipy_slsqp:
                 scipy_constraints = self.con
+                method_string = "SLSQP"
 
             min_out = minimize(
                 lambda *args: self.f_func(*args).toarray().squeeze(),
