@@ -609,6 +609,8 @@ class OptimizationProblem(InitializerMixin):
             elif self.method is OptimizationProblem.Method.scipy_slsqp:
                 scipy_constraints = self.con
                 method_string = "SLSQP"
+                for con in scipy_constraints:
+                    con["args"] = extra_args
 
             min_out = minimize(
                 lambda *args: self.f_func(*args).toarray().squeeze(),
@@ -617,6 +619,7 @@ class OptimizationProblem(InitializerMixin):
                 method=method_string,
                 args = extra_args,
                 constraints = scipy_constraints,
+                bounds = np.vstack([self.lbx, self.ubx]).T,
                 #options=dict(disp=True),
                 options=self.options,
             )
