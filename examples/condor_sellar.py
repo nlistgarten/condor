@@ -36,8 +36,18 @@ class Sellar(co.OptimizationProblem):
     constraint(constrs.con1, upper_bound=0.)
     constraint(constrs.con2, upper_bound=0.)
 
-resid_sol = Resid(1, [5., 2.])
+    class Casadi(co.Options):
+        method = (
+            co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
+        )
+        iprint = 2
+        tol = 1E-8
+        disp = True
+        maxiter = 0
+
+#resid_sol = Resid(1, [5., 2.])
 Sellar.implementation.set_initial(x=1., z=[5., 2.,])
+#Sellar.implementation.set_initial(x=0, z=[3.15, 0.,])
 sellar_opt = Sellar()
 resid_at_opt = Resid(*sellar_opt)
 obj_at_opt = Obj(*sellar_opt)
