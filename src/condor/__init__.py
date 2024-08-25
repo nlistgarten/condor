@@ -425,7 +425,8 @@ class ModelType(type):
 
                 # TODO: if we put copy fields in meta can we trace through and not warn
                 # on this case?
-                print(f"{attr_name} was defined on outer of {name}")
+                pass
+                # print(f"{attr_name} was defined on outer of {name}")
 
 
         # perform as much processing as possible before caller super().__new__
@@ -1353,12 +1354,12 @@ class ExternalSolverWrapperType(type):
 
     @classmethod
     def __prepare__(cls, model_name, bases, name="", **kwds):
-        print("prepare for", model_name, bases, name)
+        #print("prepare for", model_name, bases, name)
         if name:
             model_name = name
         sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
         if bases and ExternalSolverWrapper in bases: # should check MRO, I guess?
-            print("copying IO fields to", model_name)
+            #print("copying IO fields to", model_name)
             for field_name in ["input", "output"]:
                 sup_dict[field_name] = copy_field(
                     model_name, getattr(ExternalSolverWrapper, field_name)
@@ -1366,14 +1367,14 @@ class ExternalSolverWrapperType(type):
         return sup_dict
 
     def __new__(cls, model_name, bases, attrs, parameterized_IO=False, **kwargs):
-        print("before calling __new__")
+        #print("before calling __new__")
         if not bases:
-            print("using type.new", model_name)
+            #print("using type.new", model_name)
             new_cls = type.__new__(
                 cls, model_name, bases, attrs, **kwargs
             )
         else:
-            print("using super().new", model_name)
+            #print("using super().new", model_name)
             new_cls =  super().__new__(
                 #cls, model_name, bases, attrs, **kwargs
                 cls, model_name, bases, attrs, parameterized_IO=parameterized_IO,**kwargs
@@ -1386,7 +1387,7 @@ class ExternalSolverWrapperType(type):
         # not sure what's preferable
         # actully, this can get used instead of create model with init wrapper? no,
         # don't have access to instance yet.
-        print(cls, "__call__")
+        #print(cls, "__call__")
         wrapper_object = super().__call__(*args, **kwargs)
         return wrapper_object.condor_model
 
@@ -1404,15 +1405,15 @@ class ExternalSolverWrapper(
     def __init_subclass__(cls, singleton=True, **kwargs):
         # at this point, fields  are already bound by ExternalSolverWrapperType.__new__
         # but modifications AFTER construction can be doen here
-        print("init subclass of", cls)
+        #print("init subclass of", cls)
         cls.__original_init__ = cls.__init__
         cls.__init__ = cls.__create_model__
 
     def __create_model__(self, *args, condor_model_name="",**kwargs):
-        print("create model of", self, self.__class__)
+        #print("create model of", self, self.__class__)
         # copy field so that any field modification by __original_init__ is onto the
         # copy
-        print("copying IO fields to", condor_model_name)
+        #print("copying IO fields to", condor_model_name)
         if not condor_model_name:
             # could use repr somehow? but won't exist yet...
             condor_model_name = self.__class__.__name__

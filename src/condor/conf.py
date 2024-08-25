@@ -14,7 +14,7 @@ class Settings:
         kwargs are settings to use
         """
         self.settings.append(kwargs)
-        print(kwargs)
+        #print(kwargs)
 
         if module not in sys.modules:
             mod = importlib.import_module(module)
