@@ -15,11 +15,23 @@ from scipy.integrate import ode as scipy_ode
 from scipy.optimize import brentq, newton
 from typing import NamedTuple, Optional
 
-class SolverSciPyBase:
+class SolverMixin:
+    def store_result(self, store_t, store_x, store_y=False):
+        system = self.system
+        results = system.result
+        results.t.append(store_t)
+        results.x.append(store_x)
+        if system.dynamic_output and store_y:
+            results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
+
+
+
+class SolverSciPyBase(SolverMixin):
     SOLVER_NAME = None
     def __init__(
         self, system,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
+        nsteps=10_000.,
     ):
         self.system = system
         self.adaptive_max_step = adaptive_max_step
@@ -29,7 +41,7 @@ class SolverSciPyBase:
             atol = atol,
             rtol = rtol,
             max_step=max_step_size,
-            nsteps = 10_000,
+            nsteps = 100_000,
         )
         self.solver.set_integrator(**self.int_options)
         self.solver.set_solout(self.solout)
@@ -58,11 +70,7 @@ class SolverSciPyBase:
                 store_t = results.t[-1]
 
         self.gs = new_gs
-        results.t.append(store_t)
-        results.x.append(store_x)
-        if system.dynamic_output:
-            results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
-
+        self.store_result(store_t, store_x)
         if np.any(self.rootinfo):
             return -1
 
@@ -128,6 +136,11 @@ class SolverSciPyBase:
             # initialization has index 1
             last_x = system.update(last_t, last_x, rootsfound)
         results.e.append(Root(1, rootsfound))
+
+        terminate = np.any(rootsfound[system.terminating] != 0)
+        if terminate:
+            self.store_result(last_t, last_x)
+            return
 
 
         solver = self.solver
@@ -196,7 +209,7 @@ class SolverSciPyBase:
                 self.gs = system.events(last_t, next_x)
 
                 if terminate:
-                    self.solout(last_t, next_x)
+                    self.store_result(last_t, next_x)
                     return
 
                 last_x = next_x
@@ -232,7 +245,7 @@ class SolverSciPyDop853(SolverSciPyBase):
     SOLVER_NAME = "dop853"
 
 
-class SolverCVODE:
+class SolverCVODE(SolverMixin):
     def __init__(
         self, system,
         atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
@@ -280,14 +293,15 @@ class SolverCVODE:
         system = self.system
         results = system.result
         last_x = system.initial_state()
-        results.x.append(last_x)
+
 
         time_generator = system.time_generator()
         last_t = next(time_generator)
-        results.t.append(last_t)
         # TODO: add dynamic_output feature
 
         gs = system.events(last_t, last_x)
+        self.store_result(last_t, last_x)
+
         rootsfound = (gs == 0.).astype(int)
         if np.any(rootsfound):
             # subsequent events use length of time for index, so root index is the index
@@ -295,8 +309,11 @@ class SolverCVODE:
             # initialization has index 1
             last_x = system.update(last_t, np.copy(last_x), rootsfound)
         results.e.append(Root(1, rootsfound))
-        results.t.append(last_t)
-        results.x.append(last_x)
+        self.store_result(last_t, last_x)
+        terminate = np.any(rootsfound[system.terminating] != 0)
+        if terminate:
+            return
+
 
         solver = self.solver
         # each iteration of this loop simulates until next generated time
@@ -306,7 +323,8 @@ class SolverCVODE:
             if np.isinf(next_t):
                 break
             if next_t < 0:
-                breakpoint()
+                #breakpoint()
+                pass
 
             if self.adaptive_max_step:
                 solver.set_options(max_step_size=np.abs(next_t - last_t)/self.adaptive_max_step)
@@ -320,8 +338,9 @@ class SolverCVODE:
                 if (solver_res.flag < 0):
                     breakpoint()
 
-                results.t.append(np.copy(solver_res.values.t))
-                results.x.append(np.copy(solver_res.values.y))
+                self.store_result(
+                    np.copy(solver_res.values.t), np.copy(solver_res.values.y)
+                )
 
                 if solver_res.flag == StatusEnum.ROOT_RETURN:
                     rootsfound = solver.rootinfo()
@@ -343,10 +362,16 @@ class SolverCVODE:
                         terminate = np.any(rootsfound[system.terminating] != 0)
                     except:
                         breakpoint()
-                    results.t.append(np.copy(solver_res.values.t))
-                    results.x.append(next_x)
+                    self.store_result(
+                        np.copy(solver_res.values.t),
+                        next_x
+                    )
 
                     if terminate:
+                        self.store_result(
+                            np.copy(solver_res.values.t),
+                            next_x
+                        )
                         return
 
                     solver.init_step(solver_res.values.t, next_x)
@@ -541,10 +566,33 @@ class ResultBase:
             t=self.t[key], x=self.x[key], e=self.e[key]
         )
 
+    def save(self, filename,):
+        e_idxs = [e.index for e in self.e]
+        e_roots = [e.rootsfound for e in self.e]
+        np.savez(filename,
+            e_idxs = e_idxs,
+            e_roots = e_roots,
+            t=self.t,
+            x=self.x,
+            y=self.y,
+            p=self.p,
+        )
+
+    @classmethod
+    def load(cls, filename):
+        data = dict(np.load(filename))
+        data['e'] = [
+            Root(index=ei, rootsfound=er)
+            for ei, er in zip(data.pop('e_idxs'), data.pop('e_roots'))
+        ]
+        return cls(system=None, **data)
+
+
 
 @dataclass
 class Result(ResultBase, ResultMixin):
     pass
+
 
 class ResultSegmentInterpolant(NamedTuple):
     interpolant: callable
@@ -571,6 +619,7 @@ class ResultInterpolant:
     time_comparison: callable = field(init=False) # method
     interval_select: int = field(init=False)
     event_idxs: Optional[list] = None
+    max_deg: int = 3
 
     def __post_init__(self):
         # make interpolants
@@ -596,11 +645,11 @@ class ResultInterpolant:
             self.time_bounds[-1] = result.t[-1]
         if result.t[-1] < result.t[0]:
             self.time_comparison = self.time_bounds.__le__
-            self.interval_select = 0
+            self.interval_select = -1
             self.time_sort = slice(None, None, -1)
         else:
             self.time_comparison = self.time_bounds.__ge__
-            self.interval_select = -1
+            self.interval_select = 0
             self.time_sort = slice(None)
 
         if self.interpolants is None:
@@ -621,12 +670,13 @@ class ResultInterpolant:
             except Exception as my_e:
                 print(my_e)
                 breakpoint()
+                pass
 
             self.interpolants = []
             for idx0, idx1, coeff_data in zip(
                 event_idxs[:-1],
-                event_idxs[1:],#-1,
-                all_coeff_data
+                event_idxs[1:],
+                all_coeff_data,
             ):
                 if np.all(np.diff(coeff_data, axis=0) == 0.):
 
@@ -642,12 +692,21 @@ class ResultInterpolant:
                         breakpoint()
 
                 else:
+                    ts = result.t[idx0:idx1][self.time_sort]
+                    coefs = coeff_data[self.time_sort]
+
+                    for count, orig_idx in enumerate(np.where(np.diff(ts) <= 0)[0]):
+                        idx = count+orig_idx
+                        ts = ts[:idx] + ts[idx+1:]
+                        coefs = coefs[:idx] + coefs[idx+1:]
+                        print(f"stripping non-decreasing {ts[idx]} -- creating result interpolant")
+
                     try:
                         interp = ResultSegmentInterpolant(
                            make_interp_spline(
-                               result.t[idx0:idx1][self.time_sort],
-                               coeff_data[self.time_sort],
-                               k=min(3, idx1-idx0-1), # not needed with adaptive step size!
+                               ts,
+                               coefs,
+                               k=min(self.max_deg, idx1-idx0-1), # not needed with adaptive step size!
                                #bc_type=["natural", "natural"],
                            ),
                             idx0, idx1,
@@ -657,11 +716,12 @@ class ResultInterpolant:
                     except Exception as my_e:
                         print(my_e)
                         breakpoint()
+                        pass
                 self.interpolants.append(interp)
                 #if result.t[idx1] != result.t[idx0]
 
     def __call__(self, t):
-        interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]
+        interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]-1
         return self.interpolants[interval_idx](t)
 
     def __iter__(self):
@@ -757,8 +817,9 @@ class AdjointSystem(System):
                 lamda_tem = last_lamda
                 # TODO: add full transversality condition
                 for event_channel in active_update_idxs[::-1]:
+                    dh_dx = self.dh_dxs[event_channel](p, te, xtem,)
                     dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
-                    lamda_tem = last_lamda - dte_dxT @ ftem.T @ last_lamda
+                    lamda_tem = (dh_dx.T - dte_dxT @ ( dh_dx @ ftem).T) @ last_lamda
                     last_lamda = lamda_tem
             else:
                 lamda_dot = self.dots(te, last_lamda)
@@ -961,6 +1022,15 @@ class ShootingGradientMethod:
                     p_integrand_p_param_segment(t)).squeeze()
                     for t in time_data
                 ]
+                #idxs = np.where(np.diff(time_data) < 0)[0]
+                for count, orig_idx in enumerate(np.where(np.diff(time_data) <= 0)[0]):
+                    idx = count+orig_idx
+                    time_data = time_data[:idx] + time_data[idx+1:]
+                    integrand_data = integrand_data[:idx] + integrand_data[idx+1:]
+                    print(f"stripping non-decreasing {time_data[idx]} -- calling SGM")
+                #if idxs:
+                #    breakpoint()
+                #    pass
                 integrand_interp = make_interp_spline(
                     time_data,
                     integrand_data,
@@ -1001,24 +1071,17 @@ class ShootingGradientMethod:
                     #breakpoint()
                     jac_row += np.array(lamda_tep[None, :] @ self.p_x0_p_params(p)).squeeze()
                 if state_event is state_result.e[-1]:
-                    for event_channel in active_update_idxs[::-1]:
-                        dte_dp = self.dte_dps[event_channel](p, te, xtem)
-                        jac_row += np.array(
-                            lamda_tep[None, :] @ ftem @ dte_dp
-                        ).squeeze()
-                        #breakpoint()
-                else:
-                    for event_channel in active_update_idxs[::-1]:
-                        dh_dp = self.dh_dps[event_channel](p, te, xtem)
-                        dh_dx = adjoint_result.system.dh_dxs[event_channel](p, te, xtem,)
-                        dte_dp = self.dte_dps[event_channel](p, te, xtem)
+                    ftep = np.zeros_like(ftep)
+                for event_channel in active_update_idxs[::-1]:
+                    dh_dp = self.dh_dps[event_channel](p, te, xtem)
+                    dh_dx = adjoint_result.system.dh_dxs[event_channel](p, te, xtem,)
+                    dte_dp = self.dte_dps[event_channel](p, te, xtem)
 
-                        jac_row += np.array(
-                            lamda_tep[None, :] @ (
-                                dh_dp
-                                - (ftep - dh_dx @ ftem ) @ dte_dp
-                            )
-                        ).squeeze()
+                    jac_row += np.array(
+                        lamda_tep[None, :] @ (
+                            dh_dp - (ftep - dh_dx @ ftem ) @ dte_dp
+                        )
+                    ).squeeze()
 
 
             jac_rows.append(jac_row)

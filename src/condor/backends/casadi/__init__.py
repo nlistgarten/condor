@@ -21,7 +21,6 @@ def shape_to_nm(shape):
 
 def symbol_generator(name, shape=(1,1), symmetric=False, diagonal=False):
     n, m = shape_to_nm(shape)
-    print("casadi creating",name, n, m, symmetric, diagonal)
     sym = symbol_class.sym(name, (n, m))
     #sym = MixedMX.sym(name, (n, m))
     # TODO: symmetric and diagonal, 

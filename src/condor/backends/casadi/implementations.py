@@ -41,18 +41,43 @@ from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 # TODO for custom solvers like SGM, table, does the get_jacobian arguments allow you to 
 # avoid computing wrt particular inputs/outputs if possible?
 
+
+class DeferredSystem:
+    def __init__(self, model):
+        symbol_inputs = model.input.list_of("backend_repr")
+        symbol_outputs = model.output.list_of("backend_repr")
+
+        self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
+        self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
+
+        name_inputs = model.input.list_of('name')
+        name_outputs = model.output.list_of('name')
+        self.model = model
+        self.func =  casadi.Function(
+            model.__name__, symbol_inputs, symbol_outputs, dict(allow_free=True,),
+        )
+
+    def __call__(self, model_instance, *args):
+        model_instance.bind_field(
+            self.model.output, 
+            self.symbol_outputs[0],
+        )
+
 class ExplicitSystem:
     def __init__(self, model):
         symbol_inputs = model.input.list_of("backend_repr")
         symbol_outputs = model.output.list_of("backend_repr")
 
-        symbol_inputs = [casadi.vertcat(*symbol_inputs)]
-        symbol_outputs = [casadi.vertcat(*symbol_outputs)]
+        self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
+        self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
 
         name_inputs = model.input.list_of('name')
         name_outputs = model.output.list_of('name')
         self.model = model
-        self.func =  casadi.Function(model.__name__, symbol_inputs, symbol_outputs)
+        #self.func =  casadi.Function(model.__name__, self.symbol_inputs, self.symbol_outputs)
+        self.func =  casadi.Function(
+            model.__name__, self.symbol_inputs, self.symbol_outputs, dict(allow_free=True,),
+        )
 
     def __call__(self, model_instance, *args):
         self.args = casadi.vertcat(*flatten(args))
@@ -182,6 +207,8 @@ class AlgebraicSystem(InitializerMixin):
     ):
         rootfinder_options = dict(
             error_on_fail=error_on_fail,
+            abstol=atol,
+            abstolStep=rtol,
         )
         self.x = casadi.vertcat(*flatten(model.implicit_output))
         self.g0 = casadi.vertcat(*flatten(model.residual))
@@ -236,20 +263,43 @@ class OptimizationProblem(InitializerMixin):
 
     class Method(Enum):
         ipopt = auto()
+        snopt = auto()
+        qrsqp = auto()
         scipy_cg = auto()
         scipy_trust_constr = auto()
         scipy_slsqp = auto()
 
     scipy_trust_constr_option_defaults = dict(xtol=1E-8,)
+
+    def make_warm_start(self, x0=None, lam_g0=None, lam_x0=None):
+        if x0 is not None:
+            self.x0 = x0
+        if lam_g0 is not None:
+            self.lam_g0 = lam_g0
+        if lam_x0 is not None:
+            self.lam_x0 = lam_x0
+
+    default_options = {
+        Method.ipopt: dict(
+            warm_start_init_point=False,
+        ),
+    }
+
+
     def __init__(
         self, model,
         exact_hessian=True, # False -> ipopt alias for limited memory
         keep_feasible = True, # flag that goes to scipy trust constr linear constraints
         method=Method.ipopt,
+        calc_lam_x = False, 
+        # ipopt specific, default = False may help with computing sensitivity. To do
+        # proper warm start, need to provide lam_x and lam_g so I assume need calc_lam_x
+        # = True
         **options,
     ):
         self.model = model
-        self.options = options
+        self.options = self.default_options.get(method, dict()).copy()
+        self.options.update(options)
 
         self.keep_feasible = keep_feasible
 
@@ -259,6 +309,18 @@ class OptimizationProblem(InitializerMixin):
         self.p = p = casadi.vertcat(*flatten(model.parameter))
         self.x = x = casadi.vertcat(*flatten(model.variable))
         self.g = g = casadi.vertcat(*flatten(model.constraint))
+
+
+        self.objective_func = casadi.Function(
+            f"{model.__name__}_objective",
+            [self.x, self.p],
+            [self.f],
+        )
+        self.constraint_func = casadi.Function(
+            f"{model.__name__}_constraint",
+            [self.x, self.p],
+            [g],
+        )
 
         self.lbx = lbx = casadi.vcat(flatten(model.variable.list_of("lower_bound"))).toarray().reshape(-1)
         self.ubx = ubx = casadi.vcat(flatten(model.variable.list_of("upper_bound"))).toarray().reshape(-1)
@@ -271,24 +333,27 @@ class OptimizationProblem(InitializerMixin):
             initializer_args += [self.p]
             self.nlp_args["p"] = p
         self.parse_initializers(model.variable, initializer_args)
+
         self.x0 = self.initial_at_construction.copy()
+        self.lam_g0 = None
+        self.lam_x0 = None
         #self.variable_at_construction.copy()
 
         self.method = method
         if self.method is OptimizationProblem.Method.ipopt:
-
             self.ipopt_opts = ipopt_opts = dict(
                 print_time= False,
                 ipopt = options,
-                #print_level=5,  # 0-2: nothing, 3-4: summary, 5: iter table (default)
+                # print_level = 0-2: nothing, 3-4: summary, 5: iter table (default)
                 #tol=1E-14, # tighter tol for sensitivty
                 #accept_every_trial_step="yes",
                 #max_iter=1000,
                 #constr_viol_tol=10.,
+
                 bound_consistency=True,
-                #clip_inactive_lam=True,
-                #calc_lam_x=False,
-                #calc_lam_p=False,
+                clip_inactive_lam=True,
+                calc_lam_x=calc_lam_x,
+                calc_lam_p=False,
             )
             # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
             # to try to get sensitivity from ipopt. so far no...
@@ -303,21 +368,52 @@ class OptimizationProblem(InitializerMixin):
                 self.nlp_args,
                 self.ipopt_opts,
             )
+        elif self.method is OptimizationProblem.Method.snopt:
+            self.optimizer = casadi.nlpsol(
+                model.__name__,
+                "snopt",
+                self.nlp_args,
+                #self.ipopt_opts,
+            )
+        elif self.method is OptimizationProblem.Method.qrsqp:
+
+            self.qrsqp_opts = dict(
+                qpsol='qrqp',
+                qpsol_options=dict(
+                    print_iter=False,
+                    error_on_fail=False,
+                ),
+
+                #qpsol='osqp',
+
+                verbose=False,
+                tol_pr=1E-16,
+                tol_du=1E-16,
+                #print_iteration=False,
+                print_time=False,
+                #hessian_approximation= "limited-memory",
+                print_status=False,
+            )
+
+            self.optimizer = casadi.nlpsol(
+                model.__name__,
+                'sqpmethod',
+                self.nlp_args,
+                self.qrsqp_opts
+            )
+
         else:
             self.optimizer = None
-            self.f_func = casadi.Function(
-                f"{model.__name__}_objective",
-                [self.x, self.p],
-                [self.f],
-            )
+            self.f_func = self.objective_func
             self.f_jac_func = casadi.Function(
                 f"{model.__name__}_objective_jac",
                 [self.x, self.p],
                 [casadi.jacobian(self.f, self.x)],
             )
 
+            g_split = casadi.vertsplit(self.g)
+
             if self.method is OptimizationProblem.Method.scipy_trust_constr:
-                g_split = casadi.vertsplit(self.g)
                 g_jacs = [casadi.jacobian(g, self.x) for g in g_split]
 
                 scipy_constraints = []
@@ -390,6 +486,50 @@ class OptimizationProblem(InitializerMixin):
                         if not is_nonlinear
                     ])
 
+            elif self.method is OptimizationProblem.Method.scipy_slsqp:
+                self.con = []
+                for g, lbg, ubg in zip(g_split, self.lbg, self.ubg):
+                    if lbg == ubg:
+                        g_func = casadi.Function(
+                            f"{model.__name__}_nonlinear_constraint",
+                            [self.x, self.p],
+                            [g - lbg],
+                        )
+                        g_jac_func =  casadi.Function(
+                            f"{model.__name__}_nonlinear_constraint_jac",
+                            [self.x, self.p],
+                            [casadi.jacobian(g - lbg, self.x)],
+                        )
+                        self.con.append(dict(type="eq", fun=g_func, jac=g_jac_func))
+                    else:
+                        if lbg > -np.inf:
+                            g_func = casadi.Function(
+                                f"{model.__name__}_nonlinear_constraint",
+                                [self.x, self.p],
+                                [g - lbg],
+                            )
+                            g_jac_func =  casadi.Function(
+                                f"{model.__name__}_nonlinear_constraint_jac",
+                                [self.x, self.p],
+                                [casadi.jacobian(g - lbg, self.x)],
+                            )
+                            self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
+                        if ubg < np.inf:
+                            g_func = casadi.Function(
+                                f"{model.__name__}_nonlinear_constraint",
+                                [self.x, self.p],
+                                [ubg - g],
+                            )
+                            g_jac_func =  casadi.Function(
+                                f"{model.__name__}_nonlinear_constraint_jac",
+                                [self.x, self.p],
+                                [casadi.jacobian(ubg - g, self.x)],
+                            )
+                            self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
+                for con in self.con:
+                    cas_func = con["fun"]
+                    con["fun"] = lambda x, p: cas_func(x, p).toarray().squeeze()
+
 
     def __call__(self, model_instance, *args):
         initializer_args = [self.x0]
@@ -404,11 +544,20 @@ class OptimizationProblem(InitializerMixin):
                 )
             self.x0 = self.x0.toarray().reshape(-1)
 
-        if self.method is OptimizationProblem.Method.ipopt:
+        if self.method in (
+            OptimizationProblem.Method.ipopt,
+            OptimizationProblem.Method.snopt,
+            OptimizationProblem.Method.qrsqp,
+        ):
             call_args = dict(
                 x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg, 
-
             )
+            if self.options["warm_start_init_point"]:
+                if self.lam_x0 is not None:
+                    call_args.update(lam_x0= self.lam_x0)
+                if self.lam_g0 is not None:
+                    call_args.update(lam_g0= self.lam_g0)
+
             if self.has_p:
                 call_args["p"] = p
 
@@ -418,8 +567,11 @@ class OptimizationProblem(InitializerMixin):
 
             model_instance.bind_field(self.model.variable, out["x"])
             model_instance.bind_field(self.model.constraint, out["g"])
-            model_instance.objective = out["f"].toarray()[0,0]
+            model_instance.objective = np.array(out["f"]).squeeze()
             self.stats = model_instance._stats = self.optimizer.stats()
+            self.out = model_instance._out = out
+            self.lam_g0 = out["lam_g"]
+            self.lam_x0 = out["lam_x"]
         else:
             if self.has_p:
                 extra_args = (p,)
@@ -454,6 +606,11 @@ class OptimizationProblem(InitializerMixin):
                             lb=self.nonlinear_lb, ub=self.nonlinear_ub
                         )
                     )
+            elif self.method is OptimizationProblem.Method.scipy_slsqp:
+                scipy_constraints = self.con
+                method_string = "SLSQP"
+                for con in scipy_constraints:
+                    con["args"] = extra_args
 
             min_out = minimize(
                 lambda *args: self.f_func(*args).toarray().squeeze(),
@@ -462,6 +619,7 @@ class OptimizationProblem(InitializerMixin):
                 method=method_string,
                 args = extra_args,
                 constraints = scipy_constraints,
+                bounds = np.vstack([self.lbx, self.ubx]).T,
                 #options=dict(disp=True),
                 options=self.options,
             )
@@ -470,7 +628,7 @@ class OptimizationProblem(InitializerMixin):
             self.x0 = min_out.x
             self.stats = model_instance._stats = min_out
 
-def get_state_setter(field, setter_args, default=0., subs={}):
+def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={}):
     """
     used for building functions from matched fields to their match (loops over "state"
     but is generalized for any matched fields)
@@ -482,10 +640,12 @@ def get_state_setter(field, setter_args, default=0., subs={}):
 
     """
     setter_exprs = []
-    if isinstance(setter_args, symbol_class):
+    if not isinstance(setter_args, list):
         setter_args = [setter_args]
 
-    for state in field._matched_to:
+    if setter_targets is None:
+        setter_targets = [state for state in field._matched_to]
+    for state in setter_targets:
         setter_symbol = field.get(match=state)
         if isinstance(setter_symbol, list) and len(setter_symbol) == 0:
             if default is not None:
@@ -504,7 +664,12 @@ def get_state_setter(field, setter_args, default=0., subs={}):
             )
         else:
             # symbol_class is always a matrix, and broadcast_to cannot handle (n,) to (n,1)
-            if state.shape[1] == 1:
+            setter_symbol = np.array(setter_symbol)
+            if (state.size ==1 and setter_symbol.size ==1) or state.shape == setter_symbol.shape:
+                setter_exprs.append(
+                    setter_symbol.reshape((state.size,1))
+                )
+            elif state.shape[1] == 1:
                 setter_exprs.append(
                     np.broadcast_to(setter_symbol, state.size).reshape(-1)
                 )
@@ -553,9 +718,11 @@ class TrajectoryAnalysis:
         self.model = model
         self.ode_model = ode_model = model.inner_to
 
-        self.p = casadi.vertcat(*flatten(model.parameter))
         self.x = casadi.vertcat(*flatten(model.state))
         self.lamda = symbol_class.sym("lambda", model.state._count)
+
+        self.p = casadi.vertcat(*flatten(model.parameter))
+
         self.simulation_signature = [
             self.p,
             self.ode_model.t,
@@ -565,6 +732,7 @@ class TrajectoryAnalysis:
         self.traj_out_expr = casadi.vertcat(*flatten(
             model.trajectory_output
         ))
+        self.can_sgm = isinstance(self.p, casadi.MX) and isinstance(self.traj_out_expr, casadi.MX)
 
         traj_out_names = model.trajectory_output.list_of('name')
 
@@ -588,20 +756,12 @@ class TrajectoryAnalysis:
 
 
         self.state0 = get_state_setter(model.initial, self.p,)
-        self.p_state0_p_p_expr = casadi.jacobian(self.state0.expr, self.p)
-        p_state0_p_p = casadi.Function(
-            f"{model.__name__}_x0_jacobian",
-            [self.p],
-            [self.p_state0_p_p_expr],
-            dict(allow_free=True,),
-        )
-        p_state0_p_p.expr = self.p_state0_p_p_expr
 
         control_subs_pairs = {
             control.backend_repr: [(control.default,)]
             for control in ode_model.modal
         }
-        for mode in ode_model.Mode.subclasses:
+        for mode in ode_model.Mode._meta.subclasses:
             for act in mode.action:
                 control_subs_pairs[act.match.backend_repr].append(
                     (mode.condition, act.backend_repr)
@@ -616,6 +776,13 @@ class TrajectoryAnalysis:
             ode_model.dot,
             self.simulation_signature,
             subs = control_sub_expression,
+        )
+        lamda_jac = casadi.jacobian(state_equation_func.expr, self.x).T
+        state_dot_jac_func = casadi.Function(
+            f"{ode_model.__name__}_state_jacobian",
+            self.simulation_signature,
+            [lamda_jac.T],
+            dict(allow_free=True,),
         )
 
         self.e_exprs = []
@@ -638,14 +805,24 @@ class TrajectoryAnalysis:
                 at_time = model_tf,
                 terminate = True
 
+        events = [ e for e in ode_model.Event._meta.subclasses ]
 
-        for event_idx, event in enumerate(ode_model.Event.subclasses):
+        if model_tf is not None:
+            ode_model.Event._meta.subclasses = ode_model.Event._meta.subclasses[:-1]
+
+        num_events = len(events)
+
+        for event_idx, event in enumerate(events):
             terminate = getattr(event, 'terminate', False)
-            if hasattr(event, 'function') == hasattr(event, 'at_time'):
+            if (
+                getattr(event, 'function', None) is not None
+            ) == (
+                getattr(event, 'at_time', None) is not None
+            ):
                 raise ValueError(
                     f"Event class `{event}` has set both `function` and `at_time`"
                 )
-            if hasattr(event, 'function'):
+            if getattr(event, 'function', None) is not None:
                 e_expr = event.function
             else:
                 at_time = event.at_time
@@ -728,10 +905,75 @@ class TrajectoryAnalysis:
                 )
             )
 
-        num_events = len(ode_model.Event.subclasses)
+
+        set_solvers = []
+        for solver in [state_solver, adjoint_solver]:
+            if solver is TrajectoryAnalysis.Solver.CVODE:
+                solver_class = sgm.SolverCVODE
+            elif solver is TrajectoryAnalysis.Solver.dopri5:
+                solver_class = sgm.SolverSciPyDopri5
+            elif solver is TrajectoryAnalysis.Solver.dop853:
+                solver_class = sgm.SolverSciPyDop853
+            set_solvers.append(solver_class)
+        state_solver_class, adjoint_solver_class = set_solvers
 
 
+        self.trajectory_analysis = sgm.TrajectoryAnalysis(
+            traj_out_integrand_func, traj_out_terminal_term_func,
+        )
+        #self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
 
+        if len(ode_model.dynamic_output):
+            #self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
+            self.y_expr = casadi.vertcat(*flatten(model.dynamic_output))
+            self.y_expr = substitute(self.y_expr, control_sub_expression)
+            self.dynamic_output_func = casadi.Function(
+                f"{ode_model.__name__}_dynamic_output",
+                self.simulation_signature,
+                [self.y_expr],
+            )
+        else:
+            self.dynamic_output_func = None
+
+        self.StateSystem = sgm.System(
+            dim_state = model.state._count,
+            initial_state = self.state0,
+            dot = state_equation_func,
+            jac = state_dot_jac_func,
+            time_generator = sgm.TimeGeneratorFromSlices(
+                at_time_slices
+            ),
+            events = casadi.Function(
+                f"{ode_model.__name__}_event",
+                self.simulation_signature,
+                [substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)],
+                dict(allow_free=True,),
+            ),
+            updates = self.h_exprs,
+            num_events = num_events,
+            terminating = terminating,
+            dynamic_output = self.dynamic_output_func,
+            atol=state_atol,
+            rtol=state_rtol,
+            adaptive_max_step=state_adaptive_max_step_size,
+            max_step_size=state_max_step_size,
+            solver_class = state_solver_class,
+        )
+
+        self.callback = ca_sgm.ShootingGradientMethod(self)
+
+        if not self.can_sgm:
+            return
+
+        self.p_state0_p_p_expr = casadi.jacobian(self.state0.expr, self.p)
+
+        p_state0_p_p = casadi.Function(
+            f"{model.__name__}_x0_jacobian",
+            [self.p],
+            [self.p_state0_p_p_expr],
+            dict(allow_free=True,),
+        )
+        p_state0_p_p.expr = self.p_state0_p_p_expr
 
         self.adjoint_signature = [
             self.p,
@@ -762,15 +1004,8 @@ class TrajectoryAnalysis:
             ) for gradF, traj_name in zip(self.gradFs, traj_out_names)
         ]
 
-        lamda_jac = casadi.jacobian(state_equation_func.expr, self.x).T
         grad_jac = casadi.jacobian(state_equation_func.expr, self.p)
 
-        state_dot_jac_func = casadi.Function(
-            f"{ode_model.__name__}_state_jacobian",
-            self.simulation_signature,
-            [lamda_jac.T],
-            dict(allow_free=True,),
-        )
         param_dot_jac_func = casadi.Function(
             f"{ode_model.__name__}_param_jacobian",
             self.simulation_signature,
@@ -815,7 +1050,7 @@ class TrajectoryAnalysis:
         self.dh_dps = []
 
         for event, e_expr, h_expr in zip(
-            ode_model.Event.subclasses, self.e_exprs, self.h_exprs
+            events, self.e_exprs, self.h_exprs
         ):
             dg_dx = casadi.jacobian(e_expr, self.x)
             dg_dt = casadi.jacobian(e_expr, ode_model.t)
@@ -910,63 +1145,6 @@ class TrajectoryAnalysis:
             )
             self.dh_dps[-1].expr = dh_dp
 
-
-        if model_tf is not None:
-            ode_model.Event.subclasses = ode_model.Event.subclasses[:-1]
-
-
-        set_solvers = []
-        for solver in [state_solver, adjoint_solver]:
-            if solver is TrajectoryAnalysis.Solver.CVODE:
-                solver_class = sgm.SolverCVODE
-            elif solver is TrajectoryAnalysis.Solver.dopri5:
-                solver_class = sgm.SolverSciPyDopri5
-            elif solver is TrajectoryAnalysis.Solver.dop853:
-                solver_class = sgm.SolverSciPyDop853
-            set_solvers.append(solver_class)
-        state_solver_class, adjoint_solver_class = set_solvers
-
-
-        self.trajectory_analysis = sgm.TrajectoryAnalysis(
-            traj_out_integrand_func, traj_out_terminal_term_func,
-        )
-        self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
-
-        if len(ode_model.dynamic_output):
-            self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
-            self.y_expr = substitute(self.y_expr, control_sub_expression)
-            self.dynamic_output_func = casadi.Function(
-                f"{ode_model.__name__}_dynamic_output",
-                self.simulation_signature,
-                [self.y_expr],
-            )
-        else:
-            self.dynamic_output_func = None
-
-        self.StateSystem = sgm.System(
-            dim_state = model.state._count,
-            initial_state = self.state0,
-            dot = state_equation_func,
-            jac = state_dot_jac_func,
-            time_generator = sgm.TimeGeneratorFromSlices(
-                at_time_slices
-            ),
-            events = casadi.Function(
-                f"{ode_model.__name__}_event",
-                self.simulation_signature,
-                [self.e_exprs],
-                dict(allow_free=True,),
-            ),
-            updates = self.h_exprs,
-            num_events = num_events,
-            terminating = terminating,
-            dynamic_output = self.dynamic_output_func,
-            atol=state_atol,
-            rtol=state_rtol,
-            adaptive_max_step=state_adaptive_max_step_size,
-            max_step_size=state_max_step_size,
-            solver_class = state_solver_class,
-        )
         self.AdjointSystem = sgm.AdjointSystem(
             state_jac = state_dot_jac_func,
             dte_dxs = self.dte_dxs,
@@ -990,11 +1168,11 @@ class TrajectoryAnalysis:
             p_integrand_terms_p_state = state_integrand_jac_funcs,
         )
 
-        self.callback = ca_sgm.ShootingGradientMethod(self)
 
     def __call__(self, model_instance, *args):
         self.callback.from_implementation = True
-        out = self.callback(casadi.vertcat(*flatten(args)))
+        self.args = casadi.vertcat(*flatten(args))
+        self.out = self.callback(self.args)
         self.callback.from_implementation = False
 
         if hasattr(self.callback, 'res'):
@@ -1006,15 +1184,130 @@ class TrajectoryAnalysis:
                 np.array(res.x).T,
                 wrap=True,
             )
-            if np.array(res.y).size:
+            if self.dynamic_output_func:
+                yy = np.empty((model_instance.t.size, self.model.dynamic_output._count))
+                for idx, (t, x) in enumerate(zip(res.t, res.x)):
+                    yy[idx, None] = self.dynamic_output_func(res.p, t, x).T
                 model_instance.bind_field(
                     self.model.dynamic_output,
-                    np.array(res.y).T,
+                    yy.T,
                     wrap=True,
                 )
 
         model_instance.bind_field(
             self.model.trajectory_output,
-            out,
+            self.out,
         )
 
+
+
+class CasadiFunctionCallback(casadi.Callback):
+    """Base class for wrapping a Function with a Callback
+    """
+
+    def __init__(self, placeholder_func, wrapper_func, implementation, jacobian_of=None,  opts={}):
+        casadi.Callback.__init__(self)
+        self.wrapper_func = wrapper_func
+        self.placeholder_func = placeholder_func
+        self.jacobian = None
+        self.jacobian_of = jacobian_of
+        self.implementation = implementation
+        self.opts = opts
+
+    def init(self):
+        pass
+
+    def finalize(self):
+        pass
+
+    def get_n_in(self):
+        return self.placeholder_func.n_in()
+
+    def get_n_out(self):
+        return self.placeholder_func.n_out()
+
+    def eval(self, args):
+        try:
+            out = self.wrapper_func(
+                *wrap(self.implementation.model.input, args[0])
+            )
+        except Exception as e:
+            breakpoint()
+            pass
+        if self.jacobian_of:
+            if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
+                return out,
+            jac_out = np.concatenate(
+                flatten(out)
+            ).reshape(self.get_sparsity_out(0).shape[::-1]).T
+            return jac_out,
+        return casadi.vertcat(*flatten(out)),
+        return [out] if self.get_n_out() == 1 else out
+        #return out,
+        return casadi.vertcat(*flatten(out)),
+        return [out] if self.get_n_out() == 1 else out
+
+    def get_sparsity_in(self, i):
+        if self.jacobian_of is None or i < self.jacobian_of.get_n_in():
+            return self.placeholder_func.sparsity_in(i)
+        elif i < self.jacobian_of.get_n_in() + self.jacobian_of.get_n_out():
+            # nominal outputs are 0
+            return casadi.Sparsity(*self.jacobian_of.get_sparsity_out(
+                i-self.jacobian_of.get_n_in()
+            ).shape)
+        else:
+            raise ValueError
+
+    def get_sparsity_out(self, i):
+        return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
+
+    def has_jacobian(self):
+        return self.jacobian is not None
+
+    def get_jacobian(self, name, inames, onames, opts):
+        return self.jacobian
+
+
+class ExternalSolverModel:
+    def __init__(self, model):
+        self.model = model
+        self.wrapper = model.__external_wrapper__
+        self.input = casadi.vertcat(*flatten(model.input))
+        self.output = casadi.vertcat(*flatten(model.output))
+        self.placeholder_func = casadi.Function(
+            f"{model.__name__}_placeholder",
+            [self.input],
+            [self.output],
+            dict(allow_free=True,),
+        )
+        self.callback = CasadiFunctionCallback(
+            self.placeholder_func, self.wrapper.function, self, jacobian_of=None
+        )
+        if hasattr(self.wrapper, "jacobian"):
+            self.callback.jacobian = CasadiFunctionCallback(
+                self.placeholder_func.jacobian(),
+                self.wrapper.jacobian,
+                implementation=self,
+                jacobian_of=self.callback
+            )
+
+            self.callback.jacobian.construct(
+                self.callback.jacobian.placeholder_func.name(),
+                self.callback.jacobian.opts
+            )
+        self.callback.construct(
+            self.callback.placeholder_func.name(),
+            self.callback.opts
+        )
+
+
+
+    def __call__(self, model_instance, *args):
+        use_args = casadi.vertcat(*flatten(args))
+        out = self.callback(use_args)
+        if isinstance(out, casadi.MX):
+            out = casadi.vertsplit(out)
+        model_instance.bind_field(
+            self.model.output,
+            out,
+        )

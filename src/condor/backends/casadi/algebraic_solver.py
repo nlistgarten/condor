@@ -21,7 +21,7 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
             g0,
             lbx=lbx,
             ubx=ubx,
-            tol=1e-10,
+            tol=rootfinder_options["abstol"],
             ls_type=None,
             max_iter=100,
         )

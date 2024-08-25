@@ -32,7 +32,7 @@ class LTI(co.ODESystem):
         else:
             # feedback control matching system
             u = -K@x
-            output.u = u
+            dynamic_output.u = u
 
         xdot += B@u
 

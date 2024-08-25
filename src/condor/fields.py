@@ -1,11 +1,13 @@
 
 # TODO: figure out python version minimum
 
-from dataclasses import dataclass, make_dataclass, fields
+from dataclasses import dataclass, make_dataclass, fields, asdict as dataclass_asdict
 import numpy as np
 from enum import Enum
 from condor.backends.default import backend
 from condor.backends import BackendSymbolData
+import importlib
+import sys
 
 # TODO **kwarg expansion for a field (with a filter?)
 # TODO copy all parameters (with a filter?) from one model
@@ -154,6 +156,15 @@ class Field:
             self._model_name = model.__name__
         self._set_resolve_name()
 
+    def bind_dataclass(self):
+        mod_name = self._model.__module__
+        self._dataclass.__module__ = mod_name
+        if mod_name not in sys.modules:
+            mod_obj = importlib.import_module(mod_name)
+        else:
+            mod_obj = sys.modules[mod_name]
+        setattr(mod_obj, self._dataclass.__name__, self._dataclass)
+
     def inherit(self, model_name, field_type_name, **kwargs):
         """
         copy and re-assign name -- used in ModelType.__prepare__ before model is
@@ -196,7 +207,21 @@ class Field:
         for item in self._symbols:
             this_item = True
             for field_name, field_value in kwargs.items():
-                this_item = this_item and (getattr(item, field_name) is field_value)
+                item_value = getattr(item, field_name)
+                if isinstance(item_value, backend.symbol_class):
+                    if not isinstance(field_value, backend.symbol_class):
+                        this_item = False
+                        break
+                    this_item = this_item and backend.utils.symbol_is(
+                        item_value, field_value
+                    )
+                elif isinstance(item_value, BaseSymbol):
+                    if item_value.__class__ is not field_value.__class__:
+                        this_item = False
+                        break
+                    this_item = this_item and item_value is field_value
+                else:
+                    this_item = this_item and item_value == field_value
                 if not this_item:
                     break
             if this_item:
@@ -226,6 +251,7 @@ class Field:
             name,
             fields,
             bases=(FieldValues,),
+            namespace=dict(asdict=dataclass_asdict),
         )
 
     def __iter__(self):
@@ -234,6 +260,9 @@ class Field:
 
     def __len__(self):
         return len(self._symbols)
+
+    def __getattr__(self, with_name):
+        return self.get(name=with_name).backend_repr
 
 
 def make_class_name(components):
@@ -250,6 +279,10 @@ class FrontendSymbolData:
     backend_repr: backend.symbol_class
     name: str = ''
 
+    def flat_index(self):
+        return self.field_type.flat_index(self)
+
+
 @dataclass
 class BaseSymbol(FrontendSymbolData, BackendSymbolData,):
     def __repr__(self):
@@ -265,6 +298,7 @@ class IndependentField(Field):
     Mixin for fields which generate a symbol that are assigned to a class attribute
     during model definition.
     """
+
     pass
 
 
@@ -275,7 +309,6 @@ class FreeSymbol(IndependentSymbol):
     # Then if bounds are here, must follow broadcasting rules
 
     def __post_init__(self):
-        print("doing a post init broadcast")
         super().__post_init__()
         self.upper_bound = np.broadcast_to(self.upper_bound, self.shape)
         self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
@@ -353,11 +386,16 @@ class TrajectoryOutputField(IndependentField, default_direction=Direction.output
         # TODO: undo inner_to refactor from  0195013ddf58dc1fa8f589d99671ba231ab846a6
 
 
+        if isinstance(terminal_term, BaseSymbol):
+            terminal_term = terminal_term.backend_repr
+        if isinstance(integrand, BaseSymbol):
+            integrand = integrand.backend_repr
 
         if isinstance(terminal_term, backend.symbol_class):
             # comstant terminal terms are handled below
             shape_data = backend.get_symbol_data(terminal_term)
             kwargs['terminal_term'] = terminal_term
+
 
         if isinstance(integrand, backend.symbol_class):
             if 'terminal_term' in kwargs:
@@ -398,12 +436,11 @@ class AssignedField(Field, default_direction=Direction.output):
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
-            print('skipping private _')
             super().__setattr__(name, value)
         else:
-            print("setting special for", self, ".", name, "=", value)
-            print(f"owner={self._model_name}")
             # TODO: resolve circular imports so we can use dataclass
+            if isinstance(value, BaseSymbol):
+                value = value.backend_repr
             symbol_data = backend.get_symbol_data(value)
             self.create_symbol(
                 name=name,
@@ -417,8 +454,6 @@ class AssignedField(Field, default_direction=Direction.output):
             )
             #super().__setattr__(name, self._symbols[-1])
 
-    def __getattr__(self, name):
-        return self.get(name=name).backend_repr
 
 
 @dataclass(repr=False)
@@ -449,22 +484,23 @@ class MatchedField(Field,):
         super().__init__(**kwargs)
         self._matched_to = matched_to
         self._init_kwargs.update(dict(matched_to=matched_to))
-        print("matched to", matched_to)
 
     def __setitem__(self, key, value):
-        print("setting item for", self, ":", key, "=", value)
-        print(f"owner={self._model_name}")
         if isinstance(key, backend.symbol_class):
             match = self._matched_to.get(backend_repr=key)
             if isinstance(match, list):
                 raise ValueError
-            symbol_data = backend.get_symbol_data(value)
-            self.create_symbol(
-                name=None,
-                match=match,
-                backend_repr=value,
-                **asdict(symbol_data)
-            )
+        elif isinstance(key, BaseSymbol):
+            match = key
+        else:
+            raise ValueError
+        symbol_data = backend.get_symbol_data(value)
+        self.create_symbol(
+            name=None,
+            match=match,
+            backend_repr=value,
+            **asdict(symbol_data)
+        )
 
     def __getitem__(self, key):
         """

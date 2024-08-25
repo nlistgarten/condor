@@ -22,7 +22,6 @@ dependencies = [
     "scipy",
     "casadi",
     "ndsplines",
-    "sympy",
 ]
 
 [project.optional-dependencies]

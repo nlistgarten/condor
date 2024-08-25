@@ -8,7 +8,7 @@ from condor.fields import (
 )
 from condor.backends.default import backend
 from condor.conf import settings
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field, replace
 from condor._version import __version__
 """
 Backend:
@@ -62,33 +62,155 @@ code could update it (add/overwrite)
 
 """
 
+@dataclass
+class ModelMetaData:
+    independent_fields: list = field(default_factory=list)
+    matched_fields: list = field(default_factory=list)
+    assigned_fields: list = field(default_factory=list)
+
+    input_fields: list = field(default_factory=list)
+    output_fields: list = field(default_factory=list)
+    internal_fields: list = field(default_factory=list)
+
+    input_names: list = field(default_factory=list)
+    output_names: list = field(default_factory=list)
+
+    inner_models: list = field(default_factory=list)
+    sub_models: dict = field(default_factory=dict)
+    bind_submodels: bool = True
+
+    subclasses: list = field(init=False)
+    inner_to: object = None
+
+    def __post_init__(self):
+        self.subclasses = []
+
+    @property
+    def all_fields(self):
+        return self.input_fields + self.output_fields + self.internal_fields
+
+    @property
+    def dependent_fields(self):
+        return [f for f in self.all_fields if f not in self.independent_fields]
 
 
 
 # appears in __new__ as attrs
 class CondorClassDict(dict):
+    def __init__(self, *args, model_name='', copy_fields=[], inner_to=None,  **kwargs):
+        super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
+        self.from_outer = {}
+        self.meta = ModelMetaData(inner_to=inner_to)
+        self.model_name=model_name,
+        self.copy_fields = copy_fields
+        self.inner_to = inner_to
+        if inner_to is None:
+            self.inner_independent_fields = []
+        else:
+            self.inner_independent_fields = [f for f in inner_to._meta.independent_fields]
+        self.kwargs = kwargs
+        self.args = args
+
+
+    def set_outer(self, **from_outer):
+        self.from_outer = from_outer
+        self.meta.independent_fields.extend([
+            v for k, v in from_outer.items()
+            if isinstance(v, IndependentField) and k not in self.copy_fields
+        ])
+
+    def dynamic_link(self, **kwargs):
+        """
+        replace the string values of a dictionary with the actual object with that
+        address
+
+        dynamic_link(xx='state.x')
+
+        returns a dictionary where the key 'xx' points to the state with name 'x'
+        """
+
+        for k, v in kwargs.items():
+            path_list = v.split('.')
+            use_val = self.__getitem__(path_list[0])
+            for path_step in path_list[1:]:
+                use_val = getattr(use_val, path_step)
+            if isinstance(use_val, FreeField):
+                use_val = use_val(name=k)
+            kwargs[k] = use_val
+
+        return kwargs
 
     def __getitem__(self, *args, **kwargs):
-        #breakpoint()
         return super().__getitem__(*args, **kwargs)
 
-    def __setitem__(self, key, val):
-        return super().__setitem__(key, val)
-        # could be used to allow magic name update for symbols, Code below takes a
-        # declared variable of the name `some_var__count__` and replaces it with 
-        # `some_var_0` so you can assign variables in a loop and get unique accessors.
-        # but name can get passed to FreeSymbols, and that is more explicit.
-        count_suffix = '__count__'
-        if key.endswith(count_suffix):
-            base_name = key.split(count_suffix)[0]
-            count = 0
-            for ekey in self:
-                if ekey.startswith(base_name):
-                    count += 1
-            key = key.replace(count_suffix, f"_{count}")
-            breakpoint()
+    def __setitem__(self, attr_name, attr_val):
 
-# TODO: a way to update options
+        if isinstance(attr_val, IndependentField):
+            self.meta.independent_fields.append(attr_val)
+        if isinstance(attr_val, MatchedField):
+            self.meta.matched_fields.append(attr_val)
+        if isinstance(attr_val, AssignedField):
+            self.meta.assigned_fields.append(attr_val)
+        if isinstance(attr_val, Field):
+            if attr_val._direction == Direction.input:
+                self.meta.input_fields.append(attr_val)
+            if attr_val._direction == Direction.output:
+                self.meta.output_fields.append(attr_val)
+            if attr_val._direction == Direction.internal:
+                self.meta.internal_fields.append(attr_val)
+        if isinstance(attr_val.__class__, ModelType):
+            if attr_val.name:
+                self.meta.sub_models[attr_val.name] = attr_val
+                super().__setitem__(attr_val.name, attr_val)
+            else:
+                self.meta.sub_models[attr_name] = attr_val
+        if isinstance(attr_val, backend.symbol_class):
+            # from a IndependentField
+            known_symbol_type = False
+
+            for free_field in self.meta.independent_fields + self.inner_independent_fields:
+                symbol = free_field.get(backend_repr=attr_val)
+                # not a list (empty or len > 1)
+                if isinstance(symbol, BaseSymbol):
+                    known_symbol_type = True
+                    #if symbol.name and symbol.name != attr_name:
+                    #    raise NameError(f"Symbol on {free_field} has name {symbol.name} but assigned to {attr_name}")
+                    if symbol.name:
+                        pass
+                    elif attr_name:
+                        symbol.name = attr_name
+                    else:
+                        symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
+                    # pass attr if field is bound (_model is a constructed Model
+                    # class, not None), otherwise will get added later after more
+                    # processing
+                    break
+
+            # TODO: MatchedField in "free" mode
+            # TODO: from the output of a subsystem? Does this case matter?
+
+            if not known_symbol_type:
+                #print("unknown symbol type", attr_name)#, attr_val)
+                pass
+                #sub_models[attr_name] = attr_val
+                # Hit by ODESystem.t, is that okay?
+                # TODO: maybe DONT pass these on. they don't work to use in the
+                # another model since they don't get bound correctly, then just have
+                # dangling casadi expression/symbol. Event functions can just use
+                # ODESystem.t, or maybe handle as a special case? Could  check to
+                # see if it's in the template, and only keep those?
+
+        # TODO: other possible attr types to process:
+        # maybe field dataclass, if we care about intervening in eventual assignment
+        # deferred subsystems, but perhaps this will never get hit? need to figure
+        # out how a model with deferred subsystem behaves
+
+
+        return super().__setitem__(attr_name, attr_val)
+
+
+# TODO: a way to update options -- options should become attributes on implementation
+# that are used on every call
 class Options:
     """
     Class mix-in to flag back-end options. Define an inner class on the model that
@@ -160,10 +282,17 @@ class ModelType(type):
 
 
     @classmethod
-    def __prepare__(cls, model_name, bases, **kwds):
-        print("CondorModelType.__prepare__  for", model_name)
+    def __prepare__(cls, model_name, bases, name="", **kwds):
+        if name:
+            model_name = name
+
         sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
-        cls_dict = CondorClassDict(**sup_dict)
+        cls_dict = CondorClassDict(
+            model_name=model_name,
+            copy_fields = kwds.pop('copy_fields', []),
+            inner_to = kwds.pop('inner_to', None),
+            **sup_dict,
+        )
 
         # TODO: may need to search MRO resolution, not just bases, which without mixins
         # are just singletons. For fields and inner classes, since each generation of
@@ -189,7 +318,7 @@ class ModelType(type):
                     )
                 # inherit inner model from base, create reference now, bind in new
                 elif isinstance(v, ModelType):
-                    if v.inner_to is base and v in base.inner_models:
+                    if v.inner_to is base and v in base._meta.inner_models:
                         # inner model inheritance & binding in new
                         cls_dict[k] = v
                 elif isinstance(v, backend.symbol_class):
@@ -205,10 +334,19 @@ class ModelType(type):
                     # field?
                     if attr_name in base.__copy_fields__:
                         field_class = attr_val.__class__
-                        field_init_kwargs = attr_val._init_kwargs.copy()
+                        v_init_kwargs = attr_val._init_kwargs.copy()
+                        for init_k, init_v  in attr_val._init_kwargs.items():
+                            if isinstance(init_v, Field):
+                                # TODO not sure this will be the best way to remap connected
+                                # fields based on inheritance, but maybe sufficient?
+                                if not init_v._name in base.__copy_fields__ and _base.inner_to and init_v._name in base.inner_to.__dict__:
+                                    get_from = base.inner_to.__dict__
+                                else:
+                                    get_from = cls_dict
+                                v_init_kwargs[init_k] = get_from[init_v._name]
                         # I know it has no field references
                         copied_field = attr_val.inherit(
-                            model_name, field_type_name=attr_name, **field_init_kwargs
+                            model_name, field_type_name=attr_name, **v_init_kwargs
                         )
                         copied_field._symbols = [sym for sym in attr_val]
                         copied_field._count += sum(copied_field.list_of('size'))
@@ -217,15 +355,13 @@ class ModelType(type):
 
                     cls_dict[attr_name] = attr_val
                 # TODO: document __from_outer__?
-                cls_dict['__from_outer__'] = base.inner_to.__original_attrs__
+                cls_dict.set_outer(**base.inner_to.__original_attrs__)
         # TODO: is it better to do inner model magic in InnerModelType.__prepare__?
 
 
-        print("end prepare for", model_name,)# cls_dict)
         return cls_dict
 
     def __call__(cls, *args, **kwargs):
-        print("CondorModelType.__call__ for", cls)
         return super().__call__(*args, **kwargs)
 
     def __repr__(cls):
@@ -234,7 +370,7 @@ class ModelType(type):
         else:
             return f"<{cls.__name__}>"
 
-    def __new__(cls, name, bases, attrs, **kwargs):
+    def __new__(cls, model_name, bases, attrs, bind_submodels=True, name="", **kwargs):
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement.
         # case 2: ____ - library code that defines fields, etc that user code inherits
@@ -254,6 +390,9 @@ class ModelType(type):
         # classes.  case 4
         # fields would need to combine _symbols
 
+        if not name:
+            name = model_name
+
 
         # TODO: thought hooks might be necessary for inner model/deferred subsystems,
         # but inner model worked well. If needed, this is a decent prototype:
@@ -269,19 +408,25 @@ class ModelType(type):
         # give references to IndependentVariable backend_repr`s conveniently for
         # constructing InnerModel symbols. They get cleaned up since they live in the
         # outer model
-        attrs_from_outer = attrs.pop('__from_outer__', {})
+        #attrs_from_outer = attrs.pop('__from_outer__', {})
+        attrs_from_outer = attrs.from_outer #getattr(attrs, 'from_outer', {})
+        sub_models = attrs.meta.sub_models
+        attrs.meta.bind_submodels = bind_submodels
         for attr_name, attr_val in attrs_from_outer.items():
             if attrs[attr_name] is attr_val:
                 attrs.pop(attr_name)
+                if sub_models.get(attr_name, None) is attr_val:
+                    sub_models.pop(attr_name)
             else:
                 # TODO: make this a warning/error? add test (really for all
                 # warning/error raise)
                 # Or allow silent passage of redone variables? eg copying
                 # but copying is a special case that can be guarded...
-                print(f"{attr_name} was defined on outer of {name}")
 
-        print("CondorModelType.__new__ for", name, bases, kwargs)
-
+                # TODO: if we put copy fields in meta can we trace through and not warn
+                # on this case?
+                pass
+                # print(f"{attr_name} was defined on outer of {name}")
 
 
         # perform as much processing as possible before caller super().__new__
@@ -305,35 +450,16 @@ class ModelType(type):
         matched_fields = []
 
         # used to find free symbols and replace with symbol, seeded with outer model
-        independent_fields = [
-            v for k, v in attrs_from_outer.items()
-            if isinstance(v, IndependentField) and k not in copy_fields
-        ]
 
 
         # will be used to pack arguments in (inputs) and unpack results (output), other
         # convenience
-        input_fields = []
-        output_fields = []
-        internal_fields = []
-        input_names = []
-        output_names = []
-        inner_models = []
-        sub_models = {}
-
         # TODO: better reserve word check? see check attr name below
-        orig_attrs = {k:v for k,v in attrs.items() if not k.startswith("__")}
 
-        # TODO: use a special inner class like _meta to de-clutter model namespace?
+        orig_attrs = CondorClassDict()
+        orig_attrs.update(**{k:v for k,v in attrs.items() if not k.startswith("__")})
+
         super_attrs.update(dict(
-            input_fields = input_fields,
-            output_fields = output_fields,
-            input_names = input_names,
-            output_names = output_names,
-            internal_fields = internal_fields,
-            independent_fields = independent_fields,
-            inner_models = [],
-            sub_models = sub_models,
             __original_attrs__ = orig_attrs,
         ))
 
@@ -354,34 +480,22 @@ class ModelType(type):
             if isinstance(attr_val, type) and issubclass(attr_val, Options):
                 backend_options[attr_name] =  attr_val
                 continue
-            if isinstance(attr_val, IndependentField):
-                independent_fields.append(attr_val)
-            if isinstance(attr_val, MatchedField):
-                matched_fields.append(attr_val)
-            if isinstance(attr_val, Field):
-                if attr_val._direction == Direction.input:
-                    input_fields.append(attr_val)
-                if attr_val._direction == Direction.output:
-                    output_fields.append(attr_val)
-                if attr_val._direction == Direction.internal:
-                    internal_fields.append(attr_val)
-            if isinstance(attr_val.__class__, cls):
-                sub_models[attr_name] = attr_val
+
+            if callable(attr_val) and attr_val == attrs.dynamic_link:
+                # don't pass dynamic_link -- don't think we want this but maybe we do
+                continue
+
+
             if isinstance(attr_val, backend.symbol_class):
                 # from a IndependentField
                 known_symbol_type = False
-                for free_field in independent_fields:
+                for free_field in attrs.meta.independent_fields:
                     symbol = free_field.get(backend_repr=attr_val)
                     # not a list (empty or len > 1)
                     if isinstance(symbol, BaseSymbol):
                         known_symbol_type = True
-                        if symbol.name and symbol.name != attr_name:
-                            raise NameError(f"Symbol on {free_field} has name {symbol.name} but assigned to {attr_name}")
-                        if attr_name:
-                            symbol.name = attr_name
-                        else:
-                            symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
-                        attr_val = symbol
+                        if attr_name not in bases[-1].__dict__:
+                            attr_val = symbol
                         # pass attr if field is bound (_model is a constructed Model
                         # class, not None), otherwise will get added later after more
                         # processing
@@ -390,27 +504,8 @@ class ModelType(type):
                             # TODO is this kind of defensive checking useful?
                             assert issubclass(free_field._model, inner_to)
                         break
-
-                # TODO: MatchedField in "free" mode
-                # TODO: from the output of a subsystem? Does this case matter?
-
-                if not known_symbol_type:
-                    print("unknown symbol type", attr_name)#, attr_val)
-                    #sub_models[attr_name] = attr_val
-                    # Hit by ODESystem.t, is that okay?
-                    # TODO: maybe DONT pass these on. they don't work to use in the
-                    # another model since they don't get bound correctly, then just have
-                    # dangling casadi expression/symbol. Event functions can just use
-                    # ODESystem.t, or maybe handle as a special case? Could  check to
-                    # see if it's in the template, and only keep those?
-
-            # TODO: other possible attr types to process:
-            # maybe field dataclass, if we care about intervening in eventual assignment
-            # deferred subsystems, but perhaps this will never get hit? need to figure
-            # out how a model with deferred subsystem behaves
-
             if isinstance(attr_val, ModelType):
-                if attr_val.inner_to in bases and attr_val in attr_val.inner_to.inner_models:
+                if attr_val.inner_to in bases and attr_val in attr_val.inner_to._meta.inner_models:
                     # handle inner classes below, don't add to super
                     continue
 
@@ -421,15 +516,14 @@ class ModelType(type):
 
         # before calling super new, process fields
 
-        for field in independent_fields:
-            for symbol in field:
+        for field in attrs.meta.independent_fields:
+            for symbol_idx, symbol in enumerate(field):
                 # add names to symbols -- must be an unnamed symbol without a reference
                 # assignment in the class
                 if not symbol.name:
-                    symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
-                    print("setting name for", symbol.name)
+                    symbol.name = f"{field._model_name}_{field._name}_{symbol_idx}"
 
-        for matched_field in matched_fields:
+        for matched_field in attrs.meta.matched_fields:
             for matched_symbol in matched_field:
                 matched_symbol.update_name()
 
@@ -444,32 +538,35 @@ class ModelType(type):
         # only time it would come up?
         # TODO: review this 
 
-        for input_field in input_fields:
+        for input_field in attrs.meta.input_fields:
             for in_symbol in input_field:
                 in_name = in_symbol.name
                 check_attr_name(in_name, in_symbol, super_attrs, bases)
                 super_attrs[in_name] = in_symbol
-                input_names.append(in_name)
+                attrs.meta.input_names.append(in_name)
 
-        for internal_field in internal_fields:
+        for internal_field in attrs.meta.internal_fields:
             internal_field.create_dataclass()
 
-        for output_field in output_fields:
+        for output_field in attrs.meta.output_fields:
             for out_symbol in output_field:
                 out_name = out_symbol.name
                 check_attr_name(out_name, out_symbol, super_attrs, bases)
                 super_attrs[out_name] = out_symbol
-                output_names.append(out_name)
+                attrs.meta.output_names.append(out_name)
             output_field.create_dataclass()
 
         # process docstring / add simple equation
-        lhs_doc = ', '.join([out_name for out_name in output_names])
-        arg_doc = ', '.join([arg_name for arg_name in input_names])
+        lhs_doc = ', '.join([out_name for out_name in attrs.meta.output_names])
+        arg_doc = ', '.join([arg_name for arg_name in attrs.meta.input_names])
         orig_doc = attrs.get("__doc__", "")
         super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
 
         new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
+        # TODO: I'm surprised that this is necessary to avoid duplciating the mutable
+        # default subclasses list; but this works on the cases I have
+        new_cls._meta = replace(attrs.meta)
 
         # creating an InnerClass
         # inner_to kwarg is added to InnerModel  template definition or for subclasses
@@ -484,7 +581,7 @@ class ModelType(type):
             subclass_of_inner = False
             for base in new_cls.__bases__:
                 if base is not Model:
-                    if base in inner_to.inner_models:
+                    if base in inner_to._meta.inner_models:
                         subclass_of_inner = True
                         break
                         # TODO: base is ~ the field that cls should be added to...
@@ -496,7 +593,7 @@ class ModelType(type):
                     raise ValueError
             else:
                 # create as field
-                inner_to.inner_models.append(new_cls)
+                inner_to._meta.inner_models.append(new_cls)
                 setattr(inner_to, new_cls.__name__, new_cls)
                 new_cls.__copy_fields__ = copy_fields
 
@@ -506,13 +603,17 @@ class ModelType(type):
             new_cls.inner_through = inner_through
             new_cls.inner_to = inner_through.inner_to
 
+        elif bases and bases[0] is not Model:
+            bases[0].register(new_cls)
+
+
         # Bind Fields and InnerModels -- require reference to constructed Model
         for attr_name, attr_val in attrs.items():
             if isinstance(attr_val, Field):
                 attr_val.bind(attr_name, new_cls)
 
             if isinstance(attr_val, ModelType):
-                if attr_val.inner_to in bases and attr_val in attr_val.inner_to.inner_models:
+                if attr_val.inner_to in bases and attr_val in attr_val.inner_to._meta.inner_models:
                     # attr_val is an inner model to base, so this is a field-like inner
                     # model that the user will sub-class
 
@@ -582,11 +683,22 @@ class ModelType(type):
             cls.finalize_input_fields(new_cls)
             new_cls.implementation = implementation(new_cls, **backend_option)
 
+            for field in attrs.meta.all_fields:
+                field.bind_dataclass()
+
+        for field in attrs.meta.independent_fields:
+            for symbol_idx, symbol in enumerate(field):
+                setattr(new_cls, symbol.name, symbol)
+
         return new_cls
 
     def finalize_input_fields(cls):
-        for input_field in cls.input_fields:
+        for input_field in cls._meta.input_fields:
             input_field.create_dataclass()
+
+
+    def register(cls, subclass):
+        cls._meta.subclasses.append(subclass)
 
 
 def check_attr_name(attr_name, attr_val, super_attrs, bases):
@@ -602,7 +714,20 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
         # fields?
         return
 
-    if getattr(attr_val, 'backend_repr', None) == super_attrs.get(attr_name, None):
+
+    attr_val_backend = getattr(attr_val, 'backend_repr', None)
+    clash_value = super_attrs.get(attr_name, None)
+
+    if (
+        (
+            isinstance(attr_val_backend, backend.symbol_class)
+            and isinstance(clash_value, backend.symbol_class)
+        )
+    ):
+        if backend.utils.symbol_is(attr_val_backend, clash_value):
+            return
+
+    elif attr_val_backend == clash_value:
         return
 
     # TODO: if user-defined field starts with _, raise value error?
@@ -615,12 +740,13 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
             not (
                 getattr(attr_val, '_inherits_from', None) == getattr(base, attr_name)
                 or attr_val == getattr(base, attr_name)
+                or isinstance(attr_val, backend.symbol_class)
             )
         ):
             in_bases = True
             break
 
-    if (attr_name in super_attrs) or in_bases:
+    if (attr_name in super_attrs and super_attrs[attr_name] is not attr_val) or in_bases:
         clash_source = None
         if in_bases:
             clash_source = base
@@ -637,23 +763,41 @@ class Model(metaclass=ModelType):
     Define a Model Template  by subclassing Model, creating field types, and writing an
     implementation.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, name='', **kwargs):
         cls = self.__class__
+        self.name = name
         # bind *args and **kwargs to to appropriate signature
         # TODO: is there a better way to do this?
         input_kwargs = {}
-        for input_name, input_val in zip(cls.input_names, args):
+        for input_name, input_val in zip(cls._meta.input_names, args):
             if input_name in kwargs:
                 raise ValueError(f"Argument {input_name} has value {input_val} from args and {kwargs[input_name]} from kwargs")
             input_kwargs[input_name] = input_val
         input_kwargs.update(kwargs)
-        try:
-            self.input_kwargs = {name: input_kwargs[name] for name in cls.input_names}
-        except KeyError as e:
-            raise ValueError(f"Could not find keyword arguments {e.args} in {cls.__name__}")
+        missing_args = []
+        extra_args = []
+        self.input_kwargs = {}
+        for name in cls._meta.input_names:
+            if name in input_kwargs:
+                self.input_kwargs[name] = input_kwargs[name]
+            else:
+                missing_args.append(name)
+
+
+        # TODO: skip this one with a flag?
         for key in kwargs:
             if key not in self.input_kwargs:
-                raise ValueError(f"Unexpected keyword argument {key} in {cls.__name__}")
+                extra_args.append(key)
+
+        if missing_args or extra_args:
+            error_message = f"While calling {cls.__name__}, "
+            if extra_args:
+                error_message += f"recieved extra arguments: {extra_args}"
+            if extra_args and missing_args:
+                error_message += " and "
+            if missing_args:
+                error_message += f"missing arguments: {missing_args}"
+            raise ValueError(error_message)
 
         # TODO: check bounds on model inputs?
 
@@ -664,11 +808,12 @@ class Model(metaclass=ModelType):
 
         # generally implementations are responsible for binding computed values.
         # implementations know about models, models don't know about implementations
-        self.output_kwargs = output_kwargs = {
-            out_name: getattr(self, out_name)
-            for field in self.output_fields
-            for out_name in field.list_of('name')
-        }
+        if False:
+            self.output_kwargs = output_kwargs = {
+                out_name: getattr(self, out_name)
+                for field in cls._meta.output_fields
+                for out_name in field.list_of('name')
+            }
 
         self.bind_submodels()
 
@@ -678,7 +823,7 @@ class Model(metaclass=ModelType):
         all_values = list(self.input_kwargs.values())
 
         slice_start = 0
-        for field in cls.input_fields:
+        for field in cls._meta.input_fields:
             slice_end = slice_start + len(field)
             values = all_values[slice_start: slice_end]
             slice_start = slice_end
@@ -696,7 +841,7 @@ class Model(metaclass=ModelType):
 
     def __iter__(self):
         cls = self.__class__
-        for output_name in cls.output_names:
+        for output_name in cls._meta.output_names:
             yield getattr(self, output_name)
 
     def __repr__(self):
@@ -707,13 +852,16 @@ class Model(metaclass=ModelType):
         # Can imagine a parent model with multiple instances of the exact same
         # sub-model called with different parameters. Would need to memoize at least
         # that many calls, possibly more.
+
+        # if model instance created with `name` attribute, result will be bound to that
+        # name not the assigned name, but assigned name can still be used during model
+        # definition
         model = model_instance.__class__
-        print(f"binding sub-models on {model}")
         model_assignments = {}
 
         fields = [
             field
-            for field in model.input_fields + model.output_fields
+            for field in model._meta.input_fields + model._meta.output_fields
             if isinstance(field, IndependentField)
         ]
         for field in fields:
@@ -724,12 +872,14 @@ class Model(metaclass=ModelType):
                 for elem, val in zip(field, model_instance_field_dict.values())
             })
 
-        for sub_model_ref_name, sub_model_instance in model.sub_models.items():
+        if not model._meta.bind_submodels:
+            return
+
+        for sub_model_ref_name, sub_model_instance in model._meta.sub_models.items():
             sub_model = sub_model_instance.__class__
-            print(f"binding sub-model {sub_model} on {model}")
             sub_model_kwargs = {}
 
-            for field in sub_model.input_fields:
+            for field in sub_model._meta.input_fields:
                 bound_field = getattr(sub_model_instance, field._name)
                 bound_field_dict = asdict(bound_field)
                 for k,v in bound_field_dict.items():
@@ -743,17 +893,12 @@ class Model(metaclass=ModelType):
                                 break
                         sub_model_kwargs[k] = vv
                         if not value_found:
-                            # TODO: this is the only casadi specific thing :)
                             sub_model_kwargs[k] = backend.utils.evalf(
                                 v, model_assignments
                             )
 
             bound_sub_model = sub_model(**sub_model_kwargs)
             setattr(model_instance, sub_model_ref_name, bound_sub_model)
-            #bound_sub_model.recursive_bind()
-
-
-
 
 
 class InnerModelType(ModelType):
@@ -761,25 +906,36 @@ class InnerModelType(ModelType):
         for subclass in cls.subclasses:
             yield subclass
 
-    def register(cls, subclass):
-        cls.subclasses.append(subclass)
+    @classmethod
+    def __prepare__(cls, model_name, bases, inner_to=None, original_class=None, **kwds):
+        case1 = model_name == "InnerModel"
+        case2 = inner_to is not None and original_class is not None
+        case3 = not case1 and not case2
 
-    def __new__(cls, name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
-        print("\nInnerModelType.__new__ for class", cls,"name", name, "bases", bases,
-              "original", original_class, "\nkwargs:", kwargs,"\n")# "\nattrs:", attrs, "\n")
+        if case1 or case2:
+            return super().__prepare__(
+                model_name, bases, inner_to=inner_to, **kwds
+            )
+
+        if case3:
+            return bases[0].original_class.__prepare__(
+                model_name, bases, inner_to=inner_to, **kwds
+            )
+
+    def __new__(cls, model_name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
         # case 1: InnerModel definition
         # case 2: library inner model inherited to user model through user model's __new__
         # (inner model template)
         # case 3: subclass of inherited inner model -- user defined model
-        case1 = name == "InnerModel"
+        case1 = model_name == "InnerModel"
         case2 = inner_to is not None and original_class is not None
         case3 = not case1 and not case2
+
         if case1 or case2:
-            new_cls = super().__new__(cls, name, bases, attrs, inner_to=inner_to, **kwargs)
+            new_cls = super().__new__(cls, model_name, bases, attrs, inner_to=inner_to, **kwargs)
 
         if case2:
             new_cls.original_class = original_class
-            new_cls.subclasses = []
             # reference to original class so uer sub-classes inherit directly, see below
 
         if case3:
@@ -789,7 +945,7 @@ class InnerModelType(ModelType):
             original_class = inner_through.original_class
             # subclass original class, inheriting
             # will inherit inner_to from original_class
-            new_cls = original_class.__class__(name, (original_class,), attrs,
+            new_cls = original_class.__class__(model_name, (original_class,), attrs,
                                                inner_through=inner_through, **kwargs)
 
         return new_cls
@@ -804,6 +960,14 @@ class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
     InnerModel by sub-classing from <outer_model>.<inner_model template>
     """
     pass
+
+
+class DeferredSystem(Model):
+    """
+    output is an explicit function of input
+    """
+    input = FreeField()
+    output = FreeField(Direction.output)
 
 # TODO: Move to "contrib" or something?
 class ExplicitSystem(Model):
@@ -1022,6 +1186,7 @@ class ODESystem(Model):
     # TODO: don't like hacks to simupy to make it work... especially the success
     # checking stuff -- is that neccessary anymore?
 
+    tf = None
     t = backend.symbol_generator('t')
     state = FreeField(Direction.internal)
     initial = MatchedField(state)
@@ -1052,6 +1217,7 @@ class TrajectoryAnalysis(
     # adding an accumulator state and adding the updates to each event? Maybe that
     # doesn't make sense...
 
+
 # TODO: need to exlcude fields, particularly dot, initial, etc.
 # define which fields get lifted completely, which become "read only" (can't generate
 # new state) etc.
@@ -1071,6 +1237,19 @@ class Event(Model, inner_to = ODESystem):
     two events at 0 and 1. This means an at_time of a single value of t_e is equiavelent
     to slice(t_e, t_e, None)
 
+
+    How to bind numerical evaluation of model?
+    During trajectory analysis model construction, currently existing events get copied
+    to a local namespace and implementations are created, <trajectory analysis model
+    name>.Events.<event model name>.
+    I guess this is done by defining new  __new__ on TA, and calling super? Or do I need
+    those hooks after all?
+    Event implementation is owned by TA implementation, maybe in sub-name space to avoid
+    extraneous implementation constructions.
+    then when trajectory analysis is evaluated and bound, add events... somewhere. Maybe
+    the _res.e elements get replaced by the evaluated Event models (so one for each
+    occurance of the event)??? function isn't necessary, so maybe get an index instead.
+
     """
     # TODO: singleton field event.function is very similar to objective in
     # OptimizationProblem. And at_time. Need to be able to define such singleton
@@ -1080,9 +1259,10 @@ class Event(Model, inner_to = ODESystem):
     # actually, just update it
     #make = MatchedField(ODESystem.finite_state)
     # terminate = True -> return nan instead of update?
-    def __init_subclass__(cls, dt=0., **kwargs):
-        if dt:
-            cls.function
+
+    function = None
+    at_time = None
+
 
 # this should just provide the capabiility to overwrite make (or whatever sets control)
 # and dot based on condition...
@@ -1095,7 +1275,7 @@ class Mode(Model, inner_to=ODESystem,):
     do inheritance for ODESystems which is otherwise hard? Can this be used instead of
     deferred subsystems? Yes but only for ODESystems..
     """
-    pass
+    condition = None
     action = MatchedField(ODESystem.modal, direction=Direction.internal)
 
 
@@ -1149,3 +1329,113 @@ def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):
 
     return plant
 
+
+
+def copy_field(new_model_name, old_field, new_field=None):
+    if new_field is None:
+        new_field = old_field.inherit(
+            new_model_name, field_type_name=old_field._name
+        )
+    new_field._symbols = [ sym for sym in old_field ]
+    new_field._count = sum(new_field.list_of("size"))
+    return new_field
+
+class ExternalSolverWrapperType(type):
+    """
+    since this is only one case, only need to bind input and output fields
+    explicitly -- and possibly this is just syntax sugar. wrapper doesn't need
+    much from the metclass, primarily handled by ExternalSolverModel which is
+    automatically generated by wrapper's __create_model__, injected automatically
+    by model sub-types. Could just as easily create decorator or other
+    class-method (on Wrapper) that consumes singleton/collection of functions
+
+    IO fields just a nice way to create simple object with IO metadata. 
+    """
+
+    @classmethod
+    def __prepare__(cls, model_name, bases, name="", **kwds):
+        #print("prepare for", model_name, bases, name)
+        if name:
+            model_name = name
+        sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
+        if bases and ExternalSolverWrapper in bases: # should check MRO, I guess?
+            #print("copying IO fields to", model_name)
+            for field_name in ["input", "output"]:
+                sup_dict[field_name] = copy_field(
+                    model_name, getattr(ExternalSolverWrapper, field_name)
+                )
+        return sup_dict
+
+    def __new__(cls, model_name, bases, attrs, parameterized_IO=False, **kwargs):
+        #print("before calling __new__")
+        if not bases:
+            #print("using type.new", model_name)
+            new_cls = type.__new__(
+                cls, model_name, bases, attrs, **kwargs
+            )
+        else:
+            #print("using super().new", model_name)
+            new_cls =  super().__new__(
+                #cls, model_name, bases, attrs, **kwargs
+                cls, model_name, bases, attrs, parameterized_IO=parameterized_IO,**kwargs
+            )
+        return new_cls
+
+    def __call__(cls, *args, **kwargs):
+        # gets called on instantiation of the user wrapper, so COULD return the
+        # condor model instead of the wrapper class -- perhaps this is more condoric,
+        # not sure what's preferable
+        # actully, this can get used instead of create model with init wrapper? no,
+        # don't have access to instance yet.
+        #print(cls, "__call__")
+        wrapper_object = super().__call__(*args, **kwargs)
+        return wrapper_object.condor_model
+
+class ExternalSolverModel(Model):
+    input = FreeField()
+    output = FreeField(Direction.output)
+
+
+class ExternalSolverWrapper(
+    metaclass=ExternalSolverWrapperType,
+):
+    input = FreeField()
+    output = FreeField(Direction.output)
+
+    def __init_subclass__(cls, singleton=True, **kwargs):
+        # at this point, fields  are already bound by ExternalSolverWrapperType.__new__
+        # but modifications AFTER construction can be doen here
+        #print("init subclass of", cls)
+        cls.__original_init__ = cls.__init__
+        cls.__init__ = cls.__create_model__
+
+    def __create_model__(self, *args, condor_model_name="",**kwargs):
+        #print("create model of", self, self.__class__)
+        # copy field so that any field modification by __original_init__ is onto the
+        # copy
+        #print("copying IO fields to", condor_model_name)
+        if not condor_model_name:
+            # could use repr somehow? but won't exist yet...
+            condor_model_name = self.__class__.__name__
+        for field_name in ["input", "output"]:
+            setattr(self, field_name, copy_field(
+                condor_model_name, getattr(self, field_name)
+            ))
+
+
+        self.__original_init__(*args, **kwargs)
+        # update and/or copy meta? -- no, create a __condor_model__ class which is the
+        # actual model and call, etc. get mapped to that??
+
+        attrs = ModelType.__prepare__(condor_model_name, (ExternalSolverModel,))
+        # this copying feels slightly redundant...
+        for field_name in ["input", "output"]:
+            copy_field(
+                condor_model_name,
+                getattr(self, field_name),
+                new_field=attrs[field_name],
+            )
+        attrs["__external_wrapper__"] = self
+        self.condor_model = ModelType(
+            condor_model_name, (ExternalSolverModel,), attrs
+        )

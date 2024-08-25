@@ -90,7 +90,7 @@ cos = ca.cos
 
 def make_burn(rd, tig, tem):
     burn_name = "Burn%d" % (1 + sum([
-        event.__name__.startswith("Burn") for event in LinCovCW.Event.subclasses
+        event.__name__.startswith("Burn") for event in LinCovCW.Event._meta.subclasses
     ]))
     attrs = co.InnerModelType.__prepare__(burn_name, (LinCovCW.Event,))
     update = attrs["update"]
