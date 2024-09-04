@@ -487,49 +487,54 @@ class OptimizationProblem(InitializerMixin):
                     ])
 
             elif self.method is OptimizationProblem.Method.scipy_slsqp:
+
+                self.equality_con_exprs = []
+                self.inequality_con_exprs = []
                 self.con = []
                 for g, lbg, ubg in zip(g_split, self.lbg, self.ubg):
                     if lbg == ubg:
-                        g_func = casadi.Function(
-                            f"{model.__name__}_nonlinear_constraint",
-                            [self.x, self.p],
-                            [g - lbg],
-                        )
-                        g_jac_func =  casadi.Function(
-                            f"{model.__name__}_nonlinear_constraint_jac",
-                            [self.x, self.p],
-                            [casadi.jacobian(g - lbg, self.x)],
-                        )
-                        self.con.append(dict(type="eq", fun=g_func, jac=g_jac_func))
+                        self.equality_con_exprs.append(g - lbg)
                     else:
                         if lbg > -np.inf:
-                            use_expr = (g - lbg)
-                            g_func = casadi.Function(
-                                f"{model.__name__}_nonlinear_constraint",
-                                [self.x, self.p],
-                                [use_expr],
-                            )
-                            g_jac_func =  casadi.Function(
-                                f"{model.__name__}_nonlinear_constraint_jac",
-                                [self.x, self.p],
-                                [casadi.jacobian(use_expr, self.x)],)
-                            self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
+                            self.inequality_con_exprs.append(g-lbg)
                         if ubg < np.inf:
-                            use_expr = (ubg - g)
-                            g_func = casadi.Function(
-                                f"{model.__name__}_nonlinear_constraint",
-                                [self.x, self.p],
-                                [use_expr],
-                            )
-                            g_jac_func =  casadi.Function(
-                                f"{model.__name__}_nonlinear_constraint_jac",
-                                [self.x, self.p],
-                                [casadi.jacobian(use_expr, self.x)],
-                            )
-                            self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
-                for con in self.con:
-                    cas_func = con["fun"]
-                    con["fun"] = lambda x, p: cas_func(x, p).toarray().squeeze().T
+                            self.inequality_con_exprs.append(ubg - g)
+
+                if self.equality_con_exprs:
+                    self.equality_con_expr = casadi.vertcat(*self.equality_con_exprs)
+                    self.eq_g_func = casadi.Function(
+                        f"{model.__name__}_equality_constraint",
+                        [self.x, self.p],
+                        [self.equality_con_expr],
+                    )
+                    self.eq_g_jac_func =  casadi.Function(
+                        f"{model.__name__}_equality_constraint_jac",
+                        [self.x, self.p],
+                        [casadi.jacobian(self.equality_con_expr, self.x)],
+                    )
+                    self.con.append(dict(
+                        type="eq",
+                        fun=lambda x, p: self.eq_g_func(x, p).toarray().squeeze().T,
+                        jac=self.eq_g_jac_func,
+                    ))
+
+                if self.inequality_con_exprs:
+                    self.inequality_con_expr = casadi.vertcat(*self.inequality_con_exprs)
+                    self.ineq_g_func = casadi.Function(
+                        f"{model.__name__}_inequality_constraint",
+                        [self.x, self.p],
+                        [self.inequality_con_expr],
+                    )
+                    self.ineq_g_jac_func =  casadi.Function(
+                        f"{model.__name__}_inequality_constraint_jac",
+                        [self.x, self.p],
+                        [casadi.jacobian(self.inequality_con_expr, self.x)],
+                    )
+                    self.con.append(dict(
+                        type="ineq",
+                        fun=lambda x, p: self.ineq_g_func(x, p).toarray().squeeze().T,
+                        jac=self.ineq_g_jac_func,
+                    ))
 
 
     def __call__(self, model_instance, *args):
@@ -616,7 +621,7 @@ class OptimizationProblem(InitializerMixin):
             min_out = minimize(
                 lambda *args: self.f_func(*args).toarray().squeeze(),
                 self.x0,
-                jac=lambda *args: self.f_jac_func(*args).toarray().squeeze().T,
+                jac=lambda *args: self.f_jac_func(*args).toarray().squeeze(),
                 method=method_string,
                 args = extra_args,
                 constraints = scipy_constraints,
