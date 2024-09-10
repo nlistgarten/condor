@@ -1236,8 +1236,8 @@ class CasadiFunctionCallback(casadi.Callback):
     def eval(self, args):
         try:
             out = self.wrapper_func(
-                #*wrap(self.implementation.model.input, args[0])
-                *wrap(self.implementation.model.input, args)
+                *wrap(self.implementation.model.input, args[0])
+                #*wrap(self.implementation.model.input, args)
             )
         except Exception as e:
             breakpoint()
@@ -1270,6 +1270,7 @@ class CasadiFunctionCallback(casadi.Callback):
         return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
 
     def has_forward(self, nfwd):
+        return False
         return True
 
     def has_reverse(self, nrev):
@@ -1284,11 +1285,10 @@ class CasadiFunctionCallback(casadi.Callback):
         #return casadi.Function(
 
     def has_jacobian(self):
-        return False
         return self.jacobian is not None
 
     def get_jacobian(self, name, inames, onames, opts):
-        breakpoint()
+        #breakpoint()
         return self.jacobian
 
 
@@ -1298,14 +1298,14 @@ class ExternalSolverModel:
         self.wrapper = model.__external_wrapper__
         self.input = casadi.vertcat(*flatten(model.input))
         self.output = casadi.vertcat(*flatten(model.output))
-        self.input = model.input.list_of('backend_repr')
-        self.output = model.output.list_of('backend_repr')
+        #self.input = model.input.list_of('backend_repr')
+        #self.output = model.output.list_of('backend_repr')
         self.placeholder_func = casadi.Function(
             f"{model.__name__}_placeholder",
-            self.input,
-            self.output,
-            #[self.input],
-            #[self.output],
+            [self.input],
+            [self.output],
+            #self.input,
+            #self.output,
             dict(allow_free=True,),
         )
         self.callback = CasadiFunctionCallback(
@@ -1332,8 +1332,8 @@ class ExternalSolverModel:
 
     def __call__(self, model_instance, *args):
         use_args = casadi.vertcat(*flatten(args))
-        #out = self.callback(use_args)
-        out = self.callback(*args)
+        out = self.callback(use_args)
+        #out = self.callback(*args)
         if isinstance(out, casadi.MX):
             out = casadi.vertsplit(out)
         model_instance.bind_field(
