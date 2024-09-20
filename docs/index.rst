@@ -10,6 +10,9 @@ Welcome to Condor's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   design
+   guide/index
+
 
 
 Indices and tables

@@ -26,7 +26,10 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
-docs = ["sphinx"]
+docs = ["sphinx", "sphinx-gallery"]
 
 [tool.setuptools_scm]
 write_to = "src/condor/_version.py"
+
+[tool.ruff.lint]
+ignore = ["D212"]
