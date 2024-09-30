@@ -487,48 +487,54 @@ class OptimizationProblem(InitializerMixin):
                     ])
 
             elif self.method is OptimizationProblem.Method.scipy_slsqp:
+
+                self.equality_con_exprs = []
+                self.inequality_con_exprs = []
                 self.con = []
                 for g, lbg, ubg in zip(g_split, self.lbg, self.ubg):
                     if lbg == ubg:
-                        g_func = casadi.Function(
-                            f"{model.__name__}_nonlinear_constraint",
-                            [self.x, self.p],
-                            [g - lbg],
-                        )
-                        g_jac_func =  casadi.Function(
-                            f"{model.__name__}_nonlinear_constraint_jac",
-                            [self.x, self.p],
-                            [casadi.jacobian(g - lbg, self.x)],
-                        )
-                        self.con.append(dict(type="eq", fun=g_func, jac=g_jac_func))
+                        self.equality_con_exprs.append(g - lbg)
                     else:
                         if lbg > -np.inf:
-                            g_func = casadi.Function(
-                                f"{model.__name__}_nonlinear_constraint",
-                                [self.x, self.p],
-                                [g - lbg],
-                            )
-                            g_jac_func =  casadi.Function(
-                                f"{model.__name__}_nonlinear_constraint_jac",
-                                [self.x, self.p],
-                                [casadi.jacobian(g - lbg, self.x)],
-                            )
-                            self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
+                            self.inequality_con_exprs.append(g-lbg)
                         if ubg < np.inf:
-                            g_func = casadi.Function(
-                                f"{model.__name__}_nonlinear_constraint",
-                                [self.x, self.p],
-                                [ubg - g],
-                            )
-                            g_jac_func =  casadi.Function(
-                                f"{model.__name__}_nonlinear_constraint_jac",
-                                [self.x, self.p],
-                                [casadi.jacobian(ubg - g, self.x)],
-                            )
-                            self.con.append(dict(type="ineq", fun=g_func, jac=g_jac_func))
-                for con in self.con:
-                    cas_func = con["fun"]
-                    con["fun"] = lambda x, p: cas_func(x, p).toarray().squeeze()
+                            self.inequality_con_exprs.append(ubg - g)
+
+                if self.equality_con_exprs:
+                    self.equality_con_expr = casadi.vertcat(*self.equality_con_exprs)
+                    self.eq_g_func = casadi.Function(
+                        f"{model.__name__}_equality_constraint",
+                        [self.x, self.p],
+                        [self.equality_con_expr],
+                    )
+                    self.eq_g_jac_func =  casadi.Function(
+                        f"{model.__name__}_equality_constraint_jac",
+                        [self.x, self.p],
+                        [casadi.jacobian(self.equality_con_expr, self.x)],
+                    )
+                    self.con.append(dict(
+                        type="eq",
+                        fun=lambda x, p: self.eq_g_func(x, p).toarray().squeeze().T,
+                        jac=self.eq_g_jac_func,
+                    ))
+
+                if self.inequality_con_exprs:
+                    self.inequality_con_expr = casadi.vertcat(*self.inequality_con_exprs)
+                    self.ineq_g_func = casadi.Function(
+                        f"{model.__name__}_inequality_constraint",
+                        [self.x, self.p],
+                        [self.inequality_con_expr],
+                    )
+                    self.ineq_g_jac_func =  casadi.Function(
+                        f"{model.__name__}_inequality_constraint_jac",
+                        [self.x, self.p],
+                        [casadi.jacobian(self.inequality_con_expr, self.x)],
+                    )
+                    self.con.append(dict(
+                        type="ineq",
+                        fun=lambda x, p: self.ineq_g_func(x, p).toarray().squeeze().T,
+                        jac=self.ineq_g_jac_func,
+                    ))
 
 
     def __call__(self, model_instance, *args):
@@ -620,6 +626,7 @@ class OptimizationProblem(InitializerMixin):
                 args = extra_args,
                 constraints = scipy_constraints,
                 bounds = np.vstack([self.lbx, self.ubx]).T,
+                tol = 1E-9,
                 #options=dict(disp=True),
                 options=self.options,
             )
@@ -1230,6 +1237,7 @@ class CasadiFunctionCallback(casadi.Callback):
         try:
             out = self.wrapper_func(
                 *wrap(self.implementation.model.input, args[0])
+                #*wrap(self.implementation.model.input, args)
             )
         except Exception as e:
             breakpoint()
@@ -1241,7 +1249,7 @@ class CasadiFunctionCallback(casadi.Callback):
                 flatten(out)
             ).reshape(self.get_sparsity_out(0).shape[::-1]).T
             return jac_out,
-        return casadi.vertcat(*flatten(out)),
+        return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else out
         return [out] if self.get_n_out() == 1 else out
         #return out,
         return casadi.vertcat(*flatten(out)),
@@ -1261,10 +1269,26 @@ class CasadiFunctionCallback(casadi.Callback):
     def get_sparsity_out(self, i):
         return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
 
+    def has_forward(self, nfwd):
+        return False
+        return True
+
+    def has_reverse(self, nrev):
+        return False
+        return True
+
+    def get_forward(self, nin, name, inames, onames, opts):
+        breakpoint()
+
+    def get_reverse(self, nout, name, inames, onames, opts):
+        breakpoint()
+        #return casadi.Function(
+
     def has_jacobian(self):
         return self.jacobian is not None
 
     def get_jacobian(self, name, inames, onames, opts):
+        #breakpoint()
         return self.jacobian
 
 
@@ -1274,10 +1298,14 @@ class ExternalSolverModel:
         self.wrapper = model.__external_wrapper__
         self.input = casadi.vertcat(*flatten(model.input))
         self.output = casadi.vertcat(*flatten(model.output))
+        #self.input = model.input.list_of('backend_repr')
+        #self.output = model.output.list_of('backend_repr')
         self.placeholder_func = casadi.Function(
             f"{model.__name__}_placeholder",
             [self.input],
             [self.output],
+            #self.input,
+            #self.output,
             dict(allow_free=True,),
         )
         self.callback = CasadiFunctionCallback(
@@ -1305,6 +1333,7 @@ class ExternalSolverModel:
     def __call__(self, model_instance, *args):
         use_args = casadi.vertcat(*flatten(args))
         out = self.callback(use_args)
+        #out = self.callback(*args)
         if isinstance(out, casadi.MX):
             out = casadi.vertsplit(out)
         model_instance.bind_field(
