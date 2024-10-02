@@ -1,0 +1,1085 @@
+import numpy as np
+# TODO: figure out how to make this an option/setting like django?
+#from condor.backends import default as backend
+from condor.fields import (
+    Direction, Field, BaseSymbol, IndependentSymbol, FreeSymbol, WithDefaultField,
+    IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
+    BoundedAssignmentField, TrajectoryOutputField,
+)
+from condor.backends.default import backend
+from condor.conf import settings
+from dataclasses import asdict, dataclass, field, replace
+from condor._version import __version__
+"""
+Backend:
+[x] provide symbol_generator for creating backend symbol repr
+[x] symbol_class for isinstance(model_attr, backend.symbol_class
+[x] name which is how backend options on model is identified
+Do we allow more complicated datastructures? like models, etc.
+
+optional implementations which has a __dict__ that allows assignment
+Or, should the implementations just live in the main backend?
+
+
+Backend Implementations
+[x] must be able to flatten model symbols to backend arrays,
+[x] wrap backend arrays to model symbol, matching shape -- 
+[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics (if
+different, eg casadi DM) and backend symbols
+[ ] ideally, handle special case symmetric and dynamic flags for FreeSymbol and
+[ ] MatchedSymbol if matched to symmetric/diagonal FreeSymbol
+setting the values for outputs and intermediates
+
+Couples to Model types -- knows all fields
+
+who is responsible for:
+filling in fields/._dataclass?
+filling in model input/output attrs?
+
+
+"""
+
+"""
+Figure out how to add DB storage -- maybe expect that to be a user choice (a decorator
+or something)? Then user defined initializer could use it. Yeah, and ORM aspect just
+takes advantage of model attributes just like backend implementation
+
+
+I assume a user model/library code could inject an implementation to the backend?
+not sure how to assign special numeric stuff, probably an inner class on the model
+based on NPSS discussion it's not really needed if it's done right 
+
+For injecting a default implementation (e.g., new backend) this does work:
+
+import casadi_implementations
+casadi_implementations.ODESystem = 'a reference to check exists'
+
+import condor as co
+
+but probably should just figure out hooks to do that? Could create local dict of backend
+that gets updated with backend.implementations at the top of this file, then libary/user
+code could update it (add/overwrite)
+
+"""
+
+@dataclass
+class ModelMetaData:
+    independent_fields: list = field(default_factory=list)
+    matched_fields: list = field(default_factory=list)
+    assigned_fields: list = field(default_factory=list)
+
+    input_fields: list = field(default_factory=list)
+    output_fields: list = field(default_factory=list)
+    internal_fields: list = field(default_factory=list)
+
+    input_names: list = field(default_factory=list)
+    output_names: list = field(default_factory=list)
+
+    inner_models: list = field(default_factory=list)
+    sub_models: dict = field(default_factory=dict)
+    bind_submodels: bool = True
+
+    subclasses: list = field(init=False)
+    inner_to: object = None
+
+    def __post_init__(self):
+        self.subclasses = []
+
+    @property
+    def all_fields(self):
+        return self.input_fields + self.output_fields + self.internal_fields
+
+    @property
+    def dependent_fields(self):
+        return [f for f in self.all_fields if f not in self.independent_fields]
+
+
+
+# appears in __new__ as attrs
+class CondorClassDict(dict):
+    def __init__(self, *args, model_name='', copy_fields=[], inner_to=None,  **kwargs):
+        super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
+        self.from_outer = {}
+        self.meta = ModelMetaData(inner_to=inner_to)
+        self.model_name=model_name,
+        self.copy_fields = copy_fields
+        self.inner_to = inner_to
+        if inner_to is None:
+            self.inner_independent_fields = []
+        else:
+            self.inner_independent_fields = [f for f in inner_to._meta.independent_fields]
+        self.kwargs = kwargs
+        self.args = args
+
+
+    def set_outer(self, **from_outer):
+        self.from_outer = from_outer
+        self.meta.independent_fields.extend([
+            v for k, v in from_outer.items()
+            if isinstance(v, IndependentField) and k not in self.copy_fields
+        ])
+
+    def dynamic_link(self, **kwargs):
+        """
+        replace the string values of a dictionary with the actual object with that
+        address
+
+        dynamic_link(xx='state.x')
+
+        returns a dictionary where the key 'xx' points to the state with name 'x'
+        """
+
+        for k, v in kwargs.items():
+            path_list = v.split('.')
+            use_val = self.__getitem__(path_list[0])
+            for path_step in path_list[1:]:
+                use_val = getattr(use_val, path_step)
+            if isinstance(use_val, FreeField):
+                use_val = use_val(name=k)
+            kwargs[k] = use_val
+
+        return kwargs
+
+    def __getitem__(self, *args, **kwargs):
+        return super().__getitem__(*args, **kwargs)
+
+    def __setitem__(self, attr_name, attr_val):
+
+        if isinstance(attr_val, IndependentField):
+            self.meta.independent_fields.append(attr_val)
+        if isinstance(attr_val, MatchedField):
+            self.meta.matched_fields.append(attr_val)
+        if isinstance(attr_val, AssignedField):
+            self.meta.assigned_fields.append(attr_val)
+        if isinstance(attr_val, Field):
+            if attr_val._direction == Direction.input:
+                self.meta.input_fields.append(attr_val)
+            if attr_val._direction == Direction.output:
+                self.meta.output_fields.append(attr_val)
+            if attr_val._direction == Direction.internal:
+                self.meta.internal_fields.append(attr_val)
+        if isinstance(attr_val.__class__, ModelType):
+            if attr_val.name:
+                self.meta.sub_models[attr_val.name] = attr_val
+                super().__setitem__(attr_val.name, attr_val)
+            else:
+                self.meta.sub_models[attr_name] = attr_val
+        if isinstance(attr_val, backend.symbol_class):
+            # from a IndependentField
+            known_symbol_type = False
+
+            for free_field in self.meta.independent_fields + self.inner_independent_fields:
+                symbol = free_field.get(backend_repr=attr_val)
+                # not a list (empty or len > 1)
+                if isinstance(symbol, BaseSymbol):
+                    known_symbol_type = True
+                    #if symbol.name and symbol.name != attr_name:
+                    #    raise NameError(f"Symbol on {free_field} has name {symbol.name} but assigned to {attr_name}")
+                    if symbol.name:
+                        pass
+                    elif attr_name:
+                        symbol.name = attr_name
+                    else:
+                        symbol.name = f"{field._model_name}_{field._name}_{field._symbols.index(symbol)}"
+                    # pass attr if field is bound (_model is a constructed Model
+                    # class, not None), otherwise will get added later after more
+                    # processing
+                    break
+
+            # TODO: MatchedField in "free" mode
+            # TODO: from the output of a subsystem? Does this case matter?
+
+            if not known_symbol_type:
+                #print("unknown symbol type", attr_name)#, attr_val)
+                pass
+                #sub_models[attr_name] = attr_val
+                # Hit by ODESystem.t, is that okay?
+                # TODO: maybe DONT pass these on. they don't work to use in the
+                # another model since they don't get bound correctly, then just have
+                # dangling casadi expression/symbol. Event functions can just use
+                # ODESystem.t, or maybe handle as a special case? Could  check to
+                # see if it's in the template, and only keep those?
+
+        # TODO: other possible attr types to process:
+        # maybe field dataclass, if we care about intervening in eventual assignment
+        # deferred subsystems, but perhaps this will never get hit? need to figure
+        # out how a model with deferred subsystem behaves
+
+
+        return super().__setitem__(attr_name, attr_val)
+
+
+# TODO: a way to update options -- options should become attributes on implementation
+# that are used on every call
+class Options:
+    """
+    Class mix-in to flag back-end options. Define an inner class on the model that
+    inherits from Options that over-writes options for the backend's implementation
+    (which generates a callable). Model will transparently pass attributes of Options
+    subclass. Possibly only convention, but name the subclass according to the backend.
+    Multiple option sub-classes provide options depending on project's default backend. 
+    Single option sub-class forces back end for this model?
+    OR flag, if tihs backend then these options, otherwise no options (rely on defaults)
+
+    attribute `implementation`, if provided, should be a callable that takes a model
+    and possible options and returns a callable that evaluates the model. Otherwise,
+    will try to find an implementation in backend.implementations of the class name of
+    the defined class or soonest MRO class name.
+
+    All backend implementations must ship with reasonable defaults.
+
+    options should not start with __
+
+    Example for inheritance to keep configuration DRY
+
+    class UpcycleSolverOptions(Options):
+        warm_start = True
+        bound_behavior = backend.algebraicsystem.bound_behavior_options.L2
+        exact_hessian = False
+
+
+    class Upsolver(AlgebraicSystem):
+
+        class Casadi(UpcycleSolverOptions):
+            pass
+
+    class MostUpsolvers(Upsolver):
+        ... (define model)
+        # automatically inherit UpcycleSolverOptions settings for Casadi backend
+
+    class ParicularUpsolver(Upsolver):
+        ... (define model)
+
+        class Casadi(UpcycleSolverOptions):
+            # over write specific settings, everything else should be inherited
+            exact_hessian = True
+
+
+    """
+    pass
+    # TODO: do meta programming so implementation enums are available without import?
+
+    # TODO: allow a generic options for non-solver specific options?
+
+
+class ModelType(type):
+    """
+    Metaclass for Condor  model
+    """
+
+    # No dot setting, use func tool `partial` (or just define a dict that gets **passed
+    # in). Dot accessing done by instance datastructure.
+    # Do we want to provide magic for repeatedly passed-down variables? No. Keeps it
+    # explicit, and there's enough convenience it shouldn't be a problem.
+
+    # once imp is found gets attached to class. then __init__ calls with those values
+    # and so is actually an instance of class that has the accessed outputs, very much
+    # like django. neat.
+
+    # can I do all the name clash protection that's needed? from child to parent class I
+    # think definitely, and probably can't protect user model from over-writing self in
+    # model but can protect by modifying setattr on CondorDict
+
+
+    @classmethod
+    def __prepare__(cls, model_name, bases, name="", **kwds):
+        if name:
+            model_name = name
+
+        sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
+        cls_dict = CondorClassDict(
+            model_name=model_name,
+            copy_fields = kwds.pop('copy_fields', []),
+            inner_to = kwds.pop('inner_to', None),
+            **sup_dict,
+        )
+
+        # TODO: may need to search MRO resolution, not just bases, which without mixins
+        # are just singletons. For fields and inner classes, since each generation of
+        # class is getting re-inherited, this is sufficient. 
+        for base in bases:
+            _dict = base.__dict__
+            for k, v in _dict.items():
+                # inherit fields from base -- bound in __new__
+                if isinstance(v, Field):
+                    v_class = v.__class__
+                    v_init_kwargs = v._init_kwargs.copy()
+                    for init_k, init_v  in v._init_kwargs.items():
+                        if isinstance(init_v, Field):
+                            # TODO not sure this will be the best way to remap connected
+                            # fields based on inheritance, but maybe sufficient?
+                            if base.inner_to and init_v._name in base.inner_to.__dict__:
+                                get_from = base.inner_to.__dict__
+                            else:
+                                get_from = cls_dict
+                            v_init_kwargs[init_k] = get_from[init_v._name]
+                    cls_dict[k] = v.inherit(
+                        model_name, field_type_name=k, **v_init_kwargs
+                    )
+                # inherit inner model from base, create reference now, bind in new
+                elif isinstance(v, ModelType):
+                    if v.inner_to is base and v in base._meta.inner_models:
+                        # inner model inheritance & binding in new
+                        cls_dict[k] = v
+                elif isinstance(v, backend.symbol_class):
+                    cls_dict[k] = v
+
+            # if base is an inner model, make reference  of outer model attributes
+            # and copy fields from class __copy_fields__ kwarg definition. This allows
+            # inner field to modify local copy without affecting outer model
+            if base is not Model and base.inner_to:
+                for attr_name, attr_val in base.inner_to.__original_attrs__.items():
+                    # TODO: document copy fields? can this get DRY'd up?
+                    # don't like that symbol copying is here, maybe should be method on
+                    # field?
+                    if attr_name in base.__copy_fields__:
+                        field_class = attr_val.__class__
+                        v_init_kwargs = attr_val._init_kwargs.copy()
+                        for init_k, init_v  in attr_val._init_kwargs.items():
+                            if isinstance(init_v, Field):
+                                # TODO not sure this will be the best way to remap connected
+                                # fields based on inheritance, but maybe sufficient?
+                                if not init_v._name in base.__copy_fields__ and _base.inner_to and init_v._name in base.inner_to.__dict__:
+                                    get_from = base.inner_to.__dict__
+                                else:
+                                    get_from = cls_dict
+                                v_init_kwargs[init_k] = get_from[init_v._name]
+                        # I know it has no field references
+                        copied_field = attr_val.inherit(
+                            model_name, field_type_name=attr_name, **v_init_kwargs
+                        )
+                        copied_field._symbols = [sym for sym in attr_val]
+                        copied_field._count += sum(copied_field.list_of('size'))
+                        cls_dict[attr_name] = copied_field
+                        continue
+
+                    cls_dict[attr_name] = attr_val
+                # TODO: document __from_outer__?
+                cls_dict.set_outer(**base.inner_to.__original_attrs__)
+        # TODO: is it better to do inner model magic in InnerModelType.__prepare__?
+
+
+        return cls_dict
+
+    def __call__(cls, *args, **kwargs):
+        return super().__call__(*args, **kwargs)
+
+    def __repr__(cls):
+        if cls._parent_name:
+            return f"<{cls._parent_name}: {cls.__name__}>"
+        else:
+            return f"<{cls.__name__}>"
+
+    def __new__(cls, model_name, bases, attrs, bind_submodels=True, name="", **kwargs):
+        # case 1: class Model -- provides machinery to make subsequent cases easier to
+        # implement.
+        # case 2: ____ - library code that defines fields, etc that user code inherits
+        # maybe call this model template?
+        # from (case 3+). Implementations are tied to 2? "Library Models"?
+        # case 3: User Model - inherits from ____, defines the actual model that is
+        # being analyzed
+        # case 4: Subclass of user model to extend it?
+        # I don't think InnerModel deviates from this, except perhaps disallowing
+        # case 4
+        # Generally, bases arg will be len <= 1. Just from the previous level. Is there
+        # a case for mixins? InnerModel approach seems decent, could repeat for
+        # WithDeferredSubsystems, then Model layer is quite complete 
+
+        # TODO: add support for inheriting other models -- subclasses are
+        # modifying/adding (no deletion? need mixins to pre-build pieces?) to parent
+        # classes.  case 4
+        # fields would need to combine _symbols
+
+        if not name:
+            name = model_name
+
+
+        # TODO: thought hooks might be necessary for inner model/deferred subsystems,
+        # but inner model worked well. If needed, this is a decent prototype:
+        # ACTUALLY -- subclass of ModelType should be used, can do things before/after
+        # calling super new?
+        pre_super_new_hook = attrs.pop('pre_super_new_attr_hook', None)
+        # pre_new_attr_hook(super_attrs, attr_name, attr_val)
+        post_super_new_hook = attrs.pop('post_super_new_attr_hook', None)
+        # pre_new_attr_hook(new_cls, attr_name, attr_val)
+
+
+        # __from_outer__ attribute is attached to InnerModel`s during __prepare__ to
+        # give references to IndependentVariable backend_repr`s conveniently for
+        # constructing InnerModel symbols. They get cleaned up since they live in the
+        # outer model
+        #attrs_from_outer = attrs.pop('__from_outer__', {})
+        attrs_from_outer = attrs.from_outer #getattr(attrs, 'from_outer', {})
+        sub_models = attrs.meta.sub_models
+        attrs.meta.bind_submodels = bind_submodels
+        for attr_name, attr_val in attrs_from_outer.items():
+            if attrs[attr_name] is attr_val:
+                attrs.pop(attr_name)
+                if sub_models.get(attr_name, None) is attr_val:
+                    sub_models.pop(attr_name)
+            else:
+                # TODO: make this a warning/error? add test (really for all
+                # warning/error raise)
+                # Or allow silent passage of redone variables? eg copying
+                # but copying is a special case that can be guarded...
+
+                # TODO: if we put copy fields in meta can we trace through and not warn
+                # on this case?
+                pass
+                # print(f"{attr_name} was defined on outer of {name}")
+
+
+        # perform as much processing as possible before caller super().__new__
+        # by building up super_attrs from attrs; some operations need to operate on the
+        # constructed class, like binding fields and innermodels
+
+        super_attrs = {}
+
+        if bases:
+            super_attrs['_parent_name'] = bases[0].__name__
+            if 'inner_to' not in kwargs and bases[0] is not Model and bases[0].inner_to:
+                kwargs['inner_to'] = bases[0].inner_to
+        else:
+            super_attrs['_parent_name'] = ''
+
+        inner_to=kwargs.pop('inner_to', None)
+        inner_through=kwargs.pop('inner_through', None)
+        copy_fields=kwargs.pop('copy_fields', [])
+
+        backend_options = {}
+        matched_fields = []
+
+        # used to find free symbols and replace with symbol, seeded with outer model
+
+
+        # will be used to pack arguments in (inputs) and unpack results (output), other
+        # convenience
+        # TODO: better reserve word check? see check attr name below
+
+        orig_attrs = CondorClassDict()
+        orig_attrs.update(**{k:v for k,v in attrs.items() if not k.startswith("__")})
+
+        super_attrs.update(dict(
+            __original_attrs__ = orig_attrs,
+        ))
+
+
+        # TODO: replace if tree with match cases?
+        for attr_name, attr_val in attrs.items():
+            # TODO: process name clahees on attr_name? can't protect against internal
+            # over-write (maybe user intends to do that) but can raise error for
+            # over-writing parent, e.g., creating a "state" variable in a DynamicModel
+            # subclass. Implemented some name clash checks, but can it be easier by
+            # changing the condor dict setattr?
+
+            # need to have protected names? I guess whatever we're doing for Options and
+            # convenience fields like input_fields, input_fields, etc?
+
+            pass_attr = True
+
+            if isinstance(attr_val, type) and issubclass(attr_val, Options):
+                backend_options[attr_name] =  attr_val
+                continue
+
+            if callable(attr_val) and attr_val == attrs.dynamic_link:
+                # don't pass dynamic_link -- don't think we want this but maybe we do
+                continue
+
+
+            if isinstance(attr_val, backend.symbol_class):
+                # from a IndependentField
+                known_symbol_type = False
+                for free_field in attrs.meta.independent_fields:
+                    symbol = free_field.get(backend_repr=attr_val)
+                    # not a list (empty or len > 1)
+                    if isinstance(symbol, BaseSymbol):
+                        known_symbol_type = True
+                        if attr_name not in bases[-1].__dict__:
+                            attr_val = symbol
+                        # pass attr if field is bound (_model is a constructed Model
+                        # class, not None), otherwise will get added later after more
+                        # processing
+                        pass_attr = free_field._model is not None
+                        if pass_attr:
+                            # TODO is this kind of defensive checking useful?
+                            assert issubclass(free_field._model, inner_to)
+                        break
+            if isinstance(attr_val, ModelType):
+                if attr_val.inner_to in bases and attr_val in attr_val.inner_to._meta.inner_models:
+                    # handle inner classes below, don't add to super
+                    continue
+
+            # Options, InnerModel, and IndependentSymbol are not added here
+            if pass_attr:
+                check_attr_name(attr_name, attr_val, super_attrs, bases)
+                super_attrs[attr_name] = attr_val
+
+        # before calling super new, process fields
+
+        for field in attrs.meta.independent_fields:
+            for symbol_idx, symbol in enumerate(field):
+                # add names to symbols -- must be an unnamed symbol without a reference
+                # assignment in the class
+                if not symbol.name:
+                    symbol.name = f"{field._model_name}_{field._name}_{symbol_idx}"
+
+        for matched_field in attrs.meta.matched_fields:
+            for matched_symbol in matched_field:
+                matched_symbol.update_name()
+
+        # symbols from input and input fields are added directly to model
+        # previously, all fields were  "finalized" by creating dataclass
+        # ODESystem has no implementation and not all the fields should be finalized 
+        # Events may create new parameters that are canonical to the ODESystem model,
+        # and should be not be finalized until a trajectory analysis, which has its own
+        # copy. state must be fully defined by ODEsystem and can/should be finalized.
+        # What about output? Should fields have an optional skip_finalize or something
+        # that for when an inner class may modify it so don't finalize? And is that the
+        # only time it would come up?
+        # TODO: review this 
+
+        for input_field in attrs.meta.input_fields:
+            for in_symbol in input_field:
+                in_name = in_symbol.name
+                check_attr_name(in_name, in_symbol, super_attrs, bases)
+                super_attrs[in_name] = in_symbol
+                attrs.meta.input_names.append(in_name)
+
+        for internal_field in attrs.meta.internal_fields:
+            internal_field.create_dataclass()
+
+        for output_field in attrs.meta.output_fields:
+            for out_symbol in output_field:
+                out_name = out_symbol.name
+                check_attr_name(out_name, out_symbol, super_attrs, bases)
+                super_attrs[out_name] = out_symbol
+                attrs.meta.output_names.append(out_name)
+            output_field.create_dataclass()
+
+        # process docstring / add simple equation
+        lhs_doc = ', '.join([out_name for out_name in attrs.meta.output_names])
+        arg_doc = ', '.join([arg_name for arg_name in attrs.meta.input_names])
+        orig_doc = attrs.get("__doc__", "")
+        super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
+
+
+        new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
+        # TODO: I'm surprised that this is necessary to avoid duplciating the mutable
+        # default subclasses list; but this works on the cases I have
+        new_cls._meta = replace(attrs.meta)
+
+        # creating an InnerClass
+        # inner_to kwarg is added to InnerModel  template definition or for subclasses
+        # of innermodel templates, in InnerModel.__new__. For subclasses of template,
+        # reference to base is inner_through
+        new_cls.inner_to = inner_to
+        if inner_to:
+            # TODO: other validation?
+            if new_cls.__name__ in inner_to.__dict__:
+                raise ValueError
+
+            subclass_of_inner = False
+            for base in new_cls.__bases__:
+                if base is not Model:
+                    if base in inner_to._meta.inner_models:
+                        subclass_of_inner = True
+                        break
+                        # TODO: base is ~ the field that cls should be added to...
+                        # This could all be in ModelType.__new__, inner_to is in kwargs
+
+            if subclass_of_inner:
+                # register as symbol of field, not directly added
+                if not inner_through:
+                    raise ValueError
+            else:
+                # create as field
+                inner_to._meta.inner_models.append(new_cls)
+                setattr(inner_to, new_cls.__name__, new_cls)
+                new_cls.__copy_fields__ = copy_fields
+
+        if inner_through:
+            # create links
+            inner_through.register(new_cls)
+            new_cls.inner_through = inner_through
+            new_cls.inner_to = inner_through.inner_to
+
+        elif bases and bases[0] is not Model:
+            bases[0].register(new_cls)
+
+
+        # Bind Fields and InnerModels -- require reference to constructed Model
+        for attr_name, attr_val in attrs.items():
+            if isinstance(attr_val, Field):
+                attr_val.bind(attr_name, new_cls)
+
+            if isinstance(attr_val, ModelType):
+                if attr_val.inner_to in bases and attr_val in attr_val.inner_to._meta.inner_models:
+                    # attr_val is an inner model to base, so this is a field-like inner
+                    # model that the user will sub-class
+
+                    # new_cls is a user model that inherits an inner model type
+
+                    use_bases = (InnerModel,)
+                    if Model in attr_val.__bases__ and len(attr_val.__bases__) == 1:
+                        pass
+                    else:
+                        raise NotImplemented
+                        # does this work?
+                        use_bases = use_bases + attr_val.__bases__
+
+                    # TODO: can we dry up all these extra args? or is it necessary to
+                    # specify these? or at leat document that this is where new features
+                    # on inner models need to be added, in addition to poping from
+                    # kwargs, etc. When reverting inner model stuff to InnerModel's init
+                    # subclass, may be more obvious
+
+                    attr_val = InnerModelType(
+                        attr_name,
+                        use_bases,
+                        attr_val.__original_attrs__,
+                        inner_to = new_cls,
+                        original_class = attr_val,
+                        copy_fields = attr_val.__copy_fields__,
+                    )
+                    setattr(new_cls, attr_name, attr_val)
+
+
+        # Bind implementation
+        implementation = None
+
+        if backend_options and backend.name in backend_options:
+            backend_option = {
+                k: v 
+                for k, v in backend_options[backend.name].__dict__.items()
+                if not k.startswith('__')
+            }
+            implementation = backend_option.pop('implementation', None)
+            if implementation is not None:
+                # inject so subclasses get this implementation
+                # TODO: a better way? registration? etc?
+                backend.implementation.__dict__[name] = implementation
+
+            # TODO: other validation?
+            # TODO: inherit options? No, defaults come from implementation itself
+        else:
+            backend_option = {}
+
+        if implementation is None:
+            # TODO: search MRO?
+            for base in bases:
+                if (
+                    isinstance(base, ModelType) and 
+                    (base.__name__ in backend.implementations.__dict__)
+                ):
+                    # TODO: or are these directly on backend along with symbol_class,
+                    # symbol_generator, and other things are in a utils submodule?
+                    implementation = getattr(
+                        backend.implementations,
+                        base.__name__
+                    )
+                    break
+
+        if implementation is not None:
+            cls.finalize_input_fields(new_cls)
+            new_cls.implementation = implementation(new_cls, **backend_option)
+
+            for field in attrs.meta.all_fields:
+                field.bind_dataclass()
+
+        for field in attrs.meta.independent_fields:
+            for symbol_idx, symbol in enumerate(field):
+                setattr(new_cls, symbol.name, symbol)
+
+        return new_cls
+
+    def finalize_input_fields(cls):
+        for input_field in cls._meta.input_fields:
+            input_field.create_dataclass()
+
+
+    def register(cls, subclass):
+        cls._meta.subclasses.append(subclass)
+
+
+def check_attr_name(attr_name, attr_val, super_attrs, bases):
+    # TODO: this needs to also be called to check on bases dict to prevent creating a
+    # symbol with the name of state? I think?
+
+    if attr_name in ['__module__', '__qualname__', '__doc__']:
+        return
+
+    if len(bases) == 1 and bases[0] == Model:
+        # Skip model types
+        # TODO: is there a better way to capture it's a model type? No symbols, but
+        # fields?
+        return
+
+
+    attr_val_backend = getattr(attr_val, 'backend_repr', None)
+    clash_value = super_attrs.get(attr_name, None)
+
+    if (
+        (
+            isinstance(attr_val_backend, backend.symbol_class)
+            and isinstance(clash_value, backend.symbol_class)
+        )
+    ):
+        if backend.utils.symbol_is(attr_val_backend, clash_value):
+            return
+
+    elif attr_val_backend == clash_value:
+        return
+
+    # TODO: if user-defined field starts with _, raise value error?
+
+    in_bases = False
+    for base in bases:
+        # TODO: only need to check the parent, not all bases?
+        if (
+            attr_name in base.__dict__ and
+            not (
+                getattr(attr_val, '_inherits_from', None) == getattr(base, attr_name)
+                or attr_val == getattr(base, attr_name)
+                or isinstance(attr_val, backend.symbol_class)
+            )
+        ):
+            in_bases = True
+            break
+
+    if (attr_name in super_attrs and super_attrs[attr_name] is not attr_val) or in_bases:
+        clash_source = None
+        if in_bases:
+            clash_source = base
+        elif hasattr(super_attrs[attr_name], 'inherits_from'):
+            clash_source = super_attrs[attr_name].inherits_from
+        if clash_source:
+            clash_string = f" on {clash_source}"
+        else:
+            clash_string = ""
+        raise NameError(f"Attempting to assign attribute {attr_name} which already exists{clash_string}")
+
+class Model(metaclass=ModelType):
+    """
+    Define a Model Template  by subclassing Model, creating field types, and writing an
+    implementation.
+    """
+    def __init__(self, *args, name='', **kwargs):
+        cls = self.__class__
+        self.name = name
+        # bind *args and **kwargs to to appropriate signature
+        # TODO: is there a better way to do this?
+        input_kwargs = {}
+        for input_name, input_val in zip(cls._meta.input_names, args):
+            if input_name in kwargs:
+                raise ValueError(f"Argument {input_name} has value {input_val} from args and {kwargs[input_name]} from kwargs")
+            input_kwargs[input_name] = input_val
+        input_kwargs.update(kwargs)
+        missing_args = []
+        extra_args = []
+        self.input_kwargs = {}
+        for name in cls._meta.input_names:
+            if name in input_kwargs:
+                self.input_kwargs[name] = input_kwargs[name]
+            else:
+                missing_args.append(name)
+
+
+        # TODO: skip this one with a flag?
+        for key in kwargs:
+            if key not in self.input_kwargs:
+                extra_args.append(key)
+
+        if missing_args or extra_args:
+            error_message = f"While calling {cls.__name__}, "
+            if extra_args:
+                error_message += f"recieved extra arguments: {extra_args}"
+            if extra_args and missing_args:
+                error_message += " and "
+            if missing_args:
+                error_message += f"missing arguments: {missing_args}"
+            raise ValueError(error_message)
+
+        # TODO: check bounds on model inputs?
+
+        # pack into dot-able storage, over-writting fields and symbols
+        self.bind_input_fields()
+
+        cls.implementation(self, *list(self.input_kwargs.values()))
+
+        # generally implementations are responsible for binding computed values.
+        # implementations know about models, models don't know about implementations
+        if False:
+            self.output_kwargs = output_kwargs = {
+                out_name: getattr(self, out_name)
+                for field in cls._meta.output_fields
+                for out_name in field.list_of('name')
+            }
+
+        self.bind_submodels()
+
+
+    def bind_input_fields(self):
+        cls = self.__class__
+        all_values = list(self.input_kwargs.values())
+
+        slice_start = 0
+        for field in cls._meta.input_fields:
+            slice_end = slice_start + len(field)
+            values = all_values[slice_start: slice_end]
+            slice_start = slice_end
+            self.bind_field(field, values, symbols_to_instance=True, wrap=False)
+
+    def bind_field(self, field, values, symbols_to_instance=True, wrap=True):
+        dataclass_kwarg = {}
+        if wrap:
+            values = backend.wrap(field, values)
+        for symbol_name, value in zip(field.list_of('name'), values):
+            dataclass_kwarg[symbol_name] = value
+            if symbols_to_instance:
+                setattr(self, symbol_name, value)
+        setattr(self, field._name, field._dataclass(**dataclass_kwarg))
+
+    def __iter__(self):
+        cls = self.__class__
+        for output_name in cls._meta.output_names:
+            yield getattr(self, output_name)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
+
+    def bind_submodels(model_instance):
+        # TODO: how to have models cache previous results so this is always free?
+        # Can imagine a parent model with multiple instances of the exact same
+        # sub-model called with different parameters. Would need to memoize at least
+        # that many calls, possibly more.
+
+        # if model instance created with `name` attribute, result will be bound to that
+        # name not the assigned name, but assigned name can still be used during model
+        # definition
+        model = model_instance.__class__
+        model_assignments = {}
+
+        fields = [
+            field
+            for field in model._meta.input_fields + model._meta.output_fields
+            if isinstance(field, IndependentField)
+        ]
+        for field in fields:
+            model_instance_field = getattr(model_instance, field._name)
+            model_instance_field_dict = asdict(model_instance_field)
+            model_assignments.update({
+                elem.backend_repr: val
+                for elem, val in zip(field, model_instance_field_dict.values())
+            })
+
+        if not model._meta.bind_submodels:
+            return
+
+        for sub_model_ref_name, sub_model_instance in model._meta.sub_models.items():
+            sub_model = sub_model_instance.__class__
+            sub_model_kwargs = {}
+
+            for field in sub_model._meta.input_fields:
+                bound_field = getattr(sub_model_instance, field._name)
+                bound_field_dict = asdict(bound_field)
+                for k,v in bound_field_dict.items():
+                    if not isinstance(v, backend.symbol_class):
+                        sub_model_kwargs[k] = v
+                    else:
+                        value_found = False
+                        for kk, vv in model_assignments.items():
+                            if backend.utils.symbol_is(v, kk):
+                                value_found = True
+                                break
+                        sub_model_kwargs[k] = vv
+                        if not value_found:
+                            sub_model_kwargs[k] = backend.utils.evalf(
+                                v, model_assignments
+                            )
+
+            bound_sub_model = sub_model(**sub_model_kwargs)
+            setattr(model_instance, sub_model_ref_name, bound_sub_model)
+
+
+"""
+Do we need class inheritance?
+
+Case 1: defining a new model template -- very fiew fields, just copy and paste;
+manipulate and re-use implementaitons etc
+
+Case 2: defining a new user model -- use sub-models or functions that perform
+declarative operations for you? Need to think about this, I guess it should be possible
+to support but probably better performance for functions. Could only be the same type??
+I think relies on a get_or_create so variables can be re-used. Or maybe it really needs
+substitution mechanism from placeholders which could be fine, this pattern came from
+inheriting fields...
+
+class inheritance would be a mechanism to translate ODE to DAE -- seems useful.
+
+Case 3: Inner model version of same...
+Not sure if it's a true inner model, but definitely need some capability to re-use both
+Model and ModelTemplate on different "outer" model/template. 
+
+rename:
+submodel --> embedded_model, generally no back reference
+innermodel --> submodel, so inner_to is supermodel? parent? need to distinguish from
+assembly relationship, I think? although I did wonder if assembly is just a special type
+of submodel -- in both cases, want to generalize so templates can handle multiple
+sub-types? Thinking of LinCov and adding noise to event, but maybe I only want to
+support ODE vs DAE which is slightly different?
+
+new gascon's library of components will need something like condor-flight's
+"placeholder" field. Is this a field that is always useful for building library's? and
+the metatype that goes through the output fields and does the substitutions when users
+create their version? -- this is another *type* of declaration that needs a name. It's
+more than a model template, but not yet a user model.
+
+and, is it always used in assembly models? condor flight is a very structured assembly
+-- planet (or really, baricenter/ central body), vehicles that must have planet parent,
+then event/mode on vehicles... seems like there may be a relationship btwn placeholder
+and assembly.
+
+also, simulate "freezes" the assembly, which has been extremely useful for free drift
+stuff, may be a nice mechanism for gasp missions, although maybe the "segment assembly"
+and "operator" approach could be even better?? 
+
+I guess we can just expect to provide class methods on assembly models that perform
+symbolic operations on what currently exists? I think at that point, placeholders would
+have been substituted for their values or appropriate field elements; so AssemblyModel
+type can provide utility methods for tree traversal but users just define their own
+thing. Maybe it needs to get wrapped in something like a model? not so different from
+Vehicle's solve -
+
+Or an "Airplane" submodel that acts on root component (maybe an OML body, ? maybe user
+choice) which freezes thing, then Airplane has to have inputs bound and has the instance
+methods for operating? But actually something like aero and propulsion still need to
+create something like an explicit system (maybe it would be unique for gascon, something
+like "dynamic/performance component" or something). 
+
+Maybe "Design" off of the root of the node? And that's what gets named by a particular
+airplane? And root is just body. And then can even tree off the design for the
+performance? Point performance modules, a "mission" is a path on the tree from design,
+ground roll etc. can branch from mission to do OEI, etc.
+
+
+Re: simulate to freeze:
+Is it more efficient to have each free drift go through the whole sim, instead of saving
+the state and re-initializing each segment separately? For RPOD trajectory design,
+perhaps that would be a time when forward mode would be better... and is
+forward-over-adjoint ALWAYS better? or is there a scenario in which forward-over-forward
+(directional) is better?
+
+
+both InnerModel and Model have the same 3 cases: core, template, user; Model "knows"
+about InnerModel -- can we fix that?
+Is there a better way to handle the 3 cases, or is it acceptable that the same metaclass
+has to do all 3?
+
+There are possibly 2 more: Model with placeholder (LibraryModel??), and AssemblyModel.
+It sould be nice if all 3 sub-types could be mixed-and-matched.
+
+Also, want a singleton placeholder element or descriptor -- basically a placeholder
+field on models where users aren't adding elements. could be a detached field in Condor
+that template makers can use? Actually, the use cases I'm thinking of
+(OptimizationProblem.objective, Gascon.OMLComponent.Aero.{CL, CD},
+Gascon.Propulsor.Propulsion.thrust, ) are outputs with
+defaults -- its own field.
+
+what about tf (I guess could be an expression)
+
+submodels from atmosphere etc models from Condor-Flight?
+
+
+placeholders: elements defined by library creators to allow user inputs; condor provides
+substitution mechanisms, etc. ~ expected uer input
+
+submodels are mdoels that don't make sense w/o their parent, maybe add configuration (like
+singleton). inner_to arg becomes modifying? because submodels only exist to modify their
+parent?  maybe submodel modifies its superior? 
+
+
+A user Model with a parent, a ModelTemplate with a parent is a submodel
+ (possibly only Assembly models will allow user model to set a parent)
+
+assemblies make sense on their own, so user must define relationship, and be able to
+attach/be adopted/assign/etc. after model definition. -- hook for symbolic processing at
+attachment?
+are assmeblies just a special type for library makers to define useful datastructures?
+need a submodel/type to actually operate on them and do computation...not sure what an
+assembly of (mix and match) explicit systems, algebraic, etc would even be!
+Actually, if computation is always on some end-point submodel, can do all processing
+htere? Yes, assembly components are JUST a datastructure ot define inputs, it solves the
+the sensor model problem from LinCov demo to automatically handle creating parameters, a
+few things about accessing namespace, etc. 
+
+flags/controls to conntrol inheritance:
+"as_template" flag -- dry way to create new but related templates similar to user model
+inheritance
+parent relationship inheritance: what gets shared vs copied vs. ??
+copied --> computation/end-point submodel
+
+TrajectoryAnalysis should get extra flags for keep/skip events and modes
+
+
+
+
+"""
+class InnerModelType(ModelType):
+    def __iter__(cls):
+        for subclass in cls.subclasses:
+            yield subclass
+
+    @classmethod
+    def __prepare__(cls, model_name, bases, inner_to=None, original_class=None, **kwds):
+        case1 = model_name == "InnerModel"
+        case2 = inner_to is not None and original_class is not None
+        case3 = not case1 and not case2
+
+        if case1 or case2:
+            return super().__prepare__(
+                model_name, bases, inner_to=inner_to, **kwds
+            )
+
+        if case3:
+            return bases[0].original_class.__prepare__(
+                model_name, bases, inner_to=inner_to, **kwds
+            )
+
+    def __new__(cls, model_name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
+        # case 1: InnerModel definition
+        # case 2: library inner model inherited to user model through user model's __new__
+        # (inner model template)
+        # case 3: subclass of inherited inner model -- user defined model
+        case1 = model_name == "InnerModel"
+        case2 = inner_to is not None and original_class is not None
+        case3 = not case1 and not case2
+
+        if case1 or case2:
+            new_cls = super().__new__(cls, model_name, bases, attrs, inner_to=inner_to, **kwargs)
+
+        if case2:
+            new_cls.original_class = original_class
+            # reference to original class so uer sub-classes inherit directly, see below
+
+        if case3:
+            if len(bases) > 1:
+                raise ValueError
+            inner_through = bases[0]
+            original_class = inner_through.original_class
+            # subclass original class, inheriting
+            # will inherit inner_to from original_class
+            new_cls = original_class.__class__(model_name, (original_class,), attrs,
+                                               inner_through=inner_through, **kwargs)
+
+        return new_cls
+
+
+class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
+    """
+    Create an inner model template  by assigning an inner_to keyward arguement during
+    model template definition. The argument references another model template (which
+    becomes the "outer model"). Then a user outer model (a subclass of the inner model
+    template which is bound to outer model) can create multiple subclass of the 
+    InnerModel by sub-classing from <outer_model>.<inner_model template>
+    """
+    pass
