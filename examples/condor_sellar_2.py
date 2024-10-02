@@ -42,15 +42,13 @@ class Sellar(co.OptimizationProblem):
             #maxiter = 2
 
 Sellar.implementation.set_initial(x=1., z=[5., 2.,])
-Sellar._meta.bind_submodels = False
-sellar_opt2 = Sellar()
+Sellar._meta.bind_embedded_models = False
+sellar_opt = Sellar()
+
 
 toc = time.perf_counter()
 print("total time:", toc - tic)
-import sys
-sys.exit()
 
-for con in Sellar.implementation.con:
-    print(con["fun"]([1,5,2], []))
-    print(con["jac"]([1,5,2], []))
+print(sellar_opt.coupling, sellar_opt.coupling.implicit_output)
+
 

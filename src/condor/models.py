@@ -76,8 +76,8 @@ class ModelMetaData:
     output_names: list = field(default_factory=list)
 
     inner_models: list = field(default_factory=list)
-    sub_models: dict = field(default_factory=dict)
-    bind_submodels: bool = True
+    embedded_models: dict = field(default_factory=dict)
+    bind_embedded_models: bool = True
 
     subclasses: list = field(init=False)
     inner_to: object = None
@@ -160,10 +160,10 @@ class CondorClassDict(dict):
                 self.meta.internal_fields.append(attr_val)
         if isinstance(attr_val.__class__, ModelType):
             if attr_val.name:
-                self.meta.sub_models[attr_val.name] = attr_val
+                self.meta.embedded_models[attr_val.name] = attr_val
                 super().__setitem__(attr_val.name, attr_val)
             else:
-                self.meta.sub_models[attr_name] = attr_val
+                self.meta.embedded_models[attr_name] = attr_val
         if isinstance(attr_val, backend.symbol_class):
             # from a IndependentField
             known_symbol_type = False
@@ -370,7 +370,7 @@ class ModelType(type):
         else:
             return f"<{cls.__name__}>"
 
-    def __new__(cls, model_name, bases, attrs, bind_submodels=True, name="", **kwargs):
+    def __new__(cls, model_name, bases, attrs, bind_embedded_models=True, name="", **kwargs):
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement.
         # case 2: ____ - library code that defines fields, etc that user code inherits
@@ -410,13 +410,13 @@ class ModelType(type):
         # outer model
         #attrs_from_outer = attrs.pop('__from_outer__', {})
         attrs_from_outer = attrs.from_outer #getattr(attrs, 'from_outer', {})
-        sub_models = attrs.meta.sub_models
-        attrs.meta.bind_submodels = bind_submodels
+        embedded_models = attrs.meta.embedded_models
+        attrs.meta.bind_embedded_models = bind_embedded_models
         for attr_name, attr_val in attrs_from_outer.items():
             if attrs[attr_name] is attr_val:
                 attrs.pop(attr_name)
-                if sub_models.get(attr_name, None) is attr_val:
-                    sub_models.pop(attr_name)
+                if embedded_models.get(attr_name, None) is attr_val:
+                    embedded_models.pop(attr_name)
             else:
                 # TODO: make this a warning/error? add test (really for all
                 # warning/error raise)
@@ -505,6 +505,8 @@ class ModelType(type):
                             assert issubclass(free_field._model, inner_to)
                         break
             if isinstance(attr_val, ModelType):
+                # not sure if this should really be Base or just Model? Or maybe inner
+                # by now...  TODO check isinstance type
                 if attr_val.inner_to in bases and attr_val in attr_val.inner_to._meta.inner_models:
                     # handle inner classes below, don't add to super
                     continue
@@ -613,6 +615,7 @@ class ModelType(type):
                 attr_val.bind(attr_name, new_cls)
 
             if isinstance(attr_val, ModelType):
+                # TODO check that this check is right...
                 if attr_val.inner_to in bases and attr_val in attr_val.inner_to._meta.inner_models:
                     # attr_val is an inner model to base, so this is a field-like inner
                     # model that the user will sub-class
@@ -815,7 +818,7 @@ class Model(metaclass=ModelType):
                 for out_name in field.list_of('name')
             }
 
-        self.bind_submodels()
+        self.bind_embedded_models()
 
 
     def bind_input_fields(self):
@@ -847,7 +850,7 @@ class Model(metaclass=ModelType):
     def __repr__(self):
         return f"<{self.__class__.__name__}: " + ", ".join([f"{k}={v}" for k, v in self.input_kwargs.items()]) + ">"
 
-    def bind_submodels(model_instance):
+    def bind_embedded_models(model_instance):
         # TODO: how to have models cache previous results so this is always free?
         # Can imagine a parent model with multiple instances of the exact same
         # sub-model called with different parameters. Would need to memoize at least
@@ -872,33 +875,41 @@ class Model(metaclass=ModelType):
                 for elem, val in zip(field, model_instance_field_dict.values())
             })
 
-        if not model._meta.bind_submodels:
+        if not model._meta.bind_embedded_models:
             return
 
-        for sub_model_ref_name, sub_model_instance in model._meta.sub_models.items():
-            sub_model = sub_model_instance.__class__
-            sub_model_kwargs = {}
+        for embedded_model_ref_name, embedded_model_instance in model._meta.embedded_models.items():
+            embedded_model = embedded_model_instance.__class__
+            embedded_model_kwargs = {}
 
-            for field in sub_model._meta.input_fields:
-                bound_field = getattr(sub_model_instance, field._name)
+            for field in embedded_model._meta.input_fields:
+                bound_field = getattr(embedded_model_instance, field._name)
                 bound_field_dict = asdict(bound_field)
                 for k,v in bound_field_dict.items():
                     if not isinstance(v, backend.symbol_class):
-                        sub_model_kwargs[k] = v
+                        embedded_model_kwargs[k] = v
                     else:
                         value_found = False
                         for kk, vv in model_assignments.items():
                             if backend.utils.symbol_is(v, kk):
                                 value_found = True
                                 break
-                        sub_model_kwargs[k] = vv
+                        embedded_model_kwargs[k] = vv
                         if not value_found:
-                            sub_model_kwargs[k] = backend.utils.evalf(
+                            embedded_model_kwargs[k] = backend.utils.evalf(
                                 v, model_assignments
                             )
 
-            bound_sub_model = sub_model(**sub_model_kwargs)
-            setattr(model_instance, sub_model_ref_name, bound_sub_model)
+            bound_embedded_model = embedded_model(**embedded_model_kwargs)
+            setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
+
+
+#class ModelType(ModelType):
+#    """Type class for user models"""
+#    pass
+
+#class Model(Model, metaclass=ModelType):
+#    """handles binding etc. for user models"""
 
 
 """
