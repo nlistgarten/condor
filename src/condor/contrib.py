@@ -3,7 +3,7 @@ from condor.fields import (
     IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
     BoundedAssignmentField, TrajectoryOutputField,
 )
-from condor.models import Model
+from condor.models import Model, ModelType, SubmodelType
 from condor.backends.default import backend
 
 class DeferredSystem(Model):
@@ -242,7 +242,7 @@ class ODESystem(Model):
 
 class TrajectoryAnalysis(
         Model,
-        inner_to=ODESystem,
+        primary=ODESystem,
         copy_fields=["parameter", "initial", "state", "dynamic_output"]
 ):
     """
@@ -267,7 +267,7 @@ class TrajectoryAnalysis(
 # new state) etc.
 # maybe allow creation of new parameters (into ODESystem parameter field), access to
 # state, etc.
-class Event(Model, inner_to = ODESystem):
+class Event(Model, primary = ODESystem):
     """
     update for any state that needs it
 
@@ -312,7 +312,7 @@ class Event(Model, inner_to = ODESystem):
 # and dot based on condition...
 # needs to inject on creation? Or is TrajectoryAnalysis implementation expected to
 # iterate Modes and inject? Then can add dot and make to copy_fields
-class Mode(Model, inner_to=ODESystem,):
+class Mode(Model, primary=ODESystem,):
     """
     convenience for defining conditional behavior for state dynamics and/or controls
     depending on `condition`. No condition to over-write behavior, essentially a way to
@@ -347,7 +347,7 @@ def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):
         else:
             # feedback control matching system
             u = -K@x
-            attrs["output"].u = u
+            attrs["dynamic_output"].u = u
 
         xdot += B@u
 
@@ -357,7 +357,7 @@ def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):
     plant = ModelType(name, (ODESystem,), attrs)
 
     if dt:
-        dt_attrs = InnerModelType.__prepare__("DT", (plant.Event,))
+        dt_attrs = SubmodelType.__prepare__("DT", (plant.Event,))
         #dt_attrs["function"] = np.sin(plant.t*np.pi/dt)
         dt_attrs["at_time"] = slice(None, None, dt)
         if dt_plant:
@@ -369,7 +369,7 @@ def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):
         elif B is not None:
             dt_attrs["update"][dt_attrs["u"]] = -K@x
             #dt_attrs["update"][dt_attrs["x"]] = x
-        DTclass = InnerModelType("DT", (plant.Event,), attrs=dt_attrs, )
+        DTclass = SubmodelType("DT", (plant.Event,), attrs=dt_attrs, )
 
     return plant
 

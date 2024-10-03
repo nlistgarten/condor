@@ -32,7 +32,7 @@ class SampledOptLQR(co.OptimizationProblem):
     objective = DblIntSampledLQR(K).cost
     class Casadi(co.Options):
         exact_hessian = False
-        method = OptimizationProblem.Method.scipy_cg
+        #method = OptimizationProblem.Method.scipy_cg
         #method = OptimizationProblem.Method.scipy_trust_constr
 
 

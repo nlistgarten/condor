@@ -16,12 +16,12 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     Q = np.eye(2)
     R = np.eye(1)
     tf = 32.
-    u = output.u
+    u = dynamic_output.u
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
 
     class Casadi(co.Options):
         state_rtol=1E-7
-        #adjoint_rtol=1E-9
+        adjoint_rtol=1E-9
 
 
 

@@ -46,7 +46,7 @@ takes advantage of model attributes just like backend implementation
 
 
 I assume a user model/library code could inject an implementation to the backend?
-not sure how to assign special numeric stuff, probably an inner class on the model
+not sure how to assign special numeric stuff, probably an submodel class on the model
 based on NPSS discussion it's not really needed if it's done right 
 
 For injecting a default implementation (e.g., new backend) this does work:
@@ -75,12 +75,13 @@ class ModelMetaData:
     input_names: list = field(default_factory=list)
     output_names: list = field(default_factory=list)
 
-    inner_models: list = field(default_factory=list)
+    submodels: list = field(default_factory=list)
     embedded_models: dict = field(default_factory=dict)
     bind_embedded_models: bool = True
 
     subclasses: list = field(init=False)
-    inner_to: object = None
+    primary: object = None
+    template: object = None
 
     def __post_init__(self):
         self.subclasses = []
@@ -97,17 +98,17 @@ class ModelMetaData:
 
 # appears in __new__ as attrs
 class CondorClassDict(dict):
-    def __init__(self, *args, model_name='', copy_fields=[], inner_to=None,  **kwargs):
+    def __init__(self, *args, model_name='', copy_fields=[], primary=None,  **kwargs):
         super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
         self.from_outer = {}
-        self.meta = ModelMetaData(inner_to=inner_to)
+        self.meta = ModelMetaData(primary=primary)
         self.model_name=model_name,
         self.copy_fields = copy_fields
-        self.inner_to = inner_to
-        if inner_to is None:
-            self.inner_independent_fields = []
+        self.primary = primary
+        if primary is None:
+            self.primary_independent_fields = []
         else:
-            self.inner_independent_fields = [f for f in inner_to._meta.independent_fields]
+            self.primary_independent_fields = [f for f in primary._meta.independent_fields]
         self.kwargs = kwargs
         self.args = args
 
@@ -168,7 +169,7 @@ class CondorClassDict(dict):
             # from a IndependentField
             known_symbol_type = False
 
-            for free_field in self.meta.independent_fields + self.inner_independent_fields:
+            for free_field in self.meta.independent_fields + self.primary_independent_fields:
                 symbol = free_field.get(backend_repr=attr_val)
                 # not a list (empty or len > 1)
                 if isinstance(symbol, BaseSymbol):
@@ -213,7 +214,7 @@ class CondorClassDict(dict):
 # that are used on every call
 class Options:
     """
-    Class mix-in to flag back-end options. Define an inner class on the model that
+    Class mix-in to flag back-end options. Define an submodel class on the model that
     inherits from Options that over-writes options for the backend's implementation
     (which generates a callable). Model will transparently pass attributes of Options
     subclass. Possibly only convention, but name the subclass according to the backend.
@@ -290,12 +291,12 @@ class ModelType(type):
         cls_dict = CondorClassDict(
             model_name=model_name,
             copy_fields = kwds.pop('copy_fields', []),
-            inner_to = kwds.pop('inner_to', None),
+            primary = kwds.pop('primary', None),
             **sup_dict,
         )
 
         # TODO: may need to search MRO resolution, not just bases, which without mixins
-        # are just singletons. For fields and inner classes, since each generation of
+        # are just singletons. For fields and submodel classes, since each generation of
         # class is getting re-inherited, this is sufficient. 
         for base in bases:
             _dict = base.__dict__
@@ -308,27 +309,27 @@ class ModelType(type):
                         if isinstance(init_v, Field):
                             # TODO not sure this will be the best way to remap connected
                             # fields based on inheritance, but maybe sufficient?
-                            if base.inner_to and init_v._name in base.inner_to.__dict__:
-                                get_from = base.inner_to.__dict__
+                            if base.primary and init_v._name in base.primary.__dict__:
+                                get_from = base.primary.__dict__
                             else:
                                 get_from = cls_dict
                             v_init_kwargs[init_k] = get_from[init_v._name]
                     cls_dict[k] = v.inherit(
                         model_name, field_type_name=k, **v_init_kwargs
                     )
-                # inherit inner model from base, create reference now, bind in new
+                # inherit submodels model from base, create reference now, bind in new
                 elif isinstance(v, ModelType):
-                    if v.inner_to is base and v in base._meta.inner_models:
-                        # inner model inheritance & binding in new
+                    if v.primary is base and v in base._meta.submodels:
+                        # submodel inheritance & binding in new
                         cls_dict[k] = v
                 elif isinstance(v, backend.symbol_class):
                     cls_dict[k] = v
 
-            # if base is an inner model, make reference  of outer model attributes
+            # if base is an submodel, make reference  of outer model attributes
             # and copy fields from class __copy_fields__ kwarg definition. This allows
-            # inner field to modify local copy without affecting outer model
-            if base is not Model and base.inner_to:
-                for attr_name, attr_val in base.inner_to.__original_attrs__.items():
+            # submodel field to modify local copy without affecting outer model
+            if base is not Model and base.primary:
+                for attr_name, attr_val in base.primary.__original_attrs__.items():
                     # TODO: document copy fields? can this get DRY'd up?
                     # don't like that symbol copying is here, maybe should be method on
                     # field?
@@ -339,8 +340,8 @@ class ModelType(type):
                             if isinstance(init_v, Field):
                                 # TODO not sure this will be the best way to remap connected
                                 # fields based on inheritance, but maybe sufficient?
-                                if not init_v._name in base.__copy_fields__ and _base.inner_to and init_v._name in base.inner_to.__dict__:
-                                    get_from = base.inner_to.__dict__
+                                if not init_v._name in base.__copy_fields__ and _base.primary and init_v._name in base.primary.__dict__:
+                                    get_from = base.primary.__dict__
                                 else:
                                     get_from = cls_dict
                                 v_init_kwargs[init_k] = get_from[init_v._name]
@@ -355,8 +356,8 @@ class ModelType(type):
 
                     cls_dict[attr_name] = attr_val
                 # TODO: document __from_outer__?
-                cls_dict.set_outer(**base.inner_to.__original_attrs__)
-        # TODO: is it better to do inner model magic in InnerModelType.__prepare__?
+                cls_dict.set_outer(**base.primary.__original_attrs__)
+        # TODO: is it better to do submodel magic in SubmodelType.__prepare__?
 
 
         return cls_dict
@@ -379,10 +380,10 @@ class ModelType(type):
         # case 3: User Model - inherits from ____, defines the actual model that is
         # being analyzed
         # case 4: Subclass of user model to extend it?
-        # I don't think InnerModel deviates from this, except perhaps disallowing
+        # I don't think Submodel deviates from this, except perhaps disallowing
         # case 4
         # Generally, bases arg will be len <= 1. Just from the previous level. Is there
-        # a case for mixins? InnerModel approach seems decent, could repeat for
+        # a case for mixins? Submodel approach seems decent, could repeat for
         # WithDeferredSubsystems, then Model layer is quite complete 
 
         # TODO: add support for inheriting other models -- subclasses are
@@ -394,8 +395,8 @@ class ModelType(type):
             name = model_name
 
 
-        # TODO: thought hooks might be necessary for inner model/deferred subsystems,
-        # but inner model worked well. If needed, this is a decent prototype:
+        # TODO: thought hooks might be necessary for submodel model/deferred subsystems,
+        # but submodel worked well. If needed, this is a decent prototype:
         # ACTUALLY -- subclass of ModelType should be used, can do things before/after
         # calling super new?
         pre_super_new_hook = attrs.pop('pre_super_new_attr_hook', None)
@@ -404,9 +405,9 @@ class ModelType(type):
         # pre_new_attr_hook(new_cls, attr_name, attr_val)
 
 
-        # __from_outer__ attribute is attached to InnerModel`s during __prepare__ to
+        # __from_outer__ attribute is attached to Submodel`s during __prepare__ to
         # give references to IndependentVariable backend_repr`s conveniently for
-        # constructing InnerModel symbols. They get cleaned up since they live in the
+        # constructing Submodel symbols. They get cleaned up since they live in the
         # outer model
         #attrs_from_outer = attrs.pop('__from_outer__', {})
         attrs_from_outer = attrs.from_outer #getattr(attrs, 'from_outer', {})
@@ -431,18 +432,18 @@ class ModelType(type):
 
         # perform as much processing as possible before caller super().__new__
         # by building up super_attrs from attrs; some operations need to operate on the
-        # constructed class, like binding fields and innermodels
+        # constructed class, like binding fields and submodels
 
         super_attrs = {}
 
         if bases:
             super_attrs['_parent_name'] = bases[0].__name__
-            if 'inner_to' not in kwargs and bases[0] is not Model and bases[0].inner_to:
-                kwargs['inner_to'] = bases[0].inner_to
+            if 'primary' not in kwargs and bases[0] is not Model and bases[0].primary:
+                kwargs['primary'] = bases[0].primary
         else:
             super_attrs['_parent_name'] = ''
 
-        inner_to=kwargs.pop('inner_to', None)
+        primary=kwargs.pop('primary', None)
         inner_through=kwargs.pop('inner_through', None)
         copy_fields=kwargs.pop('copy_fields', [])
 
@@ -502,16 +503,17 @@ class ModelType(type):
                         pass_attr = free_field._model is not None
                         if pass_attr:
                             # TODO is this kind of defensive checking useful?
-                            assert issubclass(free_field._model, inner_to)
+                            assert issubclass(free_field._model, primary)
                         break
             if isinstance(attr_val, ModelType):
-                # not sure if this should really be Base or just Model? Or maybe inner
-                # by now...  TODO check isinstance type
-                if attr_val.inner_to in bases and attr_val in attr_val.inner_to._meta.inner_models:
-                    # handle inner classes below, don't add to super
+                # not sure if this should really be Base or just Model? Or maybe
+                # submodel by now...  
+                # TODO check isinstance type
+                if attr_val.primary in bases and attr_val in attr_val.primary._meta.submodels:
+                    # handle submodel classes below, don't add to super
                     continue
 
-            # Options, InnerModel, and IndependentSymbol are not added here
+            # Options, Subodel, and IndependentSymbol are not added here
             if pass_attr:
                 check_attr_name(attr_name, attr_val, super_attrs, bases)
                 super_attrs[attr_name] = attr_val
@@ -536,7 +538,7 @@ class ModelType(type):
         # and should be not be finalized until a trajectory analysis, which has its own
         # copy. state must be fully defined by ODEsystem and can/should be finalized.
         # What about output? Should fields have an optional skip_finalize or something
-        # that for when an inner class may modify it so don't finalize? And is that the
+        # that for when an submodel class may modify it so don't finalize? And is that the
         # only time it would come up?
         # TODO: review this 
 
@@ -570,59 +572,59 @@ class ModelType(type):
         # default subclasses list; but this works on the cases I have
         new_cls._meta = replace(attrs.meta)
 
-        # creating an InnerClass
-        # inner_to kwarg is added to InnerModel  template definition or for subclasses
-        # of innermodel templates, in InnerModel.__new__. For subclasses of template,
+        # creating an SubmodelClass
+        # primary kwarg is added to Submodel  template definition or for subclasses
+        # of submodel templates, in Submodel.__new__. For subclasses of template,
         # reference to base is inner_through
-        new_cls.inner_to = inner_to
-        if inner_to:
+        new_cls.primary = primary
+        if primary:
             # TODO: other validation?
-            if new_cls.__name__ in inner_to.__dict__:
+            if new_cls.__name__ in primary.__dict__:
                 raise ValueError
 
-            subclass_of_inner = False
+            user_submodel = False
             for base in new_cls.__bases__:
                 if base is not Model:
-                    if base in inner_to._meta.inner_models:
-                        subclass_of_inner = True
+                    if base in primary._meta.submodels:
+                        user_submodel = True
                         break
                         # TODO: base is ~ the field that cls should be added to...
-                        # This could all be in ModelType.__new__, inner_to is in kwargs
+                        # This could all be in ModelType.__new__, primary is in kwargs
 
-            if subclass_of_inner:
+            if user_submodel:
                 # register as symbol of field, not directly added
                 if not inner_through:
                     raise ValueError
             else:
                 # create as field
-                inner_to._meta.inner_models.append(new_cls)
-                setattr(inner_to, new_cls.__name__, new_cls)
+                primary._meta.submodels.append(new_cls)
+                setattr(primary, new_cls.__name__, new_cls)
                 new_cls.__copy_fields__ = copy_fields
 
         if inner_through:
             # create links
             inner_through.register(new_cls)
             new_cls.inner_through = inner_through
-            new_cls.inner_to = inner_through.inner_to
+            new_cls.primary = inner_through.primary
 
         elif bases and bases[0] is not Model:
             bases[0].register(new_cls)
 
 
-        # Bind Fields and InnerModels -- require reference to constructed Model
+        # Bind Fields and Submodels -- require reference to constructed Model
         for attr_name, attr_val in attrs.items():
             if isinstance(attr_val, Field):
                 attr_val.bind(attr_name, new_cls)
 
             if isinstance(attr_val, ModelType):
                 # TODO check that this check is right...
-                if attr_val.inner_to in bases and attr_val in attr_val.inner_to._meta.inner_models:
-                    # attr_val is an inner model to base, so this is a field-like inner
+                if attr_val.primary in bases and attr_val in attr_val.primary._meta.submodels:
+                    # attr_val is an submodel to base, so this is a field-like submodel
                     # model that the user will sub-class
 
-                    # new_cls is a user model that inherits an inner model type
+                    # new_cls is a user model that inherits an submodel type
 
-                    use_bases = (InnerModel,)
+                    use_bases = (Submodel,)
                     if Model in attr_val.__bases__ and len(attr_val.__bases__) == 1:
                         pass
                     else:
@@ -632,15 +634,15 @@ class ModelType(type):
 
                     # TODO: can we dry up all these extra args? or is it necessary to
                     # specify these? or at leat document that this is where new features
-                    # on inner models need to be added, in addition to poping from
-                    # kwargs, etc. When reverting inner model stuff to InnerModel's init
+                    # on sub models need to be added, in addition to poping from
+                    # kwargs, etc. When reverting sub model stuff to Submodel's init
                     # subclass, may be more obvious
 
-                    attr_val = InnerModelType(
+                    attr_val = SubmodelType(
                         attr_name,
                         use_bases,
                         attr_val.__original_attrs__,
-                        inner_to = new_cls,
+                        primary = new_cls,
                         original_class = attr_val,
                         copy_fields = attr_val.__copy_fields__,
                     )
@@ -927,7 +929,7 @@ inheriting fields...
 
 class inheritance would be a mechanism to translate ODE to DAE -- seems useful.
 
-Case 3: Inner model version of same...
+Case 3: Submodel version of same...
 Not sure if it's a true inner model, but definitely need some capability to re-use both
 Model and ModelTemplate on different "outer" model/template. 
 
@@ -1035,38 +1037,38 @@ TrajectoryAnalysis should get extra flags for keep/skip events and modes
 
 
 """
-class InnerModelType(ModelType):
+class SubmodelType(ModelType):
     def __iter__(cls):
         for subclass in cls.subclasses:
             yield subclass
 
     @classmethod
-    def __prepare__(cls, model_name, bases, inner_to=None, original_class=None, **kwds):
-        case1 = model_name == "InnerModel"
-        case2 = inner_to is not None and original_class is not None
+    def __prepare__(cls, model_name, bases, primary=None, original_class=None, **kwds):
+        case1 = model_name == "Submodel"
+        case2 = primary is not None and original_class is not None
         case3 = not case1 and not case2
 
         if case1 or case2:
             return super().__prepare__(
-                model_name, bases, inner_to=inner_to, **kwds
+                model_name, bases, primary=primary, **kwds
             )
 
         if case3:
             return bases[0].original_class.__prepare__(
-                model_name, bases, inner_to=inner_to, **kwds
+                model_name, bases, primary=primary, **kwds
             )
 
-    def __new__(cls, model_name, bases, attrs, inner_to=None, original_class = None,  **kwargs):
-        # case 1: InnerModel definition
-        # case 2: library inner model inherited to user model through user model's __new__
-        # (inner model template)
-        # case 3: subclass of inherited inner model -- user defined model
-        case1 = model_name == "InnerModel"
-        case2 = inner_to is not None and original_class is not None
+    def __new__(cls, model_name, bases, attrs, primary=None, original_class = None,  **kwargs):
+        # case 1: Submodel definition
+        # case 2: library submodel inherited to user model through user model's __new__
+        # (submodel template)
+        # case 3: subclass of inherited submodel -- user defined model
+        case1 = model_name == "Submodel"
+        case2 = primary is not None and original_class is not None
         case3 = not case1 and not case2
 
         if case1 or case2:
-            new_cls = super().__new__(cls, model_name, bases, attrs, inner_to=inner_to, **kwargs)
+            new_cls = super().__new__(cls, model_name, bases, attrs, primary=primary, **kwargs)
 
         if case2:
             new_cls.original_class = original_class
@@ -1075,22 +1077,24 @@ class InnerModelType(ModelType):
         if case3:
             if len(bases) > 1:
                 raise ValueError
+            # going to leave inner_through and hope after clean up it wont be necessary
+            # -- all metas should include template
             inner_through = bases[0]
             original_class = inner_through.original_class
             # subclass original class, inheriting
-            # will inherit inner_to from original_class
+            # will inherit primary from original_class
             new_cls = original_class.__class__(model_name, (original_class,), attrs,
                                                inner_through=inner_through, **kwargs)
 
         return new_cls
 
 
-class InnerModel(Model, metaclass=InnerModelType, inner_to=None):
+class Submodel(Model, metaclass=SubmodelType, primary=None):
     """
-    Create an inner model template  by assigning an inner_to keyward arguement during
+    Create an submodel template  by assigning an primary keyward arguement during
     model template definition. The argument references another model template (which
-    becomes the "outer model"). Then a user outer model (a subclass of the inner model
+    becomes the "outer model"). Then a user outer model (a subclass of the submodel
     template which is bound to outer model) can create multiple subclass of the 
-    InnerModel by sub-classing from <outer_model>.<inner_model template>
+    Submodel by sub-classing from <outer_model>.<submodel template>
     """
     pass

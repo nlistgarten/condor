@@ -8,4 +8,4 @@ from dataclasses import asdict, dataclass, field, replace
 from condor._version import __version__
 from condor.backends.default import backend
 from condor.contrib import *
-from condor.models import InnerModel, InnerModelType, Options
+from condor.models import Options
