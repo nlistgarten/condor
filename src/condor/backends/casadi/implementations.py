@@ -626,7 +626,8 @@ class OptimizationProblem(InitializerMixin):
                 args = extra_args,
                 constraints = scipy_constraints,
                 bounds = np.vstack([self.lbx, self.ubx]).T,
-                tol = 1E-9,
+                #tol = 1E-9,
+
                 #options=dict(disp=True),
                 options=self.options,
             )

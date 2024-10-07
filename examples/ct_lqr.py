@@ -20,8 +20,9 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
 
     class Casadi(co.Options):
-        state_rtol=1E-7
-        adjoint_rtol=1E-9
+        state_rtol=1E-8
+        adjoint_rtol=1E-8
+        pass
 
 
 

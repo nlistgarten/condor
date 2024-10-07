@@ -79,9 +79,20 @@ class ModelMetaData:
     embedded_models: dict = field(default_factory=dict)
     bind_embedded_models: bool = True
 
+    template: object = None
+
+
+    # primary only needed for submodels, maybe also subclasses?
     subclasses: list = field(init=False)
     primary: object = None
-    template: object = None
+
+    # assembly/component can also get children/parent
+    # assembly/components get inheritance rules? yes, submodels don't need it -- only
+    # attach to primary. or should events be assemblies to re-use them? probably not --
+    # re-use other things and embed but update itself is ODE system specific
+
+    # trajectory analysis gets an "exclude_modes" and "exclude_events" list?
+    # no -- the metaclass gets kwarg and copies the events that will be kept
 
     def __post_init__(self):
         self.subclasses = []
@@ -159,7 +170,7 @@ class CondorClassDict(dict):
                 self.meta.output_fields.append(attr_val)
             if attr_val._direction == Direction.internal:
                 self.meta.internal_fields.append(attr_val)
-        if isinstance(attr_val.__class__, ModelType):
+        if isinstance(attr_val.__class__, BaseModelType):
             if attr_val.name:
                 self.meta.embedded_models[attr_val.name] = attr_val
                 super().__setitem__(attr_val.name, attr_val)
@@ -214,11 +225,27 @@ class CondorClassDict(dict):
 # that are used on every call
 class Options:
     """
+    re-writing implementations to be backend agnostic (through "wrapper" layer ), the
+    option class won't need to be named after a backend; maybe just take __solver__
+    attribute to map the solver funciton [it could actually be the callable?
+    scipy.minimize, lol sorry Kenny, you can change it after release once I'm bored]
+    implementations dictionary needs to key on solver and be the arg/kwarg location for
+    the numeric callbacks (for this model/paramters) and a few other things like initial
+    state. Current version is pretty close, hopefully
+
+    Goal: ensure API works to pass in *args and **kwargs easily; Do later
+    probably need a __args attr and then rest as kwargs. Common pattern of reserving
+    wordds in user code. Also applies to IO name check, assigned field
+
+    to support changing solver options within an ipython session, maybe implementation
+    actually has a create_solver and call_solver or something -- creating solver also
+    caches any numeric callbacks
+
     Class mix-in to flag back-end options. Define an submodel class on the model that
     inherits from Options that over-writes options for the backend's implementation
     (which generates a callable). Model will transparently pass attributes of Options
     subclass. Possibly only convention, but name the subclass according to the backend.
-    Multiple option sub-classes provide options depending on project's default backend. 
+    Multiple option sub-classes provide options depending on project's default backend.
     Single option sub-class forces back end for this model?
     OR flag, if tihs backend then these options, otherwise no options (rely on defaults)
 
@@ -263,7 +290,7 @@ class Options:
     # TODO: allow a generic options for non-solver specific options?
 
 
-class ModelType(type):
+class BaseModelType(type):
     """
     Metaclass for Condor  model
     """
@@ -318,7 +345,7 @@ class ModelType(type):
                         model_name, field_type_name=k, **v_init_kwargs
                     )
                 # inherit submodels model from base, create reference now, bind in new
-                elif isinstance(v, ModelType):
+                elif isinstance(v, BaseModelType):
                     if v.primary is base and v in base._meta.submodels:
                         # submodel inheritance & binding in new
                         cls_dict[k] = v
@@ -328,7 +355,7 @@ class ModelType(type):
             # if base is an submodel, make reference  of outer model attributes
             # and copy fields from class __copy_fields__ kwarg definition. This allows
             # submodel field to modify local copy without affecting outer model
-            if base is not Model and base.primary:
+            if base is not BaseModel and base.primary:
                 for attr_name, attr_val in base.primary.__original_attrs__.items():
                     # TODO: document copy fields? can this get DRY'd up?
                     # don't like that symbol copying is here, maybe should be method on
@@ -397,7 +424,7 @@ class ModelType(type):
 
         # TODO: thought hooks might be necessary for submodel model/deferred subsystems,
         # but submodel worked well. If needed, this is a decent prototype:
-        # ACTUALLY -- subclass of ModelType should be used, can do things before/after
+        # ACTUALLY -- subclass of BaseModelType should be used, can do things before/after
         # calling super new?
         pre_super_new_hook = attrs.pop('pre_super_new_attr_hook', None)
         # pre_new_attr_hook(super_attrs, attr_name, attr_val)
@@ -438,7 +465,7 @@ class ModelType(type):
 
         if bases:
             super_attrs['_parent_name'] = bases[0].__name__
-            if 'primary' not in kwargs and bases[0] is not Model and bases[0].primary:
+            if 'primary' not in kwargs and bases[0] is not BaseModel and bases[0].primary:
                 kwargs['primary'] = bases[0].primary
         else:
             super_attrs['_parent_name'] = ''
@@ -505,7 +532,7 @@ class ModelType(type):
                             # TODO is this kind of defensive checking useful?
                             assert issubclass(free_field._model, primary)
                         break
-            if isinstance(attr_val, ModelType):
+            if isinstance(attr_val, BaseModelType):
                 # not sure if this should really be Base or just Model? Or maybe
                 # submodel by now...  
                 # TODO check isinstance type
@@ -584,12 +611,12 @@ class ModelType(type):
 
             user_submodel = False
             for base in new_cls.__bases__:
-                if base is not Model:
+                if base is not BaseModel:
                     if base in primary._meta.submodels:
                         user_submodel = True
                         break
                         # TODO: base is ~ the field that cls should be added to...
-                        # This could all be in ModelType.__new__, primary is in kwargs
+                        # This could all be in BaseModelType.__new__, primary is in kwargs
 
             if user_submodel:
                 # register as symbol of field, not directly added
@@ -607,16 +634,16 @@ class ModelType(type):
             new_cls.inner_through = inner_through
             new_cls.primary = inner_through.primary
 
-        elif bases and bases[0] is not Model:
+        elif bases and bases[0] is not BaseModel:
             bases[0].register(new_cls)
 
 
-        # Bind Fields and Submodels -- require reference to constructed Model
+        # Bind Fields and Submodels -- require reference to constructed BaseModel
         for attr_name, attr_val in attrs.items():
             if isinstance(attr_val, Field):
                 attr_val.bind(attr_name, new_cls)
 
-            if isinstance(attr_val, ModelType):
+            if isinstance(attr_val, BaseModelType):
                 # TODO check that this check is right...
                 if attr_val.primary in bases and attr_val in attr_val.primary._meta.submodels:
                     # attr_val is an submodel to base, so this is a field-like submodel
@@ -625,7 +652,7 @@ class ModelType(type):
                     # new_cls is a user model that inherits an submodel type
 
                     use_bases = (Submodel,)
-                    if Model in attr_val.__bases__ and len(attr_val.__bases__) == 1:
+                    if ModelTemplate in attr_val.__bases__ and len(attr_val.__bases__) == 1:
                         pass
                     else:
                         raise NotImplemented
@@ -673,7 +700,7 @@ class ModelType(type):
             # TODO: search MRO?
             for base in bases:
                 if (
-                    isinstance(base, ModelType) and 
+                    isinstance(base, BaseModelType) and 
                     (base.__name__ in backend.implementations.__dict__)
                 ):
                     # TODO: or are these directly on backend along with symbol_class,
@@ -713,7 +740,7 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
     if attr_name in ['__module__', '__qualname__', '__doc__']:
         return
 
-    if len(bases) == 1 and bases[0] == Model:
+    if len(bases) == 1 and bases[0] == BaseModel:
         # Skip model types
         # TODO: is there a better way to capture it's a model type? No symbols, but
         # fields?
@@ -763,11 +790,25 @@ def check_attr_name(attr_name, attr_val, super_attrs, bases):
             clash_string = ""
         raise NameError(f"Attempting to assign attribute {attr_name} which already exists{clash_string}")
 
-class Model(metaclass=ModelType):
-    """
-    Define a Model Template  by subclassing Model, creating field types, and writing an
-    implementation.
-    """
+
+class BaseModel(metaclass=BaseModelType):
+    pass
+
+
+class ModelTemplateType(BaseModelType):
+    """Define a Model Template  by subclassing Model, creating field types, and writing an
+    implementation."""
+    pass
+
+class ModelTemplate(BaseModel, metaclass=ModelTemplateType):
+    pass
+
+class ModelType(ModelTemplateType):
+    """Type class for user models"""
+    pass
+
+class Model(BaseModel, metaclass=ModelType):
+    """handles binding etc. for user models"""
     def __init__(self, *args, name='', **kwargs):
         cls = self.__class__
         self.name = name
@@ -906,12 +947,6 @@ class Model(metaclass=ModelType):
             setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
 
 
-#class ModelType(ModelType):
-#    """Type class for user models"""
-#    pass
-
-#class Model(Model, metaclass=ModelType):
-#    """handles binding etc. for user models"""
 
 
 """
