@@ -80,13 +80,21 @@ even __init_subclass__?
 
 customize meta so only have relevant attriburtes
 too hard to use different metaclasses for base/template/user ? times special types like
-submodel, assemblycomponent
+submodel, assemblycomponent.
+if template inherits from base, user inherits from template, what happens? special types
+can multi-inherit? 
 
 need to be able to make it easy to build library components (extended templates)
 how to "socket" something? e.g., quickly create a new assembly component like an
 impulsive correction and implement __new__ finalize logic to modify ODE... similar to
 condor-flight.
 clear pattern (or even better, simple API to automate) 
+if over-writing __new__, __prepare__, class_dict.__set_item__, is enough, that's OK. 
+class_dict can use meta to access anything and then adding some generality to class_dict
+filtering, maybe even adding little callback hooks or something. 
+
+above sketch is still just datastructure. Need to trace through construction of a simple
+model. 
 
 LinCov is directional SGM, sone number of number to construct covariance matrix or
 something

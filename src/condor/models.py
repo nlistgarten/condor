@@ -156,7 +156,7 @@ class CondorClassDict(dict):
         return super().__getitem__(*args, **kwargs)
 
     def __setitem__(self, attr_name, attr_val):
-
+        print(f"setting {attr_name} to {attr_val}")
         if isinstance(attr_val, IndependentField):
             self.meta.independent_fields.append(attr_val)
         if isinstance(attr_val, MatchedField):
@@ -289,8 +289,23 @@ class Options:
 
     # TODO: allow a generic options for non-solver specific options?
 
+class MetaclassType(type):
+    def __init_subclass__(cls, **kwargs):
+        cls.baseclass_for_inheritance = None
+        # backreference for baseclass (e.g., ModelTemplate, Model, etc) not created until 
 
-class BaseModelType(type):
+        # potential additional metadata:
+        # user_model_metaclass
+        # user_model_baseclass
+
+        # class dictionary subclass to over-write __set_item__ (to handle particular
+        # attribute types/fields/etc, -- may be able to use callback on metclass or even
+        # field
+
+        # similar for meta attributes, will ultimately get used by __prepare__ or
+        # __new__, I think?
+
+class BaseModelType(MetaclassType, ):
     """
     Metaclass for Condor  model
     """
@@ -308,9 +323,15 @@ class BaseModelType(type):
     # think definitely, and probably can't protect user model from over-writing self in
     # model but can protect by modifying setattr on CondorDict
 
+    class_creation_kwargs = dict(
+        copy_fields = [],
+        primary = None,
+        bind_embedded_models = True,
+    )
 
     @classmethod
     def __prepare__(cls, model_name, bases, name="", **kwds):
+        print(f"BaseModelType.__prepare__(cls={cls}, name={model_name}, bases={bases}, kwargs={kwds})")
         if name:
             model_name = name
 
@@ -398,26 +419,14 @@ class BaseModelType(type):
         else:
             return f"<{cls.__name__}>"
 
-    def __new__(cls, model_name, bases, attrs, bind_embedded_models=True, name="", **kwargs):
-        # case 1: class Model -- provides machinery to make subsequent cases easier to
-        # implement.
-        # case 2: ____ - library code that defines fields, etc that user code inherits
-        # maybe call this model template?
-        # from (case 3+). Implementations are tied to 2? "Library Models"?
-        # case 3: User Model - inherits from ____, defines the actual model that is
-        # being analyzed
-        # case 4: Subclass of user model to extend it?
-        # I don't think Submodel deviates from this, except perhaps disallowing
-        # case 4
-        # Generally, bases arg will be len <= 1. Just from the previous level. Is there
-        # a case for mixins? Submodel approach seems decent, could repeat for
-        # WithDeferredSubsystems, then Model layer is quite complete 
-
-        # TODO: add support for inheriting other models -- subclasses are
-        # modifying/adding (no deletion? need mixins to pre-build pieces?) to parent
-        # classes.  case 4
-        # fields would need to combine _symbols
-
+    @classmethod
+    def __pre_super_new__(
+        cls, model_name, bases, attrs, bind_embedded_models=True, name="", 
+        primary=None, inner_through = None, copy_fields = None,
+        **kwargs
+    ):
+        """return new name, bases, attrs to be passed to type.__new__
+        """
         if not name:
             name = model_name
 
@@ -593,16 +602,80 @@ class BaseModelType(type):
         orig_doc = attrs.get("__doc__", "")
         super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
+        post_kwargs = dict(
+            backend_options = backend_options,
+        )
+        return name, bases, super_attrs, post_kwargs
 
-        new_cls = super().__new__(cls, name, bases, super_attrs, **kwargs)
-        # TODO: I'm surprised that this is necessary to avoid duplciating the mutable
-        # default subclasses list; but this works on the cases I have
+
+    def __new__(
+        cls, name, bases, attrs, 
+        primary=None, inner_through = None, copy_fields = None,
+        **kwargs
+    ):
+        print(f'  BaseModelType.__new__(mcs={cls}, name={name}, bases={bases}, attrs=[{attrs}], primary={primary}, inner_through={inner_through}, copy_fields={copy_fields}, {kwargs})' )
+        # case 1: class Model -- provides machinery to make subsequent cases easier to
+        # implement.
+        # case 2: ____ - library code that defines fields, etc that user code inherits
+        # maybe call this model template?
+        # from (case 3+). Implementations are tied to 2? "Library Models"?
+        # case 3: User Model - inherits from ____, defines the actual model that is
+        # being analyzed
+        # case 4: Subclass of user model to extend it?
+        # I don't think Submodel deviates from this, except perhaps disallowing
+        # case 4
+        # Generally, bases arg will be len <= 1. Just from the previous level. Is there
+        # a case for mixins? Submodel approach seems decent, could repeat for
+        # WithDeferredSubsystems, then Model layer is quite complete 
+
+        # TODO: add support for inheriting other models -- subclasses are
+        # modifying/adding (no deletion? need mixins to pre-build pieces?) to parent
+        # classes.  case 4
+        # fields would need to combine _symbols
+        if copy_fields is None:
+            copy_fields = []
+
+
+
+
+        super_name, super_bases, super_attrs, post_kwargs = cls.__pre_super_new__(
+            name, bases, attrs,
+            primary=primary, inner_through = inner_through, copy_fields = copy_fields,
+            **kwargs
+        )
+
+        new_cls = super().__new__(
+            cls, super_name, super_bases, super_attrs,
+            **kwargs,
+        )
         new_cls._meta = replace(attrs.meta)
 
+
+        cls.__post_super_new__(
+            new_cls, bases, attrs,
+            primary=primary, inner_through = inner_through, copy_fields = copy_fields,
+            **post_kwargs,
+        )
+        # TODO: I'm surprised that this is necessary to avoid duplciating the mutable
+        # default subclasses list; but this works on the cases I have
+
+        return new_cls
+
+    @classmethod
+    def __post_super_new__(
+        cls, new_cls, bases, attrs,
+        primary=None, inner_through = None, copy_fields = None,
+        backend_options = {},
+        **kwargs
+    ):
+        """
+        mutate new_cls as needed for finalization
+        """
         # creating an SubmodelClass
         # primary kwarg is added to Submodel  template definition or for subclasses
         # of submodel templates, in Submodel.__new__. For subclasses of template,
         # reference to base is inner_through
+
         new_cls.primary = primary
         if primary:
             # TODO: other validation?
@@ -722,7 +795,6 @@ class BaseModelType(type):
             for symbol_idx, symbol in enumerate(field):
                 setattr(new_cls, symbol.name, symbol)
 
-        return new_cls
 
     def finalize_input_fields(cls):
         for input_field in cls._meta.input_fields:
@@ -795,17 +867,65 @@ class BaseModel(metaclass=BaseModelType):
     pass
 
 
+
 class ModelTemplateType(BaseModelType):
+
+
     """Define a Model Template  by subclassing Model, creating field types, and writing an
     implementation."""
+
+    def __new__(cls, name, bases, attrs, **kwargs):
+
+        creating_base_class_for_inheritance = cls.__name__.replace(name, "") == "Type"
+        if creating_base_class_for_inheritance:
+            print("creating base class for inheritance")
+            print(f"cls.baseclass_for_inheritance={cls.baseclass_for_inheritance}")
+
+        if cls.baseclass_for_inheritance and cls.baseclass_for_inheritance not in bases:
+            print("creating a user model")
+            # user model
+            return cls.user_model_metaclass(
+                name, bases + (cls.user_model_baseclass,), attrs, 
+                primary=None, inner_through = None, copy_fields = None,
+                **kwargs
+            )
+
+        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
+
+        if creating_base_class_for_inheritance:
+            print("creating base class for inheritance")
+            cls.baseclass_for_inheritance=new_cls
+
+        return new_cls
+
+
+        if model_name == "ModelTemplate":
+            # case 1, essentially placeholder to enable next case
+            # actually base model type should do less, and depth-specific __new__ and
+            # __prepare__ logic
+            return {} # except new is still going through BaseModelType??
+        # need to figure out good dispatch mechanism; maybe BaseModelType can identify
+        # reserved model_names or even , ModelTemplate and M then just call cls.__
+        # this might work? cls.__name__.replace(model_name, "")  == "Type"
+            pass
+        if ModelTemplate in bases: # and not some flag
+            # case 2, library defined template 
+            # presumably this metaclass is where this should be;
+            pass
+        else:
+            # case 3, different metaclass and inject Model into bases too? 
+            pass
     pass
 
 class ModelTemplate(BaseModel, metaclass=ModelTemplateType):
     pass
 
+
+
 class ModelType(ModelTemplateType):
     """Type class for user models"""
     pass
+
 
 class Model(BaseModel, metaclass=ModelType):
     """handles binding etc. for user models"""
@@ -947,7 +1067,8 @@ class Model(BaseModel, metaclass=ModelType):
             setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
 
 
-
+ModelTemplateType.user_model_metaclass = ModelType
+ModelTemplateType.user_model_baseclass = Model
 
 """
 Do we need class inheritance?
