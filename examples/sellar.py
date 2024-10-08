@@ -43,7 +43,7 @@ class Sellar(co.OptimizationProblem):
             #maxiter = 2
 
 Sellar.implementation.set_initial(x=1., z=[5., 2.,])
-Sellar._meta.bind_embedded_models = False
+#Sellar._meta.bind_embedded_models = False
 sellar_opt = Sellar()
 
 

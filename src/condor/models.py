@@ -83,8 +83,8 @@ class ModelMetaData:
 
 
     # primary only needed for submodels, maybe also subclasses?
-    subclasses: list = field(init=False)
-    primary: object = None
+    #subclasses: list = field(init=False)
+    #primary: object = None
 
     # assembly/component can also get children/parent
     # assembly/components get inheritance rules? yes, submodels don't need it -- only
@@ -109,17 +109,21 @@ class ModelMetaData:
 
 # appears in __new__ as attrs
 class CondorClassDict(dict):
-    def __init__(self, *args, model_name='', copy_fields=[], primary=None,  **kwargs):
+    def __init__(
+            self, *args, model_name='',
+            #copy_fields=[], primary=None,
+            meta = None, **kwargs
+    ):
         super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
         self.from_outer = {}
-        self.meta = ModelMetaData(primary=primary)
+        self.meta = meta
         self.model_name=model_name,
-        self.copy_fields = copy_fields
-        self.primary = primary
-        if primary is None:
-            self.primary_independent_fields = []
-        else:
-            self.primary_independent_fields = [f for f in primary._meta.independent_fields]
+        #self.copy_fields = copy_fields
+        #self.primary = primary
+        #if primary is None:
+        #    self.primary_independent_fields = []
+        #else:
+        #    self.primary_independent_fields = [f for f in primary._meta.independent_fields]
         self.kwargs = kwargs
         self.args = args
 
@@ -128,7 +132,7 @@ class CondorClassDict(dict):
         self.from_outer = from_outer
         self.meta.independent_fields.extend([
             v for k, v in from_outer.items()
-            if isinstance(v, IndependentField) and k not in self.copy_fields
+            if isinstance(v, IndependentField)# and k not in self.copy_fields
         ])
 
     def dynamic_link(self, **kwargs):
@@ -180,7 +184,7 @@ class CondorClassDict(dict):
             # from a IndependentField
             known_symbol_type = False
 
-            for free_field in self.meta.independent_fields + self.primary_independent_fields:
+            for free_field in self.meta.independent_fields:# + self.primary_independent_fields:
                 symbol = free_field.get(backend_repr=attr_val)
                 # not a list (empty or len > 1)
                 if isinstance(symbol, BaseSymbol):
@@ -323,23 +327,28 @@ class BaseModelType(MetaclassType, ):
     # think definitely, and probably can't protect user model from over-writing self in
     # model but can protect by modifying setattr on CondorDict
 
-    class_creation_kwargs = dict(
-        copy_fields = [],
-        primary = None,
-        bind_embedded_models = True,
-    )
-
     @classmethod
-    def __prepare__(cls, model_name, bases, name="", **kwds):
-        print(f"BaseModelType.__prepare__(cls={cls}, name={model_name}, bases={bases}, kwargs={kwds})")
-        if name:
-            model_name = name
+    def __prepare__(cls, name, bases, meta=None, **kwds):
+        print(f"BaseModelType.__prepare__(cls={cls}, name={name}, bases={bases}, kwargs={kwds})")
 
-        sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
+        #sup_dict = super().__prepare__(cls, name, bases, **kwds)
+        sup_dict = {}
+        if meta is None:
+            meta = ModelMetaData(
+                #primary=primary
+            )
+
+        for base in bases:
+            print(base)
+            if isinstance(base, BaseModelType):
+                meta.template = base
+                break
+
         cls_dict = CondorClassDict(
-            model_name=model_name,
-            copy_fields = kwds.pop('copy_fields', []),
-            primary = kwds.pop('primary', None),
+            model_name=name,
+            meta = meta,
+            #copy_fields = kwds.pop('copy_fields', []),
+            #primary = kwds.pop('primary', None),
             **sup_dict,
         )
 
@@ -363,7 +372,7 @@ class BaseModelType(MetaclassType, ):
                                 get_from = cls_dict
                             v_init_kwargs[init_k] = get_from[init_v._name]
                     cls_dict[k] = v.inherit(
-                        model_name, field_type_name=k, **v_init_kwargs
+                        name, field_type_name=k, **v_init_kwargs
                     )
                 # inherit submodels model from base, create reference now, bind in new
                 elif isinstance(v, BaseModelType):
@@ -373,40 +382,6 @@ class BaseModelType(MetaclassType, ):
                 elif isinstance(v, backend.symbol_class):
                     cls_dict[k] = v
 
-            # if base is an submodel, make reference  of outer model attributes
-            # and copy fields from class __copy_fields__ kwarg definition. This allows
-            # submodel field to modify local copy without affecting outer model
-            if base is not BaseModel and base.primary:
-                for attr_name, attr_val in base.primary.__original_attrs__.items():
-                    # TODO: document copy fields? can this get DRY'd up?
-                    # don't like that symbol copying is here, maybe should be method on
-                    # field?
-                    if attr_name in base.__copy_fields__:
-                        field_class = attr_val.__class__
-                        v_init_kwargs = attr_val._init_kwargs.copy()
-                        for init_k, init_v  in attr_val._init_kwargs.items():
-                            if isinstance(init_v, Field):
-                                # TODO not sure this will be the best way to remap connected
-                                # fields based on inheritance, but maybe sufficient?
-                                if not init_v._name in base.__copy_fields__ and _base.primary and init_v._name in base.primary.__dict__:
-                                    get_from = base.primary.__dict__
-                                else:
-                                    get_from = cls_dict
-                                v_init_kwargs[init_k] = get_from[init_v._name]
-                        # I know it has no field references
-                        copied_field = attr_val.inherit(
-                            model_name, field_type_name=attr_name, **v_init_kwargs
-                        )
-                        copied_field._symbols = [sym for sym in attr_val]
-                        copied_field._count += sum(copied_field.list_of('size'))
-                        cls_dict[attr_name] = copied_field
-                        continue
-
-                    cls_dict[attr_name] = attr_val
-                # TODO: document __from_outer__?
-                cls_dict.set_outer(**base.primary.__original_attrs__)
-        # TODO: is it better to do submodel magic in SubmodelType.__prepare__?
-
 
         return cls_dict
 
@@ -414,74 +389,24 @@ class BaseModelType(MetaclassType, ):
         return super().__call__(*args, **kwargs)
 
     def __repr__(cls):
-        if cls._parent_name:
-            return f"<{cls._parent_name}: {cls.__name__}>"
+        if cls.__bases__:
+            return f"<{cls.__bases__[0].__name__}: {cls.__name__}>"
         else:
             return f"<{cls.__name__}>"
 
     @classmethod
     def __pre_super_new__(
-        cls, model_name, bases, attrs, bind_embedded_models=True, name="", 
-        primary=None, inner_through = None, copy_fields = None,
+        cls, name, bases, attrs,
         **kwargs
     ):
         """return new name, bases, attrs to be passed to type.__new__
+        and post_kwargs
         """
-        if not name:
-            name = model_name
-
-
-        # TODO: thought hooks might be necessary for submodel model/deferred subsystems,
-        # but submodel worked well. If needed, this is a decent prototype:
-        # ACTUALLY -- subclass of BaseModelType should be used, can do things before/after
-        # calling super new?
-        pre_super_new_hook = attrs.pop('pre_super_new_attr_hook', None)
-        # pre_new_attr_hook(super_attrs, attr_name, attr_val)
-        post_super_new_hook = attrs.pop('post_super_new_attr_hook', None)
-        # pre_new_attr_hook(new_cls, attr_name, attr_val)
-
-
-        # __from_outer__ attribute is attached to Submodel`s during __prepare__ to
-        # give references to IndependentVariable backend_repr`s conveniently for
-        # constructing Submodel symbols. They get cleaned up since they live in the
-        # outer model
-        #attrs_from_outer = attrs.pop('__from_outer__', {})
-        attrs_from_outer = attrs.from_outer #getattr(attrs, 'from_outer', {})
-        embedded_models = attrs.meta.embedded_models
-        attrs.meta.bind_embedded_models = bind_embedded_models
-        for attr_name, attr_val in attrs_from_outer.items():
-            if attrs[attr_name] is attr_val:
-                attrs.pop(attr_name)
-                if embedded_models.get(attr_name, None) is attr_val:
-                    embedded_models.pop(attr_name)
-            else:
-                # TODO: make this a warning/error? add test (really for all
-                # warning/error raise)
-                # Or allow silent passage of redone variables? eg copying
-                # but copying is a special case that can be guarded...
-
-                # TODO: if we put copy fields in meta can we trace through and not warn
-                # on this case?
-                pass
-                # print(f"{attr_name} was defined on outer of {name}")
-
-
         # perform as much processing as possible before caller super().__new__
         # by building up super_attrs from attrs; some operations need to operate on the
         # constructed class, like binding fields and submodels
 
         super_attrs = {}
-
-        if bases:
-            super_attrs['_parent_name'] = bases[0].__name__
-            if 'primary' not in kwargs and bases[0] is not BaseModel and bases[0].primary:
-                kwargs['primary'] = bases[0].primary
-        else:
-            super_attrs['_parent_name'] = ''
-
-        primary=kwargs.pop('primary', None)
-        inner_through=kwargs.pop('inner_through', None)
-        copy_fields=kwargs.pop('copy_fields', [])
 
         backend_options = {}
         matched_fields = []
@@ -493,8 +418,14 @@ class BaseModelType(MetaclassType, ):
         # convenience
         # TODO: better reserve word check? see check attr name below
 
-        orig_attrs = CondorClassDict()
+        if name == "Coupling":
+            #breakpoint()
+            pass
+        orig_attrs = CondorClassDict(
+            meta=attrs.meta,
+        )
         orig_attrs.update(**{k:v for k,v in attrs.items() if not k.startswith("__")})
+
 
         super_attrs.update(dict(
             __original_attrs__ = orig_attrs,
@@ -644,6 +575,8 @@ class BaseModelType(MetaclassType, ):
             **kwargs
         )
 
+
+
         new_cls = super().__new__(
             cls, super_name, super_bases, super_attrs,
             **kwargs,
@@ -659,6 +592,13 @@ class BaseModelType(MetaclassType, ):
         # TODO: I'm surprised that this is necessary to avoid duplciating the mutable
         # default subclasses list; but this works on the cases I have
 
+        if name == "Sellar":
+            #breakpoint()
+            print("Sellar class ID at BaseModelType", id(new_cls))
+            print("Sellar._meta class ID at BaseModelType", id(new_cls._meta))
+            print("Sellar._meta BaseModelType", new_cls._meta)
+            pass
+
         return new_cls
 
     @classmethod
@@ -671,82 +611,15 @@ class BaseModelType(MetaclassType, ):
         """
         mutate new_cls as needed for finalization
         """
-        # creating an SubmodelClass
-        # primary kwarg is added to Submodel  template definition or for subclasses
-        # of submodel templates, in Submodel.__new__. For subclasses of template,
-        # reference to base is inner_through
 
-        new_cls.primary = primary
-        if primary:
-            # TODO: other validation?
-            if new_cls.__name__ in primary.__dict__:
-                raise ValueError
-
-            user_submodel = False
-            for base in new_cls.__bases__:
-                if base is not BaseModel:
-                    if base in primary._meta.submodels:
-                        user_submodel = True
-                        break
-                        # TODO: base is ~ the field that cls should be added to...
-                        # This could all be in BaseModelType.__new__, primary is in kwargs
-
-            if user_submodel:
-                # register as symbol of field, not directly added
-                if not inner_through:
-                    raise ValueError
-            else:
-                # create as field
-                primary._meta.submodels.append(new_cls)
-                setattr(primary, new_cls.__name__, new_cls)
-                new_cls.__copy_fields__ = copy_fields
-
-        if inner_through:
-            # create links
-            inner_through.register(new_cls)
-            new_cls.inner_through = inner_through
-            new_cls.primary = inner_through.primary
-
-        elif bases and bases[0] is not BaseModel:
-            bases[0].register(new_cls)
-
-
-        # Bind Fields and Submodels -- require reference to constructed BaseModel
         for attr_name, attr_val in attrs.items():
             if isinstance(attr_val, Field):
                 attr_val.bind(attr_name, new_cls)
 
-            if isinstance(attr_val, BaseModelType):
-                # TODO check that this check is right...
-                if attr_val.primary in bases and attr_val in attr_val.primary._meta.submodels:
-                    # attr_val is an submodel to base, so this is a field-like submodel
-                    # model that the user will sub-class
-
-                    # new_cls is a user model that inherits an submodel type
-
-                    use_bases = (Submodel,)
-                    if ModelTemplate in attr_val.__bases__ and len(attr_val.__bases__) == 1:
-                        pass
-                    else:
-                        raise NotImplemented
-                        # does this work?
-                        use_bases = use_bases + attr_val.__bases__
-
-                    # TODO: can we dry up all these extra args? or is it necessary to
-                    # specify these? or at leat document that this is where new features
-                    # on sub models need to be added, in addition to poping from
-                    # kwargs, etc. When reverting sub model stuff to Submodel's init
-                    # subclass, may be more obvious
-
-                    attr_val = SubmodelType(
-                        attr_name,
-                        use_bases,
-                        attr_val.__original_attrs__,
-                        primary = new_cls,
-                        original_class = attr_val,
-                        copy_fields = attr_val.__copy_fields__,
-                    )
-                    setattr(new_cls, attr_name, attr_val)
+        # creating an SubmodelClass
+        # primary kwarg is added to Submodel  template definition or for subclasses
+        # of submodel templates, in Submodel.__new__. For subclasses of template,
+        # reference to base is inner_through
 
 
         # Bind implementation
@@ -787,6 +660,10 @@ class BaseModelType(MetaclassType, ):
         if implementation is not None:
             cls.finalize_input_fields(new_cls)
             new_cls.implementation = implementation(new_cls, **backend_option)
+
+            if new_cls.__name__ == "Sellar":
+                #breakpoint()
+                pass
 
             for field in attrs.meta.all_fields:
                 field.bind_dataclass()
@@ -869,10 +746,23 @@ class BaseModel(metaclass=BaseModelType):
 
 
 class ModelTemplateType(BaseModelType):
-
-
     """Define a Model Template  by subclassing Model, creating field types, and writing an
     implementation."""
+    @classmethod
+    def __prepare__(
+        cls, name, bases,
+        **kwargs
+    ):
+        if cls.baseclass_for_inheritance and cls.baseclass_for_inheritance not in bases:
+            print("dispatch __prepare__ for user model")
+            # user model
+            return cls.user_model_metaclass.__prepare__(
+                name, bases + (cls.user_model_baseclass,),
+                **kwargs
+            )
+        else:
+            return super().__prepare__(name, bases, **kwargs)
+
 
     def __new__(cls, name, bases, attrs, **kwargs):
 
@@ -882,7 +772,7 @@ class ModelTemplateType(BaseModelType):
             print(f"cls.baseclass_for_inheritance={cls.baseclass_for_inheritance}")
 
         if cls.baseclass_for_inheritance and cls.baseclass_for_inheritance not in bases:
-            print("creating a user model")
+            print("dispatch __new__ for user model", name)
             # user model
             return cls.user_model_metaclass(
                 name, bases + (cls.user_model_baseclass,), attrs, 
@@ -918,13 +808,58 @@ class ModelTemplateType(BaseModelType):
     pass
 
 class ModelTemplate(BaseModel, metaclass=ModelTemplateType):
+    placeholder = FreeField(Direction.internal)
     pass
 
 
 
 class ModelType(ModelTemplateType):
     """Type class for user models"""
-    pass
+    @classmethod
+    def __prepare__(
+        cls, model_name, bases,
+        bind_embedded_models=True, name="", 
+        **kwargs
+    ):
+        if name:
+            model_name = name
+        meta = ModelMetaData(
+            bind_embedded_models=bind_embedded_models
+        )
+        print(f"ModelType.__prepare__(model_name={model_name}, bases={bases}, **{kwargs}), meta={meta}")
+
+        return super().__prepare__(model_name, bases, meta=meta)
+
+
+    @classmethod
+    def __pre_super_new__(
+        cls, model_name, bases, attrs,
+        bind_embedded_models=True, name="", 
+        **kwargs
+    ):
+        if not name:
+            name = model_name
+
+        ret_name, ret_bases, ret_attrs, ret_kwargs,  = super().__pre_super_new__(
+            name, bases, attrs
+        )
+
+        return name, ret_bases, ret_attrs, ret_kwargs
+
+    def __new__(
+        cls, name, bases, attrs,
+        #bind_embedded_models=True, name="", 
+        **kwargs
+    ):
+        new_cls =  super().__new__(cls, name, bases, attrs, **kwargs)
+
+        if name == "Sellar":
+            print("Sellar class ID at ModelType", id(new_cls))
+            print("Sellar._meta class ID at ModelType", id(new_cls._meta))
+            print("Sellar._meta ModelType", new_cls._meta)
+            #breakpoint()
+
+        return new_cls
 
 
 class Model(BaseModel, metaclass=ModelType):
@@ -1193,7 +1128,9 @@ TrajectoryAnalysis should get extra flags for keep/skip events and modes
 
 
 """
-class SubmodelType(ModelType):
+class SubmodelType(
+    #ModelType
+):
     def __iter__(cls):
         for subclass in cls.subclasses:
             yield subclass
@@ -1210,9 +1147,168 @@ class SubmodelType(ModelType):
             )
 
         if case3:
-            return bases[0].original_class.__prepare__(
+            return bases[0].__prepare__(
                 model_name, bases, primary=primary, **kwds
             )
+
+
+            # if base is an submodel, make reference  of outer model attributes
+            # and copy fields from class __copy_fields__ kwarg definition. This allows
+            # submodel field to modify local copy without affecting outer model
+            if base is not BaseModel and base.primary:
+                for attr_name, attr_val in base.primary.__original_attrs__.items():
+                    # TODO: document copy fields? can this get DRY'd up?
+                    # don't like that symbol copying is here, maybe should be method on
+                    # field?
+                    if attr_name in base.__copy_fields__:
+                        field_class = attr_val.__class__
+                        v_init_kwargs = attr_val._init_kwargs.copy()
+                        for init_k, init_v  in attr_val._init_kwargs.items():
+                            if isinstance(init_v, Field):
+                                # TODO not sure this will be the best way to remap connected
+                                # fields based on inheritance, but maybe sufficient?
+                                if not init_v._name in base.__copy_fields__ and _base.primary and init_v._name in base.primary.__dict__:
+                                    get_from = base.primary.__dict__
+                                else:
+                                    get_from = cls_dict
+                                v_init_kwargs[init_k] = get_from[init_v._name]
+                        # I know it has no field references
+                        copied_field = attr_val.inherit(
+                            name, field_type_name=attr_name, **v_init_kwargs
+                        )
+                        copied_field._symbols = [sym for sym in attr_val]
+                        copied_field._count += sum(copied_field.list_of('size'))
+                        cls_dict[attr_name] = copied_field
+                        continue
+
+                    cls_dict[attr_name] = attr_val
+                # TODO: document __from_outer__?
+                cls_dict.set_outer(**base.primary.__original_attrs__)
+        # TODO: is it better to do submodel magic in SubmodelType.__prepare__?
+
+
+    @classmethod
+    def __pre_super_new__(
+        cls, model_name, bases, attrs, bind_embedded_models=True, name="", 
+        primary=None, inner_through = None, copy_fields = None,
+        **kwargs
+    ):
+        return super().__pre_super_new__(cls, model_name, bases, attrs)
+        # __from_outer__ attribute is attached to Submodel`s during __prepare__ to
+        # give references to IndependentVariable backend_repr`s conveniently for
+        # constructing Submodel symbols. They get cleaned up since they live in the
+        # outer model
+        #attrs_from_outer = attrs.pop('__from_outer__', {})
+        attrs_from_outer = attrs.from_outer #getattr(attrs, 'from_outer', {})
+        embedded_models = attrs.meta.embedded_models
+        attrs.meta.bind_embedded_models = bind_embedded_models
+        for attr_name, attr_val in attrs_from_outer.items():
+            if attrs[attr_name] is attr_val:
+                attrs.pop(attr_name)
+                if embedded_models.get(attr_name, None) is attr_val:
+                    embedded_models.pop(attr_name)
+            else:
+                # TODO: make this a warning/error? add test (really for all
+                # warning/error raise)
+                # Or allow silent passage of redone variables? eg copying
+                # but copying is a special case that can be guarded...
+
+                # TODO: if we put copy fields in meta can we trace through and not warn
+                # on this case?
+                pass
+                # print(f"{attr_name} was defined on outer of {name}")
+
+
+
+        if bases:
+            super_attrs['_parent_name'] = bases[0].__name__
+            if 'primary' not in kwargs and bases[0] is not BaseModel and bases[0].primary:
+                kwargs['primary'] = bases[0].primary
+        else:
+            super_attrs['_parent_name'] = ''
+
+        primary=kwargs.pop('primary', None)
+        inner_through=kwargs.pop('inner_through', None)
+        copy_fields=kwargs.pop('copy_fields', [])
+
+        pass
+
+    @classmethod
+    def __post_super_new__(
+        cls, model_name, bases, attrs, bind_embedded_models=True, name="", 
+        primary=None, inner_through = None, copy_fields = None,
+        **kwargs
+    ):
+        new_cls.primary = primary
+        if primary:
+            # TODO: other validation?
+            if new_cls.__name__ in primary.__dict__:
+                raise ValueError
+
+            user_submodel = False
+            for base in new_cls.__bases__:
+                if base is not BaseModel:
+                    if base in primary._meta.submodels:
+                        user_submodel = True
+                        break
+                        # TODO: base is ~ the field that cls should be added to...
+                        # This could all be in BaseModelType.__new__, primary is in kwargs
+
+            if user_submodel:
+                # register as symbol of field, not directly added
+                if not inner_through:
+                    raise ValueError
+            else:
+                # create as field
+                primary._meta.submodels.append(new_cls)
+                setattr(primary, new_cls.__name__, new_cls)
+                new_cls.__copy_fields__ = copy_fields
+
+        if inner_through:
+            # create links
+            inner_through.register(new_cls)
+            new_cls.inner_through = inner_through
+            new_cls.primary = inner_through.primary
+
+        elif bases and bases[0] is not BaseModel:
+            bases[0].register(new_cls)
+
+
+        # Bind Fields and Submodels -- require reference to constructed BaseModel
+        for attr_name, attr_val in attrs.items():
+
+            if isinstance(attr_val, BaseModelType):
+                # TODO check that this check is right...
+                if attr_val.primary in bases and attr_val in attr_val.primary._meta.submodels:
+                    # attr_val is an submodel to base, so this is a field-like submodel
+                    # model that the user will sub-class
+
+                    # new_cls is a user model that inherits an submodel type
+
+                    use_bases = (Submodel,)
+                    if ModelTemplate in attr_val.__bases__ and len(attr_val.__bases__) == 1:
+                        pass
+                    else:
+                        raise NotImplemented
+                        # does this work?
+                        use_bases = use_bases + attr_val.__bases__
+
+                    # TODO: can we dry up all these extra args? or is it necessary to
+                    # specify these? or at leat document that this is where new features
+                    # on sub models need to be added, in addition to poping from
+                    # kwargs, etc. When reverting sub model stuff to Submodel's init
+                    # subclass, may be more obvious
+
+                    attr_val = SubmodelType(
+                        attr_name,
+                        use_bases,
+                        attr_val.__original_attrs__,
+                        primary = new_cls,
+                        original_class = attr_val,
+                        copy_fields = attr_val.__copy_fields__,
+                    )
+                    setattr(new_cls, attr_name, attr_val)
+
 
     def __new__(cls, model_name, bases, attrs, primary=None, original_class = None,  **kwargs):
         # case 1: Submodel definition
@@ -1245,7 +1341,9 @@ class SubmodelType(ModelType):
         return new_cls
 
 
-class Submodel(Model, metaclass=SubmodelType, primary=None):
+class Submodel(
+    #Model, metaclass=SubmodelType, primary=None
+):
     """
     Create an submodel template  by assigning an primary keyward arguement during
     model template definition. The argument references another model template (which

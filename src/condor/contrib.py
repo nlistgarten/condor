@@ -83,6 +83,7 @@ class OptimizationProblem(ModelTemplate):
     # problem if not? Add hook for metaclass to handle it?
     # needs validation for size == 1
     constraint = BoundedAssignmentField(Direction.internal)
+    objective = placeholder()
 
 
 class ODESystem(ModelTemplate):
@@ -241,9 +242,10 @@ class ODESystem(ModelTemplate):
 
 
 class TrajectoryAnalysis(
-        ModelTemplate,
-        primary=ODESystem,
-        copy_fields=["parameter", "initial", "state", "dynamic_output"]
+    ModelTemplate,
+    #SubmodelTemplate,
+    primary=ODESystem,
+    copy_fields=["parameter", "initial", "state", "dynamic_output"]
 ):
     """
     this is what simulates an ODE system
@@ -267,7 +269,11 @@ class TrajectoryAnalysis(
 # new state) etc.
 # maybe allow creation of new parameters (into ODESystem parameter field), access to
 # state, etc.
-class Event(ModelTemplate, primary = ODESystem):
+class Event(
+    ModelTemplate,
+    #SubmodelTemplate,
+    primary = ODESystem
+):
     """
     update for any state that needs it
 
@@ -312,7 +318,11 @@ class Event(ModelTemplate, primary = ODESystem):
 # and dot based on condition...
 # needs to inject on creation? Or is TrajectoryAnalysis implementation expected to
 # iterate Modes and inject? Then can add dot and make to copy_fields
-class Mode(ModelTemplate, primary=ODESystem,):
+class Mode(
+    ModelTemplate,
+    #SubmodelTemplate,
+    primary = ODESystem
+):
     """
     convenience for defining conditional behavior for state dynamics and/or controls
     depending on `condition`. No condition to over-write behavior, essentially a way to
