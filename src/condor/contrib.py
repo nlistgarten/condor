@@ -3,7 +3,7 @@ from condor.fields import (
     IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
     BoundedAssignmentField, TrajectoryOutputField,
 )
-from condor.models import Model, ModelType, SubmodelType, ModelTemplate
+from condor.models import Model, ModelType, SubmodelTemplate, ModelTemplate
 from condor.backends.default import backend
 
 class DeferredSystem(ModelTemplate):
@@ -242,8 +242,9 @@ class ODESystem(ModelTemplate):
 
 
 class TrajectoryAnalysis(
-    ModelTemplate,
-    #SubmodelTemplate,
+    #ModelTemplate,
+    SubmodelTemplate,
+
     primary=ODESystem,
     copy_fields=["parameter", "initial", "state", "dynamic_output"]
 ):
@@ -270,8 +271,8 @@ class TrajectoryAnalysis(
 # maybe allow creation of new parameters (into ODESystem parameter field), access to
 # state, etc.
 class Event(
-    ModelTemplate,
-    #SubmodelTemplate,
+    #ModelTemplate,
+    SubmodelTemplate,
     primary = ODESystem
 ):
     """
@@ -319,8 +320,8 @@ class Event(
 # needs to inject on creation? Or is TrajectoryAnalysis implementation expected to
 # iterate Modes and inject? Then can add dot and make to copy_fields
 class Mode(
-    ModelTemplate,
-    #SubmodelTemplate,
+    #ModelTemplate,
+    SubmodelTemplate,
     primary = ODESystem
 ):
     """

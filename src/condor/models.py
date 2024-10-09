@@ -79,6 +79,7 @@ class ModelMetaData:
     embedded_models: dict = field(default_factory=dict)
     bind_embedded_models: bool = True
 
+    inherited_items: dict = field(default_factory=dict)
     template: object = None
 
 
@@ -355,32 +356,45 @@ class BaseModelType(MetaclassType, ):
         # TODO: may need to search MRO resolution, not just bases, which without mixins
         # are just singletons. For fields and submodel classes, since each generation of
         # class is getting re-inherited, this is sufficient. 
-        for base in bases:
-            _dict = base.__dict__
-            for k, v in _dict.items():
-                # inherit fields from base -- bound in __new__
-                if isinstance(v, Field):
-                    v_class = v.__class__
-                    v_init_kwargs = v._init_kwargs.copy()
-                    for init_k, init_v  in v._init_kwargs.items():
-                        if isinstance(init_v, Field):
-                            # TODO not sure this will be the best way to remap connected
-                            # fields based on inheritance, but maybe sufficient?
-                            if base.primary and init_v._name in base.primary.__dict__:
-                                get_from = base.primary.__dict__
-                            else:
-                                get_from = cls_dict
-                            v_init_kwargs[init_k] = get_from[init_v._name]
-                    cls_dict[k] = v.inherit(
-                        name, field_type_name=k, **v_init_kwargs
-                    )
-                # inherit submodels model from base, create reference now, bind in new
-                elif isinstance(v, BaseModelType):
-                    if v.primary is base and v in base._meta.submodels:
-                        # submodel inheritance & binding in new
-                        cls_dict[k] = v
-                elif isinstance(v, backend.symbol_class):
+        if not meta.template:
+            return cls_dict
+
+        _dict = meta.template.__dict__
+        for k, v in _dict.items():
+            # inherit fields from base -- bound in __new__
+            if isinstance(v, Field):
+                v_class = v.__class__
+                v_init_kwargs = v._init_kwargs.copy()
+                for init_k, init_v  in v._init_kwargs.items():
+                    if isinstance(init_v, Field):
+                        # TODO not sure this will be the best way to remap connected
+                        # fields based on inheritance, but maybe sufficient?
+                        if base.primary and init_v._name in base.primary.__dict__:
+                            get_from = base.primary.__dict__
+                        else:
+                            get_from = cls_dict
+                        v_init_kwargs[init_k] = get_from[init_v._name]
+                cls_dict[k] = v.inherit(
+                    name, field_type_name=k, **v_init_kwargs
+                )
+
+            # inherit submodels model from base, create reference now, bind in new
+            elif isinstance(v, BaseModelType):
+                if v.primary is base and v in base._meta.submodels:
+                    # submodel inheritance & binding in new
                     cls_dict[k] = v
+            elif isinstance(v, BaseSymbol):
+                # should only be used for placeholder and placeholder-adjacent
+                print(f"Element not inheriting {k}={v} from {meta.template} to {name}")
+                cls_dict[k] = v
+            elif isinstance(v, backend.symbol_class):
+                # only used for time?
+                print(f"Symbol inheriting {k}={v} from {meta.template} to {name}")
+                cls_dict[k] = v
+
+            if k in cls_dict:
+                meta.inherited_items[k] = cls_dict[k]
+
 
 
         return cls_dict
@@ -421,15 +435,8 @@ class BaseModelType(MetaclassType, ):
         if name == "Coupling":
             #breakpoint()
             pass
-        orig_attrs = CondorClassDict(
-            meta=attrs.meta,
-        )
-        orig_attrs.update(**{k:v for k,v in attrs.items() if not k.startswith("__")})
 
-
-        super_attrs.update(dict(
-            __original_attrs__ = orig_attrs,
-        ))
+            
 
 
         # TODO: replace if tree with match cases?
@@ -541,10 +548,9 @@ class BaseModelType(MetaclassType, ):
 
     def __new__(
         cls, name, bases, attrs, 
-        primary=None, inner_through = None, copy_fields = None,
         **kwargs
     ):
-        print(f'  BaseModelType.__new__(mcs={cls}, name={name}, bases={bases}, attrs=[{attrs}], primary={primary}, inner_through={inner_through}, copy_fields={copy_fields}, {kwargs})' )
+        print(f'  BaseModelType.__new__(mcs={cls}, name={name}, bases={bases}, attrs=[{attrs}], {kwargs})' )
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement.
         # case 2: ____ - library code that defines fields, etc that user code inherits
@@ -563,15 +569,12 @@ class BaseModelType(MetaclassType, ):
         # modifying/adding (no deletion? need mixins to pre-build pieces?) to parent
         # classes.  case 4
         # fields would need to combine _symbols
-        if copy_fields is None:
-            copy_fields = []
 
 
 
 
         super_name, super_bases, super_attrs, post_kwargs = cls.__pre_super_new__(
             name, bases, attrs,
-            primary=primary, inner_through = inner_through, copy_fields = copy_fields,
             **kwargs
         )
 
@@ -586,7 +589,6 @@ class BaseModelType(MetaclassType, ):
 
         cls.__post_super_new__(
             new_cls, bases, attrs,
-            primary=primary, inner_through = inner_through, copy_fields = copy_fields,
             **post_kwargs,
         )
         # TODO: I'm surprised that this is necessary to avoid duplciating the mutable
@@ -604,7 +606,6 @@ class BaseModelType(MetaclassType, ):
     @classmethod
     def __post_super_new__(
         cls, new_cls, bases, attrs,
-        primary=None, inner_through = None, copy_fields = None,
         backend_options = {},
         **kwargs
     ):
@@ -642,20 +643,13 @@ class BaseModelType(MetaclassType, ):
         else:
             backend_option = {}
 
-        if implementation is None:
-            # TODO: search MRO?
-            for base in bases:
-                if (
-                    isinstance(base, BaseModelType) and 
-                    (base.__name__ in backend.implementations.__dict__)
-                ):
-                    # TODO: or are these directly on backend along with symbol_class,
-                    # symbol_generator, and other things are in a utils submodule?
-                    implementation = getattr(
-                        backend.implementations,
-                        base.__name__
-                    )
-                    break
+
+        if implementation is None and new_cls._meta.template:
+            implementation = getattr(
+                backend.implementations,
+                new_cls._meta.template.__name__,
+                None
+            )
 
         if implementation is not None:
             cls.finalize_input_fields(new_cls)
@@ -763,6 +757,22 @@ class ModelTemplateType(BaseModelType):
         else:
             return super().__prepare__(name, bases, **kwargs)
 
+    @classmethod
+    def __pre_super_new__(
+        cls, name, bases, attrs,
+        **kwargs
+    ):
+        ret_name, ret_bases, ret_attrs, ret_kwargs,  = super().__pre_super_new__(
+            name, bases, attrs
+        )
+
+        super_attrs = {}
+        for attr_name, attr_val in ret_attrs.items():
+            if attr_name not in attrs.meta.inherited_items:
+                print("template not passing on", attr_name, "=", attr_val)
+                super_attrs[attr_name] = attr_val
+
+        return name, ret_bases, super_attrs, ret_kwargs
 
     def __new__(cls, name, bases, attrs, **kwargs):
 
@@ -776,7 +786,6 @@ class ModelTemplateType(BaseModelType):
             # user model
             return cls.user_model_metaclass(
                 name, bases + (cls.user_model_baseclass,), attrs, 
-                primary=None, inner_through = None, copy_fields = None,
                 **kwargs
             )
 
@@ -813,7 +822,7 @@ class ModelTemplate(BaseModel, metaclass=ModelTemplateType):
 
 
 
-class ModelType(ModelTemplateType):
+class ModelType(BaseModelType):
     """Type class for user models"""
     @classmethod
     def __prepare__(
@@ -851,7 +860,8 @@ class ModelType(ModelTemplateType):
         #bind_embedded_models=True, name="", 
         **kwargs
     ):
-        new_cls =  super().__new__(cls, name, bases, attrs, **kwargs)
+        my_super = super()
+        new_cls =  super().__new__(cls, name, bases[1:], attrs, **kwargs)
 
         if name == "Sellar":
             print("Sellar class ID at ModelType", id(new_cls))
@@ -861,6 +871,12 @@ class ModelType(ModelTemplateType):
 
         return new_cls
 
+    @classmethod
+    def __post_super_new__(
+        cls, new_cls, bases, attrs,
+        **kwargs
+    ):
+        super().__post_super_new__(new_cls, bases, attrs, **kwargs)
 
 class Model(BaseModel, metaclass=ModelType):
     """handles binding etc. for user models"""
@@ -1128,9 +1144,32 @@ TrajectoryAnalysis should get extra flags for keep/skip events and modes
 
 
 """
-class SubmodelType(
-    #ModelType
+class SubmodelTemplateType(
+    ModelTemplateType
 ):
+    @classmethod
+    def __prepare__(
+        cls, model_name, bases,
+        original_class=None, primary=None, inner_through = None, copy_fields = None,
+        **kwds
+    ):
+        return super().__prepare__(model_name, bases,)
+
+    def __new__(
+        cls, name, bases, attrs,
+        original_class=None, primary=None, inner_through = None, copy_fields = None,
+        #bind_embedded_models=True, name="", 
+        **kwargs
+    ):
+        new_cls =  super().__new__(cls, name, bases[1:], attrs, **kwargs)
+        return new_cls
+
+class SubmodelTemplate(ModelTemplate, metaclass=SubmodelTemplateType):
+    pass
+
+
+
+class OldSubmodelType:
     def __iter__(cls):
         for subclass in cls.subclasses:
             yield subclass
@@ -1341,7 +1380,7 @@ class SubmodelType(
         return new_cls
 
 
-class Submodel(
+class OldSubmodel(
     #Model, metaclass=SubmodelType, primary=None
 ):
     """
