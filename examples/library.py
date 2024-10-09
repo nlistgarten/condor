@@ -1,5 +1,13 @@
 import condor as co
 
+class OutputRefCheck(co.ExplicitSystem):
+    x = input()
+    output.y = x**2
+    output.z = y+1
+
+chk = OutputRefCheck(3.)
+
+
 class ShouldFail(co.ExplicitSystem):
     x = input()
     output.y = x**2

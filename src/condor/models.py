@@ -246,48 +246,10 @@ class Options:
     actually has a create_solver and call_solver or something -- creating solver also
     caches any numeric callbacks
 
-    Class mix-in to flag back-end options. Define an submodel class on the model that
-    inherits from Options that over-writes options for the backend's implementation
-    (which generates a callable). Model will transparently pass attributes of Options
-    subclass. Possibly only convention, but name the subclass according to the backend.
-    Multiple option sub-classes provide options depending on project's default backend.
-    Single option sub-class forces back end for this model?
-    OR flag, if tihs backend then these options, otherwise no options (rely on defaults)
-
-    attribute `implementation`, if provided, should be a callable that takes a model
-    and possible options and returns a callable that evaluates the model. Otherwise,
-    will try to find an implementation in backend.implementations of the class name of
-    the defined class or soonest MRO class name.
-
     All backend implementations must ship with reasonable defaults.
 
-    options should not start with __
-
-    Example for inheritance to keep configuration DRY
-
-    class UpcycleSolverOptions(Options):
-        warm_start = True
-        bound_behavior = backend.algebraicsystem.bound_behavior_options.L2
-        exact_hessian = False
-
-
-    class Upsolver(AlgebraicSystem):
-
-        class Casadi(UpcycleSolverOptions):
-            pass
-
-    class MostUpsolvers(Upsolver):
-        ... (define model)
-        # automatically inherit UpcycleSolverOptions settings for Casadi backend
-
-    class ParicularUpsolver(Upsolver):
-        ... (define model)
-
-        class Casadi(UpcycleSolverOptions):
-            # over write specific settings, everything else should be inherited
-            exact_hessian = True
-
-
+    Actually, don't need to inherit if it's backend agnostic -- can just be by name
+    (which is what Django does)
     """
     pass
     # TODO: do meta programming so implementation enums are available without import?
@@ -377,6 +339,7 @@ class BaseModelType(MetaclassType, ):
                 cls_dict[k] = v.inherit(
                     name, field_type_name=k, **v_init_kwargs
                 )
+                cls_dict[k].prepare(cls_dict)
 
             # inherit submodels model from base, create reference now, bind in new
             elif isinstance(v, BaseModelType):
@@ -435,8 +398,6 @@ class BaseModelType(MetaclassType, ):
         if name == "Coupling":
             #breakpoint()
             pass
-
-            
 
 
         # TODO: replace if tree with match cases?
@@ -775,7 +736,6 @@ class ModelTemplateType(BaseModelType):
         return name, ret_bases, super_attrs, ret_kwargs
 
     def __new__(cls, name, bases, attrs, **kwargs):
-
         creating_base_class_for_inheritance = cls.__name__.replace(name, "") == "Type"
         if creating_base_class_for_inheritance:
             print("creating base class for inheritance")

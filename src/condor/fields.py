@@ -124,6 +124,7 @@ class Field:
         # attributes with _ because of AssignedField... 
 
 
+        self._cls_dict = None
         self._name = name
         self._model = model
         if direction is None:
@@ -164,6 +165,9 @@ class Field:
         else:
             mod_obj = sys.modules[mod_name]
         setattr(mod_obj, self._dataclass.__name__, self._dataclass)
+
+    def prepare(self, cls_dict):
+        self._cls_dict = cls_dict
 
     def inherit(self, model_name, field_type_name, **kwargs):
         """
@@ -452,6 +456,8 @@ class AssignedField(Field, default_direction=Direction.output):
                 # these reasons, ditch intermediate stuff.
                 **asdict(symbol_data)
             )
+            if self._direction == Direction.output and self._cls_dict:
+                self._cls_dict[name] = value
             #super().__setattr__(name, self._symbols[-1])
 
 
