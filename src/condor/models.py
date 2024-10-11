@@ -250,14 +250,25 @@ class Options:
 
     # TODO: allow a generic options for non-solver specific options?
 
-class MetaclassType(type):
+#class MetaclassType(type):
+
+#class BaseModelType(MetaclassType, ):
+class BaseModelType(type):
+    """
+    Metaclass for Condor  model
+    """
+    metadata_class = BaseModelMetaData
+    dict_class = BaseCondorClassDict
+
+    # not strictly necessary here since BaseModel doesn't need to exist but convenient
+    # to have the logic to automatically fill this out on all subclasses of
+    # BaseModelType
+    baseclass_for_inheritance = None
     def __init_subclass__(cls, **kwargs):
         cls.baseclass_for_inheritance = None
         # backreference for baseclass (e.g., ModelTemplate, Model, etc) not created until 
 
         # potential additional metadata:
-        # user_model_metaclass
-        # user_model_baseclass
         # these are only for templates, for 
 
         # class dictionary subclass to over-write __set_item__ (to handle particular
@@ -267,12 +278,7 @@ class MetaclassType(type):
         # similar for meta attributes, will ultimately get used by __prepare__ or
         # __new__, I think?
 
-class BaseModelType(MetaclassType, ):
-    """
-    Metaclass for Condor  model
-    """
-    metadata_class = BaseModelMetaData
-    dict_class = BaseCondorClassDict
+
 
     # No dot setting, use func tool `partial` (or just define a dict that gets **passed
     # in). Dot accessing done by instance datastructure.
@@ -538,6 +544,13 @@ class BaseModelType(MetaclassType, ):
         # fields would need to combine _symbols
 
 
+        creating_base_class_for_inheritance = (
+            cls.__name__.replace(name, "") == "Type"
+            and cls.baseclass_for_inheritance is None
+        )
+        if creating_base_class_for_inheritance:
+            print("creating base class for inheritance")
+            print(f"cls.baseclass_for_inheritance={cls.baseclass_for_inheritance}")
 
 
         super_name, super_bases, super_attrs, post_kwargs = cls.__pre_super_new__(
@@ -567,6 +580,10 @@ class BaseModelType(MetaclassType, ):
             print("Sellar._meta class ID at BaseModelType", id(new_cls._meta))
             print("Sellar._meta BaseModelType", new_cls._meta)
             pass
+
+        if creating_base_class_for_inheritance:
+            print("creating base class for inheritance")
+            cls.baseclass_for_inheritance=new_cls
 
         return new_cls
 
@@ -709,6 +726,22 @@ class BaseModel(metaclass=BaseModelType):
 class ModelTemplateType(BaseModelType):
     """Define a Model Template  by subclassing Model, creating field types, and writing an
     implementation."""
+
+    user_model_metaclass = None
+    user_model_baseclass = None
+    def __init_subclass__(cls, **kwargs):
+        cls.user_model_metaclass
+        cls.user_model_baseclass
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def is_user_model(cls, bases):
+        return (
+            cls.baseclass_for_inheritance is not None and
+            cls.baseclass_for_inheritance not in bases
+        )
+
+
     @classmethod
     def __prepare__(
         cls, name, bases,
@@ -742,12 +775,8 @@ class ModelTemplateType(BaseModelType):
         return name, ret_bases, super_attrs, ret_kwargs
 
     def __new__(cls, name, bases, attrs, **kwargs):
-        creating_base_class_for_inheritance = cls.__name__.replace(name, "") == "Type"
-        if creating_base_class_for_inheritance:
-            print("creating base class for inheritance")
-            print(f"cls.baseclass_for_inheritance={cls.baseclass_for_inheritance}")
 
-        if cls.baseclass_for_inheritance and cls.baseclass_for_inheritance not in bases:
+        if cls.is_user_model(bases):
             print("dispatch __new__ for user model", name)
             # user model
             return cls.user_model_metaclass(
@@ -757,9 +786,6 @@ class ModelTemplateType(BaseModelType):
 
         new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
 
-        if creating_base_class_for_inheritance:
-            print("creating base class for inheritance")
-            cls.baseclass_for_inheritance=new_cls
 
         return new_cls
 
@@ -790,6 +816,11 @@ class ModelTemplate(BaseModel, metaclass=ModelTemplateType):
 
 class ModelType(BaseModelType):
     """Type class for user models"""
+
+    def __repr__(cls):
+        if cls.__bases__:
+            return f"<{cls._meta.template.__name__}: {cls.__name__}>"
+
     @classmethod
     def __prepare__(
         cls, model_name, bases,
@@ -822,6 +853,14 @@ class ModelType(BaseModelType):
 
         return name, ret_bases, ret_attrs, ret_kwargs
 
+    @classmethod
+    def is_user_model(cls, bases):
+        return (
+            cls.baseclass_for_inheritance is not None and
+            cls.baseclass_for_inheritance in bases
+        )
+
+
     def __new__(
         cls, name, bases, attrs,
         #bind_embedded_models=True, name="", 
@@ -835,6 +874,10 @@ class ModelType(BaseModelType):
             print("Sellar._meta class ID at ModelType", id(new_cls._meta))
             print("Sellar._meta ModelType", new_cls._meta)
             #breakpoint()
+        if cls.is_user_model(bases):
+            for submodel in new_cls._meta.template._meta.submodels:
+                # TODO inherit submodels
+                pass
 
         return new_cls
 
@@ -1148,7 +1191,9 @@ class SubmodelTemplateType(
         primary, copy_fields = None,
         **kwargs
     ):
-        new_cls =  super().__new__(cls, name, bases[1:], attrs, **kwargs)
+        new_cls =  super().__new__(cls, name, bases[:], attrs, **kwargs)
+        if cls.baseclass_for_inheritance is not None and cls.baseclass_for_inheritance is not new_cls:
+            new_cls._meta.primary._meta.submodels.append(new_cls)
         return new_cls
 
 class SubmodelTemplate(ModelTemplate, metaclass=SubmodelTemplateType, primary=None):
