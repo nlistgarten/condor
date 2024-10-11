@@ -63,7 +63,8 @@ code could update it (add/overwrite)
 """
 
 @dataclass
-class ModelMetaData:
+class BaseModelMetaData:
+    model_name: str = ""
     independent_fields: list = field(default_factory=list)
     matched_fields: list = field(default_factory=list)
     assigned_fields: list = field(default_factory=list)
@@ -83,9 +84,6 @@ class ModelMetaData:
     template: object = None
 
 
-    # primary only needed for submodels, maybe also subclasses?
-    #subclasses: list = field(init=False)
-    #primary: object = None
 
     # assembly/component can also get children/parent
     # assembly/components get inheritance rules? yes, submodels don't need it -- only
@@ -94,9 +92,6 @@ class ModelMetaData:
 
     # trajectory analysis gets an "exclude_modes" and "exclude_events" list?
     # no -- the metaclass gets kwarg and copies the events that will be kept
-
-    def __post_init__(self):
-        self.subclasses = []
 
     @property
     def all_fields(self):
@@ -109,7 +104,7 @@ class ModelMetaData:
 
 
 # appears in __new__ as attrs
-class CondorClassDict(dict):
+class BaseCondorClassDict(dict):
     def __init__(
             self, *args, model_name='',
             #copy_fields=[], primary=None,
@@ -118,7 +113,6 @@ class CondorClassDict(dict):
         super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
         self.from_outer = {}
         self.meta = meta
-        self.model_name=model_name,
         #self.copy_fields = copy_fields
         #self.primary = primary
         #if primary is None:
@@ -264,6 +258,7 @@ class MetaclassType(type):
         # potential additional metadata:
         # user_model_metaclass
         # user_model_baseclass
+        # these are only for templates, for 
 
         # class dictionary subclass to over-write __set_item__ (to handle particular
         # attribute types/fields/etc, -- may be able to use callback on metclass or even
@@ -276,6 +271,8 @@ class BaseModelType(MetaclassType, ):
     """
     Metaclass for Condor  model
     """
+    metadata_class = BaseModelMetaData
+    dict_class = BaseCondorClassDict
 
     # No dot setting, use func tool `partial` (or just define a dict that gets **passed
     # in). Dot accessing done by instance datastructure.
@@ -293,12 +290,22 @@ class BaseModelType(MetaclassType, ):
     @classmethod
     def __prepare__(cls, name, bases, meta=None, **kwds):
         print(f"BaseModelType.__prepare__(cls={cls}, name={name}, bases={bases}, kwargs={kwds})")
+        cls_dict = cls.prepare_create(name, bases, meta=meta, **kwds)
+        if not cls_dict.meta.template:
+            return cls_dict
+        cls.prepare_populate(cls_dict)
+        return cls_dict
 
+
+    @classmethod
+    def prepare_create(cls, name, bases, meta=None, **kwds):
         #sup_dict = super().__prepare__(cls, name, bases, **kwds)
-        sup_dict = {}
+        sup_dict = {} # equivalent to super().__prepare__ unless I break something
+
         if meta is None:
-            meta = ModelMetaData(
+            meta = cls.metadata_class(
                 #primary=primary
+                model_name = name,
             )
 
         for base in bases:
@@ -307,7 +314,7 @@ class BaseModelType(MetaclassType, ):
                 meta.template = base
                 break
 
-        cls_dict = CondorClassDict(
+        cls_dict = cls.dict_class(
             model_name=name,
             meta = meta,
             #copy_fields = kwds.pop('copy_fields', []),
@@ -318,9 +325,13 @@ class BaseModelType(MetaclassType, ):
         # TODO: may need to search MRO resolution, not just bases, which without mixins
         # are just singletons. For fields and submodel classes, since each generation of
         # class is getting re-inherited, this is sufficient. 
-        if not meta.template:
-            return cls_dict
 
+        return cls_dict
+
+    @classmethod
+    def prepare_populate(cls, cls_dict):
+        meta = cls_dict.meta
+        name = meta.model_name
         _dict = meta.template.__dict__
         for k, v in _dict.items():
             # inherit fields from base -- bound in __new__
@@ -329,13 +340,8 @@ class BaseModelType(MetaclassType, ):
                 v_init_kwargs = v._init_kwargs.copy()
                 for init_k, init_v  in v._init_kwargs.items():
                     if isinstance(init_v, Field):
-                        # TODO not sure this will be the best way to remap connected
-                        # fields based on inheritance, but maybe sufficient?
-                        if base.primary and init_v._name in base.primary.__dict__:
-                            get_from = base.primary.__dict__
-                        else:
-                            get_from = cls_dict
-                        v_init_kwargs[init_k] = get_from[init_v._name]
+                        # TODO: is it OK to always assume cls_dict has the proper reference injected
+                        v_init_kwargs[init_k] = cls_dict[init_v._name]
                 cls_dict[k] = v.inherit(
                     name, field_type_name=k, **v_init_kwargs
                 )
@@ -792,12 +798,13 @@ class ModelType(BaseModelType):
     ):
         if name:
             model_name = name
-        meta = ModelMetaData(
+        meta = cls.metadata_class(
+            model_name=model_name,
             bind_embedded_models=bind_embedded_models
         )
         print(f"ModelType.__prepare__(model_name={model_name}, bases={bases}, **{kwargs}), meta={meta}")
 
-        return super().__prepare__(model_name, bases, meta=meta)
+        return super().__prepare__(model_name, bases, meta=meta, **kwargs)
 
 
     @classmethod
@@ -1104,27 +1111,47 @@ TrajectoryAnalysis should get extra flags for keep/skip events and modes
 
 
 """
+
+@dataclass
+class SubmodelMetaData(BaseModelMetaData):
+    # primary only needed for submodels, maybe also subclasses?
+    primary: object = None
+    copy_fields: list = field(default_factory=list)
+    subclasses: list = field(default_factory=dict)
+
+
 class SubmodelTemplateType(
     ModelTemplateType
 ):
+    metadata_class = SubmodelMetaData
+
     @classmethod
     def __prepare__(
         cls, model_name, bases,
-        original_class=None, primary=None, inner_through = None, copy_fields = None,
+        primary, copy_fields=None,
         **kwds
     ):
-        return super().__prepare__(model_name, bases,)
+        if copy_fields is None:
+            copy_fields = []
+        meta = cls.metadata_class(
+            model_name=model_name,
+            primary=primary, copy_fields=copy_fields,
+        )
+        cls_dict = super().__prepare__(model_name, bases,  meta=meta, **kwds)
+        return cls_dict
+        _dict = meta.template.__dict__
+        for k, v in _dict.items():
+            pass
 
     def __new__(
         cls, name, bases, attrs,
-        original_class=None, primary=None, inner_through = None, copy_fields = None,
-        #bind_embedded_models=True, name="", 
+        primary, copy_fields = None,
         **kwargs
     ):
         new_cls =  super().__new__(cls, name, bases[1:], attrs, **kwargs)
         return new_cls
 
-class SubmodelTemplate(ModelTemplate, metaclass=SubmodelTemplateType):
+class SubmodelTemplate(ModelTemplate, metaclass=SubmodelTemplateType, primary=None):
     pass
 
 

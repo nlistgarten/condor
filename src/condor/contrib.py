@@ -3,7 +3,7 @@ from condor.fields import (
     IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
     BoundedAssignmentField, TrajectoryOutputField,
 )
-from condor.models import Model, ModelType, SubmodelTemplate, ModelTemplate
+from condor.models import Model, ModelType, ModelTemplateType,  SubmodelTemplate, ModelTemplate
 from condor.backends.default import backend
 
 class DeferredSystem(ModelTemplate):
@@ -246,7 +246,12 @@ class TrajectoryAnalysis(
     SubmodelTemplate,
 
     primary=ODESystem,
-    copy_fields=["parameter", "initial", "state", "dynamic_output"]
+    copy_fields=[
+        ODESystem.parameter,
+        ODESystem.initial,
+        ODESystem.state,
+        ODESystem.dynamic_output
+    ]
 ):
     """
     this is what simulates an ODE system
@@ -336,7 +341,7 @@ class Mode(
 
 def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):
 
-    attrs = ModelType.__prepare__(name, (ODESystem,))
+    attrs = ModelTemplateType.__prepare__(name, (ODESystem,))
     attrs["A"] = A
     state = attrs["state"]
     x = state(shape=A.shape[0])
@@ -365,7 +370,7 @@ def LTI(A, B=None, dt=0., dt_plant=False, name="LTISystem", ):
     if not (dt_plant and dt):
         attrs["dot"][x] = xdot
 
-    plant = ModelType(name, (Model, ODESystem,), attrs)
+    plant = ModelTemplateType(name, (ODESystem,), attrs)
 
     if dt:
         dt_attrs = SubmodelType.__prepare__("DT", (plant.Event,))
