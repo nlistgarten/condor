@@ -52,6 +52,8 @@ submodel template:
     specify primary
     and whether fields are
     copied or accessed
+    --> attaching submodel template from template to user model is a special version of
+    extension?? kwargs need to be optional, then just another layer of dispatch.
 
 assembly/component model template:
     specify rules for acceptable child/parent (but also methods for later modificaiton)

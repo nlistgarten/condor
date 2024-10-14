@@ -7,21 +7,20 @@ from condor.models import Model, ModelType, ModelTemplateType,  SubmodelTemplate
 from condor.backends.default import backend
 
 class DeferredSystem(ModelTemplate):
-    """
-    output is an explicit function of input
+    """output is an explicit function of input
     """
     input = FreeField()
     output = FreeField(Direction.output)
 
 # TODO: Move to "contrib" or something?
 class ExplicitSystem(ModelTemplate):
-    """
-    output is an explicit function of input
+    """output is an explicit function of input
     """
     input = FreeField()
     output = AssignedField()
 
 class Tablelookup(ModelTemplate):
+    """ """
     """
     rectilnear -> structured, rectilinear grid
     later, unstructured lookup.
@@ -50,6 +49,7 @@ class Tablelookup(ModelTemplate):
 
 
 class AlgebraicSystem(ModelTemplate):
+    """"""
     """
     implicit_output are variables that drive residual to 0
     parameters are additional variables parameterizing system's explicit_output and
@@ -66,6 +66,7 @@ class AlgebraicSystem(ModelTemplate):
 
 
 class OptimizationProblem(ModelTemplate):
+    """"""
     """
     variable are what the optimizer moves to solve problem
     parameter are fixed wrt optimization
@@ -87,6 +88,7 @@ class OptimizationProblem(ModelTemplate):
 
 
 class ODESystem(ModelTemplate):
+    """"""
     """
     t - indepdendent variable of ODE, notionally time but can be used
     for anything. Used directly by subclasses (e.g., user code may use
@@ -253,6 +255,7 @@ class TrajectoryAnalysis(
         ODESystem.dynamic_output
     ]
 ):
+    """"""
     """
     this is what simulates an ODE system
     tf parameter 
@@ -280,6 +283,7 @@ class Event(
     SubmodelTemplate,
     primary = ODESystem
 ):
+    """"""
     """
     update for any state that needs it
 
@@ -329,6 +333,7 @@ class Mode(
     SubmodelTemplate,
     primary = ODESystem
 ):
+    """"""
     """
     convenience for defining conditional behavior for state dynamics and/or controls
     depending on `condition`. No condition to over-write behavior, essentially a way to
@@ -401,6 +406,7 @@ def copy_field(new_model_name, old_field, new_field=None):
     return new_field
 
 class ExternalSolverWrapperType(type):
+    """"""
     """
     since this is only one case, only need to bind input and output fields
     explicitly -- and possibly this is just syntax sugar. wrapper doesn't need
