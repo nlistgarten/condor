@@ -281,7 +281,7 @@ class TrajectoryAnalysis(
 class Event(
     #ModelTemplate,
     SubmodelTemplate,
-    primary = ODESystem
+    primary=ODESystem,
 ):
     """"""
     """

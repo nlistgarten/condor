@@ -11,10 +11,15 @@ dblintA = np.array([
 dblintB = np.array([[0,1]]).T
 
 DblInt = co.LTI(A=dblintA, B=dblintB, name="DblInt")
+#class Terminate(DblInt.Event):
+#    at_time = 32.,
+#    terminate = True
+
 class DblIntLQR(DblInt.TrajectoryAnalysis):
     initial[x] = [1., 0.1]
     Q = np.eye(2)
     R = np.eye(1)
+    #tf = None
     tf = 32.
     u = dynamic_output.u
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)

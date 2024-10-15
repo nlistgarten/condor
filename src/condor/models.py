@@ -83,6 +83,8 @@ class BaseModelMetaData:
     inherited_items: dict = field(default_factory=dict)
     template: object = None
 
+    user_set: dict = field(default_factory=dict)
+
 
 
     # assembly/component can also get children/parent
@@ -100,6 +102,18 @@ class BaseModelMetaData:
     @property
     def dependent_fields(self):
         return [f for f in self.all_fields if f not in self.independent_fields]
+
+    def copy_update(self, **new_meta_kwargs):
+        meta_kwargs = {}
+        for field in dc_fields(self):
+            field_val = getattr(self, field.name)
+            if isinstance(field_val, list):
+                # shallow copy
+                field_val = [item for item in field_val]
+            meta_kwargs[field.name] = field_val
+        meta_kwargs.update(new_meta_kwargs)
+        new_meta = self.__class__(**meta_kwargs)
+        return new_meta
 
 
 
@@ -121,6 +135,7 @@ class BaseCondorClassDict(dict):
         #    self.primary_independent_fields = [f for f in primary._meta.independent_fields]
         self.kwargs = kwargs
         self.args = args
+        self.user_setting = False
 
 
     def set_outer(self, **from_outer):
@@ -216,6 +231,8 @@ class BaseCondorClassDict(dict):
         # deferred subsystems, but perhaps this will never get hit? need to figure
         # out how a model with deferred subsystem behaves
 
+        if self.user_setting:
+            self.meta.user_set[attr_name] = attr_val
 
         return super().__setitem__(attr_name, attr_val)
 
@@ -300,6 +317,7 @@ class BaseModelType(type):
         if not cls_dict.meta.template:
             return cls_dict
         cls.prepare_populate(cls_dict)
+        cls_dict.user_setting = True
         return cls_dict
 
 
@@ -375,11 +393,9 @@ class BaseModelType(type):
             if k in cls_dict:
                 meta.inherited_items[k] = cls_dict[k]
 
-
-
-        return cls_dict
-
     def __call__(cls, *args, **kwargs):
+        #return type(cls).__call__(cls, *args, **kwargs)
+        my_super = super()
         return super().__call__(*args, **kwargs)
 
     def __repr__(cls):
@@ -411,10 +427,6 @@ class BaseModelType(type):
         # will be used to pack arguments in (inputs) and unpack results (output), other
         # convenience
         # TODO: better reserve word check? see check attr name below
-
-        if name == "Coupling":
-            #breakpoint()
-            pass
 
 
         # TODO: replace if tree with match cases?
@@ -529,6 +541,7 @@ class BaseModelType(type):
         **kwargs
     ):
         print(f'  BaseModelType.__new__(mcs={cls}, name={name}, bases={bases}, attrs=[{attrs}], {kwargs})' )
+        attrs.user_setting = False
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement.
         # case 2: ____ - library code that defines fields, etc that user code inherits
@@ -554,8 +567,11 @@ class BaseModelType(type):
             and cls.baseclass_for_inheritance is None
         )
         if creating_base_class_for_inheritance:
-            print("creating base class for inheritance")
+            print("creating base class for inheritance, pre super_new")
             print(f"cls.baseclass_for_inheritance={cls.baseclass_for_inheritance}")
+            print(name, bases)
+            if name == "Submodel":
+                breakpoint()
 
 
         super_name, super_bases, super_attrs, post_kwargs = cls.__pre_super_new__(
@@ -588,6 +604,9 @@ class BaseModelType(type):
 
         if creating_base_class_for_inheritance:
             print("creating base class for inheritance")
+            print(super_name, super_bases)
+            if name == "Submodel":
+                breakpoint()
             cls.baseclass_for_inheritance=new_cls
 
         return new_cls
@@ -754,7 +773,7 @@ class ModelTemplateType(BaseModelType):
         **kwargs
     ):
         if cls.baseclass_for_inheritance and cls.baseclass_for_inheritance not in bases:
-            print("dispatch __prepare__ for user model")
+            print("dispatch __prepare__ for user model", cls.user_model_metaclass, cls.user_model_baseclass)
             # user model
             return cls.user_model_metaclass.__prepare__(
                 name, bases + (cls.user_model_baseclass,),
@@ -783,7 +802,7 @@ class ModelTemplateType(BaseModelType):
     def __new__(cls, name, bases, attrs, **kwargs):
 
         if cls.is_user_model(bases):
-            print("dispatch __new__ for user model", name)
+            print("dispatch __new__ for user model", name, cls.user_model_metaclass, cls.user_model_baseclass)
             # user model
             return cls.user_model_metaclass(
                 name, bases + (cls.user_model_baseclass,), attrs, 
@@ -829,19 +848,10 @@ class ModelTemplate(metaclass=ModelTemplateType):
         if new_meta is None:
             if new_meta_kwargs is None:
                new_meta_kwargs = {}
-            meta_kwargs = {}
-            for field in dc_fields(cls._meta):
-                field_val = getattr(cls._meta, field.name)
-                if isinstance(field_val, list):
-                    # shallow copy
-                    field_val = [item for item in field_val]
-                meta_kwargs[field.name] = field_val
-            meta_kwargs.update(new_meta_kwargs)
-            meta_kwargs.update(
+            new_meta_kwargs.update(
                 model_name=new_name, template=cls
             )
-            new_meta = cls._meta.__class__(**meta_kwargs)
-            # make new meta class
+            new_meta = cls._meta.copy_update(**new_meta_kwargs)
         elif isinstance(new_meta, BaseModelMetaData):
             if new_meta_kwargs is not None:
                 raise TypeError()
@@ -854,10 +864,10 @@ class ModelTemplate(metaclass=ModelTemplateType):
 
         type_kwargs = cls.type_kwargs(new_meta)
         new_dict = cls.__prepare__(new_name, cls.__bases__, **type_kwargs)
-        for k, v in new_dict.items():
+        for k, v in cls.__dict__.items():
             if not k.startswith("_"):
                 if isinstance(v, Field):
-                    cls.inherit_field(v, cls_dict)
+                    cls.inherit_field(v, new_dict)
                 else:
                     new_dict[k] = v
 
@@ -879,15 +889,16 @@ class ModelType(BaseModelType):
     @classmethod
     def __prepare__(
         cls, model_name, bases,
-        bind_embedded_models=True, name="", 
+        bind_embedded_models=True, name="", meta=None,
         **kwargs
     ):
         if name:
             model_name = name
-        meta = cls.metadata_class(
-            model_name=model_name,
-            bind_embedded_models=bind_embedded_models
-        )
+        if meta is None:
+            meta = cls.metadata_class(
+                model_name=model_name,
+                bind_embedded_models=bind_embedded_models
+            )
         print(f"ModelType.__prepare__(model_name={model_name}, bases={bases}, **{kwargs}), meta={meta}")
 
         return super().__prepare__(model_name, bases, meta=meta, **kwargs)
@@ -922,7 +933,16 @@ class ModelType(BaseModelType):
         **kwargs
     ):
         my_super = super()
-        new_cls =  super().__new__(cls, name, bases[1:], attrs, **kwargs)
+
+        creating_base_class_for_inheritance = (
+            cls.__name__.replace(name, "") == "Type"
+            and cls.baseclass_for_inheritance is None
+        )
+        if creating_base_class_for_inheritance:
+            super_bases = bases
+        else:
+            super_bases = bases[1:]
+        new_cls =  super().__new__(cls, name, super_bases, attrs, **kwargs)
 
         if name == "Sellar":
             print("Sellar class ID at ModelType", id(new_cls))
@@ -935,8 +955,8 @@ class ModelType(BaseModelType):
                 extended_submodel = submodel.extend_template(
                     new_meta_kwargs=dict(primary=new_cls)
                 )
-                new_cls._meta.submodels.append(submodel)
-                setattr(new_cls, submodel.__name__, submodel)
+                new_cls._meta.submodels.append(extended_submodel)
+                setattr(new_cls, submodel.__name__, extended_submodel)
                 pass
 
         return new_cls
@@ -1220,7 +1240,7 @@ class SubmodelMetaData(BaseModelMetaData):
     # primary only needed for submodels, maybe also subclasses?
     primary: object = None
     copy_fields: list = field(default_factory=list)
-    subclasses: list = field(default_factory=dict)
+    subclasses: list = field(default_factory=list)
 
 
 class SubmodelTemplateType(
@@ -1231,6 +1251,22 @@ class SubmodelTemplateType(
     def type_kwargs(cls, meta):
         return dict(primary = meta.primary, copy_fields=meta.copy_fields)
 
+    @classmethod
+    def inherit_field(cls, field, cls_dict):
+        v = field
+        v_class = v.__class__
+        v_init_kwargs = v._init_kwargs.copy()
+        for init_k, init_v  in v._init_kwargs.items():
+            if isinstance(init_v, Field):
+                # TODO: is it OK to always assume cls_dict has the proper reference injected
+                if init_v._name in cls_dict:
+                    v_init_kwargs[init_k] = cls_dict[init_v._name]
+                elif init_v._name in cls_dict.meta.primary.__dict__:
+                    v_init_kwargs[init_k] = cls_dict.meta.primary.__dict__[init_v._name]
+        cls_dict[field._name] = v.inherit(
+            cls_dict.meta.model_name, field_type_name=field._name, **v_init_kwargs
+        )
+        cls_dict[field._name].prepare(cls_dict)
 
     @classmethod
     def __prepare__(
@@ -1242,16 +1278,30 @@ class SubmodelTemplateType(
         print(f"SubmodelTemplateType.__prepare__(model_name={model_name}, bases+{bases}, primary={primary}, copy_fields={copy_fields}, **{kwds})")
         print(cls.is_user_model(bases))
         # actually don't want this check at all
+
+        for base in bases:
+            if isinstance(base, cls):
+                base_meta = base._meta
+                break
+
         if primary is None and cls.is_user_model(bases):
-            breakpoint()
-            raise TypeError("SubmodelTemplateType.__prepare__ missing required positional argument 'primary'")
+            if base_meta.primary is None:
+                raise TypeError("SubmodelTemplateType.__prepare__ missing required positional argument 'primary'")
+            primary = base_meta.primary
         if copy_fields is None:
-            copy_fields = []
+            if cls.is_user_model(bases):
+                copy_fields = [field for field in base_meta.copy_fields]
+            else:
+                copy_fields = []
+
         meta = cls.metadata_class(
             model_name=model_name,
-            primary=primary, copy_fields=copy_fields,
+            copy_fields=copy_fields,
+            primary=primary,
         )
         cls_dict = super().__prepare__(model_name, bases,  meta=meta, **kwds)
+
+
         return cls_dict
         _dict = meta.template.__dict__
         for k, v in _dict.items():
@@ -1259,10 +1309,21 @@ class SubmodelTemplateType(
 
     def __new__(
         cls, name, bases, attrs,
-        primary, copy_fields = None,
+        primary=None, copy_fields = None,
         **kwargs
     ):
-        new_cls =  super().__new__(cls, name, bases[:], attrs, **kwargs)
+        if name == "DblIntLQR":
+            #breakpoint()
+            pass
+
+        new_cls =  super().__new__(
+            cls, name, bases[:], attrs, **kwargs
+        )
+
+        if name == "DblIntLQR":
+            #breakpoint()
+            pass
+
         if cls.baseclass_for_inheritance is not None and cls.baseclass_for_inheritance is not new_cls:
             new_cls._meta.primary._meta.submodels.append(new_cls)
         return new_cls
@@ -1270,30 +1331,65 @@ class SubmodelTemplateType(
 class SubmodelTemplate(ModelTemplate, metaclass=SubmodelTemplateType, primary=None):
     pass
 
-class InheritedSubmodelTemplateType(SubmodelTemplateType):
-    @classmethod
-    def __prepare__(
-        cls, name, bases,
-        **kwds
-    ):
-        return super().__prepare__(
-            name, bases, **kwds
-        )
 
-    def __new__(
-        cls, name, bases, attrs,
-        **kwargs
-    ):
-        new_cls = super().__new__(
-            cls, name, bases, attrs, **kwargs,
-        )
+class SubmodelType(ModelType):
+    def __new__(cls, name, bases, attrs, **kwargs):
+        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
+        if cls.is_user_model(bases):
+            new_cls._meta.template._meta.subclasses.append(new_cls)
         return new_cls
 
+    @classmethod
+    def prepare_populate(cls, cls_dict):
+        if cls.baseclass_for_inheritance is not None:
+            primary_dict = {**cls_dict.meta.primary._meta.inherited_items}
+            primary_dict.update(cls_dict.meta.primary._meta.user_set)
+            copy_field_names = [field._name for field in cls_dict.meta.copy_fields]
+            for attr_name, attr_val in primary_dict.items():
+                # TODO: document copy fields? can this get DRY'd up?
+                # don't like that symbol copying is here, maybe should be method on
+                # field?
+                #if attr_name in copy_field_names:
+                if isinstance(attr_val, Field):# and copy_field_names:
+                    """
+                    field_class = attr_val.__class__
+                    v_init_kwargs = attr_val._init_kwargs.copy()
+                    for init_k, init_v  in attr_val._init_kwargs.items():
+                        if isinstance(init_v, Field):
+                            # TODO not sure this will be the best way to remap connected
+                            # fields based on inheritance, but maybe sufficient?
+                            if not init_v._name in base.__copy_fields__ and _base.primary and init_v._name in base.primary.__dict__:
+                                get_from = base.primary.__dict__
+                            else:
+                                get_from = cls_dict
+                            v_init_kwargs[init_k] = get_from[init_v._name]
+                    # I know it has no field references
+                    copied_field = attr_val.inherit(
+                        name, field_type_name=attr_name, **v_init_kwargs
+                    )
+                    """
+                    cls.inherit_field(attr_val, cls_dict)
+                    copied_field = cls_dict[attr_val._name]
+                    copied_field._symbols = [sym for sym in attr_val]
+                    copied_field._count = attr_val._count
+                    #cls_dict[attr_name] = copied_field
+                    continue
+                cls_dict[attr_name] = attr_val
+        super().prepare_populate(cls_dict)
 
-#class InheritedSubmodelTemplate(
-#    ModelTemplate, metaclass=InheritedSubmodelTemplateType
-#):
-#    pass
+
+
+
+class Submodel(Model, metaclass=SubmodelType):
+    #def __init__(self, *args, **kwargs):
+    #    my_super = super()
+    #    breakpoint()
+    #    super().__init__(*args, **kwargs)
+    pass
+
+
+SubmodelTemplateType.user_model_metaclass = SubmodelType
+SubmodelTemplateType.user_model_baseclass = Submodel
 
 
 class OldSubmodelType:

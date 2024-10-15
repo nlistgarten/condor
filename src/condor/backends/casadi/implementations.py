@@ -724,7 +724,7 @@ class TrajectoryAnalysis:
         # other options for scipy.ode + event rootfinder?
     ):
         self.model = model
-        self.ode_model = ode_model = model.primary
+        self.ode_model = ode_model = model._meta.primary
 
         self.x = casadi.vertcat(*flatten(model.state))
         self.lamda = symbol_class.sym("lambda", model.state._count)
