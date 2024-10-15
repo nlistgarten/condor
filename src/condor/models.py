@@ -843,7 +843,7 @@ class ModelTemplateType(BaseModelType):
         return {}
 
 class ModelTemplate(metaclass=ModelTemplateType):
-    placeholder = FreeField(Direction.internal)
+    placeholder = WithDefaultField(Direction.internal)
 
     @classmethod
     def extend_template(cls, new_name="", new_meta=None, new_meta_kwargs=None, **kwargs):

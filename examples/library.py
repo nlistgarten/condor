@@ -1,51 +1,76 @@
 import condor as co
 
-class Component(co.models.ModelTemplate):
-    input = co.FreeField(co.Direction.input)
-    output = co.AssignedField(co.Direction.output)
+if True:
+    class Component(co.models.ModelTemplate):
+        input = co.FreeField(co.Direction.input)
+        output = co.AssignedField(co.Direction.output)
 
-    x = placeholder(default=2.)
-    y = placeholder(default=1.)
+        x = placeholder(default=2.)
+        y = placeholder(default=1.)
 
-    output.z = x**2 + y
+        output.z = x**2 + y
 
-class ComponentImplementation(co.backend.implementations.TrajectoryAnalysis):
-    pass
+    class ComponentImplementation(co.backend.implementations.ExplicitSystem):
+        pass
 
-co.backend.implementations.Component = ComponentImplementation
+    co.backend.implementations.Component = ComponentImplementation
 
-Component() # error
-# similarly, prevent user models from adding fields
+else:
+
+    class Component(co.ExplicitSystem, as_template=True):
+        x = placeholder(default=2.)
+        y = placeholder(default=1.)
+
+        output.z = x**2 + y
+
+##########
+
+import pytest
+with pytest.raises(Exception):
+    Component()
+    raise Exception()
+# try:
+#     Component() # error
+# except:
+#     pass
+# else:
+#     #assert False
+#     pass
+# # similarly, prevent user models from adding fields
 
 class MyComp0(Component):
     pass
 
-MyComp0() --> z=5
+assert MyComp0().z == 5
 
 class MyComp5(Component):
     u = input()
     output.v = u**2 + 2*u + 1
 
-MyComp0(3.) --> z= 5, v=13
+out = MyComp0(3.)
+assert out.z == 5
+assert out.v == 13
 
 class MyComp1(Component):
     x = input()
     y = input()
 
-MyComp1(x=2., y=3.) -> z=7
+out = MyComp1(x=2., y=3.)
+assert out.z==7
 
 class MyComp2(Component):
     x = input()
     y = 3.
 
-MyComp2(1.0) -> z=4
-MyComp2(3., 4.) # errors
+
+assert MyComp2(1.0).z==4
+#MyComp2(3., 4.)
 
 class MyComp3(Component):
     x = 3.
     y = 4.
 
-MyComp3() -> z= 13
+assert MyComp3().z==13
 
 class MyComp4(Component):
     u = input()
@@ -54,7 +79,9 @@ class MyComp4(Component):
 
     output.v = x + 5
 
-MyComp4(4.) -> v= 7, z = 4
+out = MyComp4(4.)
+assert out.v== 7
+assert out.z== 4
 
 
 
