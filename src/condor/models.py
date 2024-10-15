@@ -539,6 +539,13 @@ class BaseModelType(type):
         )
         return name, bases, super_attrs, post_kwargs
 
+    @classmethod
+    def creating_base_class_for_inheritance(cls, name):
+        return (
+            cls.__name__.replace(name, "") == "Type"
+            and cls.baseclass_for_inheritance is None
+        )
+
 
     def __new__(
         cls, name, bases, attrs, 
@@ -566,11 +573,7 @@ class BaseModelType(type):
         # fields would need to combine _symbols
 
 
-        creating_base_class_for_inheritance = (
-            cls.__name__.replace(name, "") == "Type"
-            and cls.baseclass_for_inheritance is None
-        )
-        if creating_base_class_for_inheritance:
+        if cls.creating_base_class_for_inheritance(name):
             print("creating base class for inheritance, pre super_new")
             print(f"cls.baseclass_for_inheritance={cls.baseclass_for_inheritance}")
             print(name, bases)
@@ -604,7 +607,7 @@ class BaseModelType(type):
             print("Sellar._meta BaseModelType", new_cls._meta)
             pass
 
-        if creating_base_class_for_inheritance:
+        if cls.creating_base_class_for_inheritance(name):
             print("creating base class for inheritance")
             print(super_name, super_bases)
             cls.baseclass_for_inheritance=new_cls
@@ -770,9 +773,11 @@ class ModelTemplateType(BaseModelType):
     @classmethod
     def __prepare__(
         cls, name, bases,
+        as_template=False,
         **kwargs
     ):
-        if cls.baseclass_for_inheritance and cls.baseclass_for_inheritance not in bases:
+        #if cls.baseclass_for_inheritance and cls.baseclass_for_inheritance not in bases:
+        if cls.is_user_model(bases) and not as_template:
             print("dispatch __prepare__ for user model", cls.user_model_metaclass, cls.user_model_baseclass)
             # user model
             return cls.user_model_metaclass.__prepare__(
@@ -799,9 +804,9 @@ class ModelTemplateType(BaseModelType):
 
         return name, ret_bases, super_attrs, ret_kwargs
 
-    def __new__(cls, name, bases, attrs, **kwargs):
+    def __new__(cls, name, bases, attrs, as_template=False, **kwargs):
 
-        if cls.is_user_model(bases):
+        if cls.is_user_model(bases) and not as_template:
             print("dispatch __new__ for user model", name, cls.user_model_metaclass, cls.user_model_baseclass)
             # user model
             return cls.user_model_metaclass(
@@ -871,7 +876,9 @@ class ModelTemplate(metaclass=ModelTemplateType):
                 else:
                     new_dict[k] = v
 
-        extended_template = cls.__class__(new_name, cls.__bases__, new_dict, **type_kwargs)
+        extended_template = cls.__class__(
+            new_name, cls.__bases__, new_dict, **type_kwargs
+        )
         return extended_template
 
 
@@ -930,19 +937,18 @@ class ModelType(BaseModelType):
     def __new__(
         cls, name, bases, attrs,
         #bind_embedded_models=True, name="", 
+        as_template=True,
         **kwargs
     ):
         my_super = super()
 
-        creating_base_class_for_inheritance = (
-            cls.__name__.replace(name, "") == "Type"
-            and cls.baseclass_for_inheritance is None
-        )
-        if creating_base_class_for_inheritance:
+        if cls.creating_base_class_for_inheritance(name):
             super_bases = bases
         else:
             super_bases = bases[1:]
-        new_cls =  super().__new__(cls, name, super_bases, attrs, **kwargs)
+        new_cls =  super().__new__(
+            cls, name, super_bases, attrs, **kwargs
+        )
 
         if name == "Sellar":
             print("Sellar class ID at ModelType", id(new_cls))
@@ -968,7 +974,7 @@ class ModelType(BaseModelType):
     ):
         super().__post_super_new__(new_cls, bases, attrs, **kwargs)
 
-class Model( metaclass=ModelType):
+class Model(metaclass=ModelType):
     """handles binding etc. for user models"""
     def __init__(self, *args, name='', **kwargs):
         cls = self.__class__
@@ -1271,12 +1277,13 @@ class SubmodelTemplateType(
     @classmethod
     def __prepare__(
         cls, model_name, bases,
+        as_template=False,
         primary=None,
         copy_fields=None,
         **kwds
     ):
         print(f"SubmodelTemplateType.__prepare__(model_name={model_name}, bases+{bases}, primary={primary}, copy_fields={copy_fields}, **{kwds})")
-        print(cls.is_user_model(bases))
+        print(cls.is_user_model(bases), as_template)
         # actually don't want this check at all
 
         for base in bases:
@@ -1284,22 +1291,36 @@ class SubmodelTemplateType(
                 base_meta = base._meta
                 break
 
-        if primary is None and cls.is_user_model(bases):
+        if cls.is_user_model(bases):
+            if primary is not None:
+                raise TypeError("User's submodels should not provide primary")
             if base_meta.primary is None:
-                raise TypeError("SubmodelTemplateType.__prepare__ missing required positional argument 'primary'")
+                raise TypeError("This shouldn't happen -- defining user submodel with submodel template that is missing primary attribute")
+                #raise TypeError(" SubmodelTemplateType.__prepare__ missing required positional argument 'primary'")
             primary = base_meta.primary
-        if copy_fields is None:
-            if cls.is_user_model(bases):
+
+            if copy_fields is None:
                 copy_fields = [field for field in base_meta.copy_fields]
-            else:
+        elif cls.creating_base_class_for_inheritance(model_name):
+            # primary is allowed to be None
+            if copy_fields is None:
                 copy_fields = []
+        else:
+            # should extended models hit here??
+            if primary is None:
+                raise TypeError("SubmodelTemplate requires primary")
+            if copy_fields is None:
+                copy_fields = []
+
 
         meta = cls.metadata_class(
             model_name=model_name,
             copy_fields=copy_fields,
             primary=primary,
         )
-        cls_dict = super().__prepare__(model_name, bases,  meta=meta, **kwds)
+        cls_dict = super().__prepare__(
+            model_name, bases, meta=meta, as_template=as_template, **kwds
+        )
 
 
         return cls_dict
@@ -1320,14 +1341,16 @@ class SubmodelTemplateType(
             new_cls._meta.primary._meta.submodels.append(new_cls)
         return new_cls
 
-class SubmodelTemplate(ModelTemplate, metaclass=SubmodelTemplateType, primary=None):
+class SubmodelTemplate(
+    ModelTemplate, metaclass=SubmodelTemplateType, primary=None,
+):
     pass
 
 
 class SubmodelType(ModelType):
-    def __new__(cls, name, bases, attrs, **kwargs):
-        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
-        if cls.is_user_model(bases):
+    def __new__(cls, name, bases, attrs, as_template=False, **kwargs):
+        new_cls = super().__new__(cls, name, bases, attrs, as_template=False, **kwargs)
+        if cls.is_user_model(bases) and not as_template:
             new_cls._meta.template._meta.subclasses.append(new_cls)
         return new_cls
 

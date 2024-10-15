@@ -29,6 +29,11 @@ note, inheritance is done ~ by checking bases (well, really MRO) if the attribut
 found on the leaf node. Can use this for Model's definition of __init__ etc for binding
 the IO to the model instance, but cannot rely on it for the magic name space injection
 
+ModelTemplate flag for user_model (default True)
+If false, can add placeholders, returns a tempalte instead of model
+
+
+
 
 ModelTemplate class creation
     creation of placeholder field
@@ -102,6 +107,26 @@ LinCov is directional SGM, sone number of number to construct covariance matrix 
 something
 
 
+ModelTemplate:
+provide placeholder, extend_template
+
+Model:
+provide a bunch of user-model methods
+
+a template: inherit ModelTemplate
+define fields and pre-loaded symbols (placeholders, independent variables, etc) and get
+ready for inheritance to a user model -- 
+
+a submodel template: inherit SubmodelTemplate
+primary to a template, define fields and pre-loaded symbols
+
+a user model: inherit from a template
+"read" user-defined elements, including output from embeded models
+inherit user-copies of fields, prepare to be be runnable -- substitue placeholder
+elements with their subs (or defaults)
+copy & extend any submodel templates
+
+a user submodel: inherit from a user model's extended submodel template
 
 
 
