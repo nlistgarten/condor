@@ -170,7 +170,11 @@ class BaseCondorClassDict(dict):
         return super().__getitem__(*args, **kwargs)
 
     def __setitem__(self, attr_name, attr_val):
+
         print(f"setting {attr_name} to {attr_val}")
+        if self.meta.model_name == "MinimumTime":# and attr_name == "sim":
+            #breakpoint()
+            pass
         if isinstance(attr_val, IndependentField):
             self.meta.independent_fields.append(attr_val)
         if isinstance(attr_val, MatchedField):
@@ -570,8 +574,6 @@ class BaseModelType(type):
             print("creating base class for inheritance, pre super_new")
             print(f"cls.baseclass_for_inheritance={cls.baseclass_for_inheritance}")
             print(name, bases)
-            if name == "Submodel":
-                breakpoint()
 
 
         super_name, super_bases, super_attrs, post_kwargs = cls.__pre_super_new__(
@@ -605,8 +607,6 @@ class BaseModelType(type):
         if creating_base_class_for_inheritance:
             print("creating base class for inheritance")
             print(super_name, super_bases)
-            if name == "Submodel":
-                breakpoint()
             cls.baseclass_for_inheritance=new_cls
 
         return new_cls
@@ -1312,17 +1312,9 @@ class SubmodelTemplateType(
         primary=None, copy_fields = None,
         **kwargs
     ):
-        if name == "DblIntLQR":
-            #breakpoint()
-            pass
-
         new_cls =  super().__new__(
             cls, name, bases[:], attrs, **kwargs
         )
-
-        if name == "DblIntLQR":
-            #breakpoint()
-            pass
 
         if cls.baseclass_for_inheritance is not None and cls.baseclass_for_inheritance is not new_cls:
             new_cls._meta.primary._meta.submodels.append(new_cls)
@@ -1382,7 +1374,6 @@ class SubmodelType(ModelType):
 
 class Submodel(Model, metaclass=SubmodelType):
     #def __init__(self, *args, **kwargs):
-    #    my_super = super()
     #    breakpoint()
     #    super().__init__(*args, **kwargs)
     pass
