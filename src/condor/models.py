@@ -10,60 +10,11 @@ from condor.backends.default import backend
 from condor.conf import settings
 from dataclasses import asdict, dataclass, field, replace, fields as dc_fields
 from condor._version import __version__
-"""
-Backend:
-[x] provide symbol_generator for creating backend symbol repr
-[x] symbol_class for isinstance(model_attr, backend.symbol_class
-[x] name which is how backend options on model is identified
-Do we allow more complicated datastructures? like models, etc.
-
-optional implementations which has a __dict__ that allows assignment
-Or, should the implementations just live in the main backend?
-
-
-Backend Implementations
-[x] must be able to flatten model symbols to backend arrays,
-[x] wrap backend arrays to model symbol, matching shape -- 
-[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics (if
-different, eg casadi DM) and backend symbols
-[ ] ideally, handle special case symmetric and dynamic flags for FreeSymbol and
-[ ] MatchedSymbol if matched to symmetric/diagonal FreeSymbol
-setting the values for outputs and intermediates
-
-Couples to Model types -- knows all fields
-
-who is responsible for:
-filling in fields/._dataclass?
-filling in model input/output attrs?
-
-
-"""
-
-"""
-Figure out how to add DB storage -- maybe expect that to be a user choice (a decorator
-or something)? Then user defined initializer could use it. Yeah, and ORM aspect just
-takes advantage of model attributes just like backend implementation
-
-
-I assume a user model/library code could inject an implementation to the backend?
-not sure how to assign special numeric stuff, probably an submodel class on the model
-based on NPSS discussion it's not really needed if it's done right 
-
-For injecting a default implementation (e.g., new backend) this does work:
-
-import casadi_implementations
-casadi_implementations.ODESystem = 'a reference to check exists'
-
-import condor as co
-
-but probably should just figure out hooks to do that? Could create local dict of backend
-that gets updated with backend.implementations at the top of this file, then libary/user
-code could update it (add/overwrite)
-
-"""
 
 @dataclass
 class BaseModelMetaData:
+    """Holds metadata for models
+    """
     model_name: str = ""
     independent_fields: list = field(default_factory=list)
     matched_fields: list = field(default_factory=list)
@@ -131,12 +82,6 @@ class BaseCondorClassDict(dict):
         super().__init__(*args, **kwargs, dynamic_link = self.dynamic_link)
         self.from_outer = {}
         self.meta = meta
-        #self.copy_fields = copy_fields
-        #self.primary = primary
-        #if primary is None:
-        #    self.primary_independent_fields = []
-        #else:
-        #    self.primary_independent_fields = [f for f in primary._meta.independent_fields]
         self.kwargs = kwargs
         self.args = args
         self.user_setting = False
@@ -157,6 +102,9 @@ class BaseCondorClassDict(dict):
         dynamic_link(xx='state.x')
 
         returns a dictionary where the key 'xx' points to the state with name 'x'
+
+        maybe should be in ModelClassDict (for ModelType specifically) since Templates
+        shouldn't need this. Then ModelType can be responsible for replacing it
         """
 
         for k, v in kwargs.items():
@@ -249,6 +197,11 @@ class BaseCondorClassDict(dict):
 # that are used on every call
 class Options:
     """
+    Django uses a class that owns `class Meta` attribute from model, and then processes
+    it. Has `abstract` attribute to not build table -- is that what an extended template
+    is?
+
+
     re-writing implementations to be backend agnostic (through "wrapper" layer ), the
     option class won't need to be named after a backend; maybe just take __solver__
     attribute to map the solver funciton [it could actually be the callable?
@@ -378,41 +331,61 @@ class BaseModelType(type):
     def prepare_populate(cls, cls_dict):
         meta = cls_dict.meta
         name = meta.model_name
-        _dict = meta.template.__dict__
+        template = meta.template
 
         # probably sufficient to do noninput_fields
         field_from_inherited = {}#field._inherits_from: field for field in meta.all_fields}
 
-        for k, v in _dict.items():
-            # inherit fields from base -- bound in __new__
-            if isinstance(v, Field):
-                cls.inherit_field(v, cls_dict)
-                field_from_inherited[v] = cls_dict[v._name]
+        # also need to iterate over bases/template, I guess?
+        # cls.__mro__ might work. need to make sure the things in cls are fully copied,
+        # as if user wrote it (again) -- equivalent to #include
+        # but need to use same inheritance mechanisms. Actually, this is a problem when
+        # the original/generic TrajectoryAnalysis is constructed, because the
+        # placeholder field is on the ModelTemplate, not the SubmodelTemplate
+        if name in ("TrajectoryAnalysis", "Coupling"):
+            print(cls, name, meta)
+            #breakpoint()
+            print("figuring out base")
+            pass
+        for base in template.__mro__[:-1]:
+            _dict = base.__dict__
 
-            ## inherit submodels model from base, create reference now, bind in new
-            #elif isinstance(v, BaseModelType):
-            #    if v.primary is base and v in base._meta.submodels:
-            #        # submodel inheritance & binding in new
-            #        cls_dict[k] = v
-            elif isinstance(v, BaseSymbol):
-                # should only be used for placeholder and placeholder-adjacent
-                if v.field_type in field_from_inherited:
-                    new_elem = v.copy_to_field(field_from_inherited[v.field_type])
-                    print(f"Element {k}={v} copied from {meta.template} to {name}")
-                    cls_dict[k] = new_elem.backend_repr
+            for k, v in _dict.items():
+                if name in ("Coupling", ) and k == "parameter":
+                    #breakpoint()
+                    print("processing parameter on coupilng")
+                if k in base._meta.inherited_items:
+                    print(f"k={k}, v={v}")
                     breakpoint()
-                    continue
+                # inherit fields from base -- bound in __new__
+                if isinstance(v, Field):
+                    cls.inherit_field(v, cls_dict)
+                    field_from_inherited[v] = cls_dict[v._name]
 
-                print(f"Element not inheriting {k}={v} from {meta.template} to {name}")
-                breakpoint()
-                cls_dict[k] = v
-            elif isinstance(v, backend.symbol_class):
-                # only used for time?
-                print(f"Symbol inheriting {k}={v} from {meta.template} to {name}")
-                cls_dict[k] = v
+                ## inherit submodels model from base, create reference now, bind in new
+                #elif isinstance(v, BaseModelType):
+                #    if v.primary is base and v in base._meta.submodels:
+                #        # submodel inheritance & binding in new
+                #        cls_dict[k] = v
+                elif isinstance(v, BaseSymbol):
+                    # should only be used for placeholder and placeholder-adjacent
+                    if v.field_type in field_from_inherited:
+                        new_elem = v.copy_to_field(field_from_inherited[v.field_type])
+                        print(f"Element {k}={v} copied from {meta.template} to {name}")
+                        cls_dict[k] = new_elem.backend_repr
+                        breakpoint()
+                        continue
 
-            if k in cls_dict:
-                meta.inherited_items[k] = cls_dict[k]
+                    print(f"Element not inheriting {k}={v} from {meta.template} to {name}")
+                    breakpoint()
+                    cls_dict[k] = v
+                elif isinstance(v, backend.symbol_class):
+                    # only used for time?
+                    print(f"Symbol inheriting {k}={v} from {meta.template} to {name}")
+                    cls_dict[k] = v
+
+                if k in cls_dict:
+                    meta.inherited_items[k] = cls_dict[k]
 
     def __call__(cls, *args, **kwargs):
         #return type(cls).__call__(cls, *args, **kwargs)
@@ -463,10 +436,21 @@ class BaseModelType(type):
 
             pass_attr = True
 
+            #if attr_name in ["__module__", "__qualname__"]:
+            #    breakpoint()
+            #    print("pre_super_new", attr_name)
+
 
             if callable(attr_val) and attr_val == attrs.dynamic_link:
                 # don't pass dynamic_link -- don't think we want this but maybe we do
                 continue
+
+            if attrs.meta.inherited_items.get(attr_name, None)  is attr_val:
+                print(f"not passing {attr_name} because it was inherited")
+                # templates should not pass on placeholder because it is inherited, but
+                # models should pass on remaining fields even thought hey are inherited!
+                #breakpoint()
+                pass_attr = False
 
 
             if isinstance(attr_val, backend.symbol_class):
@@ -563,6 +547,37 @@ class BaseModelType(type):
         cls, name, bases, attrs, 
         **kwargs
     ):
+        """
+        Processing of attrs in django...ModelBase is:
+        pop meta
+        iterate over attrs (old):
+           separate out django-y attributes (_has_contribute_to_class(object) )
+            from normal (`new_attrs`)
+
+        - call super new with `new attrs` 
+        - start processing Meta options and setting up model accordingly, including...
+            - contributing the contributable items. (only declared for this new class)
+               <condor inheriting/initial binding>
+            - a lot of table setup, linking etc. <implementation setup?>
+            - go through all MRO, collect inheritable attributes and link for concrete
+            class or deep copy and add to class (<condor inherit = copy, update, bind>)
+        - new_cls._prepare (instance method on ModelBase = classmethod on Model?) does
+          a few additional attributes, only one I understand is creating the manager
+        - register model with app -- like creating back-reference to template's
+          subclasses (instances)
+
+
+        should follow pattern of separating out condor attributes
+        -(isinstance(attr_val(Field, Element, backend_repr.__class__, ??)) as test)
+        from non-condor attributes. Non-condor attributes get passed to __new__ early
+        and then add appropriate condor attributes after-the fact. callback for
+        processing attribute on Type, so only 1 for loop through dict?
+
+        Then need to inherit from bases and/or template MRO
+
+
+
+        """
         print(f'  BaseModelType.__new__(mcs={cls}, name={name}, bases={bases}, attrs=[{attrs}], {kwargs})' )
         attrs.user_setting = False
         # case 1: class Model -- provides machinery to make subsequent cases easier to
@@ -595,8 +610,6 @@ class BaseModelType(type):
             name, bases, attrs,
             **kwargs
         )
-
-
 
         new_cls = super().__new__(
             cls, super_name, super_bases, super_attrs,
@@ -840,12 +853,18 @@ class ModelTemplate(metaclass=ModelTemplateType):
 
         type_kwargs = cls.type_kwargs(new_meta)
         new_dict = cls.__prepare__(new_name, cls.__bases__, **type_kwargs)
+        if new_name == "TrajectoryAnalysis":
+            print(cls, new_name)
+            breakpoint()
+            print("figuring out extend_template")
+            pass
         for k, v in cls.__dict__.items():
-            if not k.startswith("_"):
-                if isinstance(v, Field):
-                    cls.inherit_field(v, new_dict)
-                else:
-                    new_dict[k] = v
+            if k == "_meta":
+                continue
+            if isinstance(v, Field):
+                cls.inherit_field(v, new_dict)
+            else:
+                new_dict[k] = v
 
         extended_template = cls.__class__(
             new_name, cls.__bases__, new_dict, **type_kwargs
