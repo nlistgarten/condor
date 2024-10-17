@@ -292,6 +292,17 @@ class BaseSymbol(FrontendSymbolData, BackendSymbolData,):
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
 
+    def copy_to_field(element, new_field):
+        element_dict = asdict(element)
+        if isinstance(element, FreeSymbol):
+            old_backend_repr = element_dict.pop("backend_repr")
+            element_dict["backend_repr"] = backend.symbol_generator(
+                name=f"{new_field._resolve_name}_{len(new_field._symbols)}",
+                **asdict(backend.get_symbol_data(old_backend_repr))
+            )
+        element_dict["name"] = f"{new_field._model_name}_{element.name}"
+        new_field.create_symbol(**element_dict)
+        return new_field._symbols[-1]
 
 class IndependentSymbol(BaseSymbol):
     pass

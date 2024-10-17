@@ -103,6 +103,10 @@ class BaseModelMetaData:
     def dependent_fields(self):
         return [f for f in self.all_fields if f not in self.independent_fields]
 
+    @property
+    def noninput_fields(self):
+        return self.output_fields + self.internal_fields
+
     def copy_update(self, **new_meta_kwargs):
         meta_kwargs = {}
         for field in dc_fields(self):
@@ -375,10 +379,15 @@ class BaseModelType(type):
         meta = cls_dict.meta
         name = meta.model_name
         _dict = meta.template.__dict__
+
+        # probably sufficient to do noninput_fields
+        field_from_inherited = {}#field._inherits_from: field for field in meta.all_fields}
+
         for k, v in _dict.items():
             # inherit fields from base -- bound in __new__
             if isinstance(v, Field):
                 cls.inherit_field(v, cls_dict)
+                field_from_inherited[v] = cls_dict[v._name]
 
             ## inherit submodels model from base, create reference now, bind in new
             #elif isinstance(v, BaseModelType):
@@ -387,7 +396,15 @@ class BaseModelType(type):
             #        cls_dict[k] = v
             elif isinstance(v, BaseSymbol):
                 # should only be used for placeholder and placeholder-adjacent
+                if v.field_type in field_from_inherited:
+                    new_elem = v.copy_to_field(field_from_inherited[v.field_type])
+                    print(f"Element {k}={v} copied from {meta.template} to {name}")
+                    cls_dict[k] = new_elem.backend_repr
+                    breakpoint()
+                    continue
+
                 print(f"Element not inheriting {k}={v} from {meta.template} to {name}")
+                breakpoint()
                 cls_dict[k] = v
             elif isinstance(v, backend.symbol_class):
                 # only used for time?
@@ -416,13 +433,13 @@ class BaseModelType(type):
         """return new name, bases, attrs to be passed to type.__new__
         and post_kwargs
         """
+        # TODO: take meta kwarg and figure out how to catch dynamic link somewhere else
+
         # perform as much processing as possible before caller super().__new__
         # by building up super_attrs from attrs; some operations need to operate on the
         # constructed class, like binding fields and submodels
 
         super_attrs = {}
-
-        backend_options = {}
         matched_fields = []
 
         # used to find free symbols and replace with symbol, seeded with outer model
@@ -446,9 +463,6 @@ class BaseModelType(type):
 
             pass_attr = True
 
-            if isinstance(attr_val, type) and issubclass(attr_val, Options):
-                backend_options[attr_name] =  attr_val
-                continue
 
             if callable(attr_val) and attr_val == attrs.dynamic_link:
                 # don't pass dynamic_link -- don't think we want this but maybe we do
@@ -534,9 +548,7 @@ class BaseModelType(type):
         orig_doc = attrs.get("__doc__", "")
         super_attrs["__doc__"] = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
-        post_kwargs = dict(
-            backend_options = backend_options,
-        )
+        post_kwargs = {}
         return name, bases, super_attrs, post_kwargs
 
     @classmethod
@@ -617,7 +629,6 @@ class BaseModelType(type):
     @classmethod
     def __post_super_new__(
         cls, new_cls, bases, attrs,
-        backend_options = {},
         **kwargs
     ):
         """
@@ -635,53 +646,6 @@ class BaseModelType(type):
 
 
         # Bind implementation
-        implementation = None
-
-        if backend_options and backend.name in backend_options:
-            backend_option = {
-                k: v 
-                for k, v in backend_options[backend.name].__dict__.items()
-                if not k.startswith('__')
-            }
-            implementation = backend_option.pop('implementation', None)
-            if implementation is not None:
-                # inject so subclasses get this implementation
-                # TODO: a better way? registration? etc?
-                backend.implementation.__dict__[name] = implementation
-
-            # TODO: other validation?
-            # TODO: inherit options? No, defaults come from implementation itself
-        else:
-            backend_option = {}
-
-
-        if implementation is None and new_cls._meta.template:
-            implementation = getattr(
-                backend.implementations,
-                new_cls._meta.template.__name__,
-                None
-            )
-
-        if implementation is not None:
-            cls.finalize_input_fields(new_cls)
-            new_cls.implementation = implementation(new_cls, **backend_option)
-
-            if new_cls.__name__ == "Sellar":
-                #breakpoint()
-                pass
-
-            for field in attrs.meta.all_fields:
-                field.bind_dataclass()
-
-        for field in attrs.meta.independent_fields:
-            for symbol_idx, symbol in enumerate(field):
-                setattr(new_cls, symbol.name, symbol)
-
-
-    def finalize_input_fields(cls):
-        for input_field in cls._meta.input_fields:
-            input_field.create_dataclass()
-
 
     def register(cls, subclass):
         cls._meta.subclasses.append(subclass)
@@ -769,6 +733,12 @@ class ModelTemplateType(BaseModelType):
             cls.baseclass_for_inheritance not in bases
         )
 
+    @classmethod
+    def is_template(cls, bases):
+        return (
+            cls.baseclass_for_inheritance is not None and
+            cls.baseclass_for_inheritance in bases
+        )
 
     @classmethod
     def __prepare__(
@@ -809,10 +779,11 @@ class ModelTemplateType(BaseModelType):
         if cls.is_user_model(bases) and not as_template:
             print("dispatch __new__ for user model", name, cls.user_model_metaclass, cls.user_model_baseclass)
             # user model
-            return cls.user_model_metaclass(
+            user_model =  cls.user_model_metaclass(
                 name, bases + (cls.user_model_baseclass,), attrs, 
                 **kwargs
             )
+            return user_model
 
         new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
 
@@ -920,11 +891,122 @@ class ModelType(BaseModelType):
         if not name:
             name = model_name
 
+        model_post_kwargs = {}
+
         ret_name, ret_bases, ret_attrs, ret_kwargs,  = super().__pre_super_new__(
             name, bases, attrs
         )
 
+        backend_options = {}
+        pass_attrs = {}
+        for attr_name, attr_val in ret_attrs.items():
+            if isinstance(attr_val, type) and issubclass(attr_val, Options):
+                backend_options[attr_name] =  attr_val
+                breakpoint()
+
+        model_post_kwargs.update(
+            backend_options = backend_options,
+        )
+
         return name, ret_bases, ret_attrs, ret_kwargs
+
+    @classmethod
+    def __post_super_new__(
+        cls, new_cls, bases, attrs,
+        backend_options = {},
+        **kwargs
+    ):
+        super().__post_super_new__(new_cls, bases, attrs, **kwargs)
+        if not cls.is_user_model(bases):
+            return
+
+        if new_cls._meta.model_name == "MyComp0":
+            breakpoint()
+            pass
+
+        placeholder_assignment_dict = {}
+        # TODO: no back reference is preserved which frankly seems harsh...
+        placeholder_field = new_cls._meta.template._meta.inherited_items["placeholder"]
+        for elem in placeholder_field:
+            print(f"checking placeholder {elem} on {new_cls}")
+            # currently, the placeholder element is getting passed on so we know it
+            # exists and should never be None
+            val = getattr(new_cls, elem.name,)
+            use_val = None
+            if val is None:
+                pass
+            elif val is elem: # should not need to check if val is elem.backend_repr
+                use_val = elem.default
+            elif isinstance(val, BaseSymbol):
+                use_val = val.backend_repr
+            else:
+                use_val = val
+
+            print(f"creating substitution {elem.backend_repr} = {use_val}")
+            placeholder_assignment_dict[elem.backend_repr] = use_val
+
+        if new_cls._meta.model_name == "MyComp0":
+            breakpoint()
+            pass
+
+        for field in new_cls._meta.noninput_fields:
+            for elem in field:
+                elem.backend_repr = backend.utils.substitute(
+                    elem.backend_repr, placeholder_assignment_dict
+                )
+
+        if new_cls._meta.model_name == "MyComp0":
+            breakpoint()
+            pass
+
+        implementation = None
+
+        if backend_options and backend.name in backend_options:
+            backend_option = {
+                k: v 
+                for k, v in backend_options[backend.name].__dict__.items()
+                if not k.startswith('__')
+            }
+            implementation = backend_option.pop('implementation', None)
+            if implementation is not None:
+                # inject so subclasses get this implementation
+                # TODO: a better way? registration? etc?
+                backend.implementation.__dict__[name] = implementation
+
+            # TODO: other validation?
+            # TODO: inherit options? No, defaults come from implementation itself
+        else:
+            backend_option = {}
+
+
+        if implementation is None and new_cls._meta.template:
+            implementation = getattr(
+                backend.implementations,
+                new_cls._meta.template.__name__,
+                None
+            )
+
+        if implementation is not None:
+            cls.finalize_input_fields(new_cls)
+            new_cls.implementation = implementation(new_cls, **backend_option)
+
+            if new_cls.__name__ == "Sellar":
+                #breakpoint()
+                pass
+
+            for field in attrs.meta.all_fields:
+                field.bind_dataclass()
+
+        for field in attrs.meta.independent_fields:
+            for symbol_idx, symbol in enumerate(field):
+                setattr(new_cls, symbol.name, symbol)
+
+
+    def finalize_input_fields(cls):
+        for input_field in cls._meta.input_fields:
+            input_field.create_dataclass()
+
+
 
     @classmethod
     def is_user_model(cls, bases):
@@ -966,13 +1048,6 @@ class ModelType(BaseModelType):
                 pass
 
         return new_cls
-
-    @classmethod
-    def __post_super_new__(
-        cls, new_cls, bases, attrs,
-        **kwargs
-    ):
-        super().__post_super_new__(new_cls, bases, attrs, **kwargs)
 
 class Model(metaclass=ModelType):
     """handles binding etc. for user models"""
