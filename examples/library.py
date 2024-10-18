@@ -8,6 +8,7 @@ if True:
         x = placeholder(default=2.)
         y = placeholder(default=1.)
 
+        print("computing output.z")
         output.z = x**2 + y
 
     class ComponentImplementation(co.backend.implementations.ExplicitSystem):
@@ -47,9 +48,9 @@ class MyComp5(Component):
     u = input()
     output.v = u**2 + 2*u + 1
 
-out = MyComp0(3.)
+out = MyComp5(3.)
 assert out.z == 5
-assert out.v == 13
+assert out.v == 16
 
 class MyComp1(Component):
     x = input()

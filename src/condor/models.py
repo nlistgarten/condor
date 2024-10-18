@@ -125,6 +125,9 @@ class BaseCondorClassDict(dict):
                 self.meta.output_fields.append(attr_val)
             if attr_val._direction == Direction.internal:
                 self.meta.internal_fields.append(attr_val)
+
+            attr_val.prepare(self)
+
         if isinstance(attr_val.__class__, BaseModelType):
             if attr_val.name:
                 self.meta.embedded_models[attr_val.name] = attr_val
@@ -354,6 +357,17 @@ class BaseModelType(type):
                 if isinstance(v, Field):
                     cls.inherit_field(v, cls_dict)
                     field_from_inherited[v] = cls_dict[v._name]
+                    if v._symbols:
+                        print(name)
+                        if not isinstance(v, IndependentField):
+                            for element in v:
+                                new_elem = element.copy_to_field(
+                                    field_from_inherited[element.field_type]
+                                )
+                                if v._direction != Direction.internal:
+                                    cls_dict[new_elem.name] = new_elem.backend_repr
+
+                        print("inheriting a non-empty field...")
 
                 ## inherit submodels model from base, create reference now, bind in new
                 #elif isinstance(v, BaseModelType):
@@ -366,16 +380,17 @@ class BaseModelType(type):
                         new_elem = v.copy_to_field(field_from_inherited[v.field_type])
                         print(f"Element {k}={v} copied from {meta.template} to {name}")
                         cls_dict[k] = new_elem.backend_repr
-                        breakpoint()
                         continue
 
                     print(f"Element not inheriting {k}={v} from {meta.template} to {name}")
-                    breakpoint()
                     cls_dict[k] = v
                 elif isinstance(v, backend.symbol_class):
                     # only used for time?
                     print(f"Symbol inheriting {k}={v} from {meta.template} to {name}")
                     cls_dict[k] = v
+                    #if v in base._meta.backend_repr_elements:
+                    #    meta.backend_repr_elements[v] = base._meta.backend_repr_elements[v]
+
 
                 if k in cls_dict:
                     meta.inherited_items[k] = cls_dict[k]
@@ -778,7 +793,6 @@ class ModelTemplateType(BaseModelType):
                 name="placeholder",
                 model_name=cls_dict.meta.model_name
             )
-            cls_dict["placeholder"].prepare(cls_dict)
 
         super().prepare_populate(cls_dict)
 
@@ -901,6 +915,7 @@ class ModelType(BaseModelType):
         if not cls.creating_base_class_for_inheritance(cls_dict.meta.model_name):
             print(f"injecting dynamic_link on {cls_dict.meta.model_name}")
             cls_dict["dynamic_link"] = DynamicLink(cls_dict)
+
         super().prepare_populate(cls_dict)
 
     @classmethod
@@ -977,6 +992,7 @@ class ModelType(BaseModelType):
 
         if new_cls._meta.model_name == "MyComp0":
             breakpoint()
+            print("starting processing subs")
             pass
 
         # process placeholders
@@ -992,7 +1008,7 @@ class ModelType(BaseModelType):
             use_val = None
             if val is None:
                 pass
-            elif val is elem: # should not need to check if val is elem.backend_repr
+            elif val is elem or val is elem.backend_repr:
                 use_val = elem.default
             elif isinstance(val, BaseSymbol):
                 use_val = val.backend_repr
@@ -1002,6 +1018,11 @@ class ModelType(BaseModelType):
             print(f"creating substitution {elem.backend_repr} = {use_val}")
             placeholder_assignment_dict[elem.backend_repr] = use_val
 
+        if new_cls._meta.model_name == "MyComp0":
+            breakpoint()
+            print("collected subs")
+            pass
+
         for field in new_cls._meta.noninput_fields:
             for elem in field:
                 elem.backend_repr = backend.utils.substitute(
@@ -1010,6 +1031,7 @@ class ModelType(BaseModelType):
 
         if new_cls._meta.model_name == "MyComp0":
             breakpoint()
+            print("made subs")
             pass
 
         # process implementations

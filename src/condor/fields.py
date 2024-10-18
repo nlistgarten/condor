@@ -301,7 +301,7 @@ class BaseSymbol(FrontendSymbolData, BackendSymbolData,):
                 name=f"{new_field._resolve_name}_{len(new_field._symbols)}",
                 **asdict(backend.get_symbol_data(old_backend_repr))
             )
-        element_dict["name"] = f"{new_field._model_name}_{element.name}"
+        element_dict["name"] = f"{element.name}"
         new_field.create_symbol(**element_dict)
         return new_field._symbols[-1]
 
@@ -469,6 +469,7 @@ class AssignedField(Field, default_direction=Direction.output):
                 **asdict(symbol_data)
             )
             if self._direction == Direction.output and self._cls_dict:
+                #self._cls_dict.__set_item__(name, value)
                 self._cls_dict[name] = value
             #super().__setattr__(name, self._symbols[-1])
 
