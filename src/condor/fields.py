@@ -244,7 +244,7 @@ class Field:
     def create_symbol(self, **kwargs):
         kwargs.update(dict(field_type=self))
         self._symbols.append(self.symbol_class(**kwargs))
-        if self._cls_dict:
+        if self._cls_dict and isinstance(self, IndependentField):
             self._cls_dict.meta.backend_repr_elements[self._symbols[-1].backend_repr] = self._symbols[-1]
         self._count += getattr(self._symbols[-1], 'size', 1)
 

@@ -24,7 +24,7 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     u = dynamic_output.u
     cost = trajectory_output(integrand= (x.T@Q@x + u.T @ R @ u)/2)
 
-    class Casadi(co.Options):
+    class Options:
         state_rtol=1E-8
         adjoint_rtol=1E-8
         pass
@@ -44,7 +44,7 @@ class CtOptLQR(co.OptimizationProblem):
     K = variable(shape=DblIntLQR.K.shape)
     objective = DblIntLQR(K).cost
 
-    class Casadi(co.Options):
+    class Options:
         exact_hessian = False
         method = OptimizationProblem.Method.scipy_cg
 

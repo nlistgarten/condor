@@ -596,7 +596,7 @@ class BaseModelType(type):
                 attr_val = symbol
             else:
                 print(f"symbol {attr_name}={attr_val} was NOT found, NOT passing")
-                breakpoint()
+                #breakpoint()
                 pass_attr = False
 
             if False:
@@ -853,12 +853,10 @@ class ModelTemplate(metaclass=ModelTemplateType):
         new_dict = cls.__prepare__(new_name, cls.__bases__, **type_kwargs)
         if new_name == "TrajectoryAnalysis":
             print(cls, new_name)
-            breakpoint()
+            #breakpoint()
             print("figuring out extend_template")
             pass
-        for k, v in cls.__dict__.items():
-            if k == "_meta":
-                continue
+        for k, v in cls._meta.user_set.items():
             if isinstance(v, Field):
                 cls.inherit_field(v, new_dict)
             else:
@@ -906,15 +904,24 @@ class ModelType(BaseModelType):
         super().prepare_populate(cls_dict)
 
     @classmethod
+    def placeholder_names(cls, new_cls):
+        template = new_cls._meta.template
+        if hasattr(template, "placeholder"):
+            return template.placeholder.list_of("name")
+        else:
+            return []
+
+    @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
         pass_super = True
         if isinstance(attr_val, backend.symbol_class):
+            print(
+                "ModelType is checking a backend_repr...", attr_name, attr_val, cls, new_cls
+            )
             if cls.is_user_model(new_cls.__bases__):
                 pass
 
-            template = new_cls._meta.template
-
-            if hasattr(template, "placeholder") and attr_name in template.placeholder.list_of("name"):
+            if attr_name in cls.placeholder_names(new_cls):
                 setattr(new_cls, attr_name, attr_val)
                 pass_super = False
 
@@ -967,12 +974,6 @@ class ModelType(BaseModelType):
             new_cls._meta.submodels.append(extended_submodel)
             setattr(new_cls, submodel.__name__, extended_submodel)
             pass
-
-        if new_cls._meta.model_name == "MyComp0":
-            breakpoint()
-            pass
-
-
 
         if new_cls._meta.model_name == "MyComp0":
             breakpoint()
@@ -1378,7 +1379,7 @@ class SubmodelTemplateType(
         cls, model_name, bases,
         #as_template=False,
         primary=None,
-        copy_fields=None,
+        copy_fields=None, # defaults to False, but need to copy from base if not set
         **kwds
     ):
         print(f"SubmodelTemplateType.__prepare__(model_name={model_name}, bases+{bases}, primary={primary}, copy_fields={copy_fields}, **{kwds})")
@@ -1399,17 +1400,17 @@ class SubmodelTemplateType(
             primary = base_meta.primary
 
             if copy_fields is None:
-                copy_fields = [field for field in base_meta.copy_fields]
+                copy_fields = base_meta.copy_fields
         elif cls.creating_base_class_for_inheritance(model_name):
             # primary is allowed to be None
             if copy_fields is None:
-                copy_fields = []
+                copy_fields = False
         else:
             # should extended models hit here??
             if primary is None:
                 raise TypeError("SubmodelTemplate requires primary")
             if copy_fields is None:
-                copy_fields = []
+                copy_fields = False
 
 
         meta = cls.metadata_class(
@@ -1461,11 +1462,20 @@ class SubmodelType(ModelType):
         return new_cls
 
     @classmethod
+    def placeholder_names(cls, new_cls):
+        primary_template = new_cls._meta.primary._meta.template
+        super_names = super().placeholder_names(new_cls)
+        if hasattr(primary_template, "placeholder"):
+            new_names = primary_template.placeholder.list_of("name")
+        else:
+            new_names = []
+        return super_names + new_names
+
+    @classmethod
     def prepare_populate(cls, cls_dict):
         if cls.baseclass_for_inheritance is not None:
             primary_dict = {**cls_dict.meta.primary._meta.inherited_items}
             primary_dict.update(cls_dict.meta.primary._meta.user_set)
-            copy_field_names = [field._name for field in cls_dict.meta.copy_fields]
             for attr_name, attr_val in primary_dict.items():
                 # TODO: document copy fields? can this get DRY'd up?
                 # don't like that symbol copying is here, maybe should be method on

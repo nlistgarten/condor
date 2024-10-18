@@ -235,7 +235,9 @@ class ODESystem(ModelTemplate):
 
     # tf and t0 as placeholders with default 0 and inf, respectively
     tf = None
-    t = backend.symbol_generator('t') # TODO use placeholder with default = None
+    #t = backend.symbol_generator('t') # TODO use placeholder with default = None
+    t = placeholder(default=None) # TODO use placeholder with default = None
+
     state = FreeField(Direction.internal)
     initial = MatchedField(state)
     parameter = FreeField()
