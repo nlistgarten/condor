@@ -114,7 +114,7 @@ class Field:
         cls.default_direction = default_direction
 
     def __init__(
-        self, direction=None, name='', model=None, inherit_from=None
+        self, direction=None, name='', model=None, inherit_from=None, model_name="",
     ):
         # TODO: currently, AssignedField types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
@@ -133,7 +133,7 @@ class Field:
         if model:
             self._model_name = model.__class__.__name__
         else:
-            self._model_name = ''
+            self._model_name = model_name
         self._set_resolve_name()
         self._count = 0 # shortcut for flattned size?
         self._symbols = []
@@ -142,7 +142,6 @@ class Field:
         # subclasses must provide _init_kwargs for binding to sub-classes
         # TODO: can this just be taken from __init__ kwargs easily?  or
         # __init_subclass__ hook? definitely neds to be DRY'd up 
-
 
     def bind(self, name, model,):
         """
@@ -245,6 +244,8 @@ class Field:
     def create_symbol(self, **kwargs):
         kwargs.update(dict(field_type=self))
         self._symbols.append(self.symbol_class(**kwargs))
+        if self._cls_dict:
+            self._cls_dict.meta.backend_repr_elements[self._symbols[-1].backend_repr] = self._symbols[-1]
         self._count += getattr(self._symbols[-1], 'size', 1)
 
     def create_dataclass(self):

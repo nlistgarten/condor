@@ -233,8 +233,9 @@ class ODESystem(ModelTemplate):
     # TODO: don't like hacks to simupy to make it work... especially the success
     # checking stuff -- is that neccessary anymore?
 
+    # tf and t0 as placeholders with default 0 and inf, respectively
     tf = None
-    t = backend.symbol_generator('t')
+    t = backend.symbol_generator('t') # TODO use placeholder with default = None
     state = FreeField(Direction.internal)
     initial = MatchedField(state)
     parameter = FreeField()
@@ -248,12 +249,7 @@ class TrajectoryAnalysis(
     SubmodelTemplate,
 
     primary=ODESystem,
-    copy_fields=[
-        ODESystem.parameter,
-        ODESystem.initial,
-        ODESystem.state,
-        ODESystem.dynamic_output
-    ]
+    copy_fields=True,
 ):
     """"""
     """
