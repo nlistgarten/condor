@@ -730,18 +730,24 @@ def check_attr_name(attr_name, attr_val, new_cls):
 #class BaseModel(metaclass=BaseModelType):
 #    pass
 
+#@dataclass
+#class ModelTemplateMetaData(BaseModelMetaData):
+#    model_metaclass: object = None
 
 
 class ModelTemplateType(BaseModelType):
     """Define a Model Template  by subclassing Model, creating field types, and writing an
     implementation."""
 
+    # metadata_class = SubmodelMetaData
     user_model_metaclass = None
     user_model_baseclass = None
     reserved_words = BaseModelType.reserved_words + ["placeholder",]
     def __init_subclass__(cls, **kwargs):
-        cls.user_model_metaclass
-        cls.user_model_baseclass
+        #if model_metaclass is not None:
+        #    breakpoint()
+        cls.user_model_metaclass = None
+        cls.user_model_baseclass = None
         super().__init_subclass__(**kwargs)
 
 
@@ -770,14 +776,22 @@ class ModelTemplateType(BaseModelType):
     @classmethod
     def __prepare__(
         cls, name, bases,
-        as_template=False,
+        as_template=False, 
+        model_metaclass=None,
         **kwargs
     ):
         #if cls.baseclass_for_inheritance and cls.baseclass_for_inheritance not in bases:
+        if model_metaclass is not None:
+            # breakpoint()
+            print("prcessing for model metaclass asssigned, prepare")
         if cls.is_user_model(bases) and not as_template:
+            if name == "MyScenario":
+                #breakpoint()
+                pass
             print("dispatch __prepare__ for user model", cls.user_model_metaclass, cls.user_model_baseclass)
             # user model
-            return cls.user_model_metaclass.__prepare__(
+            #if bases[0].
+            return bases[0].user_model_metaclass.__prepare__(
                 name, bases + (cls.user_model_baseclass,),
                 **kwargs
             )
@@ -804,7 +818,6 @@ class ModelTemplateType(BaseModelType):
             new_cls.placeholder = attr_val
             pass_super = False
 
-
         if attr_name in new_cls._meta.inherited_items:
             pass_super = False
             print("template not passing on", attr_name, "=", attr_val)
@@ -813,11 +826,14 @@ class ModelTemplateType(BaseModelType):
             print("template IS passing on", attr_name, "=", attr_val)
             super().process_condor_attr(attr_name, attr_val, new_cls)
 
-    def __new__(cls, name, bases, attrs, as_template=False, **kwargs):
+    def __new__(cls, name, bases, attrs, as_template=False, model_metaclass=None, **kwargs):
         if cls.is_user_model(bases) and not as_template:
+            if name == "MyScenario":
+                #breakpoint()
+                pass
             print("dispatch __new__ for user model", name, cls.user_model_metaclass, cls.user_model_baseclass)
             # user model
-            user_model =  cls.user_model_metaclass(
+            user_model =  bases[0].user_model_metaclass(
                 name, bases + (cls.user_model_baseclass,), attrs, 
                 **kwargs
             )
@@ -833,6 +849,11 @@ class ModelTemplateType(BaseModelType):
         if immediate_return:
             return new_cls
 
+        if model_metaclass is not None:
+            #breakpoint()
+            new_cls.user_model_metaclass = model_metaclass
+            model_metaclass.baseclass_for_inheritance = new_cls
+            print("prcessing for model metaclass asssigned, new")
 
 
         return new_cls
@@ -841,6 +862,13 @@ class ModelTemplateType(BaseModelType):
         return {}
 
 class ModelTemplate(metaclass=ModelTemplateType):
+    """A baseclass for defining a Model Template. Eventually needs an implementation;
+
+    injects a `placeholder` field which is processed by models
+    has a default, if nan --> imply value must be provided. if None --> a dummy
+    variable. Should fail if set
+
+    """
     @classmethod
     def extend_template(cls, new_name="", new_meta=None, new_meta_kwargs=None, **kwargs):
         if not new_name:
@@ -947,7 +975,6 @@ class ModelType(BaseModelType):
     def __new__(
         cls, model_name, bases, attrs,
         bind_embedded_models=True, name="",
-        #as_template=True, # needed to prevent passing onto BaseModelType, and should 
         **kwargs
     ):
 
@@ -995,6 +1022,31 @@ class ModelType(BaseModelType):
             print("starting processing subs")
             pass
 
+        if new_cls._meta.model_name == "MyScenario":
+            #breakpoint()
+            pass
+
+        cls.process_placeholders(new_cls, attrs)
+
+        cls.process_implementation(new_cls, attrs)
+
+        cls.bind_model_fields(new_cls, attrs)
+
+        return new_cls
+
+    @classmethod
+    def process_placeholders(cls, new_cls, attrs):
+        """perform placeholder substitution
+
+        how to do an embedded model placeholder? use a deferred system to define? would
+        user models need to substitue, or would same basic mechanism work?
+
+        
+
+        """
+        if new_cls._meta.model_name == "MyScenario":
+            #breakpoint()
+            print("why isn't this going to parent")
         # process placeholders
         # TODO -- if default = None, keep it as a dummy variable
         placeholder_assignment_dict = {}
@@ -1010,6 +1062,8 @@ class ModelType(BaseModelType):
                 pass
             elif val is elem or val is elem.backend_repr:
                 use_val = elem.default
+                if use_val is None:
+                    use_val = elem.backend_repr
             elif isinstance(val, BaseSymbol):
                 use_val = val.backend_repr
             else:
@@ -1034,6 +1088,8 @@ class ModelType(BaseModelType):
             print("made subs")
             pass
 
+    @classmethod
+    def process_implementation(cls, new_cls, attrs):
         # process implementations
         implementation = None
         attr_options = attrs.get("Options", None)
@@ -1066,18 +1122,20 @@ class ModelType(BaseModelType):
             cls.finalize_input_fields(new_cls)
             new_cls.implementation = implementation(new_cls, **backend_option)
 
-            if new_cls.__name__ == "Sellar":
-                #breakpoint()
-                pass
-
             for field in attrs.meta.all_fields:
                 field.bind_dataclass()
 
-        for field in attrs.meta.independent_fields:
+            if new_cls.__name__ == "Sellar":
+                #breakpoint()
+                pass
+        else:
+            new_cls.implementation = None
+
+    @classmethod
+    def bind_model_fields(cls, new_cls, attrs):
+        for field in new_cls._meta.independent_fields:
             for symbol_idx, symbol in enumerate(field):
                 setattr(new_cls, symbol.name, symbol)
-
-        return new_cls
 
 
     def finalize_input_fields(cls):
@@ -1399,14 +1457,11 @@ class SubmodelTemplateType(
     @classmethod
     def __prepare__(
         cls, model_name, bases,
-        #as_template=False,
         primary=None,
         copy_fields=None, # defaults to False, but need to copy from base if not set
         **kwds
     ):
         print(f"SubmodelTemplateType.__prepare__(model_name={model_name}, bases+{bases}, primary={primary}, copy_fields={copy_fields}, **{kwds})")
-        #print(cls.is_user_model(bases), as_template)
-        # actually don't want this check at all
 
         for base in bases:
             if isinstance(base, cls):
@@ -1440,11 +1495,7 @@ class SubmodelTemplateType(
             copy_fields=copy_fields,
             primary=primary,
         )
-        cls_dict = super().__prepare__(
-            model_name, bases, meta=meta,
-            #as_template=as_template,
-            **kwds
-        )
+        cls_dict = super().__prepare__(model_name, bases, meta=meta, **kwds)
 
 
         return cls_dict
@@ -1472,14 +1523,9 @@ class SubmodelTemplate(
 
 
 class SubmodelType(ModelType):
-    def __new__(
-        cls, name, bases, attrs,
-                #as_template=False,
-                **kwargs):
-        new_cls = super().__new__(
-            cls, name, bases, attrs,# as_template=False,
-        **kwargs)
-        if cls.is_user_model(bases):# and not as_template:
+    def __new__( cls, name, bases, attrs, **kwargs):
+        new_cls = super().__new__( cls, name, bases, attrs, **kwargs)
+        if cls.is_user_model(bases):
             new_cls._meta.template._meta.subclasses.append(new_cls)
         return new_cls
 
