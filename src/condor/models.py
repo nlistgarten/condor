@@ -881,6 +881,9 @@ class ModelTemplate(metaclass=ModelTemplateType):
                 model_name=new_name, template=cls
             )
             new_meta = cls._meta.copy_update(**new_meta_kwargs)
+            if new_meta.template is not cls:
+                breakpoint()
+                print("did not overwrite template")
         elif isinstance(new_meta, BaseModelMetaData):
             if new_meta_kwargs is not None:
                 raise TypeError()
@@ -907,6 +910,16 @@ class ModelTemplate(metaclass=ModelTemplateType):
         extended_template = cls.__class__(
             new_name, cls.__bases__, new_dict, **type_kwargs
         )
+        # TODO: don't love that I am doing this manually; should these have just been
+        # put in some type of meta modeldata?
+        extended_template.user_model_metaclass = cls.user_model_metaclass
+        extended_template.user_model_baseclass = cls.user_model_baseclass
+        if extended_template._meta.template is not cls:
+            # TODO not sure why template didnt get set correctly even though I'm passing
+            # it in to new_meta_kwargs...
+            print(cls)
+            print("did not overwrite template")
+        extended_template._meta.template = cls
         return extended_template
 
 
@@ -1291,6 +1304,7 @@ class Model(metaclass=ModelType):
                             )
 
             bound_embedded_model = embedded_model(**embedded_model_kwargs)
+            # ALSO need to catch all the outputs of bound_embeded model?
             setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
 
 
@@ -1576,6 +1590,17 @@ class SubmodelType(ModelType):
                 cls_dict[attr_name] = attr_val
         super().prepare_populate(cls_dict)
 
+
+    @classmethod
+    def is_user_model(cls, bases):
+        if cls.baseclass_for_inheritance is None:
+            return False
+        if cls.baseclass_for_inheritance in bases:
+            return True
+        for base in bases:
+            if base._meta.template is cls.baseclass_for_inheritance:
+                return True
+        return False
 
 
 

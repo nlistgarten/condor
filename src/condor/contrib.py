@@ -245,10 +245,32 @@ class ODESystem(ModelTemplate):
     modal = WithDefaultField(Direction.internal)
     dynamic_output = AssignedField(Direction.internal)
 
+from condor.models import SubmodelType
+
+class TrajectoryAnalysisType(SubmodelType):
+    """Handle kwargs for including/excluding events (also need to include/exlcude
+    modes?), injecting bound events (event functions, updates) to model, etc.
+
+    A common use case will be to bind the parameters then only update the state...
+
+    """
+    @classmethod
+    def __prepare__(
+        cls,
+        *args,
+        include_events=None, exclude_events=None,
+        include_modes=None, exclude_modes=None,
+        **kwargs
+    ):
+        return super().__prepare__(*args, **kwargs)
+
+
 
 class TrajectoryAnalysis(
     #ModelTemplate,
     SubmodelTemplate,
+
+    model_metaclass=TrajectoryAnalysisType,
 
     primary=ODESystem,
     copy_fields=True,
@@ -269,6 +291,13 @@ class TrajectoryAnalysis(
     # TODO: how to make trajectory outputs that depend on other state's outputs without
     # adding an accumulator state and adding the updates to each event? Maybe that
     # doesn't make sense...
+
+    @classmethod
+    def dot(cls, *args, **kwargs):
+        """Compute the rates for the ODESystems that were bound (at the time of
+        construction). Need equivalent for dynamic outputs, and ???
+        """
+
 
 
 # TODO: need to exlcude fields, particularly dot, initial, etc.

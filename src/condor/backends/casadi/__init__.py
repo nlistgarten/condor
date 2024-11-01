@@ -49,7 +49,6 @@ def get_symbol_data(symbol):
     diagonal = False
     symmetric = False
 
-
     return BackendSymbolData(
         shape=shape, symmetric=symmetric, diagonal=diagonal,
     )

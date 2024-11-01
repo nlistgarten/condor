@@ -290,6 +290,11 @@ class FrontendSymbolData:
 
 @dataclass
 class BaseSymbol(FrontendSymbolData, BackendSymbolData,):
+    def __post_init__(self, *args, **kwargs):
+        super().__post_init__(self, *args, **kwargs)
+        # TODO: validate broadcasting, etc. shape info?
+        #self.backend_repr = backend.utils.reshape(self.backend_repr, self.shape)
+
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
 

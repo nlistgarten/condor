@@ -29,6 +29,17 @@ def evalf(expr, backend_repr2value):
     func = casadi.Function("temp_func", list(backend_repr2value.keys()), expr,)
     return func(*backend_repr2value.values())
 
+def reshape(backend_repr, shape):
+    if isinstance(backend_repr, (list, tuple,)):
+        return casadi.vertcat(*backend_repr).reshape(shape)
+    elif hasattr(backend_repr, "reshape"):
+        return backend_repr.reshape(shape)
+    elif np.prod(shape) == 1:
+        return backend_repr
+    raise ValueError
+
+
+
 class CasadiFunctionCallbackMixin:
     """Base class for wrapping a Function with a Callback"""
 
