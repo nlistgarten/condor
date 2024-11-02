@@ -1,5 +1,5 @@
 from condor.fields import (
-    Direction, Field, BaseSymbol, IndependentSymbol, FreeSymbol, WithDefaultField,
+    Direction, Field, BaseElement, IndependentElement, FreeElement, WithDefaultField,
     IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
     BoundedAssignmentField, TrajectoryOutputField,
 )

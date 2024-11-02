@@ -1,5 +1,5 @@
 from condor.fields import (
-    Direction, Field, BaseSymbol, IndependentSymbol, FreeSymbol, WithDefaultField,
+    Direction, Field, BaseElement, IndependentElement, FreeElement, WithDefaultField,
     IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
     BoundedAssignmentField, TrajectoryOutputField,
 )
@@ -430,7 +430,7 @@ def copy_field(new_model_name, old_field, new_field=None):
         new_field = old_field.inherit(
             new_model_name, field_type_name=old_field._name
         )
-    new_field._symbols = [ sym for sym in old_field ]
+    new_field._elements = [ sym for sym in old_field ]
     new_field._count = sum(new_field.list_of("size"))
     return new_field
 

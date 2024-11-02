@@ -654,15 +654,15 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
     if setter_targets is None:
         setter_targets = [state for state in field._matched_to]
     for state in setter_targets:
-        setter_symbol = field.get(match=state)
-        if isinstance(setter_symbol, list) and len(setter_symbol) == 0:
+        setter_element = field.get(match=state)
+        if isinstance(setter_element, list) and len(setter_element) == 0:
             if default is not None:
                 setter_symbol = default
             else:
-                #setter_symbol = casadi.vertcat(*flatten(state.backend_repr)
+                #setter_element = casadi.vertcat(*flatten(state.backend_repr)
                 setter_symbol = (state.backend_repr).reshape((-1,1))
-        elif isinstance(setter_symbol, co.BaseSymbol):
-            setter_symbol = setter_symbol.backend_repr
+        elif isinstance(setter_element, co.BaseElement):
+            setter_symbol = setter_element.backend_repr
         else:
             raise ValueError
 
@@ -874,7 +874,7 @@ class TrajectoryAnalysis:
                         )
                     ))
                 else:
-                    if isinstance(at_time[0], co.BaseSymbol):
+                    if isinstance(at_time[0], co.BaseElement):
                         at_time0 = at_time[0].backend_repr
                     else:
                         at_time0 = at_time[0]
