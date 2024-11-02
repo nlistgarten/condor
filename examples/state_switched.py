@@ -45,7 +45,7 @@ class Transfer(DblInt.TrajectoryAnalysis):
     )
     tf = 20.
 
-    class Casadi(co.Options):
+    class Options:
         state_max_step_size = 0.25
         state_atol = 1E-15
         state_rtol = 1E-12
@@ -54,6 +54,11 @@ class Transfer(DblInt.TrajectoryAnalysis):
         #state_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
         #adjoint_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
 
+
+p0 = -4., -1.
+sim = Transfer(*p0)
+#sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+
 from condor.backends.casadi.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
     p1 = variable()
@@ -61,15 +66,10 @@ class MinimumTime(co.OptimizationProblem):
     sim = Transfer(p1, p2)
     objective = sim.cost
 
-    class Casadi(co.Options):
+    class Options:
         exact_hessian = False
         method = OptimizationProblem.Method.scipy_cg
 
-p0 = -4., -1.
-sim = Transfer(*p0)
-sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
-LTI_plot(sim)
-#plt.show()
 
 MinimumTime.implementation.set_initial(p1=p0[0], p2=p0[1])
 
@@ -82,3 +82,5 @@ print("time to run:", t_stop - t_start)
 print(opt.p1, opt.p2)
 print(opt._stats)
 
+LTI_plot(opt.sim)
+plt.show()

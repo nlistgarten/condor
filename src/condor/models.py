@@ -896,12 +896,19 @@ class ModelTemplate(metaclass=ModelTemplateType):
 
         type_kwargs = cls.type_kwargs(new_meta)
         new_dict = cls.__prepare__(new_name, cls.__bases__, **type_kwargs)
+        new_placeholder_field = new_dict["placeholder"]
         if new_name == "TrajectoryAnalysis":
             print(cls, new_name)
             #breakpoint()
             print("figuring out extend_template")
             pass
         for k, v in cls._meta.user_set.items():
+            processed_v = getattr(cls, k, None)
+            if isinstance(processed_v, BaseSymbol):
+                if processed_v.field_type is cls.placeholder:
+                    new_processed_v = processed_v.copy_to_field(new_placeholder_field)
+                    new_dict[k] = new_processed_v.backend_repr
+                    continue
             if isinstance(v, Field):
                 cls.inherit_field(v, new_dict)
             else:
@@ -1077,13 +1084,16 @@ class ModelType(BaseModelType):
                 use_val = elem.default
                 if use_val is None:
                     use_val = elem.backend_repr
+
             elif isinstance(val, BaseSymbol):
                 use_val = val.backend_repr
             else:
                 use_val = val
 
+            setattr(new_cls, elem.name, use_val)
             print(f"creating substitution {elem.backend_repr} = {use_val}")
-            placeholder_assignment_dict[elem.backend_repr] = use_val
+            if not isinstance(use_val, tuple):
+                placeholder_assignment_dict[elem.backend_repr] = use_val
 
         if new_cls._meta.model_name == "MyComp0":
             breakpoint()
@@ -1534,6 +1544,12 @@ class SubmodelTemplate(
     ModelTemplate, metaclass=SubmodelTemplateType, primary=None,
 ):
     pass
+    #@classmethod
+    #def extend_template(cls, new_name="", new_meta=None, new_meta_kwargs=None, **kwargs):
+    #    print(f"SubmodelTemplate.extend_template(new_name={new_name}...)")
+    #    extended_template = super().extend_template(
+    #        new_name=new_name, new_meta=new_meta, **kwargs
+    #    )
 
 
 class SubmodelType(ModelType):
@@ -1589,6 +1605,12 @@ class SubmodelType(ModelType):
                     continue
                 cls_dict[attr_name] = attr_val
         super().prepare_populate(cls_dict)
+
+    @classmethod
+    def process_placeholders(cls, new_cls, attrs):
+        if new_cls.__name__ == "Accel":
+            print("processing Accel placeholders")
+        super().process_placeholders(new_cls, attrs)
 
 
     @classmethod

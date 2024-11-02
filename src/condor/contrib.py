@@ -5,6 +5,7 @@ from condor.fields import (
 )
 from condor.models import Model, ModelType, ModelTemplateType,  SubmodelTemplate, ModelTemplate
 from condor.backends.default import backend
+import numpy as np
 
 class DeferredSystem(ModelTemplate):
     """output is an explicit function of input
@@ -234,7 +235,6 @@ class ODESystem(ModelTemplate):
     # checking stuff -- is that neccessary anymore?
 
     # tf and t0 as placeholders with default 0 and inf, respectively
-    tf = None
     #t = backend.symbol_generator('t') # TODO use placeholder with default = None
     t = placeholder(default=None) # TODO use placeholder with default = None
 
@@ -286,7 +286,8 @@ class TrajectoryAnalysis(
 
     """
     trajectory_output = TrajectoryOutputField()
-    default_tf = 1_000_000.
+    tf = placeholder(default=np.inf) # TODO use placeholder with default = None
+    t0 = placeholder(default=0.0) # TODO use placeholder with default = None
 
     # TODO: how to make trajectory outputs that depend on other state's outputs without
     # adding an accumulator state and adding the updates to each event? Maybe that
@@ -347,8 +348,9 @@ class Event(
     #make = MatchedField(ODESystem.finite_state)
     # terminate = True -> return nan instead of update?
 
-    function = None
-    at_time = None
+    terminate = placeholder(default=False)
+    function = placeholder(default=np.nan)
+    at_time = placeholder(default=np.nan)
 
 
 # this should just provide the capabiility to overwrite make (or whatever sets control)
@@ -367,7 +369,7 @@ class Mode(
     do inheritance for ODESystems which is otherwise hard? Can this be used instead of
     deferred subsystems? Yes but only for ODESystems..
     """
-    condition = None
+    condition = placeholder(default=1.0)
     action = MatchedField(ODESystem.modal, direction=Direction.internal)
 
 

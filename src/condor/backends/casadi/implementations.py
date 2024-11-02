@@ -807,30 +807,24 @@ class TrajectoryAnalysis:
         terminating = []
 
 
-        model_tf = getattr(model, 'tf', None)
-        if model_tf is not None:
+        if model.tf is not np.inf:
             class Terminate(ode_model.Event):
-                at_time = model_tf,
+                at_time = model.tf,
                 terminate = True
 
         events = [ e for e in ode_model.Event._meta.subclasses ]
 
-        if model_tf is not None:
+        if model.tf is not np.inf:
             ode_model.Event._meta.subclasses = ode_model.Event._meta.subclasses[:-1]
 
         num_events = len(events)
 
         for event_idx, event in enumerate(events):
-            terminate = getattr(event, 'terminate', False)
-            if (
-                getattr(event, 'function', None) is not None
-            ) == (
-                getattr(event, 'at_time', None) is not None
-            ):
+            if (event.function is not np.nan) == (event.at_time is not np.nan):
                 raise ValueError(
                     f"Event class `{event}` has set both `function` and `at_time`"
                 )
-            if getattr(event, 'function', None) is not None:
+            if getattr(event, 'function', np.nan) is not np.nan:
                 e_expr = event.function
             else:
                 at_time = event.at_time
@@ -897,7 +891,7 @@ class TrajectoryAnalysis:
                 e_expr
             )
 
-            if terminate:
+            if event.terminate:
                 # For simupy, use nans to trigger termination; do we ever want to allow
                 # an update to a terminating event?
                 #self.h_exprs.append(
@@ -967,6 +961,7 @@ class TrajectoryAnalysis:
             max_step_size=state_max_step_size,
             solver_class = state_solver_class,
         )
+        self.at_time_slices = at_time_slices
 
         self.callback = ca_sgm.ShootingGradientMethod(self)
 
