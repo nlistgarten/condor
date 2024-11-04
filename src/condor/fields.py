@@ -107,7 +107,8 @@ class Field:
         if element_class is None:
             # TODO: ensure this works for different file organizations? e.g., will it
             # find a symbol defined in another file that the field subclass has access
-            # to?
+            # to? NO! need to figure out how to access parent scope dictionary?
+
             element_class = globals().get(cls.__name__.replace('Field', 'Element'))
         cls.element_class = element_class
 
@@ -267,8 +268,6 @@ class Field:
         return len(self._elements)
 
     def __getattr__(self, with_name):
-        #if with_name.startswith('_'):
-        #    return super().__getattr__(with_name)
         return self.get(name=with_name).backend_repr
 
 
@@ -300,7 +299,7 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
 
-    def copy_to_field(element, new_field):
+    def copy_to_field(element, new_field, new_name=""):
         element_dict = asdict(element)
         if isinstance(element, FreeElement):
             old_backend_repr = element_dict.pop("backend_repr")
@@ -308,7 +307,10 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
                 name=f"{new_field._resolve_name}_{len(new_field._elements)}",
                 **asdict(backend.get_symbol_data(old_backend_repr))
             )
-        element_dict["name"] = f"{element.name}"
+        if new_name:
+            element_dict["name"] = new_name
+        else:
+            element_dict["name"] = f"{element.name}"
         new_field.create_element(**element_dict)
         return new_field._elements[-1]
 
@@ -511,15 +513,21 @@ class MatchedField(Field,):
         self._matched_to = matched_to
         self._init_kwargs.update(dict(matched_to=matched_to))
 
-    def __setitem__(self, key, value):
+    def key_to_matched_element(self, key):
         if isinstance(key, backend.symbol_class):
             match = self._matched_to.get(backend_repr=key)
             if isinstance(match, list):
-                raise ValueError
+                raise ValueError(f"Could not find match for {key}")
         elif isinstance(key, BaseElement):
             match = key
+        elif isinstance(key, str):
+            match = self._matched_to.get(name=key)
         else:
-            raise ValueError
+            raise ValueError(f"Could not find match for {key}")
+        return match
+
+    def __setitem__(self, key, value):
+        match =  self.key_to_matched_element(key)
         symbol_data = backend.get_symbol_data(value)
         self.create_element(
             name=None,
@@ -532,15 +540,7 @@ class MatchedField(Field,):
         """
         get the matched symbodl by the matche's name, backend symbol, or symbol
         """
-        if isinstance(key, backend.symbol_class):
-            match = self._matched_to.get(backend_repr=key)
-        elif isinstance(key, str):
-            match = self._matched_to.get(name=key)
-        elif isinstance(key, BaseElement):
-            match = key
-        else:
-            raise ValueError 
-
+        match =  self.key_to_matched_element(key)
         item = self.get(match=match)
         if isinstance(item, list) and self._direction != Direction.input:
             # TODO: could easily create a new symbol related to match; should it depend

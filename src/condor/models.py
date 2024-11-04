@@ -914,7 +914,6 @@ class ModelType(BaseModelType):
 
         # extend submodel templates
         for submodel in new_cls._meta.template._meta.submodels:
-            # TODO inherit submodels
             extended_submodel = submodel.extend_template(
                 new_meta_kwargs=dict(primary=new_cls)
             )
@@ -931,6 +930,8 @@ class ModelType(BaseModelType):
             #breakpoint()
             pass
 
+        cls.inherit_template_methods(new_cls)
+
         cls.process_placeholders(new_cls, attrs)
 
         cls.process_implementation(new_cls, attrs)
@@ -938,6 +939,14 @@ class ModelType(BaseModelType):
         cls.bind_model_fields(new_cls, attrs)
 
         return new_cls
+
+    @classmethod
+    def inherit_template_methods(cls, new_cls):
+        for key, val in new_cls._meta.template._meta.user_set.items():
+            if isinstance(val, classmethod):
+                print(f"inheriting classmethod {key}={val} from {new_cls._meta.template} to {new_cls}")
+                setattr(new_cls, key, val.__get__(new_cls))
+
 
     @classmethod
     def process_placeholders(cls, new_cls, attrs):
