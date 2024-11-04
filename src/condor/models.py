@@ -943,7 +943,7 @@ class ModelType(BaseModelType):
     @classmethod
     def inherit_template_methods(cls, new_cls):
         for key, val in new_cls._meta.template._meta.user_set.items():
-            if isinstance(val, classmethod):
+            if not isinstance(val, Field) and callable(val):
                 print(f"inheriting classmethod {key}={val} from {new_cls._meta.template} to {new_cls}")
                 setattr(new_cls, key, val.__get__(new_cls))
 
@@ -983,7 +983,7 @@ class ModelType(BaseModelType):
 
             setattr(new_cls, elem.name, use_val)
             print(f"creating substitution {elem.backend_repr} = {use_val}")
-            if not isinstance(use_val, tuple):
+            if isinstance(use_val, backend.symbol_class) or np.array(use_val).dtype.kind in 'if':
                 placeholder_assignment_dict[elem.backend_repr] = use_val
 
         if new_cls._meta.model_name == "MyComp0":

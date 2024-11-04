@@ -511,7 +511,7 @@ class MatchedField(Field,):
 
         super().__init__(**kwargs)
         self._matched_to = matched_to
-        self._init_kwargs.update(dict(matched_to=matched_to))
+        self._init_kwargs.update(matched_to=matched_to)
 
     def key_to_matched_element(self, key):
         if isinstance(key, backend.symbol_class):
