@@ -733,7 +733,7 @@ class TrajectoryAnalysis:
 
         self.simulation_signature = [
             self.p,
-            self.ode_model.t,
+            self.model.t,
             self.x,
         ]
 
@@ -781,7 +781,7 @@ class TrajectoryAnalysis:
             )
 
         state_equation_func = get_state_setter(
-            ode_model.dot,
+            model.dot,
             self.simulation_signature,
             subs = control_sub_expression,
         )
@@ -837,28 +837,28 @@ class TrajectoryAnalysis:
                     else:
                         at_time_start = 0
 
-                    e_expr = at_time.step*casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)/(
+                    e_expr = at_time.step*casadi.sin(casadi.pi*(model.t-at_time_start)/at_time.step)/(
                         casadi.pi*100
                     )
                     # self.events(solver_res.values.t, solver_res.values.y, gs)
                     #e_expr = casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)
-                    e_expr = casadi.fmod(ode_model.t - at_time_start, at_time.step) 
+                    e_expr = casadi.fmod(model.t - at_time_start, at_time.step) 
 
                     # TODO: verify start and stop for at_time slice
                     if isinstance(at_time_start, symbol_class) or at_time_start != 0.:
-                        e_expr = e_expr * (ode_model.t >= at_time_start)
+                        e_expr = e_expr * (model.t >= at_time_start)
                         # if there is a start offset, add a linear term to provide a
                         # zero-crossing at first occurance
-                        pre_term = (at_time_start - ode_model.t) * (ode_model.t <= at_time_start)
+                        pre_term = (at_time_start - model.t) * (model.t <= at_time_start)
                     else:
                         pre_term = 0
 
                     if at_time.stop is not None:
-                        e_expr = e_expr * (ode_model.t <= at_time.stop)
+                        e_expr = e_expr * (model.t <= at_time.stop)
                         # if there is an end-time, hold constant to prevent additional
                         # zero crossings -- hopefully works even if stop is on an event
                         #post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
-                        post_term = (ode_model.t >= at_time.stop) * casadi.fmod(at_time.stop - at_time_start, at_time.step)
+                        post_term = (model.t >= at_time.stop) * casadi.fmod(at_time.stop - at_time_start, at_time.step)
                         at_time_stop = at_time.stop
                     else:
                         post_term = 0
@@ -878,7 +878,7 @@ class TrajectoryAnalysis:
                         at_time0 = at_time[0].backend_repr
                     else:
                         at_time0 = at_time[0]
-                    e_expr = at_time0 - ode_model.t
+                    e_expr = at_time0 - model.t
                     at_time_slices.append(sgm.NextTimeFromSlice(
                         casadi.Function(
                             f"{ode_model.__name__}_at_times_{event_idx}",
@@ -902,6 +902,7 @@ class TrajectoryAnalysis:
                 get_state_setter(
                     event.update,
                     self.simulation_signature,
+                    setter_targets = [state for state in model.state],
                     default=None,
                     subs = control_sub_expression,
                 )
@@ -925,7 +926,7 @@ class TrajectoryAnalysis:
         )
         #self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
 
-        if len(ode_model.dynamic_output):
+        if len(model.dynamic_output):
             #self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
             self.y_expr = casadi.vertcat(*flatten(model.dynamic_output))
             self.y_expr = substitute(self.y_expr, control_sub_expression)
@@ -981,7 +982,7 @@ class TrajectoryAnalysis:
         self.adjoint_signature = [
             self.p,
             self.x,
-            self.ode_model.t,
+            self.model.t,
             self.lamda,
         ]
         # TODO: is there something more pythonic than repeated, very similar list
@@ -1010,7 +1011,7 @@ class TrajectoryAnalysis:
         grad_jac = casadi.jacobian(state_equation_func.expr, self.p)
 
         param_dot_jac_func = casadi.Function(
-            f"{ode_model.__name__}_param_jacobian",
+            f"{model.__name__}_param_jacobian",
             self.simulation_signature,
             [grad_jac],
             dict(allow_free=True,),
@@ -1022,7 +1023,7 @@ class TrajectoryAnalysis:
         ]
         state_integrand_jac_funcs = [
                 casadi.Function(
-                    f"{ode_model.__name__}_state_integrand_jac_{ijac_expr_idx}",
+                    f"{model.__name__}_state_integrand_jac_{ijac_expr_idx}",
                     self.simulation_signature,
                     [ijac_expr],
                     dict(allow_free=True,),
@@ -1035,7 +1036,7 @@ class TrajectoryAnalysis:
         ]
         param_integrand_jac_funcs = [
                 casadi.Function(
-                    f"{ode_model.__name__}_param_integrand_jac_{ijac_expr_idx}",
+                    f"{model.__name__}_param_integrand_jac_{ijac_expr_idx}",
                     self.simulation_signature,
                     [ijac_expr]
                 ) for ijac_expr_idx, ijac_expr in enumerate(param_integrand_jacs)
@@ -1056,7 +1057,7 @@ class TrajectoryAnalysis:
             events, self.e_exprs, self.h_exprs
         ):
             dg_dx = casadi.jacobian(e_expr, self.x)
-            dg_dt = casadi.jacobian(e_expr, ode_model.t)
+            dg_dt = casadi.jacobian(e_expr, model.t)
             dg_dp = casadi.jacobian(e_expr, self.p)
 
             dte_dx = dg_dx/(dg_dx@state_equation_func.expr)
