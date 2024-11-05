@@ -983,8 +983,24 @@ class ModelType(BaseModelType):
 
             setattr(new_cls, elem.name, use_val)
             print(f"creating substitution {elem.backend_repr} = {use_val}")
-            if isinstance(use_val, backend.symbol_class) or np.array(use_val).dtype.kind in 'if':
-                placeholder_assignment_dict[elem.backend_repr] = use_val
+            if isinstance(use_val, backend.symbol_class):
+                if elem.size >= np.prod(use_val.size()):
+                    try:
+                        np.broadcast_shapes(elem.shape, use_val.shape)
+                    except:
+                        pass
+                    else:
+                        placeholder_assignment_dict[elem.backend_repr] = use_val
+            elif np.array(use_val).dtype.kind in 'if':
+                use_val = np.array(use_val)
+                if elem.size >= use_val.size:
+                    try:
+                        np.broadcast_shapes(elem.shape, use_val.shape)
+                    except:
+                        pass
+                    else:
+                        placeholder_assignment_dict[elem.backend_repr] = use_val
+                    placeholder_assignment_dict[elem.backend_repr] = np.broadcast_to(use_val, elem.shape)
 
         if new_cls._meta.model_name == "MyComp0":
             breakpoint()
@@ -1405,7 +1421,14 @@ class SubmodelTemplateType(
                 copy_fields = False
 
 
-        meta = cls.metadata_class(
+        # TODO: starts to distinguish between user model metadata and template
+        # metadata...
+        if cls.is_user_model(bases):
+            metadata_class = base.user_model_metaclass.metadata_class
+        else:
+            metadata_class = cls.metadata_class
+
+        meta = metadata_class(
             model_name=model_name,
             copy_fields=copy_fields,
             primary=primary,
@@ -1437,6 +1460,8 @@ class SubmodelTemplate(
     pass
 
 class SubmodelType(ModelType):
+    metadata_class = SubmodelMetaData
+
     def __new__( cls, name, bases, attrs, **kwargs):
         new_cls = super().__new__( cls, name, bases, attrs, **kwargs)
         if cls.is_user_model(bases):
