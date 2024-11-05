@@ -566,7 +566,7 @@ class BaseModelType(type):
                 new_cls._meta.input_names.append(in_name)
 
         for internal_field in new_cls._meta.internal_fields:
-            internal_field.create_dataclass()
+            pass
 
         for output_field in new_cls._meta.output_fields:
             for out_element in output_field:
@@ -574,7 +574,6 @@ class BaseModelType(type):
                 check_attr_name(out_name, out_element, new_cls)
                 setattr(new_cls, out_name, out_element)
                 new_cls._meta.output_names.append(out_name)
-            output_field.create_dataclass()
 
         for field in new_cls._meta.all_fields:
             setattr(new_cls, field._name, field)
@@ -1053,6 +1052,8 @@ class ModelType(BaseModelType):
             new_cls.implementation = implementation(new_cls, **backend_option)
 
             for field in attrs.meta.all_fields:
+                if field not in attrs.meta.input_fields:
+                    field.create_dataclass()
                 field.bind_dataclass()
 
             if new_cls.__name__ == "Sellar":
