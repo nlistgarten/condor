@@ -37,6 +37,9 @@ class Switch1(DblInt.Event):
     at_time = t1,
     update[mode] = 1.
 
+    pos_at_switch = state()
+    update[pos_at_switch] = x[0]
+
 class Decel(DblInt.Mode):
     condition = mode == 1.
     action[u] = -1.
@@ -63,6 +66,7 @@ class Transfer(DblInt.TrajectoryAnalysis):
 
 
 sim = Transfer(t1=1., t2= 4.,)
+print(sim.pos_at_switch)
 #jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 
 from condor.backends.casadi.implementations import OptimizationProblem

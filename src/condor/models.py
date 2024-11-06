@@ -1485,15 +1485,26 @@ class SubmodelType(ModelType):
             primary_dict = {**cls_dict.meta.primary._meta.inherited_items}
             primary_dict.update(cls_dict.meta.primary._meta.user_set)
             for attr_name, attr_val in primary_dict.items():
-                if isinstance(attr_val, Field):# and copy_field_names:
-                    cls.inherit_field(attr_val, cls_dict)
-                    copied_field = cls_dict[attr_val._name]
-                    copied_field._elements = [sym for sym in attr_val]
-                    copied_field._count = attr_val._count
-                    #cls_dict[attr_name] = copied_field
-                    continue
+                if isinstance(attr_val, Field):
+                    if cls_dict.meta.copy_fields:
+                        cls.inherit_field(attr_val, cls_dict)
+                        copied_field = cls_dict[attr_val._name]
+                        copied_field._elements = [sym for sym in attr_val]
+                        copied_field._count = attr_val._count
+                        #cls_dict[attr_name] = copied_field
+                        continue
                 cls_dict[attr_name] = attr_val
         super().prepare_populate(cls_dict)
+
+
+    @classmethod
+    def process_condor_attr(cls, attr_name, attr_val, new_cls):
+        if isinstance(attr_val, Field):
+            if not new_cls._meta.copy_fields and attr_val._inherits_from._model is not new_cls._meta.primary:
+                return
+
+
+        super().process_condor_attr(attr_name, attr_val, new_cls)
 
     @classmethod
     def process_placeholders(cls, new_cls, attrs):
