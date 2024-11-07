@@ -314,6 +314,15 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
         new_field.create_element(**element_dict)
         return new_field._elements[-1]
 
+    def reshape(element, new_shape):
+        element.backend_repr = backend.symbol_generator(
+            name=element.backend_repr.name(),
+            shape=new_shape
+        )
+        element.shape = new_shape
+        element.size = np.prod(new_shape)
+        return element
+
 class IndependentElement(BaseElement):
     pass
     # TODO: long description?
