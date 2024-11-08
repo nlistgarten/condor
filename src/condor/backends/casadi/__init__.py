@@ -39,8 +39,13 @@ def symbol_generator(name, shape=(1,1), symmetric=False, diagonal=False):
     return sym
 
 def get_symbol_data(symbol):
-    if not isinstance(symbol, symbol_class):
-        symbol = np.atleast_1d(symbol).reshape(-1)
+    if not isinstance(symbol, (symbol_class, casadi.DM)):
+        symbol = np.atleast_1d(symbol)
+        # I'm not sure why, but before I reshaped this to a vector always. Only
+        # reshaping tensors now...
+        #.reshape(-1)
+        if symbol.ndim > 2:
+            symbol.reshape(-1)
     shape = symbol.shape
     n, m = shape_to_nm(shape)
     size = n*m

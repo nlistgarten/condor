@@ -671,7 +671,7 @@ class ModelTemplateType(BaseModelType):
 
     @classmethod
     def __prepare__(
-        cls, name, bases,
+        cls, model_name, bases,
         as_template=False, 
         model_metaclass=None,
         **kwargs
@@ -681,12 +681,12 @@ class ModelTemplateType(BaseModelType):
         if cls.is_user_model(bases) and not as_template:
             print("dispatch __prepare__ for user model", cls.user_model_metaclass, cls.user_model_baseclass)
             return bases[0].user_model_metaclass.__prepare__(
-                name, bases + (cls.user_model_baseclass,),
+                model_name, bases + (cls.user_model_baseclass,),
                 **kwargs
             )
         else:
             # actually creating a model template
-            return super().__prepare__(name, bases, **kwargs)
+            return super().__prepare__(model_name, bases, **kwargs)
 
     @classmethod
     def prepare_populate(cls, cls_dict):
@@ -715,23 +715,23 @@ class ModelTemplateType(BaseModelType):
             print("template IS passing on", attr_name, "=", attr_val)
             super().process_condor_attr(attr_name, attr_val, new_cls)
 
-    def __new__(cls, name, bases, attrs, as_template=False, model_metaclass=None, **kwargs):
+    def __new__(cls, model_name, bases, attrs, as_template=False, model_metaclass=None, **kwargs):
         if cls.is_user_model(bases) and not as_template:
-            print("dispatch __new__ for user model", name, cls.user_model_metaclass, cls.user_model_baseclass)
+            print("dispatch __new__ for user model", model_name, cls.user_model_metaclass, cls.user_model_baseclass)
             # user model: inject the baseclass for inheritance to bases and call the
             # user metaclass
             user_model =  bases[0].user_model_metaclass(
-                name, bases + (cls.user_model_baseclass,), attrs,
+                model_name, bases + (cls.user_model_baseclass,), attrs,
                 **kwargs
             )
             return user_model
 
-        if cls.creating_base_class_for_inheritance(name):
+        if cls.creating_base_class_for_inheritance(model_name):
             immediate_return = True
         else:
             immediate_return = False
 
-        new_cls = super().__new__(cls, name, bases, attrs, **kwargs)
+        new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
 
         if immediate_return:
             return new_cls
@@ -838,6 +838,10 @@ class ModelType(BaseModelType):
                 model_name=model_name,
                 bind_embedded_models=bind_embedded_models
             )
+        else:
+            if meta.model_name != model_name:
+                print(f"updated meta's model_name from {meta.model_name} to {model_name}")
+                meta.model_name = model_name
         print(f"ModelType.__prepare__(model_name={model_name}, bases={bases}, **{kwargs}), meta={meta}")
 
         return super().__prepare__(model_name, bases, meta=meta, **kwargs)
@@ -1443,12 +1447,12 @@ class SubmodelTemplateType(
             pass
 
     def __new__(
-        cls, name, bases, attrs,
+        cls, model_name, bases, attrs,
         primary=None, copy_fields = None,
         **kwargs
     ):
         new_cls =  super().__new__(
-            cls, name, bases[:], attrs, **kwargs
+            cls, model_name, bases[:], attrs, **kwargs
         )
 
         if cls.baseclass_for_inheritance is not None and cls.baseclass_for_inheritance is not new_cls:
@@ -1463,8 +1467,8 @@ class SubmodelTemplate(
 class SubmodelType(ModelType):
     metadata_class = SubmodelMetaData
 
-    def __new__( cls, name, bases, attrs, **kwargs):
-        new_cls = super().__new__( cls, name, bases, attrs, **kwargs)
+    def __new__( cls, model_name, bases, attrs, **kwargs):
+        new_cls = super().__new__( cls, model_name, bases, attrs, **kwargs)
         if cls.is_user_model(bases):
             new_cls._meta.template._meta.subclasses.append(new_cls)
         return new_cls
