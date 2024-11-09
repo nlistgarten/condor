@@ -666,14 +666,23 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
         else:
             raise ValueError
 
-        if isinstance(setter_symbol, symbol_class):
+        original_setter_symbol = setter_symbol
+        try:
+            setter_symbol_original_size = np.prod(setter_symbol.shape)
+        except AttributeError:
+            setter_symbol_original_size = 1
+
+
+        if isinstance(setter_symbol, symbol_class) and setter_symbol_original_size > 1:
             setter_exprs.extend(
                 casadi.vertsplit(setter_symbol.reshape((state.size,1)))
             )
         else:
             # symbol_class is always a matrix, and broadcast_to cannot handle (n,) to (n,1)
             setter_symbol = np.array(setter_symbol)
-            if (state.size ==1 and setter_symbol.size ==1) or state.shape == setter_symbol.shape:
+            if setter_symbol_original_size == 1 and isinstance(original_setter_symbol, symbol_class):
+                setter_exprs.append(original_setter_symbol)
+            elif (state.size ==1 and setter_symbol.size ==1) or state.shape == setter_symbol.shape:
                 setter_exprs.append(
                     setter_symbol.reshape((state.size,1))
                 )
@@ -685,6 +694,15 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
                 setter_exprs.append(
                     np.broadcast_to(setter_symbol, state.shape).reshape(-1)
                 )
+            #for setter_symbol_component in setter_symbol.reshape(-1):
+            #    if isinstance(setter_symbol_component, symbol_class):
+            #        breakpoint()
+            #        pass
+
+
+
+
+            setter_symbol
     #setter_exprs = flatten(setter_exprs)
     setter_exprs = casadi.vertcat(*setter_exprs)
     setter_exprs = substitute(setter_exprs, subs)

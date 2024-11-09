@@ -555,6 +555,6 @@ class MatchedField(Field,):
             # TODO: could easily create a new symbol related to match; should it depend
             # on direction? Does matched need two other direction options for internal
             # get vs set? or is that a separate type of matchedfield?
-            raise ValueError
+            raise KeyError
         return item.backend_repr
 
