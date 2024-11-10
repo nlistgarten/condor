@@ -245,7 +245,14 @@ class ODESystem(ModelTemplate):
     modal = WithDefaultField(Direction.internal)
     dynamic_output = AssignedField(Direction.internal)
 
-from condor.models import SubmodelType
+from condor.models import SubmodelType, SubmodelMetaData
+from dataclasses import dataclass, field
+
+
+@dataclass
+class TrajectoryAnalysisMetaData(SubmodelMetaData):
+    events: list = field(default_factory=list)
+    modes: list = field(default_factory=list)
 
 class TrajectoryAnalysisType(SubmodelType):
     """Handle kwargs for including/excluding events (also need to include/exlcude
@@ -254,6 +261,8 @@ class TrajectoryAnalysisType(SubmodelType):
     A common use case will be to bind the parameters then only update the state...
 
     """
+    metadata_class = TrajectoryAnalysisMetaData
+
     @classmethod
     def __prepare__(
         cls,
@@ -262,7 +271,44 @@ class TrajectoryAnalysisType(SubmodelType):
         include_modes=None, exclude_modes=None,
         **kwargs
     ):
-        return super().__prepare__(*args, **kwargs)
+        cls_dict = super().__prepare__(*args, **kwargs)
+        if exclude_events is not None and include_events is not None:
+            raise ValueError("Use only one of include or include events")
+
+        if include_events is None:
+            cls_dict.meta.events = list(cls_dict.meta.primary.Event)
+        else:
+            cls_dict.meta.events = include_events
+
+        if exclude_events is not None:
+            cls_dict.meta.events = [event for event in cls_dict.meta.events if event not
+                                    in exclude_events]
+
+
+        if exclude_modes is not None and include_modes is not None:
+            raise ValueError("Use only one of include or include modes")
+
+        if include_modes is None:
+            cls_dict.meta.modes = list(cls_dict.meta.primary.Mode)
+        else:
+            cls_dict.meta.modes = include_modes
+
+        if exclude_modes is not None:
+            cls_dict.meta.modes = [mode for mode in cls_dict.meta.modes if mode not
+                                    in exclude_modes]
+
+        return cls_dict
+
+    def __new__(
+        cls,
+        *args,
+        include_events=None, exclude_events=None,
+        include_modes=None, exclude_modes=None,
+        **kwargs
+    ):
+        new_cls = super().__new__(cls, *args, **kwargs)
+        return new_cls
+
 
 
 

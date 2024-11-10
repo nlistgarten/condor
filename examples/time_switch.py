@@ -65,6 +65,19 @@ class Transfer(DblInt.TrajectoryAnalysis):
             #adjoint_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
 
 
+class AccelerateTransfer(DblInt.TrajectoryAnalysis, exclude_events=[Switch1]):
+    initial[x] = [-9., 0.]
+    Q = np.eye(2)
+    cost = trajectory_output((x.T @ Q @ x)/2)
+
+    if not with_time_state:
+        class Casadi(co.Options):
+            state_adaptive_max_step_size = 4
+            #state_max_step_size = 4
+            #state_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
+            #adjoint_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
+
+
 sim = Transfer(t1=1., t2= 4.,)
 print(sim.pos_at_switch)
 #jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
@@ -106,4 +119,8 @@ print(opt.t1, opt.t2)
 #print(jac)
 print(opt._stats)
 LTI_plot(opt.transfer)
+
+sim_accel = AccelerateTransfer(**opt.transfer.parameter.asdict())
+assert sim_accel._res.e[0].rootsfound.size == opt.transfer._res.e[0].rootsfound.size - 1
+
 plt.show()

@@ -755,7 +755,7 @@ class TrajectoryAnalysis:
             control.backend_repr: [(control.default,)]
             for control in ode_model.modal
         }
-        for mode in ode_model.Mode._meta.subclasses:
+        for mode in model._meta.modes:
             for act in mode.action:
                 control_subs_pairs[act.match.backend_repr].append(
                     (mode.condition, act.backend_repr)
@@ -792,16 +792,14 @@ class TrajectoryAnalysis:
 
         terminating = []
 
-
+        events = [ e for e in model._meta.events ]
         if model.tf is not np.inf:
             class Terminate(ode_model.Event):
                 at_time = model.tf,
                 terminate = True
-
-        events = [ e for e in ode_model.Event._meta.subclasses ]
-
-        if model.tf is not np.inf:
+            events += [Terminate]
             ode_model.Event._meta.subclasses = ode_model.Event._meta.subclasses[:-1]
+
 
         num_events = len(events)
 
