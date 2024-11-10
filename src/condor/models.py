@@ -620,6 +620,8 @@ class BaseModelType(type):
             setattr(new_cls, attr_name, attr_val)
 
     def register(cls, subclass):
+        if subclass.__name__ == "b0Burn":
+            breakpoint()
         cls._meta.subclasses.append(subclass)
 
 def check_attr_name(attr_name, attr_val, new_cls):
@@ -1459,6 +1461,10 @@ class SubmodelTemplateType(
             new_cls._meta.primary._meta.submodels.append(new_cls)
         return new_cls
 
+    def __iter__(cls):
+        for subclass in cls._meta.subclasses:
+            yield subclass
+
 class SubmodelTemplate(
     ModelTemplate, metaclass=SubmodelTemplateType, primary=None,
 ):
@@ -1494,20 +1500,16 @@ class SubmodelType(ModelType):
                         cls.inherit_field(attr_val, cls_dict)
                         copied_field = cls_dict[attr_val._name]
                         copied_field._elements = [sym for sym in attr_val]
-                        copied_field._count = attr_val._count
                         #cls_dict[attr_name] = copied_field
                         continue
                 cls_dict[attr_name] = attr_val
         super().prepare_populate(cls_dict)
-
 
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
         if isinstance(attr_val, Field):
             if not new_cls._meta.copy_fields and attr_val._inherits_from._model is not new_cls._meta.primary:
                 return
-
-
         super().process_condor_attr(attr_name, attr_val, new_cls)
 
     @classmethod
@@ -1515,7 +1517,6 @@ class SubmodelType(ModelType):
         if new_cls.__name__ == "Accel":
             print("processing Accel placeholders")
         super().process_placeholders(new_cls, attrs)
-
 
     @classmethod
     def is_user_model(cls, bases):

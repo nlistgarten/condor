@@ -653,58 +653,24 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
 
     if setter_targets is None:
         setter_targets = [state for state in field._matched_to]
-    for state in setter_targets:
+
+    target_sizes = [target.size for target in setter_targets]
+    start_indexes = np.cumsum([0] + target_sizes)
+
+    setter_exprs = symbol_class(sum(target_sizes), 1)
+    for state, start_index, end_index in zip(setter_targets, start_indexes, start_indexes[1:]):
         setter_element = field.get(match=state)
         if isinstance(setter_element, list) and len(setter_element) == 0:
             if default is not None:
-                setter_symbol = default
+                setter_exprs[start_index:end_index] = default
             else:
                 #setter_element = casadi.vertcat(*flatten(state.backend_repr)
-                setter_symbol = (state.backend_repr).reshape((-1,1))
+                setter_exprs[start_index:end_index] = (state.backend_repr).reshape((-1,1))
         elif isinstance(setter_element, co.BaseElement):
-            setter_symbol = setter_element.backend_repr
+            setter_exprs[start_index:end_index] = setter_element.backend_repr.reshape((-1,1))
         else:
             raise ValueError
 
-        original_setter_symbol = setter_symbol
-        try:
-            setter_symbol_original_size = np.prod(setter_symbol.shape)
-        except AttributeError:
-            setter_symbol_original_size = 1
-
-
-        if isinstance(setter_symbol, symbol_class) and setter_symbol_original_size > 1:
-            setter_exprs.extend(
-                casadi.vertsplit(setter_symbol.reshape((state.size,1)))
-            )
-        else:
-            # symbol_class is always a matrix, and broadcast_to cannot handle (n,) to (n,1)
-            setter_symbol = np.array(setter_symbol)
-            if setter_symbol_original_size == 1 and isinstance(original_setter_symbol, symbol_class):
-                setter_exprs.append(original_setter_symbol)
-            elif (state.size ==1 and setter_symbol.size ==1) or state.shape == setter_symbol.shape:
-                setter_exprs.append(
-                    setter_symbol.reshape((state.size,1))
-                )
-            elif state.shape[1] == 1:
-                setter_exprs.append(
-                    np.broadcast_to(setter_symbol, state.size).reshape(-1)
-                )
-            else:
-                setter_exprs.append(
-                    np.broadcast_to(setter_symbol, state.shape).reshape(-1)
-                )
-            #for setter_symbol_component in setter_symbol.reshape(-1):
-            #    if isinstance(setter_symbol_component, symbol_class):
-            #        breakpoint()
-            #        pass
-
-
-
-
-            setter_symbol
-    #setter_exprs = flatten(setter_exprs)
-    setter_exprs = casadi.vertcat(*setter_exprs)
     setter_exprs = substitute(setter_exprs, subs)
     setter_exprs = [setter_exprs]
     setter_func = casadi.Function(
@@ -714,6 +680,8 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
         dict(allow_free=True,),
     )
     setter_func.expr = setter_exprs[0]
+    if setter_func.expr.shape != setter_args[-1].shape and len(setter_args) > 1:
+        raise ValueError("This must be a bug... a shape mismatch")
     return setter_func
 
 
@@ -916,15 +884,15 @@ class TrajectoryAnalysis:
                 #    casadi.MX.nan(ode_model.state._count)
                 #)
                 terminating.append(event_idx)
-            self.h_exprs.append(
-                get_state_setter(
-                    event.update,
-                    self.simulation_signature,
-                    setter_targets = [state for state in model.state],
-                    default=None,
-                    subs = control_sub_expression,
-                )
+
+            h_expr = get_state_setter(
+                event.update,
+                self.simulation_signature,
+                setter_targets = [state for state in model.state],
+                default=None,
+                subs = control_sub_expression,
             )
+            self.h_exprs.append(h_expr)
 
 
         set_solvers = []

@@ -136,13 +136,16 @@ class Field:
         else:
             self._model_name = model_name
         self._set_resolve_name()
-        self._count = 0 # shortcut for flattned size?
         self._elements = []
         self._init_kwargs = dict(direction=direction)
         self._inherits_from = inherit_from
         # subclasses must provide _init_kwargs for binding to sub-classes
         # TODO: can this just be taken from __init__ kwargs easily?  or
         # __init_subclass__ hook? definitely neds to be DRY'd up 
+
+    @property
+    def _count(self):
+        return sum(self.list_of("size"))
 
     def bind(self, name, model,):
         """
@@ -247,7 +250,7 @@ class Field:
         self._elements.append(self.element_class(**kwargs))
         if self._cls_dict and isinstance(self, IndependentField):
             self._cls_dict.meta.backend_repr_elements[self._elements[-1].backend_repr] = self._elements[-1]
-        self._count += getattr(self._elements[-1], 'size', 1)
+        #self._count += getattr(self._elements[-1], 'size', 1)
 
     def create_dataclass(self):
         # TODO: do processing to handle different field types
