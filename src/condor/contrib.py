@@ -107,10 +107,10 @@ class OptimizationProblemType(ModelType):
                 relational_op = True
                 elem.backend_repr = rhs - lhs
                 elem.lower_bound = 0.0
-            elif elem.backend_repr.op() in (ca.OP_GT, ca.OP_GE):
-                relational_op = True
-                elem.backend_repr = rhs - lhs
-                elem.upper_bound = 0.0
+            #elif elem.backend_repr.op() in (ca.OP_GT, ca.OP_GE):
+            #    relational_op = True
+            #    elem.backend_repr = rhs - lhs
+            #    elem.upper_bound = 0.0
             elif elem.backend_repr.op() == ca.OP_EQ:
                 relational_op = True
                 elem.backend_repr = rhs - lhs

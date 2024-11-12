@@ -291,7 +291,7 @@ class FrontendElementData:
     def flat_index(self):
         return self.field_type.flat_index(self)
 
-
+import operator
 @dataclass
 class BaseElement(FrontendElementData, BackendSymbolData,):
     def __post_init__(self, *args, **kwargs):
@@ -325,6 +325,52 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
         element.shape = new_shape
         element.size = np.prod(new_shape)
         return element
+
+
+    def _generic_op(f):
+        def _(self, other):
+            if isinstance(other, self.__class__):
+                other_value = other.backend_repr
+            else:
+                other_value = other
+            return f(self.backend_repr, other_value)
+        return _
+
+    __le__ = _generic_op(operator.le)
+    __lt__ = _generic_op(operator.lt)
+    __ge__ = _generic_op(operator.ge)
+    __gt__ = _generic_op(operator.gt)
+
+    __add__ = _generic_op(operator.add)
+    __sub__ = _generic_op(operator.sub)
+    __mul__ = _generic_op(operator.mul)
+    __matmul__ = _generic_op(operator.matmul)
+    __truediv__ = _generic_op(operator.truediv)
+    __floordiv__ = _generic_op(operator.floordiv)
+    # mod?
+    # divmod?
+    __pow__ = _generic_op(operator.pow)
+    # lshift
+    # rshift
+    # and
+    # xor
+    # or
+
+    __neg__ = _generic_op(operator.neg)
+    __pos__ = _generic_op(operator.pos)
+
+
+    __radd__ = _generic_op(operator.add)
+    __rmul__ = _generic_op(operator.mul)
+    __rmul__ = _generic_op(operator.mul)
+    __rmatmul__ = _generic_op(operator.matmul)
+    __rtruediv__ = _generic_op(operator.truediv)
+    __rfloordiv__ = _generic_op(operator.floordiv)
+    __rpow__ = _generic_op(operator.pow)
+
+
+    del _generic_op
+
 
 class IndependentElement(BaseElement):
     pass
