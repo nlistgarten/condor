@@ -298,10 +298,26 @@ class BaseModelType(type):
         v = field
         v_class = v.__class__
         v_init_kwargs = v._init_kwargs.copy()
-        for init_k, init_v  in v._init_kwargs.items():
-            if isinstance(init_v, Field):
-                # TODO: is it OK to always assume cls_dict has the proper reference injected
-                v_init_kwargs[init_k] = cls_dict[init_v._name]
+        for init_k, init_v_iterable  in v._init_kwargs.items():
+            did_update = False
+            if isinstance(init_v_iterable, (list, tuple)):
+                originaly_iterable = True
+            else:
+                init_v_iterable = [init_v_iterable]
+                originaly_iterable = False
+
+            use_kwarg = []
+            for init_v in init_v_iterable:
+                if isinstance(init_v, Field):
+                    # TODO: is it OK to always assume cls_dict has the proper reference injected
+                    if init_v._name in cls_dict:
+                        use_kwarg.append(cls_dict[init_v._name])
+                        did_update = True
+                        #v_init_kwargs[init_k] = cls_dict[init_v._name]
+            if not originaly_iterable and use_kwarg:
+                use_kwarg = use_kwarg[0]
+            if did_update:
+                v_init_kwargs[init_k] = use_kwarg
         cls_dict[field._name] = v.inherit(
             cls_dict.meta.model_name, field_type_name=field._name, **v_init_kwargs
         )
@@ -1380,13 +1396,32 @@ class SubmodelTemplateType(
         v = field
         v_class = v.__class__
         v_init_kwargs = v._init_kwargs.copy()
-        for init_k, init_v  in v._init_kwargs.items():
-            if isinstance(init_v, Field):
-                # TODO: is it OK to always assume cls_dict has the proper reference injected
-                if init_v._name in cls_dict:
-                    v_init_kwargs[init_k] = cls_dict[init_v._name]
-                elif init_v._name in cls_dict.meta.primary.__dict__:
-                    v_init_kwargs[init_k] = cls_dict.meta.primary.__dict__[init_v._name]
+        for init_k, init_v_iterable  in v._init_kwargs.items():
+            did_update = False
+            if isinstance(init_v_iterable, (list, tuple)):
+                originaly_iterable = True
+            else:
+                init_v_iterable = [init_v_iterable]
+                originaly_iterable = False
+
+            use_kwarg = []
+            for init_v in init_v_iterable:
+                if isinstance(init_v, Field):
+                    # TODO: is it OK to always assume cls_dict has the proper reference injected
+                    if init_v._name in cls_dict:
+                        use_kwarg.append(cls_dict[init_v._name])
+                        did_update = True
+                        #v_init_kwargs[init_k] = cls_dict[init_v._name]
+                    elif init_v._name in cls_dict.meta.primary.__dict__:
+                        use_kwarg.append(cls_dict.meta.primary.__dict__[init_v._name])
+                        did_update = True
+                        #v_init_kwargs[init_k] = cls_dict.meta.primary.__dict__[init_v._name]
+            if not originaly_iterable and use_kwarg:
+                use_kwarg = use_kwarg[0]
+            if did_update:
+                v_init_kwargs[init_k] = use_kwarg
+
+        
         cls_dict[field._name] = v.inherit(
             cls_dict.meta.model_name, field_type_name=field._name, **v_init_kwargs
         )
