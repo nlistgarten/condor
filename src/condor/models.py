@@ -1534,7 +1534,11 @@ class SubmodelType(ModelType):
                     if cls_dict.meta.copy_fields:
                         cls.inherit_field(attr_val, cls_dict)
                         copied_field = cls_dict[attr_val._name]
-                        copied_field._elements = [sym for sym in attr_val]
+                        if isinstance(copied_field, IndependentField):
+                            copied_field._elements = [sym for sym in attr_val]
+                        else:
+                            for elem in attr_val:
+                                elem.copy_to_field(copied_field)
                         #cls_dict[attr_name] = copied_field
                         continue
                 cls_dict[attr_name] = attr_val
