@@ -351,25 +351,26 @@ class FreeElement(IndependentElement):
         self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
 
 
+def make_backend_symbol(
+    backend_name, shape=(1,), symmetric=False, diagonal=False, **kwargs
+):
+    if isinstance(shape, int):
+        shape = (shape,)
+    out = backend.symbol_generator(
+        name=backend_name, shape=shape, symmetric=symmetric, diagonal=diagonal
+    )
+    symbol_data = backend.get_symbol_data(out)
+    kwargs.update(
+        backend_repr=out,
+        **asdict(symbol_data),
+    )
+    return kwargs
+
 class FreeField(IndependentField, default_direction=Direction.input):
-    def make_backend_symbol(
-        self, backend_name, shape=(1,), symmetric=False, diagonal=False, **kwargs
-    ):
-        if isinstance(shape, int):
-            shape = (shape,)
-        out = backend.symbol_generator(
-            name=backend_name, shape=shape, symmetric=symmetric, diagonal=diagonal
-        )
-        symbol_data = backend.get_symbol_data(out)
-        kwargs.update(
-            backend_repr=out,
-            **asdict(symbol_data),
-        )
-        return kwargs
 
     def __call__(self, **kwargs):
         backend_name = "%s_%d" % (self._resolve_name, len(self._elements))
-        new_kwargs = self.make_backend_symbol(backend_name=backend_name, **kwargs)
+        new_kwargs = make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_element(**new_kwargs)
         return self._elements[-1].backend_repr
 
@@ -540,13 +541,19 @@ class MatchedField(Field,):
 
     def __setitem__(self, key, value):
         match =  self.key_to_matched_element(key)
-        symbol_data = backend.get_symbol_data(value)
-        self.create_element(
-            name=None,
-            match=match,
-            backend_repr=value,
-            **asdict(symbol_data)
-        )
+        existing_elem = self.get(match=match)
+        if not isinstance(existing_elem, list):
+            print("OVER-WRITING", existing_elem, "!!!")
+            # TODO verify shape etc?
+            existing_elem.backend_repr = value
+        else:
+            symbol_data = backend.get_symbol_data(value)
+            self.create_element(
+                name=None,
+                match=match,
+                backend_repr=value,
+                **asdict(symbol_data)
+            )
 
     def __getitem__(self, key):
         """
