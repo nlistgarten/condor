@@ -30,14 +30,14 @@ class Sellar(co.OptimizationProblem):
     #constraint(x, lower_bound=0, upper_bound=10)
     #constraint(z, lower_bound=0, upper_bound=10)
 
-    class Casadi(co.Options):
+    class Options:
         if True:
             method = (
                 co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
                 #co.backends.casadi.implementations.OptimizationProblem.Method.scipy_trust_constr
             )
-            #disp = True
-            #iprint = 3
+            disp = True
+            iprint = 3
             #tol = 1E-9
             #maxiter = 2
 
