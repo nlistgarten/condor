@@ -283,6 +283,9 @@ class OptimizationProblem(InitializerMixin):
         Method.ipopt: dict(
             warm_start_init_point=False,
         ),
+        Method.snopt: dict(
+            warm_start_init_point=False,
+        ),
     }
 
 
