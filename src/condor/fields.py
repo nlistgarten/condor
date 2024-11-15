@@ -8,6 +8,9 @@ from condor.backends.default import backend
 from condor.backends import BackendSymbolData
 import importlib
 import sys
+import logging
+
+log = logging.getLogger(__name__)
 
 # TODO **kwarg expansion for a field (with a filter?)
 # TODO copy all parameters (with a filter?) from one model
@@ -589,7 +592,7 @@ class MatchedField(Field,):
         match =  self.key_to_matched_element(key)
         existing_elem = self.get(match=match)
         if not isinstance(existing_elem, list):
-            print("OVER-WRITING", existing_elem, "!!!")
+            log.debug("OVER-WRITING %s!!!", existing_elem)
             # TODO verify shape etc?
             existing_elem.backend_repr = value
         else:

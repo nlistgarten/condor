@@ -10,6 +10,9 @@ from condor.backends.default import backend
 from condor.conf import settings
 from dataclasses import asdict, dataclass, field, replace, fields as dc_fields
 from condor._version import __version__
+import logging
+
+log = logging.getLogger(__name__)
 
 @dataclass
 class BaseModelMetaData:
@@ -106,7 +109,7 @@ class BaseCondorClassDict(dict):
         ):
             raise ValueError(f"Attempting to set {attr_name}={attr_val}, but {attr_name} is a reserved word")
 
-        print(f"setting {attr_name} to {attr_val}")
+        log.debug("setting %s to %s", attr_name, attr_val)
         if isinstance(attr_val, IndependentField):
             self.meta.independent_fields.append(attr_val)
         if isinstance(attr_val, MatchedField):
@@ -248,7 +251,13 @@ class BaseModelType(type):
 
     @classmethod
     def __prepare__(cls, name, bases, meta=None, **kwds):
-        print(f"BaseModelType.__prepare__(cls={cls}, name={name}, bases={bases}, kwargs={kwds})")
+        log.debug(
+            "BaseModelType.__prepare__(cls=%s, name=%s, bases=%s, kwargs=%s)",
+            cls,
+            name,
+            bases,
+            kwds,
+        )
 
         cls_dict = cls.prepare_create(name, bases, meta=meta, **kwds)
         if not cls_dict.meta.template:
@@ -274,7 +283,6 @@ class BaseModelType(type):
             )
 
         for base in bases:
-            print(base)
             if isinstance(base, BaseModelType):
                 meta.template = base
                 break
@@ -352,16 +360,15 @@ class BaseModelType(type):
             for k, v in _dict.items():
                 if name in ("Coupling", ) and k == "parameter":
                     #breakpoint()
-                    print("processing parameter on coupilng")
+                    log.debug("processing parameter on coupling")
                 if k in base._meta.inherited_items:
-                    print(f"should this be injected? {k}={v}")
+                    log.debug("should this be injected? %s=%s", k, v)
                     breakpoint()
                 # inherit fields from base -- bound in __new__
                 if isinstance(v, Field):
                     cls.inherit_field(v, cls_dict)
                     field_from_inherited[v] = cls_dict[v._name]
                     if v._elements:
-                        print(name)
                         if not isinstance(v, IndependentField):
                             for element in v:
                                 new_elem = element.copy_to_field(
@@ -370,7 +377,7 @@ class BaseModelType(type):
                                 if v._direction != Direction.internal:
                                     cls_dict[new_elem.name] = new_elem.backend_repr
 
-                        print("inheriting a non-empty field...")
+                        log.debug("inheriting a non-empty field...")
                 # TODO: other possibilities to handle:
                 # a BaseModelType would find a template/model attribute.
                 # Submodels will get assigned like this, but Model should declare that
@@ -380,16 +387,34 @@ class BaseModelType(type):
                     # should only be used for placeholder and placeholder-adjacent
                     if v.field_type in field_from_inherited:
                         new_elem = v.copy_to_field(field_from_inherited[v.field_type])
-                        print(f"Element {k}={v} copied from {meta.template} to {name}")
+                        log.debug(
+                            "Element %s=%s copied from %s to %s",
+                            k,
+                            v,
+                            meta.template,
+                            name,
+                        )
                         cls_dict[k] = new_elem.backend_repr
                         continue
 
-                    print(f"Element not inheriting {k}={v} from {meta.template} to {name}")
+                    log.debug(
+                        "Element not inheriting %s=%s from %s to %s",
+                        k,
+                        v,
+                        meta.template,
+                        name,
+                    )
                     cls_dict[k] = v
                 elif isinstance(v, backend.symbol_class):
                     # TODO: check what hits this. Previously, time dummy variable. But I
                     # think that might be captured by placeholders now?
-                    print(f"Element inheriting {k}={v} from {meta.template} to {name}")
+                    log.debug(
+                        "Element inheriting %s=%s from %s to %s",
+                        k,
+                        v,
+                        meta.template,
+                        name,
+                    )
                     cls_dict[k] = v
 
 
@@ -456,7 +481,14 @@ class BaseModelType(type):
 
 
         """
-        print(f'  BaseModelType.__new__(mcs={cls}, name={name}, bases={bases}, attrs=[{attrs}], {kwargs})' )
+        log.debug(
+            "BaseModelType.__new__(mcs=%s, name=%s, bases=%s, attrs=[%s], %s)",
+            cls,
+            name,
+            bases,
+            attrs,
+            kwargs,
+        )
         attrs.user_setting = False
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement. "base model for inheritance"
@@ -502,13 +534,13 @@ class BaseModelType(type):
         # TODO factor out (model) name processing...
 
         if cls.creating_base_class_for_inheritance(name):
-            print("creating base class for inheritance, pre super new")
-            print(f"cls.baseclass_for_inheritance={cls.baseclass_for_inheritance}")
-            print(name, bases)
-            print(
-                "Any changes to keys?",
+            log.debug("creating base class for inheritance, pre super new")
+            log.debug("cls.baseclass_for_inheritance=%s", cls.baseclass_for_inheritance)
+            log.debug("%s, %s", name, bases)
+            log.debug(
+                "Any changes to keys? %s, %s",
                 set(attrs.keys()) - set(new_attrs.keys()),
-                condor_attrs
+                condor_attrs,
             )
             # should not need the condor_attrs processing TODO
             # is the user_model_metaclass and user_model_baseclass always follow the
@@ -530,18 +562,9 @@ class BaseModelType(type):
             cls.process_condor_attr(k, v, new_cls)
 
         if cls.creating_base_class_for_inheritance(name):
-            print("creating base class for inheritance, post super new")
-            print(name, bases)
+            log.debug("creating base class for inheritance, post super new")
+            log.debug("%s, %s", name, bases)
             cls.baseclass_for_inheritance=new_cls
-
-
-        if name == "Sellar":
-            #breakpoint()
-            print("Sellar class ID at BaseModelType", id(new_cls))
-            print("Sellar._meta class ID at BaseModelType", id(new_cls._meta))
-            print("Sellar._meta BaseModelType", new_cls._meta)
-            pass
-
 
         return new_cls
 
@@ -603,10 +626,14 @@ class BaseModelType(type):
         if isinstance(attr_val, backend.symbol_class):
             element = new_cls._meta.backend_repr_elements.get(attr_val, None)
             if element is not None:
-                print(f"element {attr_name}={attr_val} was found and is being passed")
+                log.debug(
+                    "element %s=%s was found and is being passed", attr_name, attr_val
+                )
                 attr_val = element
             else:
-                print(f"symbol {attr_name}={attr_val} was NOT found, NOT passing")
+                log.debug(
+                    "symbol %s=%s was NOT found, NOT passing", attr_name, attr_val
+                )
                 #breakpoint()
                 pass_attr = False
 
@@ -621,14 +648,16 @@ class BaseModelType(type):
             attr_val.bind(attr_name, new_cls)
 
         if meta.inherited_items.get(attr_name, None)  is attr_val:
-            print(f"not passing {attr_name} because it was inherited")
+            log.debug("not passing %s because it was inherited", attr_name)
             # templates should not pass on placeholder because it is inherited, but
             # models should pass on remaining fields even thought hey are inherited!
             #breakpoint()
             pass_attr = False
 
         if attr_name in cls.reserved_words:
-            print(f"NOT passing on {attr_name} because it is a reserved word for {cls}")
+            log.debug(
+                "NOT passing on %s because it is a reserved word for %s", attr_name, cls
+            )
             pass_attr = False
 
         if pass_attr:
@@ -695,9 +724,13 @@ class ModelTemplateType(BaseModelType):
         **kwargs
     ):
         if model_metaclass is not None:
-            print("prcessing for model metaclass asssigned, prepare")
+            log.debug("prcessing for model metaclass asssigned, prepare")
         if cls.is_user_model(bases) and not as_template:
-            print("dispatch __prepare__ for user model", cls.user_model_metaclass, cls.user_model_baseclass)
+            log.debug(
+                "dispatch __prepare__ for user model %s, %s",
+                cls.user_model_metaclass,
+                cls.user_model_baseclass,
+            )
             return bases[0].user_model_metaclass.__prepare__(
                 model_name, bases + (cls.user_model_baseclass,),
                 **kwargs
@@ -709,7 +742,7 @@ class ModelTemplateType(BaseModelType):
     @classmethod
     def prepare_populate(cls, cls_dict):
         if not cls.creating_base_class_for_inheritance(cls_dict.meta.model_name):
-            print(f"injecting placeholder on {cls_dict.meta.model_name}")
+            log.debug("injecting placeholder on %s", cls_dict.meta.model_name)
             cls_dict["placeholder"] = WithDefaultField(
                 Direction.internal,
                 name="placeholder",
@@ -727,15 +760,20 @@ class ModelTemplateType(BaseModelType):
 
         if attr_name in new_cls._meta.inherited_items:
             pass_super = False
-            print("template not passing on", attr_name, "=", attr_val)
+            log.debug("template not passing on, %s=%s", attr_name, attr_val)
 
         if pass_super:
-            print("template IS passing on", attr_name, "=", attr_val)
+            log.debug("template IS passing on %s=%s", attr_name, attr_val)
             super().process_condor_attr(attr_name, attr_val, new_cls)
 
     def __new__(cls, model_name, bases, attrs, as_template=False, model_metaclass=None, **kwargs):
         if cls.is_user_model(bases) and not as_template:
-            print("dispatch __new__ for user model", model_name, cls.user_model_metaclass, cls.user_model_baseclass)
+            log.debug(
+                "dispatch __new__ for user model %s, %s, %s",
+                model_name,
+                cls.user_model_metaclass,
+                cls.user_model_baseclass,
+            )
             # user model: inject the baseclass for inheritance to bases and call the
             # user metaclass
             user_model =  bases[0].user_model_metaclass(
@@ -757,7 +795,7 @@ class ModelTemplateType(BaseModelType):
         if model_metaclass is not None:
             new_cls.user_model_metaclass = model_metaclass
             model_metaclass.baseclass_for_inheritance = new_cls
-            print("prcessing for model metaclass asssigned, new")
+            log.debug("prcessing for model metaclass asssigned, new")
 
         return new_cls
 
@@ -785,7 +823,7 @@ class ModelTemplate(metaclass=ModelTemplateType):
             new_meta = cls._meta.copy_update(**new_meta_kwargs)
             if new_meta.template is not cls:
                 breakpoint()
-                print("did not overwrite template")
+                log.debug("did not overwrite template")
         elif isinstance(new_meta, BaseModelMetaData):
             if new_meta_kwargs is not None:
                 raise TypeError()
@@ -800,9 +838,7 @@ class ModelTemplate(metaclass=ModelTemplateType):
         new_dict = cls.__prepare__(new_name, cls.__bases__, **type_kwargs)
         new_placeholder_field = new_dict["placeholder"]
         if new_name == "TrajectoryAnalysis":
-            print(cls, new_name)
-            #breakpoint()
-            print("figuring out extend_template")
+            log.debug("figuring out extend_template %s, %s", cls, new_name)
             pass
         for k, v in cls._meta.user_set.items():
             processed_v = getattr(cls, k, None)
@@ -826,8 +862,7 @@ class ModelTemplate(metaclass=ModelTemplateType):
         if extended_template._meta.template is not cls:
             # TODO not sure why template didnt get set correctly even though I'm passing
             # it in to new_meta_kwargs...
-            print(cls)
-            print("did not overwrite template")
+            log.debug("did not overwrite template %s", cls)
         extended_template._meta.template = cls
         return extended_template
 
@@ -858,16 +893,26 @@ class ModelType(BaseModelType):
             )
         else:
             if meta.model_name != model_name:
-                print(f"updated meta's model_name from {meta.model_name} to {model_name}")
+                log.debug(
+                    "updated meta's model_name from %s to %s",
+                    meta.model_name,
+                    model_name,
+                )
                 meta.model_name = model_name
-        print(f"ModelType.__prepare__(model_name={model_name}, bases={bases}, **{kwargs}), meta={meta}")
+        log.debug(
+            "ModelType.__prepare__(model_name=%s, bases=%s, **%s), meta=%s",
+            model_name,
+            bases,
+            kwargs,
+            meta,
+        )
 
         return super().__prepare__(model_name, bases, meta=meta, **kwargs)
 
     @classmethod
     def prepare_populate(cls, cls_dict):
         if not cls.creating_base_class_for_inheritance(cls_dict.meta.model_name):
-            print(f"injecting dynamic_link on {cls_dict.meta.model_name}")
+            log.debug("injecting dynamic_link on %s", cls_dict.meta.model_name)
             cls_dict["dynamic_link"] = DynamicLink(cls_dict)
 
         super().prepare_populate(cls_dict)
@@ -884,8 +929,12 @@ class ModelType(BaseModelType):
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
         pass_super = True
         if isinstance(attr_val, backend.symbol_class):
-            print(
-                "ModelType is checking a backend_repr...", attr_name, attr_val, cls, new_cls
+            log.debug(
+                "ModelType is checking a backend_repr... %s, %s, %s, %s",
+                attr_name,
+                attr_val,
+                cls,
+                new_cls,
             )
             if cls.is_user_model(new_cls.__bases__):
                 pass
@@ -915,13 +964,6 @@ class ModelType(BaseModelType):
             cls, name, super_bases, attrs, **kwargs
         )
 
-        if name == "Sellar":
-            print("Sellar class ID at ModelType", id(new_cls))
-            print("Sellar._meta class ID at ModelType", id(new_cls._meta))
-            print("Sellar._meta ModelType", new_cls._meta)
-            #breakpoint()
-
-
         if not cls.is_user_model(bases):
             return new_cls
         # proceeding for user models
@@ -944,7 +986,7 @@ class ModelType(BaseModelType):
 
         if new_cls._meta.model_name == "MyComp0":
             breakpoint()
-            print("starting processing subs")
+            log.debug("starting processing subs")
             pass
 
         if new_cls._meta.model_name == "MyScenario":
@@ -965,7 +1007,13 @@ class ModelType(BaseModelType):
     def inherit_template_methods(cls, new_cls):
         for key, val in new_cls._meta.template._meta.user_set.items():
             if not isinstance(val, Field) and callable(val):
-                print(f"inheriting classmethod {key}={val} from {new_cls._meta.template} to {new_cls}")
+                log.debug(
+                    "inheriting classmethod %s=%s from %s to %s",
+                    key,
+                    val,
+                    new_cls._meta.template,
+                    new_cls,
+                )
                 setattr(new_cls, key, val.__get__(new_cls))
 
 
@@ -978,14 +1026,14 @@ class ModelType(BaseModelType):
         """
         if new_cls._meta.model_name == "MyScenario":
             #breakpoint()
-            print("why isn't this going to parent")
+            log.debug("why isn't this going to parent")
         # process placeholders
         # TODO -- if default = None, keep it as a dummy variable
         placeholder_assignment_dict = {}
         # TODO: no back reference is preserved which frankly seems harsh...
         placeholder_field = new_cls._meta.template.placeholder
         for elem in placeholder_field:
-            print(f"checking placeholder {elem} on {new_cls}")
+            log.debug("checking placeholder %s on %s", elem, new_cls)
             # currently, the placeholder element is getting passed on so we know it
             # exists and should never be None
             val = getattr(new_cls, elem.name)
@@ -1003,7 +1051,7 @@ class ModelType(BaseModelType):
                 use_val = val
 
             setattr(new_cls, elem.name, use_val)
-            print(f"creating substitution {elem.backend_repr} = {use_val}")
+            log.debug("creating substitution %s = %s", elem.backend_repr, use_val)
             if isinstance(use_val, backend.symbol_class):
                 if elem.size >= np.prod(use_val.size()):
                     try:
@@ -1025,7 +1073,7 @@ class ModelType(BaseModelType):
 
         if new_cls._meta.model_name == "MyComp0":
             breakpoint()
-            print("collected subs")
+            log.debug("collected subs")
             pass
 
         for field in new_cls._meta.noninput_fields:
@@ -1036,7 +1084,7 @@ class ModelType(BaseModelType):
 
         if new_cls._meta.model_name == "MyComp0":
             breakpoint()
-            print("made subs")
+            log.debug("made subs")
             pass
 
     @classmethod
@@ -1434,7 +1482,15 @@ class SubmodelTemplateType(
         copy_fields=None, # defaults to False, but need to copy from base if not set
         **kwds
     ):
-        print(f"SubmodelTemplateType.__prepare__(model_name={model_name}, bases+{bases}, primary={primary}, copy_fields={copy_fields}, **{kwds})")
+        log.debug(
+            "SubmodelTemplateType.__prepare__(model_name=%s, bases+%s, primary=%s, "
+            "copy_fields=%s, **%s)",
+            model_name,
+            bases,
+            primary,
+            copy_fields,
+            kwds,
+        )
 
         for base in bases:
             if isinstance(base, cls):
@@ -1554,7 +1610,7 @@ class SubmodelType(ModelType):
     @classmethod
     def process_placeholders(cls, new_cls, attrs):
         if new_cls.__name__ == "Accel":
-            print("processing Accel placeholders")
+            log.debug("processing Accel placeholders")
         super().process_placeholders(new_cls, attrs)
 
     @classmethod
