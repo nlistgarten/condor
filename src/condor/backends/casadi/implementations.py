@@ -339,7 +339,7 @@ class OptimizationProblem(InitializerMixin):
         nlp_opts = dict()
         self.iteration_callback = iteration_callback
         if iteration_callback is not None:
-            iter_callback = IterCallback("iter", iteration_callback, self.nlp_args)
+            iter_callback = IterCallback("iter", iteration_callback, self.nlp_args, model)
             nlp_opts["iteration_callback"] = iter_callback
 
         self.x0 = self.initial_at_construction.copy()
@@ -1334,11 +1334,12 @@ class ExternalSolverModel:
 
 
 class IterCallback(casadi.Callback):
-    def __init__(self, name, func, nlpdict, opts={}):
+    def __init__(self, name, func, nlpdict, model, opts={}):
         casadi.Callback.__init__(self)
-        self.iter = 0
-        self.nlpdict = nlpdict
         self.func = func
+        self.nlpdict = nlpdict
+        self.model = model
+        self.iter = 0
         self.construct(name, opts)
 
     def get_n_in(self):
@@ -1367,7 +1368,9 @@ class IterCallback(casadi.Callback):
     def eval(self, args):
         # x, f, g, lam_x, lam_g, lam_p
         x, f, g, *_ = args
-        self.func(self.iter, x, f, g)
+        var_data = self.model.create_bound_field_dataclass(self.model.variable, x)
+        constraint_data = self.model.create_bound_field_dataclass(self.model.constraint, g)
+        self.func(self.iter, var_data, f, constraint_data)
         self.iter += 1
         return [0]
 

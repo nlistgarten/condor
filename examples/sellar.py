@@ -24,13 +24,19 @@ class Sellar(co.OptimizationProblem):
     y1, y2 = coupling
 
     objective = x**2 + z[1] + y1 + exp(-y2)
-    constraint(3.16 < y1, name="con1")
-    constraint(y2 < 24,)
+    constraint(3.16 < y1, name="y1_bound")
+    constraint(y2 < 24)
 
     #constraint(x, lower_bound=0, upper_bound=10)
     #constraint(z, lower_bound=0, upper_bound=10)
 
     class Options:
+        @staticmethod
+        def iteration_callback(i, variable, objective, constraints):
+            print(f"iter {i}: x = {variable.x}, z = {variable.z.squeeze()}")
+
+        print_level = 0
+
         if False:
             method = (
                 co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
@@ -40,7 +46,8 @@ class Sellar(co.OptimizationProblem):
             iprint = 3
             #tol = 1E-9
             #maxiter = 2
-        iteration_callback = lambda i, x, f, g: print("iter:", i, x, f, g)
+
+
 
 Sellar.implementation.set_initial(x=1., z=[5., 2.,])
 #Sellar._meta.bind_embedded_models = False

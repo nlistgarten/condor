@@ -1160,6 +1160,26 @@ class Model(metaclass=ModelType):
     def __init__(self, *args, name='', **kwargs):
         cls = self.__class__
         self.name = name
+
+        # pack into dot-able storage, over-writting fields and elements
+        self.bind_input_fields(*args, **kwargs)
+
+        cls.implementation(self, *list(self.input_kwargs.values()))
+
+        # generally implementations are responsible for binding computed values.
+        # implementations know about models, models don't know about implementations
+        if False:
+            self.output_kwargs = output_kwargs = {
+                out_name: getattr(self, out_name)
+                for field in cls._meta.output_fields
+                for out_name in field.list_of('name')
+            }
+
+        self.bind_embedded_models()
+
+    def bind_input_fields(self, *args, **kwargs):
+        cls = self.__class__
+
         # bind *args and **kwargs to to appropriate signature
         # TODO: is there a better way to do this?
         input_kwargs = {}
@@ -1195,25 +1215,6 @@ class Model(metaclass=ModelType):
 
         # TODO: check bounds on model inputs?
 
-        # pack into dot-able storage, over-writting fields and elements
-        self.bind_input_fields()
-
-        cls.implementation(self, *list(self.input_kwargs.values()))
-
-        # generally implementations are responsible for binding computed values.
-        # implementations know about models, models don't know about implementations
-        if False:
-            self.output_kwargs = output_kwargs = {
-                out_name: getattr(self, out_name)
-                for field in cls._meta.output_fields
-                for out_name in field.list_of('name')
-            }
-
-        self.bind_embedded_models()
-
-
-    def bind_input_fields(self):
-        cls = self.__class__
         all_values = list(self.input_kwargs.values())
 
         slice_start = 0
@@ -1224,14 +1225,21 @@ class Model(metaclass=ModelType):
             self.bind_field(field, values, symbols_to_instance=True, wrap=False)
 
     def bind_field(self, field, values, symbols_to_instance=True, wrap=True):
+        dataclass = self.create_bound_field_dataclass(field, values, wrap=wrap)
+        if symbols_to_instance:
+            for k, v in dataclass.asdict().items():
+                setattr(self, k, v)
+        setattr(self, field._name, dataclass)
+        return dataclass
+
+    @staticmethod
+    def create_bound_field_dataclass(field, values, wrap=True):
         dataclass_kwarg = {}
         if wrap:
             values = backend.wrap(field, values)
         for element_name, value in zip(field.list_of('name'), values):
             dataclass_kwarg[element_name] = value
-            if symbols_to_instance:
-                setattr(self, element_name, value)
-        setattr(self, field._name, field._dataclass(**dataclass_kwarg))
+        return field._dataclass(**dataclass_kwarg)
 
     def __iter__(self):
         cls = self.__class__
