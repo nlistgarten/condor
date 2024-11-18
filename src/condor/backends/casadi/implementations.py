@@ -298,6 +298,7 @@ class OptimizationProblem(InitializerMixin):
         # ipopt specific, default = False may help with computing sensitivity. To do
         # proper warm start, need to provide lam_x and lam_g so I assume need calc_lam_x
         # = True
+        iteration_callback=None,
         **options,
     ):
         self.model = model
@@ -306,13 +307,11 @@ class OptimizationProblem(InitializerMixin):
 
         self.keep_feasible = keep_feasible
 
-
         self.f = f = getattr(model, 'objective', 0)
         self.has_p = bool(len(model.parameter))
         self.p = p = casadi.vertcat(*flatten(model.parameter))
         self.x = x = casadi.vertcat(*flatten(model.variable))
         self.g = g = casadi.vertcat(*flatten(model.constraint))
-
 
         self.objective_func = casadi.Function(
             f"{model.__name__}_objective",
@@ -337,6 +336,12 @@ class OptimizationProblem(InitializerMixin):
             self.nlp_args["p"] = p
         self.parse_initializers(model.variable, initializer_args)
 
+        nlp_opts = dict()
+        self.iteration_callback = iteration_callback
+        if iteration_callback is not None:
+            iter_callback = IterCallback("iter", iteration_callback, self.nlp_args)
+            nlp_opts["iteration_callback"] = iter_callback
+
         self.x0 = self.initial_at_construction.copy()
         self.lam_g0 = None
         self.lam_x0 = None
@@ -345,6 +350,7 @@ class OptimizationProblem(InitializerMixin):
         self.method = method
         if self.method is OptimizationProblem.Method.ipopt:
             self.ipopt_opts = ipopt_opts = dict(
+                **nlp_opts,
                 print_time= False,
                 ipopt = options,
                 # print_level = 0-2: nothing, 3-4: summary, 5: iter table (default)
@@ -376,13 +382,14 @@ class OptimizationProblem(InitializerMixin):
                 model.__name__,
                 "snopt",
                 self.nlp_args,
-                #self.ipopt_opts,
+                nlp_opts,
             )
         elif self.method is OptimizationProblem.Method.qrsqp:
 
             self.qrsqp_opts = dict(
                 qpsol='qrqp',
                 qpsol_options=dict(
+                    **nlp_opts,
                     print_iter=False,
                     error_on_fail=False,
                 ),
@@ -1324,3 +1331,43 @@ class ExternalSolverModel:
             self.model.output,
             out,
         )
+
+
+class IterCallback(casadi.Callback):
+    def __init__(self, name, func, nlpdict, opts={}):
+        casadi.Callback.__init__(self)
+        self.iter = 0
+        self.nlpdict = nlpdict
+        self.func = func
+        self.construct(name, opts)
+
+    def get_n_in(self):
+        return casadi.nlpsol_n_out()
+
+    def get_n_out(self):
+        return 1
+
+    def get_name_in(self, i):
+        n = casadi.nlpsol_out(i)
+        return n
+
+    def get_name_out(self, i):
+        return "ret"
+
+    def get_sparsity_in(self, i):
+        n = casadi.nlpsol_out(i)
+        if n == "f":
+            return self.nlpdict["f"].sparsity()
+        elif n in ("x", "lam_x"):
+            return self.nlpdict["x"].sparsity()
+        elif n in ("g", "lam_g"):
+            return self.nlpdict["g"].sparsity()
+        return casadi.Sparsity(0, 0)
+
+    def eval(self, args):
+        # x, f, g, lam_x, lam_g, lam_p
+        x, f, g, *_ = args
+        self.func(self.iter, x, f, g)
+        self.iter += 1
+        return [0]
+

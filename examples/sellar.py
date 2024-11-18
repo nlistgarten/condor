@@ -31,7 +31,7 @@ class Sellar(co.OptimizationProblem):
     #constraint(z, lower_bound=0, upper_bound=10)
 
     class Options:
-        if True:
+        if False:
             method = (
                 co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
                 #co.backends.casadi.implementations.OptimizationProblem.Method.scipy_trust_constr
@@ -40,6 +40,7 @@ class Sellar(co.OptimizationProblem):
             iprint = 3
             #tol = 1E-9
             #maxiter = 2
+        iteration_callback = lambda i, x, f, g: print("iter:", i, x, f, g)
 
 Sellar.implementation.set_initial(x=1., z=[5., 2.,])
 #Sellar._meta.bind_embedded_models = False
