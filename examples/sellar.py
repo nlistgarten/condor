@@ -34,13 +34,15 @@ class Sellar(co.OptimizationProblem):
         @staticmethod
         def iteration_callback(i, variable, objective, constraints):
             print(f"iter {i}: x = {variable.x}, z = {variable.z.squeeze()}")
-            sellar_init = Sellar.from_guess(**variable.asdict())
+            sellar_init = Sellar.from_values(**variable.asdict())
             print(sellar_init.coupling)
 
         print_level = 0
 
 
-Sellar.implementation.set_initial(x=1., z=[5., 2.,])
+#Sellar.implementation.set_initial(x=1., z=[5., 2.,])
+Sellar.x.initializer = 1.
+Sellar.z.initializer = [5., 2.,]
 #Sellar._meta.bind_embedded_models = False
 sellar_opt = Sellar()
 

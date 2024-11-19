@@ -145,6 +145,24 @@ class OptimizationProblemType(ModelType):
             if re_append_elem:
                 new_cls.constraint._elements.append(elem)
 
+        # handle
+        p = casadi.vertcat(*flatten(new_cls.parameter))
+        x = casadi.vertcat(*flatten(new_cls.variable))
+        g = casadi.vertcat(*flatten(new_cls.constraint))
+        f = getattr(new_cls, "objective", 0.)
+
+        new_cls._meta.objective_func = casadi.Function(
+            f"{new_cls.__name__}_objective",
+            [x, p],
+            [f],
+        )
+        new_cls._meta.constraint_func = casadi.Function(
+            f"{new_cls.__name__}_constraint",
+            [x, p],
+            [g],
+        )
+
+
 
 class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType):
     """"""
@@ -184,6 +202,7 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
         if kwargs:
             raise ValueError(f"Extra arguments provided: {kwargs}")
 
+        self.input_kwargs = parameters
         self.parameter = cls.parameter._dataclass(**parameters)
         self.variable = cls.variable._dataclass(**variables)
 
@@ -191,10 +210,10 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
             casadi.vertcat(*flatten(self.variable.asdict().values())),
             casadi.vertcat(*flatten(self.parameter.asdict().values())),
         ]
-        constraints = self.implementation.constraint_func(*args)
+        constraints = cls._meta.constraint_func(*args)
         self.bind_field(cls.constraint, constraints)
 
-        self.objective = self.implementation.objective_func(*args)
+        self.objective = cls._meta.objective_func(*args)
 
         self.bind_embedded_models()
 
@@ -452,11 +471,16 @@ class TrajectoryAnalysis(
     # adding an accumulator state and adding the updates to each event? Maybe that
     # doesn't make sense...
 
-    @classmethod
     def dot(cls, *args, **kwargs):
         """Compute the rates for the ODESystems that were bound (at the time of
         construction). Need equivalent for dynamic outputs, and ???
         """
+        # bind paramaeters, state, call implementation function
+        # apply to dynamic output, as well? but needs the embedded models? hmm...
+        # and I guess should similarly bind the events?
+        # OR maybe dot/dynamic output is more simple, it's useful for trimming /other
+        # solvers and doesn't need additional use case? there are potentially lots of
+        # places embedded models came from -- I guess just events and modals?
 
 
 

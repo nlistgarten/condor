@@ -38,6 +38,7 @@ class BaseModelMetaData:
 
     user_set: dict = field(default_factory=dict)
     backend_repr_elements: dict = field(default_factory=dict)
+    options: object = None
 
 
     # assembly/component can also get children/parent
@@ -654,6 +655,9 @@ class BaseModelType(type):
             #breakpoint()
             pass_attr = False
 
+        if attr_name == "Options":
+            new_cls.Options = attr_val
+
         if attr_name in cls.reserved_words:
             log.debug(
                 "NOT passing on %s because it is a reserved word for %s", attr_name, cls
@@ -997,8 +1001,6 @@ class ModelType(BaseModelType):
 
         cls.process_placeholders(new_cls, attrs)
 
-        cls.process_implementation(new_cls, attrs)
-
         cls.bind_model_fields(new_cls, attrs)
 
         return new_cls
@@ -1071,11 +1073,6 @@ class ModelType(BaseModelType):
                         placeholder_assignment_dict[elem.backend_repr] = use_val
                     placeholder_assignment_dict[elem.backend_repr] = np.broadcast_to(use_val, elem.shape)
 
-        if new_cls._meta.model_name == "MyComp0":
-            breakpoint()
-            log.debug("collected subs")
-            pass
-
         for field in new_cls._meta.noninput_fields:
             for elem in field:
                 elem.backend_repr = backend.utils.substitute(
@@ -1087,17 +1084,27 @@ class ModelType(BaseModelType):
             log.debug("made subs")
             pass
 
+
     @classmethod
-    def process_implementation(cls, new_cls, attrs):
-        # process implementations
-        implementation = None
-        attr_options = attrs.get("Options", None)
-        if attr_options is not None:
+    def options_to_kwargs(cls, new_cls):
+        Options = getattr(new_cls, "Options", None)
+        if Options is not None:
             backend_option = {
                 k: v 
-                for k, v in attr_options.__dict__.items()
+                for k, v in Options.__dict__.items()
                 if not k.startswith('__')
             }
+        else:
+            backend_option = {}
+        return backend_option
+
+
+    @classmethod
+    def get_implementation_class(cls, new_cls):
+        # process implementations
+        implementation = None
+        backend_option = cls.options_to_kwargs(new_cls)
+        if backend_option:
             implementation = backend_option.pop('implementation', None)
             if implementation is not None:
                 # inject so subclasses get this implementation
@@ -1117,23 +1124,21 @@ class ModelType(BaseModelType):
                 None
             )
 
+        return implementation, backend_option
+
+
+    @classmethod
+    def bind_model_fields(cls, new_cls, attrs):
+        implementation, backend_option = cls.get_implementation_class(new_cls)
+
         if implementation is not None:
             cls.finalize_input_fields(new_cls)
-            new_cls.implementation = implementation(new_cls, **backend_option)
 
             for field in attrs.meta.all_fields:
                 if field not in attrs.meta.input_fields:
                     field.create_dataclass()
                 field.bind_dataclass()
 
-            if new_cls.__name__ == "Sellar":
-                #breakpoint()
-                pass
-        else:
-            new_cls.implementation = None
-
-    @classmethod
-    def bind_model_fields(cls, new_cls, attrs):
         for field in new_cls._meta.independent_fields:
             for element_idx, element in enumerate(field):
                 setattr(new_cls, element.name, element)
@@ -1198,7 +1203,9 @@ class Model(metaclass=ModelType):
         # pack into dot-able storage, over-writting fields and elements
         self.bind_input_fields()
 
-        cls.implementation(self, *list(self.input_kwargs.values()))
+        implementation_class, options = cls.get_implementation_class(cls)
+        self.implementation = implementation_class(cls, **options)
+        self.implementation(self, *list(self.input_kwargs.values()))
 
         # generally implementations are responsible for binding computed values.
         # implementations know about models, models don't know about implementations

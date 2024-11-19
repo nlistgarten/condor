@@ -269,8 +269,6 @@ class OptimizationProblem(InitializerMixin):
         scipy_trust_constr = auto()
         scipy_slsqp = auto()
 
-    scipy_trust_constr_option_defaults = dict(xtol=1E-8,)
-
     def make_warm_start(self, x0=None, lam_g0=None, lam_x0=None):
         if x0 is not None:
             self.x0 = x0

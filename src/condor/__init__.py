@@ -1,3 +1,7 @@
+import logging
+logging.getLogger("condor").setLevel(logging.DEBUG)
+logging.basicConfig()
+
 from condor.fields import (
     Direction, Field, BaseElement, IndependentElement, FreeElement, WithDefaultField,
     IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
