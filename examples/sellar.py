@@ -34,19 +34,10 @@ class Sellar(co.OptimizationProblem):
         @staticmethod
         def iteration_callback(i, variable, objective, constraints):
             print(f"iter {i}: x = {variable.x}, z = {variable.z.squeeze()}")
+            sellar_init = Sellar.from_guess(**variable.asdict())
+            print(sellar_init.coupling)
 
         print_level = 0
-
-        if False:
-            method = (
-                co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
-                #co.backends.casadi.implementations.OptimizationProblem.Method.scipy_trust_constr
-            )
-            disp = True
-            iprint = 3
-            #tol = 1E-9
-            #maxiter = 2
-
 
 
 Sellar.implementation.set_initial(x=1., z=[5., 2.,])
@@ -58,5 +49,3 @@ toc = time.perf_counter()
 print("total time:", toc - tic)
 
 print(sellar_opt.coupling, sellar_opt.coupling.implicit_output)
-
-

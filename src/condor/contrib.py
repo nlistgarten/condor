@@ -5,6 +5,8 @@ from condor.fields import (
 )
 from condor.models import Model, ModelType, ModelTemplateType,  SubmodelTemplate, ModelTemplate
 from condor.backends.default import backend
+from condor.backends.casadi.utils import flatten
+import casadi
 import numpy as np
 
 class DeferredSystem(ModelTemplate):
@@ -164,6 +166,39 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
     # needs validation for size == 1
     constraint = BoundedAssignmentField(Direction.internal)
     objective = placeholder()
+
+    def from_values(cls, **kwargs):
+        self = cls.__new__(cls)
+        parameters = {}
+        for elem in cls.parameter:
+            val = kwargs.pop(elem.name)
+            parameters[elem.name] = val
+            setattr(self, elem.name, val)
+
+        variables = {}
+        for elem in cls.variable:
+            val = kwargs.pop(elem.name)
+            variables[elem.name] = val
+            setattr(self, elem.name, val)
+
+        if kwargs:
+            raise ValueError(f"Extra arguments provided: {kwargs}")
+
+        self.parameter = cls.parameter._dataclass(**parameters)
+        self.variable = cls.variable._dataclass(**variables)
+
+        args = [
+            casadi.vertcat(*flatten(self.variable.asdict().values())),
+            casadi.vertcat(*flatten(self.parameter.asdict().values())),
+        ]
+        constraints = self.implementation.constraint_func(*args)
+        self.bind_field(cls.constraint, constraints)
+
+        self.objective = self.implementation.objective_func(*args)
+
+        self.bind_embedded_models()
+
+        return self
 
 
 class ODESystem(ModelTemplate):

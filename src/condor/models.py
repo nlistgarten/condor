@@ -1161,25 +1161,6 @@ class Model(metaclass=ModelType):
         cls = self.__class__
         self.name = name
 
-        # pack into dot-able storage, over-writting fields and elements
-        self.bind_input_fields(*args, **kwargs)
-
-        cls.implementation(self, *list(self.input_kwargs.values()))
-
-        # generally implementations are responsible for binding computed values.
-        # implementations know about models, models don't know about implementations
-        if False:
-            self.output_kwargs = output_kwargs = {
-                out_name: getattr(self, out_name)
-                for field in cls._meta.output_fields
-                for out_name in field.list_of('name')
-            }
-
-        self.bind_embedded_models()
-
-    def bind_input_fields(self, *args, **kwargs):
-        cls = self.__class__
-
         # bind *args and **kwargs to to appropriate signature
         # TODO: is there a better way to do this?
         input_kwargs = {}
@@ -1214,6 +1195,24 @@ class Model(metaclass=ModelType):
             raise ValueError(error_message)
 
         # TODO: check bounds on model inputs?
+        # pack into dot-able storage, over-writting fields and elements
+        self.bind_input_fields()
+
+        cls.implementation(self, *list(self.input_kwargs.values()))
+
+        # generally implementations are responsible for binding computed values.
+        # implementations know about models, models don't know about implementations
+        if False:
+            self.output_kwargs = output_kwargs = {
+                out_name: getattr(self, out_name)
+                for field in cls._meta.output_fields
+                for out_name in field.list_of('name')
+            }
+
+        self.bind_embedded_models()
+
+    def bind_input_fields(self):
+        cls = self.__class__
 
         all_values = list(self.input_kwargs.values())
 
