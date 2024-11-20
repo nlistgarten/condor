@@ -9,6 +9,10 @@ from condor.backends.casadi.utils import flatten
 import casadi
 import numpy as np
 
+import logging
+
+log = logging.getLogger(__name__)
+
 class DeferredSystem(ModelTemplate):
     """output is an explicit function of input
     """
@@ -614,10 +618,9 @@ def copy_field(new_model_name, old_field, new_field=None):
             new_model_name, field_type_name=old_field._name
         )
     new_field._elements = [ sym for sym in old_field ]
-    new_field._count = sum(new_field.list_of("size"))
     return new_field
 
-class ExternalSolverWrapperType(type):
+class ExternalSolverWrapperType(ModelTemplateType):
     """"""
     """
     since this is only one case, only need to bind input and output fields
@@ -632,34 +635,22 @@ class ExternalSolverWrapperType(type):
 
     @classmethod
     def __prepare__(cls, model_name, bases, name="", **kwds):
-        #print("prepare for", model_name, bases, name)
+        log.debug(f"ExternalSolverWrapperType prepare for cls={cls}, model_name={model_name}, bases={bases}, name={name}, kwds={kwds}")
         if name:
             model_name = name
-        sup_dict = super().__prepare__(cls, model_name, bases, **kwds)
-        if bases and ExternalSolverWrapper in bases: # should check MRO, I guess?
-            #print("copying IO fields to", model_name)
-            for field_name in ["input", "output"]:
-                sup_dict[field_name] = copy_field(
-                    model_name, getattr(ExternalSolverWrapper, field_name)
-                )
+        sup_dict = super().__prepare__(model_name, bases, **kwds)
+        if cls.baseclass_for_inheritance is not None:
+            if ExternalSolverWrapper in bases: # should check MRO, I guess?
+                #print("copying IO fields to", model_name)
+                for field_name in ["input", "output"]:
+                    sup_dict[field_name] = copy_field(
+                        model_name, getattr(ExternalSolverWrapper, field_name)
+                    )
         return sup_dict
 
-    def __new__(cls, model_name, bases, attrs, parameterized_IO=False, **kwargs):
-        #print("before calling __new__")
-        if not bases:
-            #print("using type.new", model_name)
-            new_cls = type.__new__(
-                cls, model_name, bases, attrs, **kwargs
-            )
-        else:
-            #print("using super().new", model_name)
-            new_cls =  super().__new__(
-                #cls, model_name, bases, attrs, **kwargs
-                cls, model_name, bases, attrs, parameterized_IO=parameterized_IO,**kwargs
-            )
-        return new_cls
 
     def __call__(cls, *args, **kwargs):
+        log.debug(f"ExternalSolverWrapperType __call__ for cls={cls}, *args={args}, **kwargs={kwargs}")
         # gets called on instantiation of the user wrapper, so COULD return the
         # condor model instead of the wrapper class -- perhaps this is more condoric,
         # not sure what's preferable
@@ -675,12 +666,14 @@ class ExternalSolverModel(ModelTemplate):
 
 
 class ExternalSolverWrapper(
+    ModelTemplate,
     metaclass=ExternalSolverWrapperType,
 ):
     input = FreeField()
     output = FreeField(Direction.output)
 
     def __init_subclass__(cls, singleton=True, **kwargs):
+        log.debug(f"ExternalSolverWrapper init subclass, cls={cls}, singleton={singleton}, kwargs={kwargs}")
         # at this point, fields  are already bound by ExternalSolverWrapperType.__new__
         # but modifications AFTER construction can be doen here
         #print("init subclass of", cls)
@@ -688,6 +681,7 @@ class ExternalSolverWrapper(
         cls.__init__ = cls.__create_model__
 
     def __create_model__(self, *args, condor_model_name="",**kwargs):
+        log.debug(f"ExternalSolverWrapper create model self={self}, args={args}, condor_model_name={condor_model_name}, kwargs={kwargs}")
         #print("create model of", self, self.__class__)
         # copy field so that any field modification by __original_init__ is onto the
         # copy
@@ -705,7 +699,7 @@ class ExternalSolverWrapper(
         # update and/or copy meta? -- no, create a __condor_model__ class which is the
         # actual model and call, etc. get mapped to that??
 
-        attrs = ModelType.__prepare__(condor_model_name, (ExternalSolverModel,))
+        attrs = ExternalSolverModel.__prepare__(condor_model_name, (ExternalSolverModel,))
         # this copying feels slightly redundant...
         for field_name in ["input", "output"]:
             copy_field(
@@ -713,7 +707,10 @@ class ExternalSolverWrapper(
                 getattr(self, field_name),
                 new_field=attrs[field_name],
             )
-        attrs["__external_wrapper__"] = self
-        self.condor_model = ModelType(
+
+        self.condor_model = ExternalSolverModel.__class__(
             condor_model_name, (ExternalSolverModel,), attrs
         )
+        self.condor_model._meta.external_wrapper = self
+
+

@@ -1071,27 +1071,14 @@ class ModelType(BaseModelType):
                 )
 
 
-    @classmethod
-    def options_to_kwargs(cls, new_cls):
-        Options = getattr(new_cls, "Options", None)
-        if Options is not None:
-            backend_option = {
-                k: v 
-                for k, v in Options.__dict__.items()
-                if not k.startswith('__')
-            }
-        else:
-            backend_option = {}
-        return backend_option
 
 
     @classmethod
     def get_implementation_class(cls, new_cls):
         # process implementations
         implementation = None
-        backend_option = cls.options_to_kwargs(new_cls)
-        if backend_option:
-            implementation = backend_option.pop('implementation', None)
+        if hasattr(new_cls, "Options"):
+            implementation = getattr(new_cls.Options, '__implementation__', None)
             if implementation is not None:
                 # inject so subclasses get this implementation
                 # TODO: a better way? registration? etc?
@@ -1099,9 +1086,6 @@ class ModelType(BaseModelType):
 
             # TODO: other validation?
             # TODO: inherit options? No, defaults come from implementation itself
-        else:
-            backend_option = {}
-
 
         if implementation is None and new_cls._meta.template:
             implementation = getattr(
@@ -1110,12 +1094,12 @@ class ModelType(BaseModelType):
                 None
             )
 
-        return implementation, backend_option
+        return implementation
 
 
     @classmethod
     def bind_model_fields(cls, new_cls, attrs):
-        implementation, backend_option = cls.get_implementation_class(new_cls)
+        implementation = cls.get_implementation_class(new_cls)
 
         if implementation is not None:
             cls.finalize_input_fields(new_cls)
@@ -1189,9 +1173,10 @@ class Model(metaclass=ModelType):
         # pack into dot-able storage, over-writting fields and elements
         self.bind_input_fields()
 
-        implementation_class, options = cls.get_implementation_class(cls)
-        self.implementation = implementation_class(cls, **options)
-        self.implementation(self, *list(self.input_kwargs.values()))
+        implementation_class = cls.get_implementation_class(cls)
+        self.implementation = implementation_class(
+            self, list(self.input_kwargs.values())
+        )
 
         # generally implementations are responsible for binding computed values.
         # implementations know about models, models don't know about implementations

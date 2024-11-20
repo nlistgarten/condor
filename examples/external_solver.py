@@ -70,7 +70,13 @@ data_xx = dict(
     xbbar = np.linspace(0, 1.0, data_yy["sigma"].shape[0]),
     xhbar = np.linspace(0, 0.3, data_yy["sigma"].shape[1]),
 )
+
+print("\n"*10)
+print("instantatiating Table")
+
 Table = TableLookup(data_xx, data_yy, 1)
+print("\n"*10)
+print("calling Table")
 tt = Table(0.5, 0.5)
 print(tt.input, tt.output)
 
@@ -81,7 +87,7 @@ class MyOpt3(co.OptimizationProblem):
     interp = Table(0.5, yy)
     objective = (interp.sigma - 0.2)**2 + (interp.sigstr - .7)**2
 
-    class Casadi(co.Options):
+    class Options:
         exact_hessian = False
 
 opt3 = MyOpt3()

@@ -41,9 +41,20 @@ from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 # TODO for custom solvers like SGM, table, does the get_jacobian arguments allow you to 
 # avoid computing wrt particular inputs/outputs if possible?
 
+def options_to_kwargs(new_cls):
+    Options = getattr(new_cls, "Options", None)
+    if Options is not None:
+        backend_option = {
+            k: v 
+            for k, v in Options.__dict__.items()
+            if not k.startswith('__')
+        }
+    else:
+        backend_option = {}
+    return backend_option
 
 class DeferredSystem:
-    def __init__(self, model):
+    def construct(self, model):
         symbol_inputs = model.input.list_of("backend_repr")
         symbol_outputs = model.output.list_of("backend_repr")
 
@@ -57,6 +68,10 @@ class DeferredSystem:
             model.__name__, symbol_inputs, symbol_outputs, dict(allow_free=True,),
         )
 
+    def __init__(self, model_instance, args):
+        self.construct(model_instance.__class__)
+        self(model_instance, *args)
+
     def __call__(self, model_instance, *args):
         model_instance.bind_field(
             self.model.output, 
@@ -64,7 +79,11 @@ class DeferredSystem:
         )
 
 class ExplicitSystem:
-    def __init__(self, model):
+    def __init__(self, model_instance, args):
+        self.construct(model_instance.__class__)
+        self(model_instance, *args)
+
+    def construct(self, model):
         symbol_inputs = model.input.list_of("backend_repr")
         symbol_outputs = model.output.list_of("backend_repr")
 
@@ -88,7 +107,12 @@ class ExplicitSystem:
         )
 
 class Tablelookup:
-    def __init__(self, model, degrees=3,):
+    def __init__(self, model_instance, args):
+        model = model_instance.__class__
+        self.construct(model, **options_to_kwargs(model))
+        self(model_instance, *args)
+
+    def construct(self, model, degrees=3,):
         self.model = model
         self.symbol_inputs = model.input.list_of("backend_repr")
         self.symbol_outputs = model.output.list_of("backend_repr")
@@ -191,8 +215,12 @@ class AlgebraicSystem(InitializerMixin):
     class LineSearchCriteria(Enum):
         armijo = auto()
 
+    def __init__(self, model_instance, args):
+        model = model_instance.__class__
+        self.construct(model, **options_to_kwargs(model))
+        self(model_instance, *args)
 
-    def __init__(
+    def construct(
         self, model,
         # standard options
         atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True, max_iters=100,
@@ -286,8 +314,12 @@ class OptimizationProblem(InitializerMixin):
         ),
     }
 
+    def __init__(self, model_instance, args):
+        model = model_instance.__class__
+        self.construct(model, **options_to_kwargs(model))
+        self(model_instance, *args)
 
-    def __init__(
+    def construct(
         self, model,
         exact_hessian=True, # False -> ipopt alias for limited memory
         keep_feasible = True, # flag that goes to scipy trust constr linear constraints
@@ -701,7 +733,12 @@ class TrajectoryAnalysis:
         dopri5 = auto()
         dop853 = auto()
 
-    def __init__(
+    def __init__(self, model_instance, args):
+        model = model_instance.__class__
+        self.construct(model, **options_to_kwargs(model))
+        self(model_instance, *args)
+
+    def construct(
         self, model,
 
         state_atol=1E-12, state_rtol=1E-6,
@@ -1283,9 +1320,14 @@ class CasadiFunctionCallback(casadi.Callback):
 
 
 class ExternalSolverModel:
-    def __init__(self, model):
+    def __init__(self, model_instance, args):
+        model = model_instance.__class__
+        self.construct(model, **options_to_kwargs(model))
+        self(model_instance, *args)
+
+    def construct(self, model):
         self.model = model
-        self.wrapper = model.__external_wrapper__
+        self.wrapper = model._meta.external_wrapper
         self.input = casadi.vertcat(*flatten(model.input))
         self.output = casadi.vertcat(*flatten(model.output))
         #self.input = model.input.list_of('backend_repr')

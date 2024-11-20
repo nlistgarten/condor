@@ -24,8 +24,10 @@ class Sellar(co.OptimizationProblem):
     y1, y2 = coupling
 
     objective = x**2 + z[1] + y1 + exp(-y2)
-    constraint(3.16 < y1, name="y1_bound")
-    y2_bound = constraint(y2 < 24)
+    #constraint(3.16 < y1, name="y1_bound")
+    #y2_bound = constraint(y2 < 24)
+    constraint(y1, upper_bound=10, lower_bound=3.16, name="y1_bound")
+    y2_bound = constraint(y2 < 20)
 
     #constraint(x, lower_bound=0, upper_bound=10)
     #constraint(z, lower_bound=0, upper_bound=10)
@@ -39,7 +41,7 @@ class Sellar(co.OptimizationProblem):
             sellar_init = Sellar.from_values(**variable.asdict())
             print(sellar_init.coupling.implicit_output)
 
-        print_level = 0
+        #print_level = 0
 
 
 #Sellar.implementation.set_initial(x=1., z=[5., 2.,])

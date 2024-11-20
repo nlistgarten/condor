@@ -73,7 +73,7 @@ class CDIFlapInterp(co.Tablelookup):
     output_data[dCL_flaps_coef] = asigma
     output_data[CDI_factor] = adel6
 
-    class Casadi(co.Options):
+    class Options:
         degrees = 1
 
 flap_defl = 7.
@@ -91,7 +91,7 @@ class MyOpt(co.OptimizationProblem):
     xx = variable()
     objective = MyInterp(xx).y
 
-    class Casadi(co.Options):
+    class Options:
         exact_hessian = False
 
 mysol = MyOpt().xx
@@ -115,7 +115,7 @@ class VDEL3_interp(co.Tablelookup):
             [1.0, 1.0, 1.0],
     ])
 
-    class Casadi(co.Options):
+    class Options:
         degrees = 1
 
 VDEL3_interp_obj = VDEL3_interp(flap_span_ratio=0.3, taper_ratio=0.2)
