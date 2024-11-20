@@ -2,8 +2,8 @@ import numpy as np
 # TODO: figure out how to make this an option/setting like django?
 #from condor.backends import default as backend
 from condor.fields import (
-    Direction, Field, BaseElement, IndependentElement, FreeElement, WithDefaultField,
-    IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
+    Direction, Field, BaseElement, FreeElement, WithDefaultField,
+    FreeField, AssignedField, MatchedField, InitializedField,
     BoundedAssignmentField, TrajectoryOutputField,
 )
 from condor.backends.default import backend
@@ -94,7 +94,7 @@ class BaseCondorClassDict(dict):
         self.from_outer = from_outer
         self.meta.independent_fields.extend([
             v for k, v in from_outer.items()
-            if isinstance(v, IndependentField)# and k not in self.copy_fields
+            if isinstance(v, FreeField)# and k not in self.copy_fields
         ])
 
 
@@ -111,7 +111,7 @@ class BaseCondorClassDict(dict):
             raise ValueError(f"Attempting to set {attr_name}={attr_val}, but {attr_name} is a reserved word")
 
         log.debug("setting %s to %s", attr_name, attr_val)
-        if isinstance(attr_val, IndependentField):
+        if isinstance(attr_val, FreeField):
             self.meta.independent_fields.append(attr_val)
         if isinstance(attr_val, MatchedField):
             self.meta.matched_fields.append(attr_val)
@@ -134,7 +134,7 @@ class BaseCondorClassDict(dict):
             else:
                 self.meta.embedded_models[attr_name] = attr_val
         if isinstance(attr_val, backend.symbol_class):
-            # from a IndependentField
+            # from a FreeField
             if attr_val in self.meta.backend_repr_elements:
                 element = self.meta.backend_repr_elements[attr_val]
                 if element.name:
@@ -370,7 +370,7 @@ class BaseModelType(type):
                     cls.inherit_field(v, cls_dict)
                     field_from_inherited[v] = cls_dict[v._name]
                     if v._elements:
-                        if not isinstance(v, IndependentField):
+                        if not isinstance(v, FreeField):
                             for element in v:
                                 new_elem = element.copy_to_field(
                                     field_from_inherited[element.field_type]
@@ -988,15 +988,6 @@ class ModelType(BaseModelType):
             setattr(new_cls, submodel.__name__, extended_submodel)
             pass
 
-        if new_cls._meta.model_name == "MyComp0":
-            breakpoint()
-            log.debug("starting processing subs")
-            pass
-
-        if new_cls._meta.model_name == "MyScenario":
-            #breakpoint()
-            pass
-
         cls.inherit_template_methods(new_cls)
 
         cls.process_placeholders(new_cls, attrs)
@@ -1078,11 +1069,6 @@ class ModelType(BaseModelType):
                 elem.backend_repr = backend.utils.substitute(
                     elem.backend_repr, placeholder_assignment_dict
                 )
-
-        if new_cls._meta.model_name == "MyComp0":
-            breakpoint()
-            log.debug("made subs")
-            pass
 
 
     @classmethod
@@ -1270,7 +1256,7 @@ class Model(metaclass=ModelType):
         fields = [
             field
             for field in model._meta.input_fields + model._meta.output_fields
-            if isinstance(field, IndependentField)
+            if isinstance(field, FreeField)
         ]
         for field in fields:
             model_instance_field = getattr(model_instance, field._name)
@@ -1604,7 +1590,7 @@ class SubmodelType(ModelType):
                     if cls_dict.meta.copy_fields:
                         cls.inherit_field(attr_val, cls_dict)
                         copied_field = cls_dict[attr_val._name]
-                        if isinstance(copied_field, IndependentField):
+                        if isinstance(copied_field, FreeField):
                             copied_field._elements = [sym for sym in attr_val]
                         else:
                             for elem in attr_val:

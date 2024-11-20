@@ -251,7 +251,7 @@ class Field:
     def create_element(self, **kwargs):
         kwargs.update(dict(field_type=self))
         self._elements.append(self.element_class(**kwargs))
-        if self._cls_dict and isinstance(self, IndependentField):
+        if self._cls_dict and isinstance(self, FreeField):
             self._cls_dict.meta.backend_repr_elements[self._elements[-1].backend_repr] = self._elements[-1]
         #self._count += getattr(self._elements[-1], 'size', 1)
 
@@ -375,30 +375,9 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
     del _generic_op
 
 
-class IndependentElement(BaseElement):
+class FreeElement(BaseElement):
     pass
     # TODO: long description?
-
-class IndependentField(Field):
-    """
-    Mixin for fields which generate a symbol that are assigned to a class attribute
-    during model definition.
-    """
-
-    pass
-
-
-@dataclass(repr=False)
-class FreeElement(IndependentElement):
-    upper_bound: float = np.inf
-    lower_bound: float = -np.inf
-    # Then if bounds are here, must follow broadcasting rules
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.upper_bound = np.broadcast_to(self.upper_bound, self.shape)
-        self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
-
 
 def make_backend_symbol(
     backend_name, shape=(1,), symmetric=False, diagonal=False, **kwargs
@@ -415,14 +394,18 @@ def make_backend_symbol(
     )
     return kwargs
 
-class FreeField(IndependentField, default_direction=Direction.input):
-
+class FreeField(Field, default_direction=Direction.input):
+    """
+    Mixin for fields which generate a symbol that are assigned to a class attribute
+    during model definition.
+    """
     def __call__(self, **kwargs):
         backend_name = "%s_%d" % (self._resolve_name, len(self._elements))
         new_kwargs = make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_element(**new_kwargs)
         return self._elements[-1].backend_repr
 
+    pass
 
 @dataclass(repr=False)
 class WithDefaultElement(FreeElement,):
@@ -432,18 +415,28 @@ class WithDefaultField(FreeField):
     pass
 
 @dataclass(repr=False)
-class InitializedElement(FreeElement,):
+class BoundedElement(FreeElement):
+    upper_bound: float = np.inf
+    lower_bound: float = -np.inf
+    # Then if bounds are here, must follow broadcasting rules
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.upper_bound = np.broadcast_to(self.upper_bound, self.shape)
+        self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
+
+@dataclass(repr=False)
+class InitializedElement(BoundedElement, ):
     initializer: float = 0.  # TODO union[numeric, expression]
     warm_start: bool = True
 
 class InitializedField(FreeField):
     pass
 
-@dataclass(repr=False)
-class BoundedAssignmentElement(FreeElement):
-    pass
 
-class BoundedAssignmentField(FreeField, default_direction=Direction.output):
+class BoundedAssignmentField(
+    FreeField, default_direction=Direction.output, element_class=BoundedElement
+):
     def __call__(self, value, eq=None, **kwargs):
         symbol_data = backend.get_symbol_data(value)
         if eq is not None:
@@ -456,11 +449,11 @@ class BoundedAssignmentField(FreeField, default_direction=Direction.output):
 
 
 @dataclass(repr=False)
-class TrajectoryOutputElement(IndependentElement):
+class TrajectoryOutputElement(FreeElement):
     terminal_term: BaseElement = 0.
     integrand: BaseElement = 0.
 
-class TrajectoryOutputField(IndependentField, default_direction=Direction.output):
+class TrajectoryOutputField(FreeField, default_direction=Direction.output):
     def __call__(self, terminal_term=0, integrand=0, **kwargs):
         # Use quadrature instead of state.
         # to create a copy of state on TrajectoryAnalysis and give trajectory_output
@@ -551,6 +544,7 @@ class MatchedElementMixin:
 
     def update_name(self):
         self.name = '__'.join([self.field_type._name, self.match.name])
+        self.name = self.match.name
 
 @dataclass(repr=False)
 class MatchedElement(BaseElement, MatchedElementMixin,):

@@ -1,6 +1,6 @@
 from condor.fields import (
-    Direction, Field, BaseElement, IndependentElement, FreeElement, WithDefaultField,
-    IndependentField, FreeField, AssignedField, MatchedField, InitializedField,
+    Direction, Field, BaseElement, FreeElement, WithDefaultField,
+    FreeField, AssignedField, MatchedField, InitializedField,
     BoundedAssignmentField, TrajectoryOutputField,
 )
 from condor.models import Model, ModelType, ModelTemplateType,  SubmodelTemplate, ModelTemplate

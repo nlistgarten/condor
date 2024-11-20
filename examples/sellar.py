@@ -14,7 +14,7 @@ class Coupling(co.AlgebraicSystem):
     residual.y2 = y2 == y1**0.5 + z[0] + z[1]
 
 
-coupling = Coupling(1, [5., 2.])
+#coupling = Coupling(1, [5., 2.])
 
 
 class Sellar(co.OptimizationProblem):
