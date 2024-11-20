@@ -366,11 +366,10 @@ class OptimizationProblem(InitializerMixin):
             self.nlp_args["p"] = p
         self.parse_initializers(model.variable, initializer_args)
 
-        nlp_opts = dict()
+        self.nlp_opts = dict()
         self.iteration_callback = iteration_callback
         if iteration_callback is not None:
-            iter_callback = IterCallback("iter", iteration_callback, self.nlp_args, model)
-            nlp_opts["iteration_callback"] = iter_callback
+            self.nlp_opts["iteration_callback"] = CasadiIterationCallback("iter", self.nlp_args, model)
 
         self.x0 = self.initial_at_construction.copy()
         self.lam_g0 = None
@@ -379,8 +378,7 @@ class OptimizationProblem(InitializerMixin):
 
         self.method = method
         if self.method is OptimizationProblem.Method.ipopt:
-            self.ipopt_opts = ipopt_opts = dict(
-                **nlp_opts,
+            self.nlp_opts.update(
                 print_time= False,
                 ipopt = options,
                 # print_level = 0-2: nothing, 3-4: summary, 5: iter table (default)
@@ -397,7 +395,7 @@ class OptimizationProblem(InitializerMixin):
             # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
             # to try to get sensitivity from ipopt. so far no...
             if not exact_hessian:
-                ipopt_opts["ipopt"].update(
+                self.nlp_opts["ipopt"].update(
                     hessian_approximation="limited-memory",
                 )
 
@@ -405,21 +403,20 @@ class OptimizationProblem(InitializerMixin):
                 model.__name__,
                 "ipopt",
                 self.nlp_args,
-                self.ipopt_opts,
+                self.nlp_opts,
             )
         elif self.method is OptimizationProblem.Method.snopt:
             self.optimizer = casadi.nlpsol(
                 model.__name__,
                 "snopt",
                 self.nlp_args,
-                nlp_opts,
+                self.nlp_opts,
             )
         elif self.method is OptimizationProblem.Method.qrsqp:
 
-            self.qrsqp_opts = dict(
+            self.nlp_opts.update(
                 qpsol='qrqp',
                 qpsol_options=dict(
-                    **nlp_opts,
                     print_iter=False,
                     error_on_fail=False,
                 ),
@@ -439,7 +436,7 @@ class OptimizationProblem(InitializerMixin):
                 model.__name__,
                 'sqpmethod',
                 self.nlp_args,
-                self.qrsqp_opts
+                self.nlp_opts
             )
 
         else:
@@ -595,6 +592,7 @@ class OptimizationProblem(InitializerMixin):
             OptimizationProblem.Method.snopt,
             OptimizationProblem.Method.qrsqp,
         ):
+            self.nlp_opts["iteration_callback"].iteration_callback = self.iteration_callback(model_instance.parameter, self.nlp_opts)
             call_args = dict(
                 x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg, 
             )
@@ -1378,10 +1376,10 @@ class ExternalSolverModel:
         )
 
 
-class IterCallback(casadi.Callback):
-    def __init__(self, name, func, nlpdict, model, opts={}):
+class CasadiIterationCallback(casadi.Callback):
+    def __init__(self, name, nlpdict, model, opts={}):
         casadi.Callback.__init__(self)
-        self.func = func
+        self.iteration_callback = None
         self.nlpdict = nlpdict
         self.model = model
         self.iter = 0
@@ -1415,7 +1413,7 @@ class IterCallback(casadi.Callback):
         x, f, g, *_ = args
         var_data = self.model.create_bound_field_dataclass(self.model.variable, x)
         constraint_data = self.model.create_bound_field_dataclass(self.model.constraint, g)
-        self.func(self.iter, var_data, f, constraint_data)
+        self.iteration_callback(self.iter, var_data, f, constraint_data)
         self.iter += 1
         return [0]
 

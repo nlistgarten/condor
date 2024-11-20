@@ -33,13 +33,20 @@ class Sellar(co.OptimizationProblem):
     #constraint(z, lower_bound=0, upper_bound=10)
 
     class Options:
-        @staticmethod
-        def iteration_callback(i, variable, objective, constraints):
-            print(f"iter {i}: x = {variable.x}, z = {variable.z.squeeze()}")
-            print(f"objective = {objective}")
-            print(constraints)
-            sellar_init = Sellar.from_values(**variable.asdict())
-            print(sellar_init.coupling.variable)
+        class iteration_callback:
+            def __init__(self, parameter, implementation_opts):
+                print("starting optimization with...")
+                print(parameter)
+                print(implementation_opts)
+                print("\n"*10)
+                pass
+
+            def __call__(self, i, variable, objective, constraints):
+                print(f"iter {i}: x = {variable.x}, z = {variable.z.squeeze()}")
+                print(f"objective = {objective}")
+                print(constraints)
+                sellar_init = Sellar.from_values(**variable.asdict())
+                print(sellar_init.coupling.variable)
 
         #print_level = 0
 
