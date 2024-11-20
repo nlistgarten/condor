@@ -613,10 +613,14 @@ class OptimizationProblem(InitializerMixin):
                 self.x0 = out["x"]
 
             model_instance.bind_field(self.model.variable, out["x"])
+            for k, v in model_instance.variable.asdict().items():
+                model_var = getattr(self.model, k)
+                if not isinstance(model_var.initializer, symbol_class):
+                    model_var.initializer = v
             model_instance.bind_field(self.model.constraint, out["g"])
             model_instance.objective = np.array(out["f"]).squeeze()
-            self.stats = model_instance._stats = self.optimizer.stats()
-            self.out = model_instance._out = out
+            self.stats = self.optimizer.stats()
+            self.out = out
             self.lam_g0 = out["lam_g"]
             self.lam_x0 = out["lam_x"]
         else:

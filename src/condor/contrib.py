@@ -84,6 +84,13 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
     # implicit_outputs to ensure enough DOF?
     explicit_output = AssignedField()
 
+    def set_initial(cls, **kwargs):
+        for k, v in kwargs.items():
+            var = getattr(cls, k)
+            if var.field_type is not cls.variable:
+                raise ValueError("Use set initial to set the initialier for variables, attempting to set {k}")
+            var.initializer = v
+
 class OptimizationProblemType(ModelType):
     @classmethod
     def process_placeholders(cls, new_cls, attrs):
@@ -188,6 +195,13 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
     # needs validation for size == 1
     constraint = BoundedAssignmentField(Direction.internal)
     objective = placeholder()
+
+    def set_initial(cls, **kwargs):
+        for k, v in kwargs.items():
+            var = getattr(cls, k)
+            if var.field_type is not cls.variable:
+                raise ValueError("Use set initial to set the initialier for variables, attempting to set {k}")
+            var.initializer = v
 
     def from_values(cls, **kwargs):
         self = cls.__new__(cls)
