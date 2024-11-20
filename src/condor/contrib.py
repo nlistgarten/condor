@@ -1,7 +1,7 @@
 from condor.fields import (
     Direction, Field, BaseElement, FreeElement, WithDefaultField,
     FreeField, AssignedField, MatchedField, InitializedField,
-    BoundedAssignmentField, TrajectoryOutputField,
+    BoundedAssignmentField, TrajectoryOutputField, FreeAssignedField
 )
 from condor.models import Model, ModelType, ModelTemplateType,  SubmodelTemplate, ModelTemplate
 from condor.backends.default import backend
@@ -75,7 +75,7 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
     """
     parameter = FreeField()
     implicit_output = InitializedField(Direction.output)
-    residual = AssignedField(Direction.internal)
+    residual = FreeAssignedField(Direction.internal)
     # unmatched, but maybe a subclass or imp might check lengths of residuals and
     # implicit_outputs to ensure enough DOF?
     explicit_output = AssignedField()

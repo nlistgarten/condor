@@ -407,6 +407,14 @@ class FreeField(Field, default_direction=Direction.input):
 
     pass
 
+class FreeAssignedField(
+    FreeField, default_direction=Direction.output, element_class=FreeElement
+):
+    def __call__(self, value, **kwargs):
+        symbol_data = backend.get_symbol_data(value)
+        self.create_element(backend_repr=value,  **kwargs, **asdict(symbol_data))
+        return self._elements[-1].backend_repr
+
 @dataclass(repr=False)
 class WithDefaultElement(FreeElement,):
     default: float = 0.   # TODO union[numeric, expression] or None?
