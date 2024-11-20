@@ -443,17 +443,16 @@ class InitializedField(FreeField):
 class BoundedAssignmentElement(FreeElement):
     pass
 
-class BoundedAssignmentField(Field, default_direction=Direction.output):
-    def __call__(self, value, eq=None, name='', **kwargs):
+class BoundedAssignmentField(FreeField, default_direction=Direction.output):
+    def __call__(self, value, eq=None, **kwargs):
         symbol_data = backend.get_symbol_data(value)
-        if not name:
-            name="%s_%s_%d" % (self._model_name, self._name, len(self._elements))
         if eq is not None:
             if 'lower_bound' in kwargs or 'upper_bound' in kwargs:
                 raise ValueError
             kwargs['lower_bound'] = eq
             kwargs['upper_bound'] = eq
-        self.create_element(name=name, backend_repr=value,  **kwargs, **asdict(symbol_data))
+        self.create_element(backend_repr=value,  **kwargs, **asdict(symbol_data))
+        return self._elements[-1].backend_repr
 
 
 @dataclass(repr=False)

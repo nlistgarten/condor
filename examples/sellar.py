@@ -25,7 +25,7 @@ class Sellar(co.OptimizationProblem):
 
     objective = x**2 + z[1] + y1 + exp(-y2)
     constraint(3.16 < y1, name="y1_bound")
-    constraint(y2 < 24)
+    y2_bound = constraint(y2 < 24)
 
     #constraint(x, lower_bound=0, upper_bound=10)
     #constraint(z, lower_bound=0, upper_bound=10)
@@ -34,8 +34,10 @@ class Sellar(co.OptimizationProblem):
         @staticmethod
         def iteration_callback(i, variable, objective, constraints):
             print(f"iter {i}: x = {variable.x}, z = {variable.z.squeeze()}")
+            print(f"objective = {objective}")
+            print(constraints)
             sellar_init = Sellar.from_values(**variable.asdict())
-            print(sellar_init.coupling)
+            print(sellar_init.coupling.implicit_output)
 
         print_level = 0
 

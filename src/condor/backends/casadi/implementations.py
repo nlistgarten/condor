@@ -575,6 +575,7 @@ class OptimizationProblem(InitializerMixin):
             if self.has_p:
                 call_args["p"] = p
 
+            print("x0:", call_args["x0"])
             out = self.optimizer(**call_args)
             if not self.has_p or not isinstance(args[0], symbol_class):
                 self.x0 = out["x"]
