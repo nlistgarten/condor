@@ -238,14 +238,14 @@ class AlgebraicSystem(InitializerMixin):
             abstol=atol,
             abstolStep=rtol,
         )
-        self.x = casadi.vertcat(*flatten(model.implicit_output))
+        self.x = casadi.vertcat(*flatten(model.variable))
         self.g0 = casadi.vertcat(*flatten(model.residual))
-        self.g1 = casadi.vertcat(*flatten(model.explicit_output))
+        self.g1 = casadi.vertcat(*flatten(model.output))
         self.p = casadi.vertcat(*flatten(model.parameter))
 
 
         self.model = model
-        self.parse_initializers(model.implicit_output, [self.x, self.p],)
+        self.parse_initializers(model.variable, [self.x, self.p],)
 
         self.callback = SolverWithWarmStart(
             model.__name__,
@@ -253,8 +253,8 @@ class AlgebraicSystem(InitializerMixin):
             self.p,
             self.g0,
             self.g1,
-            flatten(model.implicit_output.list_of("lower_bound")),
-            flatten(model.implicit_output.list_of("upper_bound")),
+            flatten(model.variable.list_of("lower_bound")),
+            flatten(model.variable.list_of("upper_bound")),
             #self.implicit_output_at_construction,
             self.initial_at_construction,
             rootfinder_options,
@@ -265,12 +265,12 @@ class AlgebraicSystem(InitializerMixin):
     def __call__(self, model_instance, *args, **kwargs):
         out = self.callback(casadi.vertcat(*flatten(args)))
         model_instance.bind_field(
-            self.model.implicit_output,
-            out[:self.model.implicit_output._count]
+            self.model.variable,
+            out[:self.model.variable._count]
         )
         model_instance.bind_field(
-            self.model.explicit_output,
-            out[self.model.implicit_output._count:self.model.implicit_output._count+self.model.explicit_output._count]
+            self.model.output,
+            out[self.model.variable._count:self.model.variable._count+self.model.output._count]
         )
 
         if hasattr(self.callback, 'resid'):

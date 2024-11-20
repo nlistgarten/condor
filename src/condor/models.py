@@ -1127,8 +1127,6 @@ class ModelType(BaseModelType):
             cls.baseclass_for_inheritance in bases
         )
 
-
-
 class Model(metaclass=ModelType):
     """handles binding etc. for user models"""
 
@@ -1138,6 +1136,11 @@ class Model(metaclass=ModelType):
 
         # bind *args and **kwargs to to appropriate signature
         # TODO: is there a better way to do this?
+        # yes, can refactor (including from_values, will need to do this for the
+        # trajectory analysis convenience models, etc.
+        # OR just get rid of *args, only accept by kwarg and do it how
+        # OptimizationProblem.from_values currently does it
+
         input_kwargs = {}
         for input_name, input_val in zip(cls._meta.input_names, args):
             if input_name in kwargs:

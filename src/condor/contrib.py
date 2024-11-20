@@ -78,11 +78,11 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
     implicit_output and parameters
     """
     parameter = FreeField()
-    implicit_output = InitializedField(Direction.output)
+    variable = InitializedField(Direction.output)
     residual = FreeAssignedField(Direction.internal)
     # unmatched, but maybe a subclass or imp might check lengths of residuals and
     # implicit_outputs to ensure enough DOF?
-    explicit_output = AssignedField()
+    output = AssignedField()
 
     def set_initial(cls, **kwargs):
         for k, v in kwargs.items():
@@ -489,13 +489,15 @@ class TrajectoryAnalysis(
     # adding an accumulator state and adding the updates to each event? Maybe that
     # doesn't make sense...
 
-    def dot(cls, *args, **kwargs):
+    def point_analysis(cls, t, *args, **kwargs):
+        self = ODESystem.__new__(ODESystem)
         """Compute the rates for the ODESystems that were bound (at the time of
         construction). Need equivalent for dynamic outputs, and ???
         """
-        # bind paramaeters, state, call implementation function
+        # bind paramaeters, state, call implementation functions (dot, dynamic output)
+
         # apply to dynamic output, as well? but needs the embedded models? hmm...
-        # and I guess should similarly bind the events?
+        # and I guess should similarly bind the events? -- a dictionary for update,
         # OR maybe dot/dynamic output is more simple, it's useful for trimming /other
         # solvers and doesn't need additional use case? there are potentially lots of
         # places embedded models came from -- I guess just events and modals?

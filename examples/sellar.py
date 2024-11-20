@@ -7,8 +7,8 @@ from casadi import exp
 class Coupling(co.AlgebraicSystem):
     x = parameter()
     z = parameter(shape=2)
-    y1 = implicit_output(initializer=1.)
-    y2 = implicit_output(initializer=1.)
+    y1 = variable(initializer=1.)
+    y2 = variable(initializer=1.)
 
     y1_agreement = residual(y1 == z[0] ** 2 + z[1] + x - 0.2 * y2)
     residual(y2 == y1**0.5 + z[0] + z[1])
@@ -39,7 +39,7 @@ class Sellar(co.OptimizationProblem):
             print(f"objective = {objective}")
             print(constraints)
             sellar_init = Sellar.from_values(**variable.asdict())
-            print(sellar_init.coupling.implicit_output)
+            print(sellar_init.coupling.variable)
 
         #print_level = 0
 
@@ -54,4 +54,4 @@ sellar_opt = Sellar()
 toc = time.perf_counter()
 print("total time:", toc - tic)
 
-print(sellar_opt.coupling, sellar_opt.coupling.implicit_output)
+print(sellar_opt.coupling, sellar_opt.coupling.variable)
