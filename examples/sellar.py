@@ -17,6 +17,7 @@ class Coupling(co.AlgebraicSystem):
 coupling = Coupling(1, [5., 2.])
 
 
+callback_data = {}
 class Sellar(co.OptimizationProblem):
     x = variable(lower_bound=0, upper_bound=10)
     z = variable(shape=2, lower_bound=0, upper_bound=10)
@@ -33,20 +34,23 @@ class Sellar(co.OptimizationProblem):
     #constraint(z, lower_bound=0, upper_bound=10)
 
     class Options:
-        class iteration_callback:
-            def __init__(self, parameter, implementation_opts):
-                print("starting optimization with...")
-                print(parameter)
-                print(implementation_opts)
-                print("\n"*10)
-                pass
 
-            def __call__(self, i, variable, objective, constraints):
-                print(f"iter {i}: x = {variable.x}, z = {variable.z.squeeze()}")
-                print(f"objective = {objective}")
-                print(constraints)
-                sellar_init = Sellar.from_values(**variable.asdict())
-                print(sellar_init.coupling.variable)
+        @staticmethod
+        def init_callback(parameter, implementation_opts):
+            callback_data["base_dir"] = ...
+            print("starting optimization with...")
+            print(parameter)
+            print(implementation_opts)
+            print("\n"*10)
+            pass
+
+        @staticmethod
+        def iter_callback(i, variable, objective, constraints):
+            print(f"iter {i}: x = {variable.x}, z = {variable.z.squeeze()}")
+            print(f"objective = {objective}")
+            print(constraints)
+            sellar_init = Sellar.from_values(**variable.asdict())
+            print(sellar_init.coupling.variable)
 
         #print_level = 0
 

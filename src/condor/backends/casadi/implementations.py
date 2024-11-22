@@ -47,7 +47,7 @@ def options_to_kwargs(new_cls):
         backend_option = {
             k: v 
             for k, v in Options.__dict__.items()
-            if not k.startswith('__')
+            if not k.startswith('_')
         }
     else:
         backend_option = {}
@@ -342,7 +342,8 @@ class OptimizationProblem(InitializerMixin):
         # ipopt specific, default = False may help with computing sensitivity. To do
         # proper warm start, need to provide lam_x and lam_g so I assume need calc_lam_x
         # = True
-        iteration_callback=None,
+        iter_callback=None,
+        init_callback=None,
         **options,
     ):
         self.model = model
@@ -381,9 +382,12 @@ class OptimizationProblem(InitializerMixin):
         self.parse_initializers(model.variable, initializer_args)
 
         self.nlp_opts = dict()
-        self.iteration_callback = iteration_callback
-        if iteration_callback is not None:
-            self.nlp_opts["iteration_callback"] = CasadiIterationCallback("iter", self.nlp_args, model)
+        self.iter_callback = iter_callback
+        self.init_callback = init_callback
+        if iter_callback is not None:
+            self.nlp_opts["iteration_callback"] = CasadiIterationCallback(
+                "iter", self.nlp_args, model, self.iter_callback
+            )
 
         self.x0 = self.initial_at_construction.copy()
         self.lam_g0 = None
@@ -606,7 +610,8 @@ class OptimizationProblem(InitializerMixin):
             OptimizationProblem.Method.snopt,
             OptimizationProblem.Method.qrsqp,
         ):
-            self.nlp_opts["iteration_callback"].iteration_callback = self.iteration_callback(model_instance.parameter, self.nlp_opts)
+            if self.init_callback is not None:
+                self.init_callback(model_instance.parameter, self.nlp_opts)
             call_args = dict(
                 x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg, 
             )
@@ -1392,9 +1397,9 @@ class ExternalSolverModel:
 
 
 class CasadiIterationCallback(casadi.Callback):
-    def __init__(self, name, nlpdict, model, opts={}):
+    def __init__(self, name, nlpdict, model, iteration_callback, opts={}):
         casadi.Callback.__init__(self)
-        self.iteration_callback = None
+        self.iteration_callback = iteration_callback
         self.nlpdict = nlpdict
         self.model = model
         self.iter = 0

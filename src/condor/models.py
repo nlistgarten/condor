@@ -818,6 +818,7 @@ class ModelTemplate(metaclass=ModelTemplateType):
     has a default, if nan --> imply value must be provided. if None --> a dummy
     variable. Should fail if set
     """
+
     @classmethod
     def extend_template(cls, new_name="", new_meta=None, new_meta_kwargs=None, **kwargs):
         if not new_name:
@@ -1091,6 +1092,9 @@ class ModelType(BaseModelType):
 
             # TODO: other validation?
             # TODO: inherit options? No, defaults come from implementation itself
+        else:
+            new_cls.Options = type("Options", (), {})
+
 
         if implementation is None and new_cls._meta.template:
             implementation = getattr(
