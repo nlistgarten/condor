@@ -678,6 +678,8 @@ def check_attr_name(attr_name, attr_val, new_cls):
         raise NameError(f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is a reserved word")
     existing_attr = getattr(new_cls, attr_name, None)
     if existing_attr is not None and attr_val is not existing_attr:
+        if attr_val.backend_repr is existing_attr.backend_repr:
+            return
         raise NameError(f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is already set to {getattr(new_cls, attr_name)}")
     return
 
@@ -1238,7 +1240,11 @@ class Model(metaclass=ModelType):
         # if model instance created with `name` attribute, result will be bound to that
         # name not the assigned name, but assigned name can still be used during model
         # definition
+
+
         model = model_instance.__class__
+        if not model._meta.bind_embedded_models:
+            return
         model_assignments = {}
 
         fields = [
@@ -1254,8 +1260,6 @@ class Model(metaclass=ModelType):
                 for elem, val in zip(field, model_instance_field_dict.values())
             })
 
-        if not model._meta.bind_embedded_models:
-            return
 
         for embedded_model_ref_name, embedded_model_instance in model._meta.embedded_models.items():
             embedded_model = embedded_model_instance.__class__
@@ -1279,9 +1283,29 @@ class Model(metaclass=ModelType):
                                 v, model_assignments
                             )
 
+                    # not working because python is checking equality of stuff??
+                    # model_assignments[v] = embedded_model_kwargs[k]
+
             bound_embedded_model = embedded_model(**embedded_model_kwargs)
-            # ALSO need to catch all the outputs of bound_embeded model?
             setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
+
+            for field in embedded_model._meta.output_fields:
+                sym_bound_field = getattr(embedded_model_instance, field._name)
+                sym_bound_field_dict = asdict(sym_bound_field)
+
+                ran_bound_field = getattr(bound_embedded_model, field._name)
+                ran_bound_field_dict = asdict(ran_bound_field)
+
+                model_assignments.update({
+                    sym_val: ran_val
+                    for sym_val, ran_val in zip(
+                        sym_bound_field_dict.values(), ran_bound_field_dict.values()
+                    )
+                })
+
+                #for symbolic_key, value in zip(field, bound_field_dict.values()):
+
+
 
 
 ModelTemplateType.user_model_metaclass = ModelType

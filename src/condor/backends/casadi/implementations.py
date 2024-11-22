@@ -223,7 +223,7 @@ class AlgebraicSystem(InitializerMixin):
     def construct(
         self, model,
         # standard options
-        atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True, max_iters=100,
+        atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True, max_iter=100,
         # new options
         re_initialize=slice(None), # slice for re-initializing at every call. will support indexing 
         default_initializer=0.,
@@ -237,11 +237,16 @@ class AlgebraicSystem(InitializerMixin):
             error_on_fail=error_on_fail,
             abstol=atol,
             abstolStep=rtol,
+            max_iter=max_iter
         )
         self.x = casadi.vertcat(*flatten(model.variable))
         self.g0 = casadi.vertcat(*flatten(model.residual))
         self.g1 = casadi.vertcat(*flatten(model.output))
         self.p = casadi.vertcat(*flatten(model.parameter))
+
+        self.output_func = casadi.Function(
+            f"{model.__name__}_output", [self.x, self.p], [self.g1]
+        )
 
 
         self.model = model
@@ -260,17 +265,20 @@ class AlgebraicSystem(InitializerMixin):
             rootfinder_options,
             self.initializer_func,
             enforce_bounds=enforce_bounds,
+            max_iter=max_iter,
         )
 
     def __call__(self, model_instance, *args, **kwargs):
-        out = self.callback(casadi.vertcat(*flatten(args)))
+        self.call_args = casadi.vertcat(*flatten(args))
+        out = self.callback(self.call_args)
+        self.var_out = casadi.vertcat(*out[:self.model.variable._count])
         model_instance.bind_field(
             self.model.variable,
-            out[:self.model.variable._count]
+            self.var_out
         )
         model_instance.bind_field(
             self.model.output,
-            out[self.model.variable._count:self.model.variable._count+self.model.output._count]
+            self.output_func(self.var_out, self.call_args)
         )
 
         if hasattr(self.callback, 'resid'):
@@ -281,6 +289,12 @@ class AlgebraicSystem(InitializerMixin):
             model_instance.bind_field(
                 self.model.residual, resid, symbols_to_instance=False
             )
+
+        for k, v in model_instance.variable.asdict().items():
+            model_var = getattr(self.model, k)
+            if model_var.warm_start and not isinstance(model_var.initializer, symbol_class):
+                if not isinstance(v, symbol_class):
+                    model_var.initializer = v
 
     def set_initial(self, *args, **kwargs):
         self.x0 = self.callback.x0
@@ -605,16 +619,11 @@ class OptimizationProblem(InitializerMixin):
             if self.has_p:
                 call_args["p"] = p
 
-            print("x0:", call_args["x0"])
             out = self.optimizer(**call_args)
             if not self.has_p or not isinstance(args[0], symbol_class):
                 self.x0 = out["x"]
 
             model_instance.bind_field(self.model.variable, out["x"])
-            for k, v in model_instance.variable.asdict().items():
-                model_var = getattr(self.model, k)
-                if not isinstance(model_var.initializer, symbol_class):
-                    model_var.initializer = v
             model_instance.bind_field(self.model.constraint, out["g"])
             model_instance.objective = np.array(out["f"]).squeeze()
             self.stats = self.optimizer.stats()
@@ -678,6 +687,12 @@ class OptimizationProblem(InitializerMixin):
             model_instance.objective = min_out.fun
             self.x0 = min_out.x
             self.stats = model_instance._stats = min_out
+
+
+        for k, v in model_instance.variable.asdict().items():
+            model_var = getattr(self.model, k)
+            if model_var.warm_start and not isinstance(model_var.initializer, symbol_class):
+                model_var.initializer = v
 
 def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={}):
     """
@@ -1401,7 +1416,7 @@ class CasadiIterationCallback(casadi.Callback):
     def get_sparsity_in(self, i):
         n = casadi.nlpsol_out(i)
         if n == "f":
-            return self.nlpdict["f"].sparsity()
+            return casadi.Sparsity.dense(1)
         elif n in ("x", "lam_x"):
             return self.nlpdict["x"].sparsity()
         elif n in ("g", "lam_g"):

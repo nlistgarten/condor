@@ -44,7 +44,7 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
 
     def eval(self, args):
         p = args[0]
-        if not casadi.is_equal(self.shot.p, args[0]):
+        if self.shot.p is None or not casadi.is_equal(self.shot.p, args[0]):
             self.shot(args[0])
         o = args[1]
         jac = self.i.shooting_gradient_method(self.shot.res)

@@ -30,7 +30,8 @@ class Newton:
     """
 
     def __init__(
-        self, x, p, resids, lbx=None, ubx=None, max_iter=1000, tol=1e-10, ls_type=None
+        self, x, p, resids, lbx=None, ubx=None, max_iter=1000, tol=1e-10, ls_type=None,
+        error_on_fail=True
     ):
         self.max_iter = max_iter
         self.tol = tol
@@ -54,6 +55,7 @@ class Newton:
         self.ls_fprime = wrap_ls_func(
             casadi.Function("ls_fprime", [x, p], [casadi.jacobian(resids_norm, x)])
         )
+        self.error_on_fail = error_on_fail
 
     def __call__(self, x, p):
         x = np.asarray(x, dtype=float).reshape(-1)

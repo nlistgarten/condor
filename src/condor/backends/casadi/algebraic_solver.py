@@ -4,9 +4,16 @@ import casadi
 from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
 from condor.solvers.newton import Newton
 
+import logging
+
+log = logging.getLogger(__name__)
+
 class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
 
-    def __init__(self, name, x, p, g0, g1, lbx, ubx, x0, rootfinder_options, initializer, enforce_bounds=True):
+    def __init__(
+        self, name, x, p, g0, g1, lbx, ubx, x0, rootfinder_options, initializer,
+        enforce_bounds=True, max_iter=100,
+    ):
         casadi.Callback.__init__(self)
         self.name = name
         self.initializer = initializer
@@ -22,8 +29,9 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
             lbx=lbx,
             ubx=ubx,
             tol=rootfinder_options["abstol"],
+            error_on_fail=rootfinder_options["error_on_fail"],
             ls_type=None,
-            max_iter=100,
+            max_iter=max_iter,
         )
 
         self.resid_func = casadi.Function(f"{name}_resid_func", [x, p], [g0, g1])
@@ -46,6 +54,7 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
 
     def eval(self, args):
         p = casadi.vertcat(*args)
+        log.debug(f"solver {self.name} with x0={self.x0}")
         self.x0 = self.initializer(self.x0, p)
 
         self.x0 = np.array(self.x0).reshape(-1)
@@ -64,6 +73,7 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
             self.x0, out_exp = self.rootfinder(self.x0, p)
             self.x0 = self.x0.toarray().reshape(-1)
             out_exp = out_exp.toarray().reshape(-1)
+        log.debug(f"solved to {self.x0}")
 
         return tuple([*self.x0, *out_exp])
 
