@@ -300,7 +300,7 @@ class BaseModelType(type):
 
         return cls_dict
 
-    def inherit_field(field, cls_dict):
+    def inherit_field(field, cls_dict, new_direction=None):
         """ Used to inherit a field from parent to new class dictionary (so it is
         available during class declaration)
         """
@@ -327,9 +327,12 @@ class BaseModelType(type):
                 use_kwarg = use_kwarg[0]
             if did_update:
                 v_init_kwargs[init_k] = use_kwarg
-        cls_dict[field._name] = v.inherit(
+        inherited_field = v.inherit(
             cls_dict.meta.model_name, field_type_name=field._name, **v_init_kwargs
         )
+        if new_direction is not None:
+            inherited_field._direction = new_direction
+        cls_dict[field._name] = inherited_field
         cls_dict[field._name].prepare(cls_dict)
 
 
@@ -1481,10 +1484,10 @@ class SubmodelTemplateType(
             if did_update:
                 v_init_kwargs[init_k] = use_kwarg
 
-        
-        cls_dict[field._name] = v.inherit(
+        inherited_field = v.inherit(
             cls_dict.meta.model_name, field_type_name=field._name, **v_init_kwargs
         )
+        cls_dict[field._name] = inherited_field
         cls_dict[field._name].prepare(cls_dict)
 
     @classmethod
@@ -1600,7 +1603,11 @@ class SubmodelType(ModelType):
             for attr_name, attr_val in primary_dict.items():
                 if isinstance(attr_val, Field):
                     if cls_dict.meta.copy_fields:
-                        cls.inherit_field(attr_val, cls_dict)
+                        if attr_val._direction == Direction.output:
+                            new_direction = Direction.internal
+                        else:
+                            new_direction = None
+                        cls.inherit_field(attr_val, cls_dict, new_direction)
                         copied_field = cls_dict[attr_val._name]
                         if isinstance(copied_field, FreeField):
                             copied_field._elements = [sym for sym in attr_val]
