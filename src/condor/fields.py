@@ -518,7 +518,12 @@ class TrajectoryOutputField(FreeField, default_direction=Direction.output):
 
         if isinstance(integrand, backend.symbol_class):
             if "terminal_term" in kwargs:
-                assert backend.get_symbol_data(integrand) == shape_data
+                if backend.get_symbol_data(integrand) != shape_data:
+                    # TODO would be nice to include the names here
+                    raise ValueError(
+                        f"Incompatible terminal term shape {shape_data} for integrand "
+                        f"{backend.get_symbol_data(integrand)}"
+                    )
             else:
                 shape_data = backend.get_symbol_data(integrand)
                 kwargs["terminal_term"] = np.broadcast_to(

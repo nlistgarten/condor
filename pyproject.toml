@@ -32,4 +32,6 @@ docs = ["sphinx", "sphinx-gallery"]
 write_to = "src/condor/_version.py"
 
 [tool.ruff.lint]
-ignore = ["D212"]
+ignore = [
+    "F821", # Undefined name ..."
+]
