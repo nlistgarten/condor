@@ -22,7 +22,7 @@ class NDSplinesHessianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         self.original_xdim = anti_deriv_interp.xdim
         self.primary_shape = (
             anti_deriv_interp.ydim * anti_deriv_interp.xdim,
-            anti_deriv_interp.xdim
+            anti_deriv_interp.xdim,
         )
         self.func = antiderivative.func.jacobian()
         self.construct(name, {})
@@ -70,13 +70,13 @@ class NDSplinesJacobianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         self.construct(name, {})
         self.interpolant = interpolant
 
-    def get_sparsity_in(self,i):
-        if i==0: # nominal input
+    def get_sparsity_in(self, i):
+        if i == 0:  # nominal input
             return casadi.Sparsity.dense(self.primary_shape[1])
-        elif i==1: # nominal output
+        elif i == 1:  # nominal output
             return casadi.Sparsity(self.primary_shape[0], 1)
 
-    def get_sparsity_out(self,i):
+    def get_sparsity_out(self, i):
         return casadi.Sparsity.dense(self.primary_shape)
 
     def eval(self, local_args):
@@ -85,18 +85,19 @@ class NDSplinesJacobianCallback(CasadiFunctionCallbackMixin, casadi.Callback):
             for interp in self.interpolant
         ]
         return_val = np.stack(array_vals, axis=1)
-        return casadi.DM(return_val),
+        return (casadi.DM(return_val),)
 
     def get_jacobian(self, name, inames, onames, opts):
         interp = [
-            interpolant.derivative(idx) 
+            interpolant.derivative(idx)
             if interpolant.degrees[idx] > 0
             else lambda *args: np.zeros(interpolant.ydim)
             for interpolant in self.interpolant
             for idx in range(interpolant.xdim)
         ]
-        self.jac_callback = NDSplinesHessianCallback(self, interp, name,
-                                                     inames, onames, opts)
+        self.jac_callback = NDSplinesHessianCallback(
+            self, interp, name, inames, onames, opts
+        )
         return self.jac_callback
 
 
@@ -108,7 +109,7 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
             f"{intermediate.model.__name__}_placeholder",
             [casadi.vertcat(*intermediate.symbol_inputs)],
             [casadi.vertcat(*intermediate.symbol_outputs)],
-            dict(allow_free=True)
+            dict(allow_free=True),
         )
         self.i = intermediate
         self.construct(name, {})
@@ -116,19 +117,17 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         model = self.i.model
 
         self.interpolant = ndsplines.make_interp_spline(
-            self.i.input_data,
-            self.i.output_data,
-            degrees = self.i.degrees
+            self.i.input_data, self.i.output_data, degrees=self.i.degrees
         )
 
     def eval(self, args):
-        return self.interpolant(np.array(args[0]).reshape(-1))[0, :],
+        return (self.interpolant(np.array(args[0]).reshape(-1))[0, :],)
 
     def get_jacobian(self, name, inames, onames, opts):
         interp = [
             self.interpolant.derivative(idx) for idx in range(self.interpolant.xdim)
         ]
-        self.jac_callback = NDSplinesJacobianCallback(self, interp, name,
-                                                     inames, onames, opts)
+        self.jac_callback = NDSplinesJacobianCallback(
+            self, interp, name, inames, onames, opts
+        )
         return self.jac_callback
-

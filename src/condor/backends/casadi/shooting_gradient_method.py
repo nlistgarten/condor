@@ -8,6 +8,7 @@ from condor.solvers.shooting_gradient_method import ResultInterpolant
 
 DEBUG_LEVEL = 0
 
+
 class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callback):
     def has_jacobian(self):
         return False
@@ -28,16 +29,16 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
     def get_n_out(self):
         return 1
 
-    def get_sparsity_in(self,i):
+    def get_sparsity_in(self, i):
         shot = self.shot
         p = shot.i.p
         out = shot.i.traj_out_expr
-        if i==0: # nominal input
+        if i == 0:  # nominal input
             return casadi.Sparsity.dense(p.shape)
-        elif i==1: # nominal output
+        elif i == 1:  # nominal output
             return casadi.Sparsity(out.shape)
 
-    def get_sparsity_out(self,i):
+    def get_sparsity_out(self, i):
         p = self.i.p
         out = self.i.traj_out_expr
         return casadi.Sparsity.dense(out.shape[0], p.shape[0])
@@ -49,15 +50,16 @@ class ShootingGradientMethodJacobian(CasadiFunctionCallbackMixin, casadi.Callbac
         o = args[1]
         jac = self.i.shooting_gradient_method(self.shot.res)
 
-        #Sim = self.i.model
-        #DV_idx = Sim.trajectory_output.flat_index(Sim.tot_Delta_v_mag)
-        #tig_idx = Sim.parameter.flat_index(Sim.tig)
-        #tem_idx = Sim.parameter.flat_index(Sim.tem)
-        #p = p.toarray().squeeze()
-        #print("jac params:", p[tig_idx], p[tem_idx])
-        #print("jac:", jac[DV_idx, tig_idx], jac[DV_idx, tem_idx])
+        # Sim = self.i.model
+        # DV_idx = Sim.trajectory_output.flat_index(Sim.tot_Delta_v_mag)
+        # tig_idx = Sim.parameter.flat_index(Sim.tig)
+        # tem_idx = Sim.parameter.flat_index(Sim.tem)
+        # p = p.toarray().squeeze()
+        # print("jac params:", p[tig_idx], p[tem_idx])
+        # print("jac:", jac[DV_idx, tig_idx], jac[DV_idx, tem_idx])
 
-        return jac,
+        return (jac,)
+
 
 class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
     def __init__(self, intermediate):
@@ -67,7 +69,9 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
             f"{intermediate.model.__name__}_placeholder",
             [intermediate.p],
             [intermediate.traj_out_expr],
-            dict(allow_free=True,),
+            dict(
+                allow_free=True,
+            ),
         )
         self.i = intermediate
         self.construct(name, {})
@@ -79,17 +83,18 @@ class ShootingGradientMethod(CasadiFunctionCallbackMixin, casadi.Callback):
 
     def get_jacobian(self, name, inames, onames, opts):
         if DEBUG_LEVEL:
-            print("\n"*10, f"getting jacobian for {self} . {name}", sep="\n")
+            print("\n" * 10, f"getting jacobian for {self} . {name}", sep="\n")
             if hasattr(self, "p"):
                 print(f"p={self.p}")
-        self.jac_callback = ShootingGradientMethodJacobian(self, name, inames, onames, opts)
+        self.jac_callback = ShootingGradientMethodJacobian(
+            self, name, inames, onames, opts
+        )
         return self.jac_callback
 
     def eval(self, args):
-        p  = casadi.vertcat(*args)
+        p = casadi.vertcat(*args)
         if self.p is None or not np.all(self.p == p):
             self.p = p
             self.res = self.i.StateSystem(p)
             self.output = self.i.trajectory_analysis(self.res)
-        return self.output,
-
+        return (self.output,)

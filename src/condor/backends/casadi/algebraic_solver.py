@@ -8,11 +8,22 @@ import logging
 
 log = logging.getLogger(__name__)
 
-class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
 
+class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
     def __init__(
-        self, name, x, p, g0, g1, lbx, ubx, x0, rootfinder_options, initializer,
-        enforce_bounds=True, max_iter=100,
+        self,
+        name,
+        x,
+        p,
+        g0,
+        g1,
+        lbx,
+        ubx,
+        x0,
+        rootfinder_options,
+        initializer,
+        enforce_bounds=True,
+        max_iter=100,
     ):
         casadi.Callback.__init__(self)
         self.name = name
@@ -76,4 +87,3 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
         log.debug(f"solved to {self.x0}")
 
         return tuple([*self.x0, *out_exp])
-

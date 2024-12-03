@@ -1,6 +1,8 @@
 import importlib
 import sys
+
 settings = {}
+
 
 class Settings:
     def __init__(self):
@@ -14,7 +16,7 @@ class Settings:
         kwargs are settings to use
         """
         self.settings.append(kwargs)
-        #print(kwargs)
+        # print(kwargs)
 
         if module not in sys.modules:
             mod = importlib.import_module(module)
@@ -33,10 +35,7 @@ class Settings:
         # TODO: defensive check on unused self.settings? Or maybe it's a feature to
         # allow unused settings so a big dict can be used for a project
 
-        return {
-            k: self.settings[-1].get(k, defaults[k])
-            for k in defaults
-        }
+        return {k: self.settings[-1].get(k, defaults[k]) for k in defaults}
 
 
 settings = Settings()

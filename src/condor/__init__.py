@@ -1,12 +1,21 @@
 if False:
     import logging
+
     logging.getLogger("condor").setLevel(logging.DEBUG)
     logging.basicConfig()
 
 from condor.fields import (
-    Direction, Field, BaseElement, FreeElement, WithDefaultField,
-    FreeField, AssignedField, MatchedField, InitializedField,
-    BoundedAssignmentField, TrajectoryOutputField,
+    Direction,
+    Field,
+    BaseElement,
+    FreeElement,
+    WithDefaultField,
+    FreeField,
+    AssignedField,
+    MatchedField,
+    InitializedField,
+    BoundedAssignmentField,
+    TrajectoryOutputField,
 )
 from condor.conf import settings
 from dataclasses import asdict, dataclass, field, replace

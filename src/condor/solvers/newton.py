@@ -2,8 +2,8 @@ import numpy as np
 from scipy import linalg
 import casadi
 
-def wrap_ls_func(f):
 
+def wrap_ls_func(f):
     def func(x, p):
         out = f(x, p).toarray().reshape(-1)
         if out.size == 1:
@@ -30,8 +30,16 @@ class Newton:
     """
 
     def __init__(
-        self, x, p, resids, lbx=None, ubx=None, max_iter=1000, tol=1e-10, ls_type=None,
-        error_on_fail=True
+        self,
+        x,
+        p,
+        resids,
+        lbx=None,
+        ubx=None,
+        max_iter=1000,
+        tol=1e-10,
+        ls_type=None,
+        error_on_fail=True,
     ):
         self.max_iter = max_iter
         self.tol = tol
@@ -49,7 +57,7 @@ class Newton:
         self.fprime = casadi.Function("fprime", [x, p], [casadi.jacobian(resids, x)])
 
         # obj for linesearch, TODO: performance testing for sumsqr vs norm_2
-        #resids_norm = casadi.sumsqr(resids)
+        # resids_norm = casadi.sumsqr(resids)
         resids_norm = casadi.norm_2(resids)
         self.ls_f = wrap_ls_func(casadi.Function("ls_f", [x, p], [resids_norm]))
         self.ls_fprime = wrap_ls_func(
@@ -83,7 +91,10 @@ class Newton:
             try:
                 dx = linalg.solve(J, -f)
             except linalg.LinAlgError as e:
-                print("solver failed, jacobian is singular. itr:", itr,)
+                print(
+                    "solver failed, jacobian is singular. itr:",
+                    itr,
+                )
                 break
             except ValueError as e:
                 print("some other error. itr:", itr)
@@ -104,7 +115,7 @@ class Newton:
 
                 # TODO ArmijoGoldsteinLS takes an option for initial alpha, default 1.0
 
-                xb, dxb = _enforce_bounds_scalar(x+dx, dx, 1.0, self.lbx, self.ubx)
+                xb, dxb = _enforce_bounds_scalar(x + dx, dx, 1.0, self.lbx, self.ubx)
 
                 fx = self.ls_f(x, p)
                 gx = self.ls_fprime(x, p)
@@ -161,12 +172,12 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # the step required to get up to the lower bound.
     # For du, we normalize by alpha since du eventually gets
     # multiplied by alpha.
-    change_lower = 0. if lower_bounds is None else np.maximum(u, lower_bounds) - u
+    change_lower = 0.0 if lower_bounds is None else np.maximum(u, lower_bounds) - u
 
     # If u < upper, we're just adding zero. Otherwise, we're adding
     # the step required to get down to the upper bound, but normalized
     # by alpha since du eventually gets multiplied by alpha.
-    change_upper = 0. if upper_bounds is None else np.minimum(u, upper_bounds) - u
+    change_upper = 0.0 if upper_bounds is None else np.minimum(u, upper_bounds) - u
 
     if lower_bounds is not None:
         mask = u < lower_bounds
@@ -188,4 +199,3 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # u += change
     # du += change / alpha
     return u + change, du + change / alpha
-

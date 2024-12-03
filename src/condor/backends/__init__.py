@@ -58,9 +58,10 @@ code could update it (add/overwrite)
 
 """
 
+
 @dataclass
 class BackendSymbolData:
-    shape: tuple # TODO: tuple of ints
+    shape: tuple  # TODO: tuple of ints
     symmetric: bool
     diagonal: bool
     size: int = field(init=False)
@@ -71,7 +72,7 @@ class BackendSymbolData:
         n = self.shape[0]
         size = np.prod(self.shape)
         if self.symmetric:
-            size = int(n*(n+1)/2)
+            size = int(n * (n + 1) / 2)
         if self.diagonal:
             size = n
 
@@ -81,5 +82,3 @@ class BackendSymbolData:
             assert len(shape) == 2
             assert self.shape[0] == self.shape[1]
         self.size = size
-
-

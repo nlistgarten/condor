@@ -1,9 +1,11 @@
 import numpy as np
-#from condor import backend
+
+# from condor import backend
 from scipy.interpolate import make_interp_spline
 from scipy.linalg import expm
 
 from dataclasses import dataclass, field, InitVar
+
 try:
     from scikits.odes.sundials.cvode import CVODE, StatusEnum
 except ModuleNotFoundError:
@@ -15,6 +17,7 @@ from scipy.integrate import ode as scipy_ode
 from scipy.optimize import brentq, newton
 from typing import NamedTuple, Optional
 
+
 class SolverMixin:
     def store_result(self, store_t, store_x, store_y=False):
         system = self.system
@@ -22,26 +25,34 @@ class SolverMixin:
         results.t.append(store_t)
         results.x.append(store_x)
         if system.dynamic_output and store_y:
-            results.y.append(np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1))
-
+            results.y.append(
+                np.array(system.dynamic_output(results.p, store_t, store_x)).reshape(-1)
+            )
 
 
 class SolverSciPyBase(SolverMixin):
     SOLVER_NAME = None
+
     def __init__(
-        self, system,
-        atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
-        nsteps=10_000.,
+        self,
+        system,
+        atol=1e-12,
+        rtol=1e-6,
+        adaptive_max_step=0.0,
+        max_step_size=0.0,
+        nsteps=10_000.0,
     ):
         self.system = system
         self.adaptive_max_step = adaptive_max_step
-        self.solver = scipy_ode( system.dots,)
+        self.solver = scipy_ode(
+            system.dots,
+        )
         self.int_options = dict(
-            name = self.SOLVER_NAME,
-            atol = atol,
-            rtol = rtol,
+            name=self.SOLVER_NAME,
+            atol=atol,
+            rtol=rtol,
             max_step=max_step_size,
-            nsteps = 100_000,
+            nsteps=100_000,
         )
         self.solver.set_integrator(**self.int_options)
         self.solver.set_solout(self.solout)
@@ -51,14 +62,14 @@ class SolverSciPyBase(SolverMixin):
         results = system.result
         # had to do some debugging and figured out a decent pattern for conditional
         # breakpoints... TODO move to notes or something?
-        #if results.e and results.e[-1].index == 19 and np.abs(results.t[-1] - 56.81341256) < 1.5E-9:
+        # if results.e and results.e[-1].index == 19 and np.abs(results.t[-1] - 56.81341256) < 1.5E-9:
         #    breakpoint()
 
         # if any sign change, return -1. maybe could determine rootinfo here?
         new_gs = system.events(t, x)
         gs_sign = np.sign(new_gs) - np.sign(self.gs)
         immediately_after_event = (
-            results.e and results.e[-1].index >= len(results.t)-1
+            results.e and results.e[-1].index >= len(results.t) - 1
         )
         if not immediately_after_event and np.any(np.abs(gs_sign) > 0):
             self.rootinfo = gs_sign
@@ -66,7 +77,11 @@ class SolverSciPyBase(SolverMixin):
         else:
             self.rootinfo = None
             store_t, store_x = t, np.copy(x)
-            if results.e and results.e[-1].index == len(results.t) and t != results.t[-1]:
+            if (
+                results.e
+                and results.e[-1].index == len(results.t)
+                and t != results.t[-1]
+            ):
                 store_t = results.t[-1]
 
         self.gs = new_gs
@@ -81,9 +96,10 @@ class SolverSciPyBase(SolverMixin):
         k = min(num_points_since_last_event - 1, 3)
         spline_ts = results.t[-k:] + [t]
         spline_xs = np.array(results.x[-k:] + [x])
-        spline_gs = np.array([system.events(tt, xx) for tt, xx in zip(
-            spline_ts[:-2], spline_xs[:-2]
-        )] + [self.gs, new_gs])
+        spline_gs = np.array(
+            [system.events(tt, xx) for tt, xx in zip(spline_ts[:-2], spline_xs[:-2])]
+            + [self.gs, new_gs]
+        )
 
         if self.integration_direction > 0:
             time_sort = slice(None)
@@ -94,19 +110,22 @@ class SolverSciPyBase(SolverMixin):
         x_spl = make_interp_spline(spline_ts[time_sort], spline_xs[time_sort], k=k)
         t_events = np.empty(system.num_events)
 
-        #ts_for_g = np.linspace(*spline_ts[-2:], 4)
-        #spline_gs = np.array([system.events(tt, x_spl(tt)) for tt in ts_for_g])
-        #g_spl = make_interp_spline(ts_for_g[time_sort], spline_gs[time_sort], k=k)
+        # ts_for_g = np.linspace(*spline_ts[-2:], 4)
+        # spline_gs = np.array([system.events(tt, x_spl(tt)) for tt in ts_for_g])
+        # g_spl = make_interp_spline(ts_for_g[time_sort], spline_gs[time_sort], k=k)
 
         g_der = g_spl.derivative()
-
 
         for g_idx, g_sign in enumerate(gs_sign):
             if g_sign:
                 find_function = lambda t: g_spl(t)[g_idx]
                 find_prime = lambda t: g_der(t)[g_idx]
-                set_t = brentq(find_function, spline_ts[-2], spline_ts[-1],)
-                #set_t = newton(find_function, spline_ts[-2], find_prime, tol=1E-12)
+                set_t = brentq(
+                    find_function,
+                    spline_ts[-2],
+                    spline_ts[-1],
+                )
+                # set_t = newton(find_function, spline_ts[-2], find_prime, tol=1E-12)
             else:
                 set_t = spline_ts[-1]
             t_events[g_idx] = set_t
@@ -115,7 +134,6 @@ class SolverSciPyBase(SolverMixin):
         self.rootinfo[t_events > min_t] = 0
 
         return min_t, x_spl(min_t)
-
 
     def simulate(self):
         system = self.system
@@ -129,10 +147,10 @@ class SolverSciPyBase(SolverMixin):
         self.gs = system.events(last_t, last_x)
         self.solout(last_t, last_x)
 
-        rootsfound = (self.gs == 0.).astype(int)
+        rootsfound = (self.gs == 0.0).astype(int)
         if np.any(rootsfound):
             # subsequent events use length of time for index, so root index is the index
-            # of the updated state to the right of event. -> root coinciding with 
+            # of the updated state to the right of event. -> root coinciding with
             # initialization has index 1
             last_x = system.update(last_t, last_x, rootsfound)
         results.e.append(Root(1, rootsfound))
@@ -142,27 +160,28 @@ class SolverSciPyBase(SolverMixin):
             self.store_result(last_t, last_x)
             return
 
-
         solver = self.solver
 
         # each iteration of this loop simulates until next generated time
         while True:
-
             next_t = next(time_generator)
             self.gs = system.events(last_t, last_x)
             if np.isinf(next_t):
                 break
-            #if next_t < 0:
+            # if next_t < 0:
             #    breakpoint()
 
             if self.adaptive_max_step:
-                self.int_options.update(dict(
-                    max_step=np.abs(next_t - last_t)/self.adaptive_max_step
-                ))
+                self.int_options.update(
+                    dict(max_step=np.abs(next_t - last_t) / self.adaptive_max_step)
+                )
 
                 self.solver.set_integrator(**self.int_options)
                 self.solver.set_solout(self.solout)
-            solver.set_initial_value(last_x, last_t,)
+            solver.set_initial_value(
+                last_x,
+                last_t,
+            )
             self.integration_direction = np.sign(next_t - last_t)
 
             # each iteration of this loop is one step until next event or time stop
@@ -175,12 +194,11 @@ class SolverSciPyBase(SolverMixin):
 
                 # assume we have an event, either a true event or at next_t
 
-                solver_flag =  solver.get_return_code()
-                #== 1: #equivalent to tstop
-                #== 2: #equivalent to rootfound
+                solver_flag = solver.get_return_code()
+                # == 1: #equivalent to tstop
+                # == 2: #equivalent to rootfound
 
-
-                #if len(results.t) > 10 and np.abs(solver.t - next_t) < 1E-13 and solver.t != next_t:
+                # if len(results.t) > 10 and np.abs(solver.t - next_t) < 1E-13 and solver.t != next_t:
                 #    breakpoint()
 
                 if np.any(self.rootinfo):
@@ -193,17 +211,18 @@ class SolverSciPyBase(SolverMixin):
                     rootsfound = (gs == min_e).astype(int)
 
                 idx = len(results.t)
-        # had to do some debugging and figured out a decent pattern for conditional
-        # breakpoints... TODO move to notes or something?
-                #if idx == 19 and isinstance(system, AdjointSystem) and np.abs(next_t - 56.81341256) < 1.5E-9:#:21 and results.e[-1].index == 19:
+                # had to do some debugging and figured out a decent pattern for conditional
+                # breakpoints... TODO move to notes or something?
+                # if idx == 19 and isinstance(system, AdjointSystem) and np.abs(next_t - 56.81341256) < 1.5E-9:#:21 and results.e[-1].index == 19:
                 ##if idx == 21 and results.e[-1].index == 19:
                 #    breakpoint()
                 results.e.append(Root(idx, rootsfound))
                 next_x = system.update(
-                    results.t[-1], results.x[-1], rootsfound,
+                    results.t[-1],
+                    results.x[-1],
+                    rootsfound,
                 )
                 terminate = np.any(rootsfound[system.terminating] != 0)
-
 
                 last_t = results.t[-1]
                 self.gs = system.events(last_t, next_x)
@@ -213,20 +232,23 @@ class SolverSciPyBase(SolverMixin):
                     return
 
                 last_x = next_x
-                solver.set_initial_value(last_x, last_t,)
+                solver.set_initial_value(
+                    last_x,
+                    last_t,
+                )
 
                 if (
-                    (self.integration_direction * last_t) 
+                    (self.integration_direction * last_t)
                     >= (self.integration_direction * next_t)
                 ) or np.nextafter(next_t, last_t) == results.t[-1]:
                     # ideally this one gets triggered by an at_time event
                     # subsequent case is really only if integrator terminated (and
-                    # thinks successful) but closest event 
+                    # thinks successful) but closest event
 
                     break
 
-                if solver_flag ==1 and np.any(
-                    (system.events(next_t, results.x[-1]) == 0.)
+                if solver_flag == 1 and np.any(
+                    (system.events(next_t, results.x[-1]) == 0.0)
                     & rootsfound.astype(bool)
                 ):
                     break
@@ -234,12 +256,12 @@ class SolverSciPyBase(SolverMixin):
                 elif solver_flag == 2 and isinstance(system, AdjointSystem):
                     breakpoint()
 
-
             last_t = next_t
 
 
 class SolverSciPyDopri5(SolverSciPyBase):
     SOLVER_NAME = "dopri5"
+
 
 class SolverSciPyDop853(SolverSciPyBase):
     SOLVER_NAME = "dop853"
@@ -247,8 +269,12 @@ class SolverSciPyDop853(SolverSciPyBase):
 
 class SolverCVODE(SolverMixin):
     def __init__(
-        self, system,
-        atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
+        self,
+        system,
+        atol=1e-12,
+        rtol=1e-6,
+        adaptive_max_step=0.0,
+        max_step_size=0.0,
     ):
         self.system = system
         self.adaptive_max_step = adaptive_max_step
@@ -260,18 +286,26 @@ class SolverCVODE(SolverMixin):
             rootfn=self.events,
             nr_rootfns=system.num_events,
             max_step_size=max_step_size,
-            atol = atol,
-            rtol = rtol,
+            atol=atol,
+            rtol=rtol,
         )
 
-    def dots(self, t, x, xdot,):# userdata=None,):
+    def dots(
+        self,
+        t,
+        x,
+        xdot,
+    ):  # userdata=None,):
         xdot[:] = self.system.dots(t, x)
 
-    def jac(self, t, x, xdot, jac):#
+    def jac(self, t, x, xdot, jac):  #
         jac[...] = self.system.jac(t, x)
 
     def events(self, t, x, g):
-        g[:] = self.system.events(t, x,)
+        g[:] = self.system.events(
+            t,
+            x,
+        )
 
     def simulate(self):
         """
@@ -282,18 +316,17 @@ class SolverCVODE(SolverMixin):
 
         self.result is a namespace with t, x, and e attributes that can be appended with
         time value, state at time, and possibly events e
-        initializer 
-        update 
+        initializer
+        update
 
         events have index corresponding to start of each segment. except perhaps the
         first. -- can always assume the 0 index corresponds to initialization
         initial and final segments may be singular if an event causes an update that
-        coincides with 
+        coincides with
         """
         system = self.system
         results = system.result
         last_x = system.initial_state()
-
 
         time_generator = system.time_generator()
         last_t = next(time_generator)
@@ -302,10 +335,10 @@ class SolverCVODE(SolverMixin):
         gs = system.events(last_t, last_x)
         self.store_result(last_t, last_x)
 
-        rootsfound = (gs == 0.).astype(int)
+        rootsfound = (gs == 0.0).astype(int)
         if np.any(rootsfound):
             # subsequent events use length of time for index, so root index is the index
-            # of the updated state to the right of event. -> root coinciding with 
+            # of the updated state to the right of event. -> root coinciding with
             # initialization has index 1
             last_x = system.update(last_t, np.copy(last_x), rootsfound)
         results.e.append(Root(1, rootsfound))
@@ -314,20 +347,20 @@ class SolverCVODE(SolverMixin):
         if terminate:
             return
 
-
         solver = self.solver
         # each iteration of this loop simulates until next generated time
         while True:
-
             next_t = next(time_generator)
             if np.isinf(next_t):
                 break
             if next_t < 0:
-                #breakpoint()
+                # breakpoint()
                 pass
 
             if self.adaptive_max_step:
-                solver.set_options(max_step_size=np.abs(next_t - last_t)/self.adaptive_max_step)
+                solver.set_options(
+                    max_step_size=np.abs(next_t - last_t) / self.adaptive_max_step
+                )
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
             integration_direction = np.sign(next_t - last_t)
@@ -335,7 +368,7 @@ class SolverCVODE(SolverMixin):
             # each iteration of this loop is one step until next event or time stop
             while True:
                 solver_res = solver.step(next_t)
-                if (solver_res.flag < 0):
+                if solver_res.flag < 0:
                     breakpoint()
 
                 self.store_result(
@@ -347,7 +380,7 @@ class SolverCVODE(SolverMixin):
 
                 if solver_res.flag == StatusEnum.TSTOP_RETURN:
                     # assume this is associated with an event
-                    #does occur on time_switch but not sp_lqr
+                    # does occur on time_switch but not sp_lqr
                     gs = system.events(results.t[-1], results.x[-1])
                     min_e = np.abs(gs).min()
                     rootsfound = (gs == min_e).astype(int)
@@ -356,34 +389,29 @@ class SolverCVODE(SolverMixin):
                     idx = len(results.t)
                     results.e.append(Root(idx, rootsfound))
                     next_x = system.update(
-                        results.t[-1], results.x[-1], rootsfound,
+                        results.t[-1],
+                        results.x[-1],
+                        rootsfound,
                     )
                     try:
                         terminate = np.any(rootsfound[system.terminating] != 0)
                     except:
                         breakpoint()
-                    self.store_result(
-                        np.copy(solver_res.values.t),
-                        next_x
-                    )
+                    self.store_result(np.copy(solver_res.values.t), next_x)
 
                     if terminate:
-                        self.store_result(
-                            np.copy(solver_res.values.t),
-                            next_x
-                        )
+                        self.store_result(np.copy(solver_res.values.t), next_x)
                         return
 
                     solver.init_step(solver_res.values.t, next_x)
                     last_x = next_x
 
-                if (
-                    (integration_direction * solver_res.values.t) 
-                    >= (integration_direction * next_t)
+                if (integration_direction * solver_res.values.t) >= (
+                    integration_direction * next_t
                 ):
                     break
                 if solver_res.flag == StatusEnum.TSTOP_RETURN:
-                    #does occur on time_switch but not sp_lqr
+                    # does occur on time_switch but not sp_lqr
                     break
 
             last_t = next_t
@@ -420,9 +448,9 @@ class NextTimeFromSlice:
         if self.before_start(t):
             return self.start
         if self.after_stop(t):
-            return self.direction*np.inf
+            return self.direction * np.inf
         # TODO handle negative step -- may need to adjust a few of these
-        return (1+(t-self.start)//self.step)*self.step + self.start
+        return (1 + (t - self.start) // self.step) * self.step + self.start
 
 
 class TimeGeneratorFromSlices:
@@ -435,7 +463,7 @@ class TimeGeneratorFromSlices:
         for time_slice in self.time_slices:
             time_slice.set_p(p)
 
-        t = -self.direction*np.inf
+        t = -self.direction * np.inf
         if self.direction > 0:
             get_time = min
         else:
@@ -450,11 +478,22 @@ class TimeGeneratorFromSlices:
 
 class System:
     def __init__(
-        self, dim_state, initial_state, dot, jac, time_generator,
-        events, updates, num_events, terminating,
-        dynamic_output = None,
-        atol=1E-12, rtol=1E-6, adaptive_max_step = 0., max_step_size=0.,
-        solver_class = SolverSciPyDopri5,
+        self,
+        dim_state,
+        initial_state,
+        dot,
+        jac,
+        time_generator,
+        events,
+        updates,
+        num_events,
+        terminating,
+        dynamic_output=None,
+        atol=1e-12,
+        rtol=1e-6,
+        adaptive_max_step=0.0,
+        max_step_size=0.0,
+        solver_class=SolverSciPyDopri5,
     ):
         """
         if adaptive_max_step, treat max_step_size as the fraction of the next simulation
@@ -476,7 +515,7 @@ class System:
         self._dot = dot
         self._jac = jac
         self._events = events
-        #     list of functions for 
+        #     list of functions for
         self._updates = updates
         self.dynamic_output = dynamic_output
 
@@ -485,11 +524,11 @@ class System:
         # who owns t0? time generator? for adjoint system, very easy to own all of them.
         # I guess can just handle single point as a special case instead of assuming all
         # take the form of an interval? Does this make it easier to allow events that
-        # occur at t0? Then 
+        # occur at t0? Then
 
         # data for time_generator method -- should this just be a generator class
         # itself? yes, basically just a sub-name space to the System which should own
-        # the (parameterized) callables. Use wrapper method to define interface, then 
+        # the (parameterized) callables. Use wrapper method to define interface, then
         # AdjointSystem can re-implement wrapper method to change interface
         self._time_generator = time_generator
 
@@ -502,18 +541,18 @@ class System:
         self.make_solver(
             atol=atol,
             rtol=rtol,
-            adaptive_max_step = adaptive_max_step,
-            max_step_size = max_step_size,
-            solver_class = solver_class,
+            adaptive_max_step=adaptive_max_step,
+            max_step_size=max_step_size,
+            solver_class=solver_class,
         )
 
     def make_solver(self, atol, rtol, adaptive_max_step, max_step_size, solver_class):
-        self.system_solver = solver_class( #SolverSciPy( #SolverCVODE(
+        self.system_solver = solver_class(  # SolverSciPy( #SolverCVODE(
             system=self,
             atol=atol,
             rtol=rtol,
-            adaptive_max_step = adaptive_max_step,
-            max_step_size = max_step_size,
+            adaptive_max_step=adaptive_max_step,
+            max_step_size=max_step_size,
         )
 
     def initial_state(self):
@@ -522,14 +561,18 @@ class System:
     def dots(self, t, x):
         return np.array(self._dot(self.result.p, t, x)).reshape(-1)
 
-    def jac(self, t, x, ):
+    def jac(
+        self,
+        t,
+        x,
+    ):
         return np.array(self._jac(self.result.p, t, x)).squeeze()
 
     def events(self, t, x):
         return np.array(self._events(self.result.p, t, x)).reshape(-1)
 
     def update(self, t, x, rootsfound):
-        next_x = x #np.copy(x) # who is responsible for copying? I suppose simulate
+        next_x = x  # np.copy(x) # who is responsible for copying? I suppose simulate
         for root_sign, update in zip(rootsfound, self._updates):
             if root_sign != 0:
                 next_x = update(self.result.p, t, next_x)
@@ -563,15 +606,21 @@ class ResultBase:
     def __getitem__(self, key):
         return self.__class__(
             *tuple(getattr(self, field.name) for field in fields(self)[:-3]),
-            t=self.t[key], x=self.x[key], e=self.e[key]
+            t=self.t[key],
+            x=self.x[key],
+            e=self.e[key],
         )
 
-    def save(self, filename,):
+    def save(
+        self,
+        filename,
+    ):
         e_idxs = [e.index for e in self.e]
         e_roots = [e.rootsfound for e in self.e]
-        np.savez(filename,
-            e_idxs = e_idxs,
-            e_roots = e_roots,
+        np.savez(
+            filename,
+            e_idxs=e_idxs,
+            e_roots=e_roots,
             t=self.t,
             x=self.x,
             y=self.y,
@@ -581,12 +630,11 @@ class ResultBase:
     @classmethod
     def load(cls, filename):
         data = dict(np.load(filename))
-        data['e'] = [
+        data["e"] = [
             Root(index=ei, rootsfound=er)
-            for ei, er in zip(data.pop('e_idxs'), data.pop('e_roots'))
+            for ei, er in zip(data.pop("e_idxs"), data.pop("e_roots"))
         ]
         return cls(system=None, **data)
-
 
 
 @dataclass
@@ -612,11 +660,11 @@ class ResultInterpolant:
     result: Result
     function: callable = lambda p, t, x: x
     # don't pass interpolants to init?
-    # should state_Result be saved or just be an initvar? I back-references are OK so 
+    # should state_Result be saved or just be an initvar? I back-references are OK so
     # we can keep it...
-    interpolants: Optional[list[callable]] = None # field(init=False)
-    time_bounds: Optional[list[float]] = None # field(init=False)
-    time_comparison: callable = field(init=False) # method
+    interpolants: Optional[list[callable]] = None  # field(init=False)
+    time_bounds: Optional[list[float]] = None  # field(init=False)
+    time_comparison: callable = field(init=False)  # method
     interval_select: int = field(init=False)
     event_idxs: Optional[list] = None
     max_deg: int = 3
@@ -627,19 +675,18 @@ class ResultInterpolant:
         function = self.function
         if self.event_idxs is None:
             # currently expect each root.index to be to the right of each event so is
-            # the start of each segment, so zero belongs with this set by adding the 
-            # element len(result.t), the slice of pairs slice(idx[i], idx[i+1]) 
-            # captures the whole segment including the last one. 
+            # the start of each segment, so zero belongs with this set by adding the
+            # element len(result.t), the slice of pairs slice(idx[i], idx[i+1])
+            # captures the whole segment including the last one.
 
-            self.event_idxs = np.array([
-                root.index for root in result.e
-            ])# + [len(result.t)])
+            self.event_idxs = np.array(
+                [root.index for root in result.e]
+            )  # + [len(result.t)])
             if np.any(np.diff(self.event_idxs) < 1):
                 breakpoint()
 
         event_idxs = self.event_idxs
         if self.time_bounds is None:
-
             self.time_bounds = np.empty(self.event_idxs.shape)
             self.time_bounds[:-1] = np.array(result.t)[event_idxs[:-1]]
             self.time_bounds[-1] = result.t[-1]
@@ -653,20 +700,23 @@ class ResultInterpolant:
             self.time_sort = slice(None)
 
         if self.interpolants is None:
-        # TODO figure out how to combine (and possibly reverse direction) state and
-        # parameter jacobian of state equation to reduce number of calls (and distance
-        # at each call), since this is potentially most expensive call -- I guess only
-        # if the ODE depends on inner-loop solver? then split
-        # coefficients
-        # --> then also combine e.g., adjoint forcing function and jacobian interpolant
+            # TODO figure out how to combine (and possibly reverse direction) state and
+            # parameter jacobian of state equation to reduce number of calls (and distance
+            # at each call), since this is potentially most expensive call -- I guess only
+            # if the ODE depends on inner-loop solver? then split
+            # coefficients
+            # --> then also combine e.g., adjoint forcing function and jacobian interpolant
 
-        # expect integrand-term related functions to be cheap functions of state
-        # point-wise along trajectory
+            # expect integrand-term related functions to be cheap functions of state
+            # point-wise along trajectory
             try:
-                all_coeff_data =[[
-                    np.array(function(result.p, t, x)).squeeze() 
-                    for t, x in zip(result.t[idx0:idx1], result.x[idx0:idx1])
-                ] for idx0, idx1 in zip(event_idxs[:-1], event_idxs[1:])]
+                all_coeff_data = [
+                    [
+                        np.array(function(result.p, t, x)).squeeze()
+                        for t, x in zip(result.t[idx0:idx1], result.x[idx0:idx1])
+                    ]
+                    for idx0, idx1 in zip(event_idxs[:-1], event_idxs[1:])
+                ]
             except Exception as my_e:
                 print(my_e)
                 breakpoint()
@@ -678,14 +728,20 @@ class ResultInterpolant:
                 event_idxs[1:],
                 all_coeff_data,
             ):
-                if np.all(np.diff(coeff_data, axis=0) == 0.):
-
+                if np.all(np.diff(coeff_data, axis=0) == 0.0):
                     try:
                         interp = ResultSegmentInterpolant(
-                           make_interp_spline( result.t[idx0], [coeff_data[0]], k=0,),
-                            idx0, idx1,
-                            result.t[idx0], result.t[idx1],
-                            result.x[idx0], result.x[idx1],
+                            make_interp_spline(
+                                result.t[idx0],
+                                [coeff_data[0]],
+                                k=0,
+                            ),
+                            idx0,
+                            idx1,
+                            result.t[idx0],
+                            result.t[idx1],
+                            result.x[idx0],
+                            result.x[idx1],
                         )
                     except Exception as my_e:
                         print(my_e)
@@ -696,32 +752,39 @@ class ResultInterpolant:
                     coefs = coeff_data[self.time_sort]
 
                     for count, orig_idx in enumerate(np.where(np.diff(ts) <= 0)[0]):
-                        idx = count+orig_idx
-                        ts = ts[:idx] + ts[idx+1:]
-                        coefs = coefs[:idx] + coefs[idx+1:]
-                        print(f"stripping non-decreasing {ts[idx]} -- creating result interpolant")
+                        idx = count + orig_idx
+                        ts = ts[:idx] + ts[idx + 1 :]
+                        coefs = coefs[:idx] + coefs[idx + 1 :]
+                        print(
+                            f"stripping non-decreasing {ts[idx]} -- creating result interpolant"
+                        )
 
                     try:
                         interp = ResultSegmentInterpolant(
-                           make_interp_spline(
-                               ts,
-                               coefs,
-                               k=min(self.max_deg, idx1-idx0-1), # not needed with adaptive step size!
-                               #bc_type=["natural", "natural"],
-                           ),
-                            idx0, idx1,
-                            result.t[idx0], result.t[idx1],
-                            result.x[idx0], result.x[idx1],
+                            make_interp_spline(
+                                ts,
+                                coefs,
+                                k=min(
+                                    self.max_deg, idx1 - idx0 - 1
+                                ),  # not needed with adaptive step size!
+                                # bc_type=["natural", "natural"],
+                            ),
+                            idx0,
+                            idx1,
+                            result.t[idx0],
+                            result.t[idx1],
+                            result.x[idx0],
+                            result.x[idx1],
                         )
                     except Exception as my_e:
                         print(my_e)
                         breakpoint()
                         pass
                 self.interpolants.append(interp)
-                #if result.t[idx1] != result.t[idx0]
+                # if result.t[idx1] != result.t[idx0]
 
     def __call__(self, t):
-        interval_idx = np.where(self.time_comparison(t))[0][self.interval_select]-1
+        interval_idx = np.where(self.time_comparison(t))[0][self.interval_select] - 1
         return self.interpolants[interval_idx](t)
 
     def __iter__(self):
@@ -734,7 +797,7 @@ class AdjointResultMixin:
     state_jacobian: ResultInterpolant
     forcing_function: ResultInterpolant
     state_result: Result = field(init=False)
-    p : list[float] = field(init=False)
+    p: list[float] = field(init=False)
 
     def __post_init__(self):
         # TODO: validate forcing_function.result is the same?
@@ -743,45 +806,59 @@ class AdjointResultMixin:
 
 
 @dataclass
-class AdjointResult(ResultBase, AdjointResultMixin,):
+class AdjointResult(
+    ResultBase,
+    AdjointResultMixin,
+):
     pass
 
 
 class AdjointSystem(System):
     def __init__(
-        self, state_jac, dte_dxs, dh_dxs,
-        solver_class = SolverSciPyDopri5,
-        atol=1E-12, rtol=1E-6, adaptive_max_step = False, max_step_size=0.,
+        self,
+        state_jac,
+        dte_dxs,
+        dh_dxs,
+        solver_class=SolverSciPyDopri5,
+        atol=1e-12,
+        rtol=1e-6,
+        adaptive_max_step=False,
+        max_step_size=0.0,
     ):
         """
-        to support caching jacobians, 
+        to support caching jacobians,
 
         adjoint solver will use parent simulate but without using events machinery
         time generator will call update method
         """
         self.state_jac = state_jac
-        self.dte_dxs, self.dh_dxs = dte_dxs, dh_dxs,
+        self.dte_dxs, self.dh_dxs = (
+            dte_dxs,
+            dh_dxs,
+        )
         self.num_events = 1
         self.dynamic_output = None
-        #self.adjoint_updates = adjoint_updates
+        # self.adjoint_updates = adjoint_updates
 
         self.make_solver(
             atol=atol,
             rtol=rtol,
-            adaptive_max_step = adaptive_max_step,
-            max_step_size = max_step_size,
-            solver_class = solver_class,
+            adaptive_max_step=adaptive_max_step,
+            max_step_size=max_step_size,
+            solver_class=solver_class,
         )
 
     def events(self, t, lamda):
-        return np.array(t - self.result.state_result.t[
-            self.result.state_result.e[self.segment_idx].index
-        ]).reshape(-1)
-
+        return np.array(
+            t
+            - self.result.state_result.t[
+                self.result.state_result.e[self.segment_idx].index
+            ]
+        ).reshape(-1)
 
     def update(self, t, lamda, ignore_rootsfound):
         """
-        for adjoint system, update will always get called for t1 of each segment, 
+        for adjoint system, update will always get called for t1 of each segment,
         """
         lamda_res = self.result
         state_res = lamda_res.state_result
@@ -789,46 +866,52 @@ class AdjointSystem(System):
         # might be able to some magic to skip if nothing is done? but might only be for
         # terminal event anyway? maybe initial?
         active_update_idxs = np.where(event.rootsfound != 0)[0]
-        lamda_tep = last_lamda = lamda #self.result.x[-1]
+        lamda_tep = last_lamda = lamda  # self.result.x[-1]
         p = state_res.p
-        state_idxp = event.index # positive side of event
+        state_idxp = event.index  # positive side of event
         te = state_res.t[state_idxp]
-
 
         if len(active_update_idxs) > 1:
             # not sure how to handle actual computation for this case, may need to
             # re-compute each update to get x at each update for correct partials and
             # time derivatives??
-            #breakpoint()
+            # breakpoint()
             pass
 
         if len(active_update_idxs):
             xtep = state_res.x[state_idxp]
             ftep = state_res.system._dot(p, te, xtep)
 
-            idxm = state_idxp -1
+            idxm = state_idxp - 1
             if state_res.t[idxm] != te:
                 breakpoint()
             xtem = state_res.x[idxm]
             ftem = state_res.system._dot(p, te, xtem)
 
-
             if event is state_res.e[-1]:
                 lamda_tem = last_lamda
                 # TODO: add full transversality condition
                 for event_channel in active_update_idxs[::-1]:
-                    dh_dx = self.dh_dxs[event_channel](p, te, xtem,)
+                    dh_dx = self.dh_dxs[event_channel](
+                        p,
+                        te,
+                        xtem,
+                    )
                     dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
-                    lamda_tem = (dh_dx.T - dte_dxT @ ( dh_dx @ ftem).T) @ last_lamda
+                    lamda_tem = (dh_dx.T - dte_dxT @ (dh_dx @ ftem).T) @ last_lamda
                     last_lamda = lamda_tem
             else:
                 lamda_dot = self.dots(te, last_lamda)
 
                 for event_channel in active_update_idxs[::-1]:
-                    dh_dx = self.dh_dxs[event_channel](p, te, xtem,)
+                    dh_dx = self.dh_dxs[event_channel](
+                        p,
+                        te,
+                        xtem,
+                    )
                     dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
                     lamda_tem = (
-                        dh_dx.T - dte_dxT @ ( ftep - dh_dx @ ftem).T
+                        dh_dx.T - dte_dxT @ (ftep - dh_dx @ ftem).T
                     ) @ last_lamda
                     last_lamda = lamda_tem
         else:
@@ -838,15 +921,14 @@ class AdjointSystem(System):
         return lamda_tem
 
     def time_generator(self):
-        """
-        """
+        """ """
         result = self.result
         for (
             segment_idx,
             event,
-            #jac_segment, forcing_segment,
+            # jac_segment, forcing_segment,
         ) in zip(
-            range(len(result.state_result.e)-1, -1, -1),
+            range(len(result.state_result.e) - 1, -1, -1),
             result.state_result.e[::-1],
             # result.state_jacobian[::-1], result.forcing_function[::-1],
         ):
@@ -855,7 +937,7 @@ class AdjointSystem(System):
             self.segment_idx = segment_idx
             if segment_idx == 0:
                 self.terminating = [0]
-            #if event.index == 1:
+            # if event.index == 1:
             #    breakpoint()
             yield result.state_result.t[event.index]
             # nothing about segment_idx will get used the first time (terminal event)
@@ -866,13 +948,13 @@ class AdjointSystem(System):
             # so on first iteration, will not propoagate, will hit first iteration of
             # simulate's loop and call next-yield. so do terminal update (can optimize
             # code to reduce computations if needed) then loop.
-            #self.update(event)
+            # self.update(event)
 
             # so update for terminal event is right, but could optimize performance for
             # special cases/maybe need distinct expression for update (to implement
             # update from from true terminal condition to effect of an immediate update)
             # then when this yields initial event (i.e., index=1) will THEN propoagate
-            # backwards to initial condition. 
+            # backwards to initial condition.
 
         # then exits above loop, will have just simulated to t0 and handled any possible
         # update
@@ -883,40 +965,47 @@ class AdjointSystem(System):
         return self.final_lamda
 
     def __call__(self, final_lamda, forcing_function, state_jacobian):
-        self.terminating = slice(0,0)
+        self.terminating = slice(0, 0)
         self.result = AdjointResult(
             system=self,
             state_jacobian=state_jacobian,
-            forcing_function=forcing_function
+            forcing_function=forcing_function,
         )
-        self.final_lamda = final_lamda 
+        self.final_lamda = final_lamda
         # I guess this could be put in result.x? then initial_state can pop and return?
         self.system_solver.simulate()
         result = self.result
-        #self.result = None
+        # self.result = None
         return result
 
     def dots(self, t, lamda):
         # TODO adjoint system takes jacobian and integrand terms, do matrix multiply and
         # vector add here. then can ust call jacobian term for jac method
-        # then before simulate, could actually construct 
+        # then before simulate, could actually construct
         # who would own the data for interpolating ? maybe just a new (data) class that
         # also stores the interpolant? then adjointsystem simulate can create it if
         # it'snot provided
         return np.array(
             -self.result.state_jacobian.interpolants[self.segment_idx](t).T @ lamda
-            -self.result.forcing_function.interpolants[self.segment_idx](t)
+            - self.result.forcing_function.interpolants[self.segment_idx](t)
         ).reshape(-1)
-        np.matmul(self.result.state_jacobian.interpolants[self.segment_idx](t).T,
-                  -lamda, out=lamdadot)
+        np.matmul(
+            self.result.state_jacobian.interpolants[self.segment_idx](t).T,
+            -lamda,
+            out=lamdadot,
+        )
         np.add(
             lamdadot,
             -self.result.forcing_function.interpolants[self.segment_idx](t),
-            out=lamdadot
+            out=lamdadot,
         )
 
-    def jac(self, t, lamda,):
-        return  -self.result.state_jacobian.interpolants[self.segment_idx](t).T
+    def jac(
+        self,
+        t,
+        lamda,
+    ):
+        return -self.result.state_jacobian.interpolants[self.segment_idx](t).T
 
 
 @dataclass
@@ -927,11 +1016,15 @@ class TrajectoryAnalysis:
     def __call__(self, result):
         # evaluate the trajectory analysis of this result
         # should this return a dataclass? Or just the vector of results?
-        integral = 0.
-        integrand_interpolant = ResultInterpolant(result=result, function=self.integrand_terms)
+        integral = 0.0
+        integrand_interpolant = ResultInterpolant(
+            result=result, function=self.integrand_terms
+        )
         for segment in integrand_interpolant:
             integrand_antideriv = segment.interpolant.antiderivative()
-            integral += integrand_antideriv(segment.t1) - integrand_antideriv(segment.t0)
+            integral += integrand_antideriv(segment.t1) - integrand_antideriv(
+                segment.t0
+            )
         return self.terminal_terms(result.p, result.t[-1], result.x[-1]) + integral
 
 
@@ -940,7 +1033,7 @@ class ShootingGradientMethod:
     # per system
     adjoint_system: AdjointSystem
     p_x0_p_params: callable
-    p_dots_p_params: callable # could be cached, or just combined with integrand terms
+    p_dots_p_params: callable  # could be cached, or just combined with integrand terms
     # per system's events (length number of events)
     dh_dps: list[callable]
     dte_dps: list[callable]
@@ -951,7 +1044,6 @@ class ShootingGradientMethod:
     p_integrand_terms_p_state: list[callable]
     p_terminal_terms_p_state: list[callable]
 
-
     def __call__(self, state_result):
         # iterate over each output, generate forcing functions, etc
 
@@ -961,10 +1053,7 @@ class ShootingGradientMethod:
 
         p = state_result.p
 
-
         jac_rows = []
-
-
 
         for (
             p_integrand_term_p_params,
@@ -979,9 +1068,9 @@ class ShootingGradientMethod:
         ):
             # simulate adjoint for each one
             adjoint_forcing = ResultInterpolant(state_result, p_integrand_term_p_state)
-            final_lamda = np.array(p_terminal_term_p_state(
-                p, state_result.t[-1], state_result.x[-1]
-            )).squeeze()
+            final_lamda = np.array(
+                p_terminal_term_p_state(p, state_result.t[-1], state_result.x[-1])
+            ).squeeze()
             adjoint_result = self.adjoint_system(
                 final_lamda, adjoint_forcing, state_jacobian
             )
@@ -991,13 +1080,15 @@ class ShootingGradientMethod:
             )
 
             adjoint_interp = ResultInterpolant(adjoint_result)
-            jac_row = np.array(p_terminal_term_p_params(
-                p, state_result.t[-1], state_result.x[-1]
-            )).squeeze()
+            jac_row = np.array(
+                p_terminal_term_p_params(p, state_result.t[-1], state_result.x[-1])
+            ).squeeze()
 
             # iterate over each segment/event for both  state + adjoint
             for (
-                adjoint_segment, param_jacobian_segment, p_integrand_p_param_segment
+                adjoint_segment,
+                param_jacobian_segment,
+                p_integrand_p_param_segment,
             ) in zip(
                 adjoint_interp.interpolants[::-1],
                 param_jacobian.interpolants,
@@ -1006,8 +1097,12 @@ class ShootingGradientMethod:
                 # compute discontinuous portion of gradient associated with each event
                 # integrate continuous portion of gradient corresponding to pre/suc-ceding
                 # segment
-                adjoint_time_data = adjoint_result.t[adjoint_segment.idx0:adjoint_segment.idx1][::-1]
-                state_time_data = state_result.t[param_jacobian_segment.idx0:param_jacobian_segment.idx1]
+                adjoint_time_data = adjoint_result.t[
+                    adjoint_segment.idx0 : adjoint_segment.idx1
+                ][::-1]
+                state_time_data = state_result.t[
+                    param_jacobian_segment.idx0 : param_jacobian_segment.idx1
+                ]
 
                 # thought it would be faster to use the denser one, but don't achieve
                 # required precision
@@ -1015,42 +1110,45 @@ class ShootingGradientMethod:
                     time_data = adjoint_time_data
                 else:
                     time_data = state_time_data
-                #time_data = state_time_data
+                # time_data = state_time_data
 
                 integrand_data = [
-                    np.array(adjoint_segment(t).T @ param_jacobian_segment(t) +
-                    p_integrand_p_param_segment(t)).squeeze()
+                    np.array(
+                        adjoint_segment(t).T @ param_jacobian_segment(t)
+                        + p_integrand_p_param_segment(t)
+                    ).squeeze()
                     for t in time_data
                 ]
-                #idxs = np.where(np.diff(time_data) < 0)[0]
+                # idxs = np.where(np.diff(time_data) < 0)[0]
                 for count, orig_idx in enumerate(np.where(np.diff(time_data) <= 0)[0]):
-                    idx = count+orig_idx
-                    time_data = time_data[:idx] + time_data[idx+1:]
-                    integrand_data = integrand_data[:idx] + integrand_data[idx+1:]
+                    idx = count + orig_idx
+                    time_data = time_data[:idx] + time_data[idx + 1 :]
+                    integrand_data = integrand_data[:idx] + integrand_data[idx + 1 :]
                     print(f"stripping non-decreasing {time_data[idx]} -- calling SGM")
-                #if idxs:
+                # if idxs:
                 #    breakpoint()
                 #    pass
                 integrand_interp = make_interp_spline(
                     time_data,
                     integrand_data,
-                    #bc_type=["natural", "natural"],
+                    # bc_type=["natural", "natural"],
                 )
                 integrand_antider = integrand_interp.antiderivative()
-                jac_row += integrand_antider(time_data[-1]) - integrand_antider(time_data[0])
+                jac_row += integrand_antider(time_data[-1]) - integrand_antider(
+                    time_data[0]
+                )
 
             for lamda_event, state_event in zip(adjoint_result.e, state_result.e[::-1]):
-                # had to copy and paste this setup code from adjointsystem.update, not 
+                # had to copy and paste this setup code from adjointsystem.update, not
                 # sure if that's acceptable given the nature of these variables (mostly
                 # selecting indices, a few hopefully cheap calls to time derivative,
                 # etc)
-                idxp = state_event.index # positive side of event
+                idxp = state_event.index  # positive side of event
                 te = state_result.t[idxp]
                 xtep = state_result.x[idxp]
                 ftep = state_result.system._dot(p, te, xtep)
 
-
-                idxm = idxp -1
+                idxm = idxp - 1
                 if state_result.t[idxm] != te:
                     breakpoint()
                 xtem = state_result.x[idxm]
@@ -1068,23 +1166,25 @@ class ShootingGradientMethod:
                 lamda_tep = adjoint_result.x[idxp]
 
                 if state_event.index == 1:
-                    #breakpoint()
-                    jac_row += np.array(lamda_tep[None, :] @ self.p_x0_p_params(p)).squeeze()
+                    # breakpoint()
+                    jac_row += np.array(
+                        lamda_tep[None, :] @ self.p_x0_p_params(p)
+                    ).squeeze()
                 if state_event is state_result.e[-1]:
                     ftep = np.zeros_like(ftep)
                 for event_channel in active_update_idxs[::-1]:
                     dh_dp = self.dh_dps[event_channel](p, te, xtem)
-                    dh_dx = adjoint_result.system.dh_dxs[event_channel](p, te, xtem,)
+                    dh_dx = adjoint_result.system.dh_dxs[event_channel](
+                        p,
+                        te,
+                        xtem,
+                    )
                     dte_dp = self.dte_dps[event_channel](p, te, xtem)
 
                     jac_row += np.array(
-                        lamda_tep[None, :] @ (
-                            dh_dp - (ftep - dh_dx @ ftem ) @ dte_dp
-                        )
+                        lamda_tep[None, :] @ (dh_dp - (ftep - dh_dx @ ftem) @ dte_dp)
                     ).squeeze()
-
 
             jac_rows.append(jac_row)
 
         return np.stack(jac_rows, axis=0)
-

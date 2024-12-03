@@ -2,11 +2,16 @@ import casadi
 from condor.backends.casadi import implementations
 from condor.backends import BackendSymbolData
 from condor.backends.casadi.utils import (
-    flatten, wrap, symbol_class, substitute, recurse_if_else
+    flatten,
+    wrap,
+    symbol_class,
+    substitute,
+    recurse_if_else,
 )
 import numpy as np
 
-name = 'Casadi'
+name = "Casadi"
+
 
 def shape_to_nm(shape):
     if len(shape) > 2:
@@ -16,14 +21,14 @@ def shape_to_nm(shape):
         m = shape[1]
     else:
         m = 1
-    return n,m
+    return n, m
 
 
-def symbol_generator(name, shape=(1,1), symmetric=False, diagonal=False):
+def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
     n, m = shape_to_nm(shape)
     sym = symbol_class.sym(name, (n, m))
-    #sym = MixedMX.sym(name, (n, m))
-    # TODO: symmetric and diagonal, 
+    # sym = MixedMX.sym(name, (n, m))
+    # TODO: symmetric and diagonal,
 
     if symmetric:
         raise NotImplemented
@@ -38,23 +43,25 @@ def symbol_generator(name, shape=(1,1), symmetric=False, diagonal=False):
         sym = casadi.diag(sym)
     return sym
 
+
 def get_symbol_data(symbol):
     if not isinstance(symbol, (symbol_class, casadi.DM)):
         symbol = np.atleast_1d(symbol)
         # I'm not sure why, but before I reshaped this to a vector always. Only
         # reshaping tensors now...
-        #.reshape(-1)
+        # .reshape(-1)
         if symbol.ndim > 2:
             symbol.reshape(-1)
     shape = symbol.shape
     n, m = shape_to_nm(shape)
-    size = n*m
+    size = n * m
 
     # TODO: actually check these
     diagonal = False
     symmetric = False
 
     return BackendSymbolData(
-        shape=shape, symmetric=symmetric, diagonal=diagonal,
+        shape=shape,
+        symmetric=symmetric,
+        diagonal=diagonal,
     )
-

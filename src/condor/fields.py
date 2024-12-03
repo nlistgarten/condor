@@ -1,4 +1,3 @@
-
 # TODO: figure out python version minimum
 
 from dataclasses import dataclass, make_dataclass, fields, asdict as dataclass_asdict
@@ -23,8 +22,8 @@ log = logging.getLogger(__name__)
 # of creating input field elements to a super-system based on input field elements that
 # the sub-system require that aren't matching outputs of previous sub-systems (exact
 # name matching or define dictionary where key is current subsystem input name and value
-# is previous subsytem output name to connect) and 
-# want to do something like 
+# is previous subsytem output name to connect) and
+# want to do something like
 """
 class AnyTopeofModel(co....):
     some specific setup
@@ -52,11 +51,11 @@ class AnyTopeofModel(co....):
 
 
 # TODO defensive chek to make sure trajectory analysis doesn't over write odemodel
-# dynamic output? 
+# dynamic output?
 # todo inner_to is only for ode system. should backref have a better name than
 # `inner_to`? Maybe even ODESystem....
 
-# keyword expand modals? 
+# keyword expand modals?
 
 
 def asdict(obj):
@@ -64,21 +63,26 @@ def asdict(obj):
         (field.name, getattr(obj, field.name)) for field in fields(obj) if field.init
     )
 
+
 class Direction(Enum):
     """
     Used to indicate the direction of a Element relative to a model
     MatchedField may need to become MatchedElement and also use direction -- might
     be useful for DAE models, etc.
     """
+
     output = -1
     internal = 0
     input = 1
+
 
 class FieldValues:
     """
     Base class for Field dataclasses -- may need to use issubclass/isinstance
     """
+
     pass
+
 
 class Field:
     """
@@ -103,7 +107,7 @@ class Field:
         self._resolve_name = ".".join([self._model_name, self._name])
 
     def __init_subclass__(
-            cls, element_class=None, default_direction=Direction.internal, **kwargs
+        cls, element_class=None, default_direction=Direction.internal, **kwargs
     ):
         # TODO: make sure python version requirement is correct
         super().__init_subclass__(**kwargs)
@@ -112,21 +116,25 @@ class Field:
             # find a symbol defined in another file that the field subclass has access
             # to? NO! need to figure out how to access parent scope dictionary?
 
-            element_class = globals().get(cls.__name__.replace('Field', 'Element'))
+            element_class = globals().get(cls.__name__.replace("Field", "Element"))
         cls.element_class = element_class
 
         cls.default_direction = default_direction
 
     def __init__(
-        self, direction=None, name='', model=None, inherit_from=None, model_name="",
+        self,
+        direction=None,
+        name="",
+        model=None,
+        inherit_from=None,
+        model_name="",
     ):
         # TODO: currently, AssignedField types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
         # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
         # not-an-assignment, but I guess I could just use element_class on value instead
         # of checking name? Anyway, really don't like needing to prefix all Field
-        # attributes with _ because of AssignedField... 
-
+        # attributes with _ because of AssignedField...
 
         self._cls_dict = None
         self._name = name
@@ -144,13 +152,17 @@ class Field:
         self._inherits_from = inherit_from
         # subclasses must provide _init_kwargs for binding to sub-classes
         # TODO: can this just be taken from __init__ kwargs easily?  or
-        # __init_subclass__ hook? definitely neds to be DRY'd up 
+        # __init_subclass__ hook? definitely neds to be DRY'd up
 
     @property
     def _count(self):
         return sum(self.list_of("size"))
 
-    def bind(self, name, model,):
+    def bind(
+        self,
+        name,
+        model,
+    ):
         """
         bind an existing Field instance to a model
         """
@@ -252,8 +264,10 @@ class Field:
         kwargs.update(dict(field_type=self))
         self._elements.append(self.element_class(**kwargs))
         if self._cls_dict and isinstance(self, FreeField):
-            self._cls_dict.meta.backend_repr_elements[self._elements[-1].backend_repr] = self._elements[-1]
-        #self._count += getattr(self._elements[-1], 'size', 1)
+            self._cls_dict.meta.backend_repr_elements[
+                self._elements[-1].backend_repr
+            ] = self._elements[-1]
+        # self._count += getattr(self._elements[-1], 'size', 1)
 
     def create_dataclass(self):
         # TODO: do processing to handle different field types
@@ -278,29 +292,35 @@ class Field:
 
 
 def make_class_name(components):
-    separate_words = ' '.join([comp.replace('_', ' ') for comp in components])
+    separate_words = " ".join([comp.replace("_", " ") for comp in components])
     # use pascal case from https://stackoverflow.com/a/8347192
     # TODO: this is turning mid-word uppercase (e.g., from a CamelCaseClassName) -- how
     # to just capitalize first character of word?
-    return ''.join(word for word in separate_words.title() if not word.isspace())
+    return "".join(word for word in separate_words.title() if not word.isspace())
 
 
 @dataclass
 class FrontendElementData:
     field_type: Field
     backend_repr: backend.symbol_class
-    name: str = ''
+    name: str = ""
 
     def flat_index(self):
         return self.field_type.flat_index(self)
 
+
 import operator
+
+
 @dataclass
-class BaseElement(FrontendElementData, BackendSymbolData,):
+class BaseElement(
+    FrontendElementData,
+    BackendSymbolData,
+):
     def __post_init__(self, *args, **kwargs):
         super().__post_init__(self, *args, **kwargs)
         # TODO: validate broadcasting, etc. shape info?
-        #self.backend_repr = backend.utils.reshape(self.backend_repr, self.shape)
+        # self.backend_repr = backend.utils.reshape(self.backend_repr, self.shape)
 
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
@@ -311,7 +331,7 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
             old_backend_repr = element_dict.pop("backend_repr")
             element_dict["backend_repr"] = backend.symbol_generator(
                 name=f"{new_field._resolve_name}_{len(new_field._elements)}",
-                **asdict(backend.get_symbol_data(old_backend_repr))
+                **asdict(backend.get_symbol_data(old_backend_repr)),
             )
         if new_name:
             element_dict["name"] = new_name
@@ -322,13 +342,11 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
 
     def reshape(element, new_shape):
         element.backend_repr = backend.symbol_generator(
-            name=element.backend_repr.name(),
-            shape=new_shape
+            name=element.backend_repr.name(), shape=new_shape
         )
         element.shape = new_shape
         element.size = np.prod(new_shape)
         return element
-
 
     def _generic_op(f):
         def _(self, other):
@@ -337,6 +355,7 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
             else:
                 other_value = other
             return f(self.backend_repr, other_value)
+
         return _
 
     __le__ = _generic_op(operator.le)
@@ -362,7 +381,6 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
     __neg__ = _generic_op(operator.neg)
     __pos__ = _generic_op(operator.pos)
 
-
     __radd__ = _generic_op(operator.add)
     __rmul__ = _generic_op(operator.mul)
     __rmul__ = _generic_op(operator.mul)
@@ -371,13 +389,13 @@ class BaseElement(FrontendElementData, BackendSymbolData,):
     __rfloordiv__ = _generic_op(operator.floordiv)
     __rpow__ = _generic_op(operator.pow)
 
-
     del _generic_op
 
 
 class FreeElement(BaseElement):
     pass
     # TODO: long description?
+
 
 def make_backend_symbol(
     backend_name, shape=(1,), symmetric=False, diagonal=False, **kwargs
@@ -394,11 +412,13 @@ def make_backend_symbol(
     )
     return kwargs
 
+
 class FreeField(Field, default_direction=Direction.input):
     """
     Mixin for fields which generate a symbol that are assigned to a class attribute
     during model definition.
     """
+
     def __call__(self, **kwargs):
         backend_name = "%s_%d" % (self._resolve_name, len(self._elements))
         new_kwargs = make_backend_symbol(backend_name=backend_name, **kwargs)
@@ -407,20 +427,26 @@ class FreeField(Field, default_direction=Direction.input):
 
     pass
 
+
 class FreeAssignedField(
     FreeField, default_direction=Direction.output, element_class=FreeElement
 ):
     def __call__(self, value, **kwargs):
         symbol_data = backend.get_symbol_data(value)
-        self.create_element(backend_repr=value,  **kwargs, **asdict(symbol_data))
+        self.create_element(backend_repr=value, **kwargs, **asdict(symbol_data))
         return self._elements[-1].backend_repr
 
+
 @dataclass(repr=False)
-class WithDefaultElement(FreeElement,):
-    default: float = 0.   # TODO union[numeric, expression] or None?
+class WithDefaultElement(
+    FreeElement,
+):
+    default: float = 0.0  # TODO union[numeric, expression] or None?
+
 
 class WithDefaultField(FreeField):
     pass
+
 
 @dataclass(repr=False)
 class BoundedElement(FreeElement):
@@ -433,10 +459,14 @@ class BoundedElement(FreeElement):
         self.upper_bound = np.broadcast_to(self.upper_bound, self.shape)
         self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
 
+
 @dataclass(repr=False)
-class InitializedElement(BoundedElement, ):
-    initializer: float = 0.  # TODO union[numeric, expression]
+class InitializedElement(
+    BoundedElement,
+):
+    initializer: float = 0.0  # TODO union[numeric, expression]
     warm_start: bool = True
+
 
 class InitializedField(FreeField):
     pass
@@ -448,18 +478,19 @@ class BoundedAssignmentField(
     def __call__(self, value, eq=None, **kwargs):
         symbol_data = backend.get_symbol_data(value)
         if eq is not None:
-            if 'lower_bound' in kwargs or 'upper_bound' in kwargs:
+            if "lower_bound" in kwargs or "upper_bound" in kwargs:
                 raise ValueError
-            kwargs['lower_bound'] = eq
-            kwargs['upper_bound'] = eq
-        self.create_element(backend_repr=value,  **kwargs, **asdict(symbol_data))
+            kwargs["lower_bound"] = eq
+            kwargs["upper_bound"] = eq
+        self.create_element(backend_repr=value, **kwargs, **asdict(symbol_data))
         return self._elements[-1].backend_repr
 
 
 @dataclass(repr=False)
 class TrajectoryOutputElement(FreeElement):
-    terminal_term: BaseElement = 0.
-    integrand: BaseElement = 0.
+    terminal_term: BaseElement = 0.0
+    integrand: BaseElement = 0.0
+
 
 class TrajectoryOutputField(FreeField, default_direction=Direction.output):
     def __call__(self, terminal_term=0, integrand=0, **kwargs):
@@ -468,10 +499,9 @@ class TrajectoryOutputField(FreeField, default_direction=Direction.output):
         # access to new copy, would need to add a reference at copy time which is
         # doable but less clean, especially since this is just a hack to avoid
         # quadrature anyway
-        # then didn't need to re-arrange ModelType.__new__ to give access to inner_to, 
-        # etc. before implementation binding. 
+        # then didn't need to re-arrange ModelType.__new__ to give access to inner_to,
+        # etc. before implementation binding.
         # TODO: undo inner_to refactor from  0195013ddf58dc1fa8f589d99671ba231ab846a6
-
 
         if isinstance(terminal_term, BaseElement):
             terminal_term = terminal_term.backend_repr
@@ -481,28 +511,27 @@ class TrajectoryOutputField(FreeField, default_direction=Direction.output):
         if isinstance(terminal_term, backend.symbol_class):
             # comstant terminal terms are handled below
             shape_data = backend.get_symbol_data(terminal_term)
-            kwargs['terminal_term'] = terminal_term
-
+            kwargs["terminal_term"] = terminal_term
 
         if isinstance(integrand, backend.symbol_class):
-            if 'terminal_term' in kwargs:
+            if "terminal_term" in kwargs:
                 assert backend.get_symbol_data(integrand) == shape_data
             else:
                 shape_data = backend.get_symbol_data(integrand)
-                kwargs['terminal_term'] = np.broadcast_to(terminal_term, shape_data.shape)
+                kwargs["terminal_term"] = np.broadcast_to(
+                    terminal_term, shape_data.shape
+                )
         else:
             integrand = np.broadcast_to(integrand, shape_data.shape)
 
-        kwargs['integrand'] = integrand
+        kwargs["integrand"] = integrand
 
         shape_data_dict = asdict(shape_data)
 
-
         traj_out_placeholder = backend.symbol_generator(
-            name=f'trajectory_output_{len(self._elements)}',
+            name=f"trajectory_output_{len(self._elements)}",
             **shape_data_dict,
         )
-
 
         self.create_element(
             backend_repr=traj_out_placeholder,
@@ -515,14 +544,15 @@ class TrajectoryOutputField(FreeField, default_direction=Direction.output):
 class DependentElement(BaseElement):
     pass
 
+
 @dataclass(repr=False)
 class AssignedElement(BaseElement):
     pass
 
-class AssignedField(Field, default_direction=Direction.output):
 
+class AssignedField(Field, default_direction=Direction.output):
     def __setattr__(self, name, value):
-        if name.startswith('_'):
+        if name.startswith("_"):
             super().__setattr__(name, value)
         else:
             # TODO: resolve circular imports so we can use dataclass
@@ -537,29 +567,34 @@ class AssignedField(Field, default_direction=Direction.output):
                 # both system encapsolation and implementations. So don't do it, but
                 # doument it. Can programatically add sub-system outputs though. For
                 # these reasons, ditch intermediate stuff.
-                **asdict(symbol_data)
+                **asdict(symbol_data),
             )
             if self._direction == Direction.output and self._cls_dict:
-                #self._cls_dict.__set_item__(name, value)
+                # self._cls_dict.__set_item__(name, value)
                 self._cls_dict[name] = value
-            #super().__setattr__(name, self._symbols[-1])
-
+            # super().__setattr__(name, self._symbols[-1])
 
 
 @dataclass(repr=False)
 class MatchedElementMixin:
-    match: BaseElement # match to the Element instance
+    match: BaseElement  # match to the Element instance
 
     def update_name(self):
-        self.name = '__'.join([self.field_type._name, self.match.name])
+        self.name = "__".join([self.field_type._name, self.match.name])
         self.name = self.match.name
 
+
 @dataclass(repr=False)
-class MatchedElement(BaseElement, MatchedElementMixin,):
+class MatchedElement(
+    BaseElement,
+    MatchedElementMixin,
+):
     pass
 
 
-class MatchedField(Field,):
+class MatchedField(
+    Field,
+):
     def __init__(self, matched_to=None, **kwargs):
         """
         matched_to is Field instance that this MatchedField is matched to.
@@ -590,7 +625,7 @@ class MatchedField(Field,):
         return match
 
     def __setitem__(self, key, value):
-        match =  self.key_to_matched_element(key)
+        match = self.key_to_matched_element(key)
         existing_elem = self.get(match=match)
         if not isinstance(existing_elem, list):
             log.debug("OVER-WRITING %s!!!", existing_elem)
@@ -599,17 +634,14 @@ class MatchedField(Field,):
         else:
             symbol_data = backend.get_symbol_data(value)
             self.create_element(
-                name=None,
-                match=match,
-                backend_repr=value,
-                **asdict(symbol_data)
+                name=None, match=match, backend_repr=value, **asdict(symbol_data)
             )
 
     def __getitem__(self, key):
         """
         get the matched symbodl by the matche's name, backend symbol, or symbol
         """
-        match =  self.key_to_matched_element(key)
+        match = self.key_to_matched_element(key)
         item = self.get(match=match)
         if isinstance(item, list) and self._direction != Direction.input:
             # TODO: could easily create a new symbol related to match; should it depend
@@ -617,4 +649,3 @@ class MatchedField(Field,):
             # get vs set? or is that a separate type of matchedfield?
             raise KeyError
         return item.backend_repr
-

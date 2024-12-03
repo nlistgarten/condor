@@ -10,8 +10,7 @@ import pandas as pd
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.components.balance_comp import BalanceComp
-from openmdao.components.meta_model_structured_comp import \
-    MetaModelStructuredComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.core.problem import Problem
 import openmdao.api as om
 from openmdao.vectors.default_vector import DefaultVector
@@ -21,6 +20,7 @@ import warnings
 
 
 os.environ["OPENMDAO_REPORTS"] = "none"
+
 
 def sympify_problem(prob):
     """Set up and run `prob` with symbolic inputs
@@ -53,12 +53,19 @@ UpcycleSolver also maps to a generic Rootfinding / Algebraic System of Equations
 in condor; not a sub-class but provides the same interface:
 """
 
+
 class UpcycleSystem:
     """
     Base class for Implicit and Explic
     """
+
     def __init__(
-        self, path, parent, external_input_names, prob, omsys,
+        self,
+        path,
+        parent,
+        external_input_names,
+        prob,
+        omsys,
     ):
         self.path = path
 
@@ -85,7 +92,9 @@ class UpcycleSystem:
 
 class UpcycleImplicitSystem(UpcycleSystem):
     def __init__(
-        self, *args, **kwargs,
+        self,
+        *args,
+        **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.make_strings()
@@ -103,9 +112,9 @@ class UpcycleImplicitSystem(UpcycleSystem):
             output_name = sanitize_variable_name(om_name)
             meta = self.out_meta[om_name]
             declare_string = f"\n    {output_name} = implicit_output("
-            declare_string +=  f"\n        shape={meta['shape']},"
+            declare_string += f"\n        shape={meta['shape']},"
             declare_string += f"\n        initializer={prob.model._outputs[om_name]},"
-            #declare_string += f"\n        initializer={meta['val']},"
+            # declare_string += f"\n        initializer={meta['val']},"
             lb = meta["lower"]
             if lb is not None:
                 declare_string += f"\n        lower_bound={lb},"
@@ -124,13 +133,16 @@ class UpcycleImplicitSystem(UpcycleSystem):
 
 class UpcycleExplicitSystem(UpcycleSystem):
     def to_implicit(self):
-        self.__class__ =  UpcycleImplicitSystem
+        self.__class__ = UpcycleImplicitSystem
         for output in self.outputs:
             self.outputs[output] = self.outputs[output] - self.output_symbols[output]
         self.make_strings()
 
-
-    def __init__(self, *args, **kwargs,):
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.make_strings()
 
@@ -158,21 +170,27 @@ class UpcycleExplicitSystem(UpcycleSystem):
             self.outputs[output_name] = (symbol + expr).expand()
             self.output_string += f"\n    {output_name} = {self.outputs[output_name]}"
 
-
     @property
     def model_string(self):
-        return "\n".join([
-            f"class {self.path.split('.')[-1]}(co.ExplicitSystem):"
-            + self.input_string,
-            self.output_string,
-        ])
+        return "\n".join(
+            [
+                f"class {self.path.split('.')[-1]}(co.ExplicitSystem):"
+                + self.input_string,
+                self.output_string,
+            ]
+        )
 
 
 class UpcycleSolver:
-    def __init__(self, path="", parent=None, om_equiv=None, ):
+    def __init__(
+        self,
+        path="",
+        parent=None,
+        om_equiv=None,
+    ):
         self.path = path
         self.parent = parent
-        self.om_equiv=om_equiv
+        self.om_equiv = om_equiv
 
         self.inputs = []  # external inputs (actually src names)
 
@@ -205,7 +223,7 @@ class UpcycleSolver:
 
     def add_child(self, child):
         child.parent = self
-        # explicit/implicit systems have solvers not parents, unless they get reparented? 
+        # explicit/implicit systems have solvers not parents, unless they get reparented?
         # was that causing problems?
 
         if self.internal_loop and isinstance(child, UpcycleExplicitSystem):
@@ -221,8 +239,8 @@ class UpcycleSolver:
                     self.internal_loop = True
 
                     if isinstance(child, UpcycleExplicitSystem):
-                    # only the last explicit system should get turned into an implicit
-                    # system? or go-back and turn all children into implicit?
+                        # only the last explicit system should get turned into an implicit
+                        # system? or go-back and turn all children into implicit?
                         child.to_implicit()
                         for sibling in self.children:
                             if isinstance(sibling, UpcycleExplicitSystem):
@@ -234,7 +252,7 @@ class UpcycleSolver:
 
                 self.inputs.remove(output)
             if output in self.outputs:
-                breakpoint() # conflicting outputs
+                breakpoint()  # conflicting outputs
 
         self.children.append(child)
 
@@ -249,56 +267,68 @@ class UpcycleSolver:
                 self.inputs.append(input_)
                 self.param_string += f"\n    {input_} = parameter(shape={inputs[om_input_name]['shape']})"
 
-
     @property
     def outputs(self):
         return self.implicit_outputs + self.explicit_outputs
 
     @property
     def implicit_outputs(self):
-        return [o for s in self.children
-                if isinstance(s, UpcycleImplicitSystem)
-                for o in s.outputs]
+        return [
+            o
+            for s in self.children
+            if isinstance(s, UpcycleImplicitSystem)
+            for o in s.outputs
+        ]
 
     @property
     def explicit_outputs(self):
-        return [o for s in self.children
-                if not isinstance(s, UpcycleImplicitSystem) # solvers or explicit
-                for o in s.outputs]
+        return [
+            o
+            for s in self.children
+            if not isinstance(s, UpcycleImplicitSystem)  # solvers or explicit
+            for o in s.outputs
+        ]
 
     @property
     def implicit_output_declaration_string(self):
-        return "".join([
-            sys.declaration_string
-            for sys in self.children
-            if isinstance(sys, UpcycleImplicitSystem)
-        ])
+        return "".join(
+            [
+                sys.declaration_string
+                for sys in self.children
+                if isinstance(sys, UpcycleImplicitSystem)
+            ]
+        )
 
     @property
     def implicit_output_residual_string(self):
-        return "".join([
-            sys.residual_string
-            for sys in self.children
-            if isinstance(sys, UpcycleImplicitSystem)
-        ])
-
+        return "".join(
+            [
+                sys.residual_string
+                for sys in self.children
+                if isinstance(sys, UpcycleImplicitSystem)
+            ]
+        )
 
     @property
     def explicit_output_computation_string(self):
-        return "".join([
-            s.output_string
-            for s in self.children
-            if isinstance(s, (UpcycleExplicitSystem, UpcycleSolver))
-        ])
+        return "".join(
+            [
+                s.output_string
+                for s in self.children
+                if isinstance(s, (UpcycleExplicitSystem, UpcycleSolver))
+            ]
+        )
 
     @property
     def explicit_output_assignment_string(self):
-        return "".join([
-            f"\n    explicit_output.{o} = {o}"
-            for s in self.children
-            if isinstance(s, (UpcycleExplicitSystem, UpcycleSolver))
-            for o in s.outputs
-        ])
+        return "".join(
+            [
+                f"\n    explicit_output.{o} = {o}"
+                for s in self.children
+                if isinstance(s, (UpcycleExplicitSystem, UpcycleSolver))
+                for o in s.outputs
+            ]
+        )
 
     @property
     def output_string(self):
@@ -308,70 +338,84 @@ class UpcycleSolver:
 
     @property
     def model_string(self):
-        return "\n".join([
-            f"class {self.solver_name}(co.AlgebraicSystem):"
-            + self.param_string,
-            self.implicit_output_declaration_string,
-            self.explicit_output_computation_string,
-            self.implicit_output_residual_string,
-            self.explicit_output_assignment_string,
-        ])
+        return "\n".join(
+            [
+                f"class {self.solver_name}(co.AlgebraicSystem):" + self.param_string,
+                self.implicit_output_declaration_string,
+                self.explicit_output_computation_string,
+                self.implicit_output_residual_string,
+                self.explicit_output_assignment_string,
+            ]
+        )
+
 
 class UpcycleDriver(UpcycleSolver):
-    def __init__(self, prob, *args, **kwargs,):
+    def __init__(
+        self,
+        prob,
+        *args,
+        **kwargs,
+    ):
         self.prob = prob
         super().__init__(*args, **kwargs)
 
         cons_meta = prob.driver._cons
         obj_meta = prob.driver._objs
         dv_meta = prob.driver._designvars
-        out_meta = prob.model._var_abs2meta['output']
-        self.declare_variable_string = "".join([
-              #f"\n    {sanitize_variable_name(name)} = variable("
-              f"\n    {sanitize_variable_name(meta['source'])} = variable("
-            + f"\n        shape={out_meta[meta['source']]['shape']},"
-            + f"\n        upper_bound={meta['upper']},"
-            + f"\n        lower_bound={meta['lower']},"
-            + f"\n        initializer={get_val(prob,meta['source']).tolist()},"
-            +  "\n    )"
-            for name, meta in dv_meta.items()
-        ])
+        out_meta = prob.model._var_abs2meta["output"]
+        self.declare_variable_string = "".join(
+            [
+                # f"\n    {sanitize_variable_name(name)} = variable("
+                f"\n    {sanitize_variable_name(meta['source'])} = variable("
+                + f"\n        shape={out_meta[meta['source']]['shape']},"
+                + f"\n        upper_bound={meta['upper']},"
+                + f"\n        lower_bound={meta['lower']},"
+                + f"\n        initializer={get_val(prob,meta['source']).tolist()},"
+                + "\n    )"
+                for name, meta in dv_meta.items()
+            ]
+        )
 
+        self.constraint_string = "".join(
+            [
+                "\n    constraint("
+                + f"\n        {sanitize_variable_name(name)},"
+                + f"\n        upper_bound={meta['upper']},"
+                + f"\n        lower_bound={meta['lower']},"
+                + "\n    )"
+                for name, meta in cons_meta.items()
+            ]
+        )
 
-        self.constraint_string = "".join([
-               "\n    constraint("
-            + f"\n        {sanitize_variable_name(name)},"
-            + f"\n        upper_bound={meta['upper']},"
-            + f"\n        lower_bound={meta['lower']},"
-            +  "\n    )"
-            for name, meta in cons_meta.items()
-        ])
-
-        self.objective_string = f"\n    objective = {sanitize_variable_name(list(obj_meta.keys())[0])}"
+        self.objective_string = (
+            f"\n    objective = {sanitize_variable_name(list(obj_meta.keys())[0])}"
+        )
 
     @property
     def model_string(self):
-        return "\n".join([
-        f"class {self.solver_name}(co.OptimizationProblem):"
-        + self.declare_variable_string,
-        self.param_string,
-        self.explicit_output_computation_string,
-        self.constraint_string,
-        self.objective_string,
-    ])
-
+        return "\n".join(
+            [
+                f"class {self.solver_name}(co.OptimizationProblem):"
+                + self.declare_variable_string,
+                self.param_string,
+                self.explicit_output_computation_string,
+                self.constraint_string,
+                self.objective_string,
+            ]
+        )
 
 
 def get_sources(conn_df, sys_path, parent_path):
     sys_conns = conn_df[conn_df["tgt"].str.startswith(sys_path + ".")]
     return sys_conns["src"]
 
+
 def pop_upsolver(syspath, upsolver):
     while not syspath.startswith(upsolver.path):
         # special case: solver in the om system has nothing to solve
         # remove self from parent, re-parent children, propagate up inputs
         cyclic_io = set(upsolver.inputs) & set(upsolver.outputs)
-        #I don't think cyclic_io should happen anymore?
+        # I don't think cyclic_io should happen anymore?
         if cyclic_io:
             breakpoint()
         if (len(upsolver.implicit_outputs) == 0) or cyclic_io:
@@ -401,22 +445,22 @@ def upcycle_problem(make_problem, warm_start=False):
     conn_df = pd.DataFrame(vdat["connections_list"])
 
     all_om_systems = list(
-            up_prob.model.system_iter(include_self=False, recurse=True),
+        up_prob.model.system_iter(include_self=False, recurse=True),
     )
 
     for omsys, numeric_omsys in zip(
-            up_prob.model.system_iter(include_self=False, recurse=True),
-            prob.model.system_iter(include_self=False, recurse=True),
+        up_prob.model.system_iter(include_self=False, recurse=True),
+        prob.model.system_iter(include_self=False, recurse=True),
     ):
         syspath = omsys.pathname
-
 
         upsolver = pop_upsolver(syspath, upsolver)
 
         nls = omsys.nonlinear_solver
         if nls is not None and not isinstance(nls, om.NonlinearRunOnce):
-            upsolver = UpcycleSolver(path=syspath, parent=upsolver,
-                                     om_equiv=numeric_omsys)
+            upsolver = UpcycleSolver(
+                path=syspath, parent=upsolver, om_equiv=numeric_omsys
+            )
 
         if isinstance(omsys, om.Group):
             continue
@@ -424,11 +468,14 @@ def upcycle_problem(make_problem, warm_start=False):
         if isinstance(omsys, om.IndepVarComp):
             print("indepvarcomp?")
 
-
             if upsolver is not top_upsolver:
-                warnings.warn("IVC not under top level model. Adding " +
-                              "\n".join(flat_varnames) + " to " + upsolver.path 
-                              + " as well as top level.")
+                warnings.warn(
+                    "IVC not under top level model. Adding "
+                    + "\n".join(flat_varnames)
+                    + " to "
+                    + upsolver.path
+                    + " as well as top level."
+                )
                 # TODO: maybe don't need this with add_child
                 top_upsolver.add_inputs(omsys._var_abs2meta["output"])
             upsolver.add_inputs(omsys._var_abs2meta["output"])
@@ -448,13 +495,13 @@ def upcycle_problem(make_problem, warm_start=False):
 
     upsolver = pop_upsolver(top_upsolver.path, upsolver)
 
-
-    if prob.driver._objs:# and False:
+    if prob.driver._objs:  # and False:
         updriver = UpcycleDriver(prob=prob, path="optimizer")
         updriver.add_child(upsolver)
         return updriver, prob
     else:
         return upsolver, prob
+
 
 # TODO: generalize get_nlp_for... methods? currently its a mix of sympy and casadi
 # backends.
@@ -481,6 +528,7 @@ def make_interp_wrapper(interp):
 
     return wrapper
 
+
 class UpcycleTable:
     def __init__(self, name, inputs, outputs, mmcs):
         self.name = name
@@ -489,10 +537,8 @@ class UpcycleTable:
         self.symbolic_om_outputs = outputs
         self.inputs = [k for k in inputs.keys()]
         self.outputs = [k for k in outputs.keys()]
-        self.model_string =  "\n".join([
-            f"class {self.name}(co.Tablelookup):"
+        self.model_string = "\n".join([f"class {self.name}(co.Tablelookup):"])
 
-        ])
 
 def mmsc_compute(self, inputs, outputs):
     if isinstance(inputs, SymbolicVector):
@@ -545,7 +591,6 @@ def usatm1976_compute(self, inputs, outputs):
 USatm1976Comp.compute = usatm1976_compute
 
 
-
 def flatten_varnames(abs2meta, varpaths=None):
     names = []
     if varpaths is None:
@@ -554,6 +599,7 @@ def flatten_varnames(abs2meta, varpaths=None):
     for path in varpaths:
         names.extend(expand_varname(path, abs2meta[path]["size"]))
     return names
+
 
 def expand_varname(name, size=1):
     if size == 1:
@@ -565,20 +611,25 @@ def expand_varname(name, size=1):
 
 def sanitize_variable_name(path):
     # TODO: replace with regex, ensure no clashes?
-    return path.replace(".", "_dot_").replace(':', '_colon_')
+    return path.replace(".", "_dot_").replace(":", "_colon_")
+
 
 def sanitize_variable_names(paths):
-    return [ sanitize_variable_name(path) for path in paths ]
+    return [sanitize_variable_name(path) for path in paths]
+
 
 _VARNAME_PATTERN = re.compile(r"(.*)\[(\d)+\]$")
 
+
 def contaminate_variable_name(clean_name):
-    return clean_name.replace('_dot_', '.').replace('_colon_', ':')
+    return clean_name.replace("_dot_", ".").replace("_colon_", ":")
+
 
 def get_val(prob, name, sanitized=True, **kwargs):
-    if sanitized: # re-contaminate variable names to interact with om
+    if sanitized:  # re-contaminate variable names to interact with om
         name = contaminate_variable_name(name)
     return prob.get_val(name, **kwargs)
+
 
 # SYMPY BACKEND FOR UPCYCLE -- I think casadi backend doesn't need getitem? easiest
 # thing is just build a numpy array of MX objects

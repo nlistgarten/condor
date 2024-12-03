@@ -4,7 +4,11 @@ import numpy as np
 from enum import Enum, auto
 from dataclasses import dataclass
 from condor.backends.casadi.utils import (
-    flatten, wrap, symbol_class, substitute, recurse_if_else
+    flatten,
+    wrap,
+    symbol_class,
+    substitute,
+    recurse_if_else,
 )
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 import condor.solvers.shooting_gradient_method as sgm
@@ -38,20 +42,20 @@ from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 # consistent interface
 # --> move some of the helper functions that are tightly coupled to backend to utils, ?
 # and generalize, eg state setter
-# TODO for custom solvers like SGM, table, does the get_jacobian arguments allow you to 
+# TODO for custom solvers like SGM, table, does the get_jacobian arguments allow you to
 # avoid computing wrt particular inputs/outputs if possible?
+
 
 def options_to_kwargs(new_cls):
     Options = getattr(new_cls, "Options", None)
     if Options is not None:
         backend_option = {
-            k: v 
-            for k, v in Options.__dict__.items()
-            if not k.startswith('_')
+            k: v for k, v in Options.__dict__.items() if not k.startswith("_")
         }
     else:
         backend_option = {}
     return backend_option
+
 
 class DeferredSystem:
     def construct(self, model):
@@ -61,11 +65,16 @@ class DeferredSystem:
         self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
         self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
 
-        name_inputs = model.input.list_of('name')
-        name_outputs = model.output.list_of('name')
+        name_inputs = model.input.list_of("name")
+        name_outputs = model.output.list_of("name")
         self.model = model
-        self.func =  casadi.Function(
-            model.__name__, symbol_inputs, symbol_outputs, dict(allow_free=True,),
+        self.func = casadi.Function(
+            model.__name__,
+            symbol_inputs,
+            symbol_outputs,
+            dict(
+                allow_free=True,
+            ),
         )
 
     def __init__(self, model_instance, args):
@@ -74,9 +83,10 @@ class DeferredSystem:
 
     def __call__(self, model_instance, *args):
         model_instance.bind_field(
-            self.model.output, 
+            self.model.output,
             self.symbol_outputs[0],
         )
+
 
 class ExplicitSystem:
     def __init__(self, model_instance, args):
@@ -90,21 +100,27 @@ class ExplicitSystem:
         self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
         self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
 
-        name_inputs = model.input.list_of('name')
-        name_outputs = model.output.list_of('name')
+        name_inputs = model.input.list_of("name")
+        name_outputs = model.output.list_of("name")
         self.model = model
-        #self.func =  casadi.Function(model.__name__, self.symbol_inputs, self.symbol_outputs)
-        self.func =  casadi.Function(
-            model.__name__, self.symbol_inputs, self.symbol_outputs, dict(allow_free=True,),
+        # self.func =  casadi.Function(model.__name__, self.symbol_inputs, self.symbol_outputs)
+        self.func = casadi.Function(
+            model.__name__,
+            self.symbol_inputs,
+            self.symbol_outputs,
+            dict(
+                allow_free=True,
+            ),
         )
 
     def __call__(self, model_instance, *args):
         self.args = casadi.vertcat(*flatten(args))
         self.out = self.func(self.args)
         model_instance.bind_field(
-            self.model.output, 
+            self.model.output,
             self.out,
         )
+
 
 class Tablelookup:
     def __init__(self, model_instance, args):
@@ -112,11 +128,17 @@ class Tablelookup:
         self.construct(model, **options_to_kwargs(model))
         self(model_instance, *args)
 
-    def construct(self, model, degrees=3,):
+    def construct(
+        self,
+        model,
+        degrees=3,
+    ):
         self.model = model
         self.symbol_inputs = model.input.list_of("backend_repr")
         self.symbol_outputs = model.output.list_of("backend_repr")
-        self.input_data = [model.input_data.get(match=inp).backend_repr for inp in model.input]
+        self.input_data = [
+            model.input_data.get(match=inp).backend_repr for inp in model.input
+        ]
         self.output_data = np.stack(
             [model.output_data.get(match=out).backend_repr for out in model.output],
             axis=-1,
@@ -142,9 +164,9 @@ class InitializerMixin:
         else:
             count_accumulator = 0
             for field in self.parsed_initialized_fields:
-                size_cum_sum = np.cumsum([count_accumulator] + field.list_of('size'))
+                size_cum_sum = np.cumsum([count_accumulator] + field.list_of("size"))
                 for start_idx, end_idx, name in zip(
-                    size_cum_sum, size_cum_sum[1:], field.list_of('name')
+                    size_cum_sum, size_cum_sum[1:], field.list_of("name")
                 ):
                     if name in kwargs:
                         self.x0[start_idx:end_idx] = flatten(kwargs[name])
@@ -163,7 +185,6 @@ class InitializerMixin:
         if isinstance(fields, co.Field):
             fields = [fields]
 
-
         for field in fields:
             defined_initializers = field.list_of("initializer")
             for solver_var in field:
@@ -171,7 +192,7 @@ class InitializerMixin:
                     x0_at_construction.extend(np.zeros(solver_var.size))
                     initializer_exprs.extend(
                         casadi.vertsplit(
-                            solver_var.initializer.reshape((solver_var.size,1))
+                            solver_var.initializer.reshape((solver_var.size, 1))
                         )
                     )
                 else:
@@ -185,7 +206,7 @@ class InitializerMixin:
                     if solver_var.warm_start:
                         x0_at_construction.extend(shaped_initial)
                         initializer_exprs.extend(
-                            casadi.vertsplit(solver_var.backend_repr.reshape((-1,1)))
+                            casadi.vertsplit(solver_var.backend_repr.reshape((-1, 1)))
                         )
                     else:
                         x0_at_construction.append(shaped_initial)
@@ -193,10 +214,10 @@ class InitializerMixin:
 
         self.parsed_initialized_fields = fields
 
-        #setattr(self, f"{field._name}_at_construction", flatten(x0_at_construction))
+        # setattr(self, f"{field._name}_at_construction", flatten(x0_at_construction))
         self.initial_at_construction = flatten(x0_at_construction)
         initializer_exprs = flatten(initializer_exprs)
-        #setattr(self, f"{field._name}_initializer_func",
+        # setattr(self, f"{field._name}_initializer_func",
         self.initializer_func = casadi.Function(
             f"{field._model_name}_{field._name}_initializer",
             initializer_args,
@@ -205,11 +226,12 @@ class InitializerMixin:
 
 
 class AlgebraicSystem(InitializerMixin):
-
     class BoundBehavior(Enum):
-        p1 = auto() # enforce in a p1 sense ("scalar")
-        p2 = auto() # enforce in a p2 sense ("vector")
-        p1_hold = auto() # enforce in a p1 sense, modify search direction to hold enforced ("wall")
+        p1 = auto()  # enforce in a p1 sense ("scalar")
+        p2 = auto()  # enforce in a p2 sense ("vector")
+        p1_hold = (
+            auto()
+        )  # enforce in a p1 sense, modify search direction to hold enforced ("wall")
         ignore = auto()
 
     class LineSearchCriteria(Enum):
@@ -221,23 +243,27 @@ class AlgebraicSystem(InitializerMixin):
         self(model_instance, *args)
 
     def construct(
-        self, model,
+        self,
+        model,
         # standard options
-        atol=1E-12, rtol=1E-12, warm_start=True, exact_hessian=True, max_iter=100,
+        atol=1e-12,
+        rtol=1e-12,
+        warm_start=True,
+        exact_hessian=True,
+        max_iter=100,
         # new options
-        re_initialize=slice(None), # slice for re-initializing at every call. will support indexing 
-        default_initializer=0.,
+        re_initialize=slice(
+            None
+        ),  # slice for re-initializing at every call. will support indexing
+        default_initializer=0.0,
         bound_behavior=BoundBehavior.p1,
-        line_search_contraction = 0.5, # 1.0 -> no line search?
+        line_search_contraction=0.5,  # 1.0 -> no line search?
         line_search_criteria=LineSearchCriteria.armijo,
         error_on_fail=False,
         enforce_bounds=False,
     ):
         rootfinder_options = dict(
-            error_on_fail=error_on_fail,
-            abstol=atol,
-            abstolStep=rtol,
-            max_iter=max_iter
+            error_on_fail=error_on_fail, abstol=atol, abstolStep=rtol, max_iter=max_iter
         )
         self.x = casadi.vertcat(*flatten(model.variable))
         self.g0 = casadi.vertcat(*flatten(model.residual))
@@ -248,9 +274,11 @@ class AlgebraicSystem(InitializerMixin):
             f"{model.__name__}_output", [self.x, self.p], [self.g1]
         )
 
-
         self.model = model
-        self.parse_initializers(model.variable, [self.x, self.p],)
+        self.parse_initializers(
+            model.variable,
+            [self.x, self.p],
+        )
 
         self.callback = SolverWithWarmStart(
             model.__name__,
@@ -260,7 +288,7 @@ class AlgebraicSystem(InitializerMixin):
             self.g1,
             flatten(model.variable.list_of("lower_bound")),
             flatten(model.variable.list_of("upper_bound")),
-            #self.implicit_output_at_construction,
+            # self.implicit_output_at_construction,
             self.initial_at_construction,
             rootfinder_options,
             self.initializer_func,
@@ -271,20 +299,16 @@ class AlgebraicSystem(InitializerMixin):
     def __call__(self, model_instance, *args, **kwargs):
         self.call_args = casadi.vertcat(*flatten(args))
         out = self.callback(self.call_args)
-        self.var_out = casadi.vertcat(*out[:self.model.variable._count])
+        self.var_out = casadi.vertcat(*out[: self.model.variable._count])
+        model_instance.bind_field(self.model.variable, self.var_out)
         model_instance.bind_field(
-            self.model.variable,
-            self.var_out
-        )
-        model_instance.bind_field(
-            self.model.output,
-            self.output_func(self.var_out, self.call_args)
+            self.model.output, self.output_func(self.var_out, self.call_args)
         )
 
-        if hasattr(self.callback, 'resid'):
+        if hasattr(self.callback, "resid"):
             # TODO: verify this will never become stale
             # TODO: it seems a bit WET to wrap each field and then, eventually, bind
-            # each field. 
+            # each field.
             resid = self.callback.resid
             model_instance.bind_field(
                 self.model.residual, resid, symbols_to_instance=False
@@ -292,7 +316,9 @@ class AlgebraicSystem(InitializerMixin):
 
         for k, v in model_instance.variable.asdict().items():
             model_var = getattr(self.model, k)
-            if model_var.warm_start and not isinstance(model_var.initializer, symbol_class):
+            if model_var.warm_start and not isinstance(
+                model_var.initializer, symbol_class
+            ):
                 if not isinstance(v, symbol_class):
                     model_var.initializer = v
 
@@ -301,8 +327,8 @@ class AlgebraicSystem(InitializerMixin):
         super().set_initial(*args, **kwargs)
         self.callback.x0 = self.x0
 
-class OptimizationProblem(InitializerMixin):
 
+class OptimizationProblem(InitializerMixin):
     class Method(Enum):
         ipopt = auto()
         snopt = auto()
@@ -334,11 +360,12 @@ class OptimizationProblem(InitializerMixin):
         self(model_instance, *args)
 
     def construct(
-        self, model,
-        exact_hessian=True, # False -> ipopt alias for limited memory
-        keep_feasible = True, # flag that goes to scipy trust constr linear constraints
+        self,
+        model,
+        exact_hessian=True,  # False -> ipopt alias for limited memory
+        keep_feasible=True,  # flag that goes to scipy trust constr linear constraints
         method=Method.ipopt,
-        calc_lam_x = False, 
+        calc_lam_x=False,
         # ipopt specific, default = False may help with computing sensitivity. To do
         # proper warm start, need to provide lam_x and lam_g so I assume need calc_lam_x
         # = True
@@ -352,7 +379,7 @@ class OptimizationProblem(InitializerMixin):
 
         self.keep_feasible = keep_feasible
 
-        self.f = f = getattr(model, 'objective', 0)
+        self.f = f = getattr(model, "objective", 0)
         self.has_p = bool(len(model.parameter))
         self.p = p = casadi.vertcat(*flatten(model.parameter))
         self.x = x = casadi.vertcat(*flatten(model.variable))
@@ -369,10 +396,26 @@ class OptimizationProblem(InitializerMixin):
             [g],
         )
 
-        self.lbx = lbx = casadi.vcat(flatten(model.variable.list_of("lower_bound"))).toarray().reshape(-1)
-        self.ubx = ubx = casadi.vcat(flatten(model.variable.list_of("upper_bound"))).toarray().reshape(-1)
-        self.lbg = lbg = casadi.vcat(flatten(model.constraint.list_of("lower_bound"))).toarray().reshape(-1)
-        self.ubg = ubg = casadi.vcat(flatten(model.constraint.list_of("upper_bound"))).toarray().reshape(-1)
+        self.lbx = lbx = (
+            casadi.vcat(flatten(model.variable.list_of("lower_bound")))
+            .toarray()
+            .reshape(-1)
+        )
+        self.ubx = ubx = (
+            casadi.vcat(flatten(model.variable.list_of("upper_bound")))
+            .toarray()
+            .reshape(-1)
+        )
+        self.lbg = lbg = (
+            casadi.vcat(flatten(model.constraint.list_of("lower_bound")))
+            .toarray()
+            .reshape(-1)
+        )
+        self.ubg = ubg = (
+            casadi.vcat(flatten(model.constraint.list_of("upper_bound")))
+            .toarray()
+            .reshape(-1)
+        )
 
         self.nlp_args = dict(f=f, x=x, g=g)
         initializer_args = [self.x]
@@ -392,19 +435,18 @@ class OptimizationProblem(InitializerMixin):
         self.x0 = self.initial_at_construction.copy()
         self.lam_g0 = None
         self.lam_x0 = None
-        #self.variable_at_construction.copy()
+        # self.variable_at_construction.copy()
 
         self.method = method
         if self.method is OptimizationProblem.Method.ipopt:
             self.nlp_opts.update(
-                print_time= False,
-                ipopt = options,
+                print_time=False,
+                ipopt=options,
                 # print_level = 0-2: nothing, 3-4: summary, 5: iter table (default)
-                #tol=1E-14, # tighter tol for sensitivty
-                #accept_every_trial_step="yes",
-                #max_iter=1000,
-                #constr_viol_tol=10.,
-
+                # tol=1E-14, # tighter tol for sensitivty
+                # accept_every_trial_step="yes",
+                # max_iter=1000,
+                # constr_viol_tol=10.,
                 bound_consistency=True,
                 clip_inactive_lam=True,
                 calc_lam_x=calc_lam_x,
@@ -431,30 +473,24 @@ class OptimizationProblem(InitializerMixin):
                 self.nlp_opts,
             )
         elif self.method is OptimizationProblem.Method.qrsqp:
-
             self.nlp_opts.update(
-                qpsol='qrqp',
+                qpsol="qrqp",
                 qpsol_options=dict(
                     print_iter=False,
                     error_on_fail=False,
                 ),
-
-                #qpsol='osqp',
-
+                # qpsol='osqp',
                 verbose=False,
-                tol_pr=1E-16,
-                tol_du=1E-16,
-                #print_iteration=False,
+                tol_pr=1e-16,
+                tol_du=1e-16,
+                # print_iteration=False,
                 print_time=False,
-                #hessian_approximation= "limited-memory",
+                # hessian_approximation= "limited-memory",
                 print_status=False,
             )
 
             self.optimizer = casadi.nlpsol(
-                model.__name__,
-                'sqpmethod',
-                self.nlp_args,
-                self.nlp_opts
+                model.__name__, "sqpmethod", self.nlp_args, self.nlp_opts
             )
 
         else:
@@ -474,7 +510,8 @@ class OptimizationProblem(InitializerMixin):
                 scipy_constraints = []
 
                 nonlinear_flags = [
-                    casadi.depends_on(g_jac, self.x) or casadi.depends_on(g_expr, self.p)
+                    casadi.depends_on(g_jac, self.x)
+                    or casadi.depends_on(g_expr, self.p)
                     for g_jac, g_expr in zip(g_jacs, g_split)
                     # could ignore dependence on parameters, but to be consistent with
                     # ipopt specification require parameters within function not in
@@ -483,13 +520,15 @@ class OptimizationProblem(InitializerMixin):
 
                 # process nonlinear constraints
                 nonlinear_g_fun_exprs = [
-                    g_expr for g_expr, is_nonlinear in zip(g_split, nonlinear_flags)
+                    g_expr
+                    for g_expr, is_nonlinear in zip(g_split, nonlinear_flags)
                     if is_nonlinear
                 ]
                 self.num_nonlinear_g = len(nonlinear_g_fun_exprs)
                 if self.num_nonlinear_g:
                     nonlinear_g_jac_exprs = [
-                        g_jac for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
+                        g_jac
+                        for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
                         if is_nonlinear
                     ]
 
@@ -499,50 +538,59 @@ class OptimizationProblem(InitializerMixin):
                         [casadi.vertcat(*nonlinear_g_fun_exprs)],
                     )
 
-
-                    self.g_jac_func =  casadi.Function(
+                    self.g_jac_func = casadi.Function(
                         f"{model.__name__}_nonlinear_constraint_jac",
                         [self.x, self.p],
                         [casadi.vertcat(*nonlinear_g_jac_exprs)],
                     )
 
+                    self.nonlinear_ub = np.array(
+                        [
+                            ub
+                            for ub, is_nonlinear in zip(self.ubg, nonlinear_flags)
+                            if is_nonlinear
+                        ]
+                    )
 
-                    self.nonlinear_ub = np.array([
-                        ub for ub, is_nonlinear in zip(self.ubg, nonlinear_flags)
-                        if is_nonlinear
-                    ])
-
-                    self.nonlinear_lb = np.array([
-                        lb for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
-                        if is_nonlinear
-                    ])
-
+                    self.nonlinear_lb = np.array(
+                        [
+                            lb
+                            for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
+                            if is_nonlinear
+                        ]
+                    )
 
                 # process linear constraints
                 linear_A_exprs = [
-                    g_jac for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
+                    g_jac
+                    for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
                     if not is_nonlinear
                 ]
                 self.num_linear_g = len(linear_A_exprs)
                 if self.num_linear_g:
-
                     self.linear_jac_func = casadi.Function(
                         f"{model.__name__}_A",
-                        [self.p], [casadi.vertcat(*linear_A_exprs)],
+                        [self.p],
+                        [casadi.vertcat(*linear_A_exprs)],
                     )
 
-                    self.linear_ub = np.array([
-                        ub for ub, is_nonlinear in zip(self.ubg, nonlinear_flags)
-                        if not is_nonlinear
-                    ])
+                    self.linear_ub = np.array(
+                        [
+                            ub
+                            for ub, is_nonlinear in zip(self.ubg, nonlinear_flags)
+                            if not is_nonlinear
+                        ]
+                    )
 
-                    self.linear_lb = np.array([
-                        lb for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
-                        if not is_nonlinear
-                    ])
+                    self.linear_lb = np.array(
+                        [
+                            lb
+                            for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
+                            if not is_nonlinear
+                        ]
+                    )
 
             elif self.method is OptimizationProblem.Method.scipy_slsqp:
-
                 self.equality_con_exprs = []
                 self.inequality_con_exprs = []
                 self.con = []
@@ -551,7 +599,7 @@ class OptimizationProblem(InitializerMixin):
                         self.equality_con_exprs.append(g - lbg)
                     else:
                         if lbg > -np.inf:
-                            self.inequality_con_exprs.append(g-lbg)
+                            self.inequality_con_exprs.append(g - lbg)
                         if ubg < np.inf:
                             self.inequality_con_exprs.append(ubg - g)
 
@@ -562,35 +610,43 @@ class OptimizationProblem(InitializerMixin):
                         [self.x, self.p],
                         [self.equality_con_expr],
                     )
-                    self.eq_g_jac_func =  casadi.Function(
+                    self.eq_g_jac_func = casadi.Function(
                         f"{model.__name__}_equality_constraint_jac",
                         [self.x, self.p],
                         [casadi.jacobian(self.equality_con_expr, self.x)],
                     )
-                    self.con.append(dict(
-                        type="eq",
-                        fun=lambda x, p: self.eq_g_func(x, p).toarray().squeeze().T,
-                        jac=self.eq_g_jac_func,
-                    ))
+                    self.con.append(
+                        dict(
+                            type="eq",
+                            fun=lambda x, p: self.eq_g_func(x, p).toarray().squeeze().T,
+                            jac=self.eq_g_jac_func,
+                        )
+                    )
 
                 if self.inequality_con_exprs:
-                    self.inequality_con_expr = casadi.vertcat(*self.inequality_con_exprs)
+                    self.inequality_con_expr = casadi.vertcat(
+                        *self.inequality_con_exprs
+                    )
                     self.ineq_g_func = casadi.Function(
                         f"{model.__name__}_inequality_constraint",
                         [self.x, self.p],
                         [self.inequality_con_expr],
                     )
-                    self.ineq_g_jac_func =  casadi.Function(
+                    self.ineq_g_jac_func = casadi.Function(
                         f"{model.__name__}_inequality_constraint_jac",
                         [self.x, self.p],
                         [casadi.jacobian(self.inequality_con_expr, self.x)],
                     )
-                    self.con.append(dict(
-                        type="ineq",
-                        fun=lambda x, p: self.ineq_g_func(x, p).toarray().squeeze().T,
-                        jac=self.ineq_g_jac_func,
-                    ))
-
+                    self.con.append(
+                        dict(
+                            type="ineq",
+                            fun=lambda x, p: self.ineq_g_func(x, p)
+                            .toarray()
+                            .squeeze()
+                            .T,
+                            jac=self.ineq_g_jac_func,
+                        )
+                    )
 
     def __call__(self, model_instance, *args):
         initializer_args = [self.x0]
@@ -600,9 +656,7 @@ class OptimizationProblem(InitializerMixin):
         if not self.has_p or not isinstance(args[0], symbol_class):
             self.x0 = self.initializer_func(*initializer_args)
             if not isinstance(self.x0, casadi.DM):
-                self.x0 = casadi.vertcat(
-                    *self.x0
-                )
+                self.x0 = casadi.vertcat(*self.x0)
             self.x0 = self.x0.toarray().reshape(-1)
 
         if self.method in (
@@ -613,13 +667,17 @@ class OptimizationProblem(InitializerMixin):
             if self.init_callback is not None:
                 self.init_callback(model_instance.parameter, self.nlp_opts)
             call_args = dict(
-                x0=self.x0, ubx=self.ubx, lbx=self.lbx, ubg=self.ubg, lbg=self.lbg, 
+                x0=self.x0,
+                ubx=self.ubx,
+                lbx=self.lbx,
+                ubg=self.ubg,
+                lbg=self.lbg,
             )
             if self.options["warm_start_init_point"]:
                 if self.lam_x0 is not None:
-                    call_args.update(lam_x0= self.lam_x0)
+                    call_args.update(lam_x0=self.lam_x0)
                 if self.lam_g0 is not None:
-                    call_args.update(lam_g0= self.lam_g0)
+                    call_args.update(lam_g0=self.lam_g0)
 
             if self.has_p:
                 call_args["p"] = p
@@ -651,22 +709,27 @@ class OptimizationProblem(InitializerMixin):
                 if self.num_linear_g:
                     scipy_constraints.append(
                         LinearConstraint(
-                            A = self.linear_jac_func(*extra_args).sparse(),
-                            ub = self.linear_ub,
-                            lb = self.linear_lb,
+                            A=self.linear_jac_func(*extra_args).sparse(),
+                            ub=self.linear_ub,
+                            lb=self.linear_lb,
                             keep_feasible=self.keep_feasible,
                         )
                     )
                 if self.num_nonlinear_g:
                     scipy_constraints.append(
                         NonlinearConstraint(
-                            fun=(lambda *args:
-                                 self.g_func(*args, *extra_args).toarray().squeeze()
+                            fun=(
+                                lambda *args: self.g_func(*args, *extra_args)
+                                .toarray()
+                                .squeeze()
                             ),
-                            jac=(lambda *args:
-                                 self.g_jac_func(*args, *extra_args).sparse()
+                            jac=(
+                                lambda *args: self.g_jac_func(
+                                    *args, *extra_args
+                                ).sparse()
                             ),
-                            lb=self.nonlinear_lb, ub=self.nonlinear_ub
+                            lb=self.nonlinear_lb,
+                            ub=self.nonlinear_ub,
                         )
                     )
             elif self.method is OptimizationProblem.Method.scipy_slsqp:
@@ -680,12 +743,11 @@ class OptimizationProblem(InitializerMixin):
                 self.x0,
                 jac=lambda *args: self.f_jac_func(*args).toarray().squeeze(),
                 method=method_string,
-                args = extra_args,
-                constraints = scipy_constraints,
-                bounds = np.vstack([self.lbx, self.ubx]).T,
-                #tol = 1E-9,
-
-                #options=dict(disp=True),
+                args=extra_args,
+                constraints=scipy_constraints,
+                bounds=np.vstack([self.lbx, self.ubx]).T,
+                # tol = 1E-9,
+                # options=dict(disp=True),
                 options=self.options,
             )
             model_instance.bind_field(self.model.variable, min_out.x)
@@ -693,13 +755,15 @@ class OptimizationProblem(InitializerMixin):
             self.x0 = min_out.x
             self.stats = model_instance._stats = min_out
 
-
         for k, v in model_instance.variable.asdict().items():
             model_var = getattr(self.model, k)
-            if model_var.warm_start and not isinstance(model_var.initializer, symbol_class):
+            if model_var.warm_start and not isinstance(
+                model_var.initializer, symbol_class
+            ):
                 model_var.initializer = v
 
-def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={}):
+
+def get_state_setter(field, setter_args, setter_targets=None, default=0.0, subs={}):
     """
     used for building functions from matched fields to their match (loops over "state"
     but is generalized for any matched fields)
@@ -707,7 +771,7 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
 
     field is MatchedField
     default None to pass through
-    setter_args are arguments for generalized 
+    setter_args are arguments for generalized
 
     """
     setter_exprs = []
@@ -721,16 +785,22 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
     start_indexes = np.cumsum([0] + target_sizes)
 
     setter_exprs = symbol_class(sum(target_sizes), 1)
-    for state, start_index, end_index in zip(setter_targets, start_indexes, start_indexes[1:]):
+    for state, start_index, end_index in zip(
+        setter_targets, start_indexes, start_indexes[1:]
+    ):
         setter_element = field.get(match=state)
         if isinstance(setter_element, list) and len(setter_element) == 0:
             if default is not None:
                 setter_exprs[start_index:end_index] = default
             else:
-                #setter_element = casadi.vertcat(*flatten(state.backend_repr)
-                setter_exprs[start_index:end_index] = (state.backend_repr).reshape((-1,1))
+                # setter_element = casadi.vertcat(*flatten(state.backend_repr)
+                setter_exprs[start_index:end_index] = (state.backend_repr).reshape(
+                    (-1, 1)
+                )
         elif isinstance(setter_element, co.BaseElement):
-            setter_exprs[start_index:end_index] = setter_element.backend_repr.reshape((-1,1))
+            setter_exprs[start_index:end_index] = setter_element.backend_repr.reshape(
+                (-1, 1)
+            )
         else:
             raise ValueError
 
@@ -740,7 +810,9 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
         f"{field._model_name}_{field._matched_to._name}_{field._name}",
         setter_args,
         setter_exprs,
-        dict(allow_free=True,),
+        dict(
+            allow_free=True,
+        ),
     )
     setter_func.expr = setter_exprs[0]
     if setter_func.expr.shape != setter_args[-1].shape and len(setter_args) > 1:
@@ -749,7 +821,6 @@ def get_state_setter(field, setter_args, setter_targets=None, default=0., subs={
 
 
 class TrajectoryAnalysis:
-
     class Solver(Enum):
         CVODE = auto()
         dopri5 = auto()
@@ -761,20 +832,21 @@ class TrajectoryAnalysis:
         self(model_instance, *args)
 
     def construct(
-        self, model,
-
-        state_atol=1E-12, state_rtol=1E-6,
-        state_adaptive_max_step_size=0., state_max_step_size = 0,
+        self,
+        model,
+        state_atol=1e-12,
+        state_rtol=1e-6,
+        state_adaptive_max_step_size=0.0,
+        state_max_step_size=0,
         # TODO add options for scipy solver name (dopri5 or dop853) and settings for the
         # rootfinder, including choosing between brentq and newton
-
-        adjoint_atol=1E-12, adjoint_rtol=1E-6,
-        adjoint_adaptive_max_step_size=4., adjoint_max_step_size = 0,
-
-        state_solver = Solver.dopri5,
-        adjoint_solver = Solver.dopri5,
-
-        #lmm_type=ADAMS or BDF, possibly also linsolver, etc? for CVODE?
+        adjoint_atol=1e-12,
+        adjoint_rtol=1e-6,
+        adjoint_adaptive_max_step_size=4.0,
+        adjoint_max_step_size=0,
+        state_solver=Solver.dopri5,
+        adjoint_solver=Solver.dopri5,
+        # lmm_type=ADAMS or BDF, possibly also linsolver, etc? for CVODE?
         # other options for scipy.ode + event rootfinder?
     ):
         self.model = model
@@ -791,37 +863,42 @@ class TrajectoryAnalysis:
             self.x,
         ]
 
-        self.traj_out_expr = casadi.vertcat(*flatten(
-            model.trajectory_output
-        ))
-        self.can_sgm = isinstance(self.p, casadi.MX) and isinstance(self.traj_out_expr, casadi.MX)
+        self.traj_out_expr = casadi.vertcat(*flatten(model.trajectory_output))
+        self.can_sgm = isinstance(self.p, casadi.MX) and isinstance(
+            self.traj_out_expr, casadi.MX
+        )
 
-        traj_out_names = model.trajectory_output.list_of('name')
+        traj_out_names = model.trajectory_output.list_of("name")
 
-        integrand_terms = flatten(model.trajectory_output.list_of('integrand'))
+        integrand_terms = flatten(model.trajectory_output.list_of("integrand"))
         self.traj_out_integrand = casadi.vertcat(*integrand_terms)
         traj_out_integrand_func = casadi.Function(
             f"{model.__name__}_trajectory_output_integrand",
             self.simulation_signature,
             [self.traj_out_integrand],
-            dict(allow_free=True,),
+            dict(
+                allow_free=True,
+            ),
         )
 
-        terminal_terms = flatten(model.trajectory_output.list_of('terminal_term'))
+        terminal_terms = flatten(model.trajectory_output.list_of("terminal_term"))
         self.traj_out_terminal_term = casadi.vertcat(*terminal_terms)
         traj_out_terminal_term_func = casadi.Function(
             f"{model.__name__}_trajectory_output_terminal_term",
             self.simulation_signature,
             [self.traj_out_terminal_term],
-            dict(allow_free=True,),
+            dict(
+                allow_free=True,
+            ),
         )
 
-
-        self.state0 = get_state_setter(model.initial, self.p,)
+        self.state0 = get_state_setter(
+            model.initial,
+            self.p,
+        )
 
         control_subs_pairs = {
-            control.backend_repr: [(control.default,)]
-            for control in ode_model.modal
+            control.backend_repr: [(control.default,)] for control in ode_model.modal
         }
         for mode in model._meta.modes:
             for act in mode.action:
@@ -829,7 +906,7 @@ class TrajectoryAnalysis:
                     (mode.condition, act.backend_repr)
                 )
         control_sub_expression = {}
-        for k,v in control_subs_pairs.items():
+        for k, v in control_subs_pairs.items():
             control_sub_expression[k] = substitute(
                 recurse_if_else(v), control_sub_expression
             )
@@ -837,37 +914,42 @@ class TrajectoryAnalysis:
         state_equation_func = get_state_setter(
             model.dot,
             self.simulation_signature,
-            subs = control_sub_expression,
+            subs=control_sub_expression,
         )
         lamda_jac = casadi.jacobian(state_equation_func.expr, self.x).T
         state_dot_jac_func = casadi.Function(
             f"{ode_model.__name__}_state_jacobian",
             self.simulation_signature,
             [lamda_jac.T],
-            dict(allow_free=True,),
+            dict(
+                allow_free=True,
+            ),
         )
 
         self.e_exprs = []
         self.h_exprs = []
-        at_time_slices = [sgm.NextTimeFromSlice(
-            casadi.Function(
-                f"{ode_model.__name__}_at_times_t0",
-                [self.p],
-                # TODO in future allow t0 to occur at arbitrary times
-                [0., 0., casadi.inf]
+        at_time_slices = [
+            sgm.NextTimeFromSlice(
+                casadi.Function(
+                    f"{ode_model.__name__}_at_times_t0",
+                    [self.p],
+                    # TODO in future allow t0 to occur at arbitrary times
+                    [0.0, 0.0, casadi.inf],
+                )
             )
-        )]
+        ]
 
         terminating = []
 
-        events = [ e for e in model._meta.events ]
+        events = [e for e in model._meta.events]
         if model.tf is not np.inf:
+
             class Terminate(ode_model.Event):
-                at_time = model.tf,
+                at_time = (model.tf,)
                 terminate = True
+
             events += [Terminate]
             ode_model.Event._meta.subclasses = ode_model.Event._meta.subclasses[:-1]
-
 
         num_events = len(events)
 
@@ -876,7 +958,7 @@ class TrajectoryAnalysis:
                 raise ValueError(
                     f"Event class `{event}` has set both `function` and `at_time`"
                 )
-            if getattr(event, 'function', np.nan) is not np.nan:
+            if getattr(event, "function", np.nan) is not np.nan:
                 e_expr = event.function
             else:
                 at_time = event.at_time
@@ -889,19 +971,25 @@ class TrajectoryAnalysis:
                     else:
                         at_time_start = 0
 
-                    e_expr = at_time.step*casadi.sin(casadi.pi*(model.t-at_time_start)/at_time.step)/(
-                        casadi.pi*100
+                    e_expr = (
+                        at_time.step
+                        * casadi.sin(
+                            casadi.pi * (model.t - at_time_start) / at_time.step
+                        )
+                        / (casadi.pi * 100)
                     )
                     # self.events(solver_res.values.t, solver_res.values.y, gs)
-                    #e_expr = casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)
-                    e_expr = casadi.fmod(model.t - at_time_start, at_time.step) 
+                    # e_expr = casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)
+                    e_expr = casadi.fmod(model.t - at_time_start, at_time.step)
 
                     # TODO: verify start and stop for at_time slice
-                    if isinstance(at_time_start, symbol_class) or at_time_start != 0.:
+                    if isinstance(at_time_start, symbol_class) or at_time_start != 0.0:
                         e_expr = e_expr * (model.t >= at_time_start)
                         # if there is a start offset, add a linear term to provide a
                         # zero-crossing at first occurance
-                        pre_term = (at_time_start - model.t) * (model.t <= at_time_start)
+                        pre_term = (at_time_start - model.t) * (
+                            model.t <= at_time_start
+                        )
                     else:
                         pre_term = 0
 
@@ -909,8 +997,10 @@ class TrajectoryAnalysis:
                         e_expr = e_expr * (model.t <= at_time.stop)
                         # if there is an end-time, hold constant to prevent additional
                         # zero crossings -- hopefully works even if stop is on an event
-                        #post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
-                        post_term = (model.t >= at_time.stop) * casadi.fmod(at_time.stop - at_time_start, at_time.step)
+                        # post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
+                        post_term = (model.t >= at_time.stop) * casadi.fmod(
+                            at_time.stop - at_time_start, at_time.step
+                        )
                         at_time_stop = at_time.stop
                     else:
                         post_term = 0
@@ -918,48 +1008,49 @@ class TrajectoryAnalysis:
 
                     e_expr = e_expr + pre_term + post_term
 
-                    at_time_slices.append(sgm.NextTimeFromSlice(
-                        casadi.Function(
-                            f"{ode_model.__name__}_at_times_{event_idx}",
-                            [self.p],
-                            [at_time_start, at_time_stop, at_time.step]
+                    at_time_slices.append(
+                        sgm.NextTimeFromSlice(
+                            casadi.Function(
+                                f"{ode_model.__name__}_at_times_{event_idx}",
+                                [self.p],
+                                [at_time_start, at_time_stop, at_time.step],
+                            )
                         )
-                    ))
+                    )
                 else:
                     if isinstance(at_time[0], co.BaseElement):
                         at_time0 = at_time[0].backend_repr
                     else:
                         at_time0 = at_time[0]
                     e_expr = at_time0 - model.t
-                    at_time_slices.append(sgm.NextTimeFromSlice(
-                        casadi.Function(
-                            f"{ode_model.__name__}_at_times_{event_idx}",
-                            [self.p],
-                            [at_time0, at_time0, casadi.inf]
+                    at_time_slices.append(
+                        sgm.NextTimeFromSlice(
+                            casadi.Function(
+                                f"{ode_model.__name__}_at_times_{event_idx}",
+                                [self.p],
+                                [at_time0, at_time0, casadi.inf],
+                            )
                         )
-                    ))
+                    )
 
-            self.e_exprs.append(
-                e_expr
-            )
+            self.e_exprs.append(e_expr)
 
             if event.terminate:
                 # For simupy, use nans to trigger termination; do we ever want to allow
                 # an update to a terminating event?
-                #self.h_exprs.append(
+                # self.h_exprs.append(
                 #    casadi.MX.nan(ode_model.state._count)
-                #)
+                # )
                 terminating.append(event_idx)
 
             h_expr = get_state_setter(
                 event.update,
                 self.simulation_signature,
-                setter_targets = [state for state in model.state],
+                setter_targets=[state for state in model.state],
                 default=None,
-                subs = control_sub_expression,
+                subs=control_sub_expression,
             )
             self.h_exprs.append(h_expr)
-
 
         set_solvers = []
         for solver in [state_solver, adjoint_solver]:
@@ -972,14 +1063,14 @@ class TrajectoryAnalysis:
             set_solvers.append(solver_class)
         state_solver_class, adjoint_solver_class = set_solvers
 
-
         self.trajectory_analysis = sgm.TrajectoryAnalysis(
-            traj_out_integrand_func, traj_out_terminal_term_func,
+            traj_out_integrand_func,
+            traj_out_terminal_term_func,
         )
-        #self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
+        # self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
 
         if len(model.dynamic_output):
-            #self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
+            # self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
             self.y_expr = casadi.vertcat(*flatten(model.dynamic_output))
             self.y_expr = substitute(self.y_expr, control_sub_expression)
             self.dynamic_output_func = casadi.Function(
@@ -991,28 +1082,28 @@ class TrajectoryAnalysis:
             self.dynamic_output_func = None
 
         self.StateSystem = sgm.System(
-            dim_state = model.state._count,
-            initial_state = self.state0,
-            dot = state_equation_func,
-            jac = state_dot_jac_func,
-            time_generator = sgm.TimeGeneratorFromSlices(
-                at_time_slices
-            ),
-            events = casadi.Function(
+            dim_state=model.state._count,
+            initial_state=self.state0,
+            dot=state_equation_func,
+            jac=state_dot_jac_func,
+            time_generator=sgm.TimeGeneratorFromSlices(at_time_slices),
+            events=casadi.Function(
                 f"{ode_model.__name__}_event",
                 self.simulation_signature,
                 [substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)],
-                dict(allow_free=True,),
+                dict(
+                    allow_free=True,
+                ),
             ),
-            updates = self.h_exprs,
-            num_events = num_events,
-            terminating = terminating,
-            dynamic_output = self.dynamic_output_func,
+            updates=self.h_exprs,
+            num_events=num_events,
+            terminating=terminating,
+            dynamic_output=self.dynamic_output_func,
             atol=state_atol,
             rtol=state_rtol,
             adaptive_max_step=state_adaptive_max_step_size,
             max_step_size=state_max_step_size,
-            solver_class = state_solver_class,
+            solver_class=state_solver_class,
         )
         self.at_time_slices = at_time_slices
 
@@ -1027,7 +1118,9 @@ class TrajectoryAnalysis:
             f"{model.__name__}_x0_jacobian",
             [self.p],
             [self.p_state0_p_p_expr],
-            dict(allow_free=True,),
+            dict(
+                allow_free=True,
+            ),
         )
         p_state0_p_p.expr = self.p_state0_p_p_expr
 
@@ -1047,7 +1140,8 @@ class TrajectoryAnalysis:
                 f"{model.__name__}_{traj_name}_lamdaF",
                 self.simulation_signature,
                 [lamdaF],
-            ) for lamdaF, traj_name in zip(self.lamdaFs, traj_out_names)
+            )
+            for lamdaF, traj_name in zip(self.lamdaFs, traj_out_names)
         ]
         self.gradFs = [
             casadi.jacobian(terminal_term, self.p) for terminal_term in terminal_terms
@@ -1057,7 +1151,8 @@ class TrajectoryAnalysis:
                 f"{model.__name__}_{traj_name}_gradF",
                 self.simulation_signature,
                 [gradF],
-            ) for gradF, traj_name in zip(self.gradFs, traj_out_names)
+            )
+            for gradF, traj_name in zip(self.gradFs, traj_out_names)
         ]
 
         grad_jac = casadi.jacobian(state_equation_func.expr, self.p)
@@ -1066,7 +1161,9 @@ class TrajectoryAnalysis:
             f"{model.__name__}_param_jacobian",
             self.simulation_signature,
             [grad_jac],
-            dict(allow_free=True,),
+            dict(
+                allow_free=True,
+            ),
         )
 
         state_integrand_jacs = [
@@ -1074,12 +1171,15 @@ class TrajectoryAnalysis:
             for integrand_term in integrand_terms
         ]
         state_integrand_jac_funcs = [
-                casadi.Function(
-                    f"{model.__name__}_state_integrand_jac_{ijac_expr_idx}",
-                    self.simulation_signature,
-                    [ijac_expr],
-                    dict(allow_free=True,),
-                ) for ijac_expr_idx, ijac_expr in enumerate(state_integrand_jacs)
+            casadi.Function(
+                f"{model.__name__}_state_integrand_jac_{ijac_expr_idx}",
+                self.simulation_signature,
+                [ijac_expr],
+                dict(
+                    allow_free=True,
+                ),
+            )
+            for ijac_expr_idx, ijac_expr in enumerate(state_integrand_jacs)
         ]
 
         param_integrand_jacs = [
@@ -1087,15 +1187,16 @@ class TrajectoryAnalysis:
             for integrand_term in integrand_terms
         ]
         param_integrand_jac_funcs = [
-                casadi.Function(
-                    f"{model.__name__}_param_integrand_jac_{ijac_expr_idx}",
-                    self.simulation_signature,
-                    [ijac_expr]
-                ) for ijac_expr_idx, ijac_expr in enumerate(param_integrand_jacs)
+            casadi.Function(
+                f"{model.__name__}_param_integrand_jac_{ijac_expr_idx}",
+                self.simulation_signature,
+                [ijac_expr],
+            )
+            for ijac_expr_idx, ijac_expr in enumerate(param_integrand_jacs)
         ]
         # TODO figure out how to combine (and possibly reverse direction) to reduce
         # number of calls, since this is potentially most expensive call with inner
-        # loop solvers, 
+        # loop solvers,
 
         # lamda updates
         # grad updates
@@ -1105,20 +1206,16 @@ class TrajectoryAnalysis:
         self.dte_dps = []
         self.dh_dps = []
 
-        for event, e_expr, h_expr in zip(
-            events, self.e_exprs, self.h_exprs
-        ):
+        for event, e_expr, h_expr in zip(events, self.e_exprs, self.h_exprs):
             dg_dx = casadi.jacobian(e_expr, self.x)
             dg_dt = casadi.jacobian(e_expr, model.t)
             dg_dp = casadi.jacobian(e_expr, self.p)
 
-            dte_dx = dg_dx/(dg_dx@state_equation_func.expr)
-            dte_dp = -dg_dp/(dg_dx@state_equation_func.expr + dg_dt)
-
+            dte_dx = dg_dx / (dg_dx @ state_equation_func.expr)
+            dte_dp = -dg_dp / (dg_dx @ state_equation_func.expr + dg_dt)
 
             dh_dx = casadi.jacobian(h_expr.expr, self.x)
             dh_dp = casadi.jacobian(h_expr.expr, self.p)
-
 
             """
             te = ode_model.t
@@ -1169,24 +1266,18 @@ class TrajectoryAnalysis:
             )
             self.dte_dxs[-1].expr = dte_dx
 
-
             dte_dp = substitute(dte_dp, control_sub_expression)
             self.dte_dps.append(
                 casadi.Function(
-                    f"{event.__name__}_dte_dp",
-                    self.simulation_signature,
-                    [dte_dp]
+                    f"{event.__name__}_dte_dp", self.simulation_signature, [dte_dp]
                 )
             )
             self.dte_dps[-1].expr = dte_dp
 
-
             dh_dx = substitute(dh_dx, control_sub_expression)
             self.dh_dxs.append(
                 casadi.Function(
-                    f"{event.__name__}_dh_dx",
-                    self.simulation_signature,
-                    [dh_dx]
+                    f"{event.__name__}_dh_dx", self.simulation_signature, [dh_dx]
                 )
             )
             self.dh_dxs[-1].expr = dh_dx
@@ -1194,36 +1285,32 @@ class TrajectoryAnalysis:
             dh_dp = substitute(dh_dp, control_sub_expression)
             self.dh_dps.append(
                 casadi.Function(
-                    f"{event.__name__}_dh_dp",
-                    self.simulation_signature,
-                    [dh_dp]
+                    f"{event.__name__}_dh_dp", self.simulation_signature, [dh_dp]
                 )
             )
             self.dh_dps[-1].expr = dh_dp
 
         self.AdjointSystem = sgm.AdjointSystem(
-            state_jac = state_dot_jac_func,
-            dte_dxs = self.dte_dxs,
-            dh_dxs = self.dh_dxs,
+            state_jac=state_dot_jac_func,
+            dte_dxs=self.dte_dxs,
+            dh_dxs=self.dh_dxs,
             atol=adjoint_atol,
             rtol=adjoint_rtol,
             adaptive_max_step=adjoint_adaptive_max_step_size,
             max_step_size=adjoint_max_step_size,
-            solver_class = adjoint_solver_class,
+            solver_class=adjoint_solver_class,
         )
         self.shooting_gradient_method = sgm.ShootingGradientMethod(
-            adjoint_system = self.AdjointSystem,
-            p_x0_p_params = p_state0_p_p,
-            p_dots_p_params = param_dot_jac_func,
-            dh_dps = self.dh_dps,
-            dte_dps = self.dte_dps,
-
-            p_terminal_terms_p_params = self.gradF_funcs,
-            p_integrand_terms_p_params = param_integrand_jac_funcs,
-            p_terminal_terms_p_state = self.lamdaF_funcs,
-            p_integrand_terms_p_state = state_integrand_jac_funcs,
+            adjoint_system=self.AdjointSystem,
+            p_x0_p_params=p_state0_p_p,
+            p_dots_p_params=param_dot_jac_func,
+            dh_dps=self.dh_dps,
+            dte_dps=self.dte_dps,
+            p_terminal_terms_p_params=self.gradF_funcs,
+            p_integrand_terms_p_params=param_integrand_jac_funcs,
+            p_terminal_terms_p_state=self.lamdaF_funcs,
+            p_integrand_terms_p_state=state_integrand_jac_funcs,
         )
-
 
     def __call__(self, model_instance, *args):
         self.callback.from_implementation = True
@@ -1231,7 +1318,7 @@ class TrajectoryAnalysis:
         self.out = self.callback(self.args)
         self.callback.from_implementation = False
 
-        if hasattr(self.callback, 'res'):
+        if hasattr(self.callback, "res"):
             res = self.callback.res
             model_instance._res = res
             model_instance.t = np.array(res.t)
@@ -1256,12 +1343,12 @@ class TrajectoryAnalysis:
         )
 
 
-
 class CasadiFunctionCallback(casadi.Callback):
-    """Base class for wrapping a Function with a Callback
-    """
+    """Base class for wrapping a Function with a Callback"""
 
-    def __init__(self, placeholder_func, wrapper_func, implementation, jacobian_of=None,  opts={}):
+    def __init__(
+        self, placeholder_func, wrapper_func, implementation, jacobian_of=None, opts={}
+    ):
         casadi.Callback.__init__(self)
         self.wrapper_func = wrapper_func
         self.placeholder_func = placeholder_func
@@ -1286,22 +1373,24 @@ class CasadiFunctionCallback(casadi.Callback):
         try:
             out = self.wrapper_func(
                 *wrap(self.implementation.model.input, args[0])
-                #*wrap(self.implementation.model.input, args)
+                # *wrap(self.implementation.model.input, args)
             )
         except Exception as e:
             breakpoint()
             pass
         if self.jacobian_of:
             if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
-                return out,
-            jac_out = np.concatenate(
-                flatten(out)
-            ).reshape(self.get_sparsity_out(0).shape[::-1]).T
-            return jac_out,
+                return (out,)
+            jac_out = (
+                np.concatenate(flatten(out))
+                .reshape(self.get_sparsity_out(0).shape[::-1])
+                .T
+            )
+            return (jac_out,)
         return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else out
         return [out] if self.get_n_out() == 1 else out
-        #return out,
-        return casadi.vertcat(*flatten(out)),
+        # return out,
+        return (casadi.vertcat(*flatten(out)),)
         return [out] if self.get_n_out() == 1 else out
 
     def get_sparsity_in(self, i):
@@ -1309,9 +1398,11 @@ class CasadiFunctionCallback(casadi.Callback):
             return self.placeholder_func.sparsity_in(i)
         elif i < self.jacobian_of.get_n_in() + self.jacobian_of.get_n_out():
             # nominal outputs are 0
-            return casadi.Sparsity(*self.jacobian_of.get_sparsity_out(
-                i-self.jacobian_of.get_n_in()
-            ).shape)
+            return casadi.Sparsity(
+                *self.jacobian_of.get_sparsity_out(
+                    i - self.jacobian_of.get_n_in()
+                ).shape
+            )
         else:
             raise ValueError
 
@@ -1331,13 +1422,13 @@ class CasadiFunctionCallback(casadi.Callback):
 
     def get_reverse(self, nout, name, inames, onames, opts):
         breakpoint()
-        #return casadi.Function(
+        # return casadi.Function(
 
     def has_jacobian(self):
         return self.jacobian is not None
 
     def get_jacobian(self, name, inames, onames, opts):
-        #breakpoint()
+        # breakpoint()
         return self.jacobian
 
 
@@ -1352,15 +1443,17 @@ class ExternalSolverModel:
         self.wrapper = model._meta.external_wrapper
         self.input = casadi.vertcat(*flatten(model.input))
         self.output = casadi.vertcat(*flatten(model.output))
-        #self.input = model.input.list_of('backend_repr')
-        #self.output = model.output.list_of('backend_repr')
+        # self.input = model.input.list_of('backend_repr')
+        # self.output = model.output.list_of('backend_repr')
         self.placeholder_func = casadi.Function(
             f"{model.__name__}_placeholder",
             [self.input],
             [self.output],
-            #self.input,
-            #self.output,
-            dict(allow_free=True,),
+            # self.input,
+            # self.output,
+            dict(
+                allow_free=True,
+            ),
         )
         self.callback = CasadiFunctionCallback(
             self.placeholder_func, self.wrapper.function, self, jacobian_of=None
@@ -1370,24 +1463,21 @@ class ExternalSolverModel:
                 self.placeholder_func.jacobian(),
                 self.wrapper.jacobian,
                 implementation=self,
-                jacobian_of=self.callback
+                jacobian_of=self.callback,
             )
 
             self.callback.jacobian.construct(
                 self.callback.jacobian.placeholder_func.name(),
-                self.callback.jacobian.opts
+                self.callback.jacobian.opts,
             )
         self.callback.construct(
-            self.callback.placeholder_func.name(),
-            self.callback.opts
+            self.callback.placeholder_func.name(), self.callback.opts
         )
-
-
 
     def __call__(self, model_instance, *args):
         use_args = casadi.vertcat(*flatten(args))
         out = self.callback(use_args)
-        #out = self.callback(*args)
+        # out = self.callback(*args)
         if isinstance(out, casadi.MX):
             out = casadi.vertsplit(out)
         model_instance.bind_field(
@@ -1432,8 +1522,9 @@ class CasadiIterationCallback(casadi.Callback):
         # x, f, g, lam_x, lam_g, lam_p
         x, f, g, *_ = args
         var_data = self.model.create_bound_field_dataclass(self.model.variable, x)
-        constraint_data = self.model.create_bound_field_dataclass(self.model.constraint, g)
+        constraint_data = self.model.create_bound_field_dataclass(
+            self.model.constraint, g
+        )
         self.iteration_callback(self.iter, var_data, f, constraint_data)
         self.iter += 1
         return [0]
-

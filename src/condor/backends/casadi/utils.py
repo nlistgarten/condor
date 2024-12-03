@@ -6,12 +6,12 @@ import numpy as np
 # use AlgebraicSystem or ODESystem)
 symbol_class = casadi.MX
 
+
 def substitute(expr, subs):
     for key, val in subs.items():
-        expr = casadi.substitute(
-            expr, key, val
-        )
+        expr = casadi.substitute(expr, key, val)
     return expr
+
 
 def recurse_if_else(conditions_actions):
     if len(conditions_actions) == 1:
@@ -20,24 +20,36 @@ def recurse_if_else(conditions_actions):
     remainder = recurse_if_else(conditions_actions[:-1])
     return casadi.if_else(condition, action, remainder)
 
+
 def symbol_is(a, b):
     return (a.shape == b.shape) and (a == b).is_one()
+
 
 def evalf(expr, backend_repr2value):
     if not isinstance(expr, list):
         expr = [expr]
-    func = casadi.Function("temp_func", list(backend_repr2value.keys()), expr,)
+    func = casadi.Function(
+        "temp_func",
+        list(backend_repr2value.keys()),
+        expr,
+    )
     return func(*backend_repr2value.values())
 
+
 def reshape(backend_repr, shape):
-    if isinstance(backend_repr, (list, tuple,)):
+    if isinstance(
+        backend_repr,
+        (
+            list,
+            tuple,
+        ),
+    ):
         return casadi.vertcat(*backend_repr).reshape(shape)
     elif hasattr(backend_repr, "reshape"):
         return backend_repr.reshape(shape)
     elif np.prod(shape) == 1:
         return backend_repr
     raise ValueError
-
 
 
 class CasadiFunctionCallbackMixin:
@@ -84,52 +96,71 @@ def flatten(symbols):
         symbols = symbols.list_of("backend_repr")
 
     if isinstance(symbols, symbol_class):
-        # if it's a single 
+        # if it's a single
         symbol = symbols
-        return tuple([ elem
-            #for symbol in symbols
-            for col in casadi.horzsplit(symbol)
-            for elem in casadi.vertsplit(col)
-        ])
+        return tuple(
+            [
+                elem
+                # for symbol in symbols
+                for col in casadi.horzsplit(symbol)
+                for elem in casadi.vertsplit(col)
+            ]
+        )
 
     if isinstance(symbols, (float, int)):
         return [symbols]
 
     return [
-        symbol.reshape((-1,1)) if hasattr(symbol, "reshape")
-        else np.array(symbol).reshape(-1,1)
+        symbol.reshape((-1, 1))
+        if hasattr(symbol, "reshape")
+        else np.array(symbol).reshape(-1, 1)
         for symbol in symbols
     ]
 
 
 def wrap(field, values):
-    size_cum_sum = np.cumsum([0] + field.list_of('size'))
+    size_cum_sum = np.cumsum([0] + field.list_of("size"))
     if isinstance(values, symbol_class):
         values = casadi.vertsplit(values)
 
-        return tuple([
-            values[start_idx]
-            if symbol.size == 1
-            else casadi.vcat(values[start_idx:end_idx]).reshape(symbol.shape)
+        return tuple(
+            [
+                values[start_idx]
+                if symbol.size == 1
+                else casadi.vcat(values[start_idx:end_idx]).reshape(symbol.shape)
+                for start_idx, end_idx, symbol in zip(
+                    size_cum_sum, size_cum_sum[1:], field
+                )
+            ]
+        )
 
-            for start_idx, end_idx, symbol in zip(size_cum_sum, size_cum_sum[1:], field)
-        ])
-
-    if isinstance(values, (float, int, casadi.DM,)):# or len(field) != len(values):
-        if not isinstance(values, (float, int, casadi.DM,)) and len(field) != len(values):
+    if isinstance(
+        values,
+        (
+            float,
+            int,
+            casadi.DM,
+        ),
+    ):  # or len(field) != len(values):
+        if not isinstance(
+            values,
+            (
+                float,
+                int,
+                casadi.DM,
+            ),
+        ) and len(field) != len(values):
             breakpoint()
         values = np.atleast_1d(values).reshape(-1)
 
-    values = np.array(values)#.reshape(-1)
-    return tuple([
-        values[start_idx]#.reshape((1,-1))[0,0]
-        if symbol.size == 1
-
-        else values[start_idx:end_idx].reshape(symbol.shape)
-        if values[start_idx:end_idx].size == symbol.size
-
-        else values[start_idx:end_idx].reshape(symbol.shape + (-1,))
-
-        for start_idx, end_idx, symbol in zip(size_cum_sum, size_cum_sum[1:], field)
-    ])
-
+    values = np.array(values)  # .reshape(-1)
+    return tuple(
+        [
+            values[start_idx]  # .reshape((1,-1))[0,0]
+            if symbol.size == 1
+            else values[start_idx:end_idx].reshape(symbol.shape)
+            if values[start_idx:end_idx].size == symbol.size
+            else values[start_idx:end_idx].reshape(symbol.shape + (-1,))
+            for start_idx, end_idx, symbol in zip(size_cum_sum, size_cum_sum[1:], field)
+        ]
+    )

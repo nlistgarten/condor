@@ -7,8 +7,9 @@ from sympy.core.expr import Expr
 
 from sympy.core.function import (
     UndefinedFunction as symUndefined,
-    AppliedUndef as symApplied
+    AppliedUndef as symApplied,
 )
+
 
 class CodePrinter(PythonCodePrinter):
     def doprint(self, *args, **kwargs):
@@ -28,17 +29,17 @@ class CodePrinter(PythonCodePrinter):
         # for the other Ops (optimizer/rootfinder, SGM)
         if isinstance(expr, AppliedFunction):
             cls = type(type(expr))
-            funcprintmethodname = '_print_' + cls.__name__
+            funcprintmethodname = "_print_" + cls.__name__
             funcprintmethod = getattr(self, funcprintmethodname, None)
             if funcprintmethod is None:
-               funcprintmethod = PythonCodePrinter._print
+                funcprintmethod = PythonCodePrinter._print
 
             return "%s(%s)" % (
-                funcprintmethod(expr.func), self.stringify(expr.args, ", ")
+                funcprintmethod(expr.func),
+                self.stringify(expr.args, ", "),
             )
         else:
             return super()._print(expr, **kwargs)
-
 
     def _print_NDimArray(self, expr, **kwargs):
         return repr(expr)
@@ -71,56 +72,53 @@ class AppliedFunction(symApplied):
 
         return newcls
 
+
 class UndefinedFunction(symUndefined):
-    def __new__(mcl, name, 
-                bases=(AppliedFunction,),
-                __dict__=None, **kwargs):
+    def __new__(mcl, name, bases=(AppliedFunction,), __dict__=None, **kwargs):
         # called when an argument is applied, e.g., tab_h(...)
         # returns the called function expression as subclass of condor.AppliedFunction
         # applied tab_h is what codeprinter sees, without catching it gets processed as
-        # a Function which would be  fine, since don't want to repeat the  print 
+        # a Function which would be  fine, since don't want to repeat the  print
         # function and args logic, but Printer._print has some special Function filter
         # logic and the CodePrinter._print_Function uses string value of known_functions
         # dict or delegates if "allow_unknown_functions". I guess it would be reasonable
         # for _print_TableLookup to just add to known_functions dict?
-        # also, the logic is just 
+        # also, the logic is just
         # return "%s(%s)" % (func, self.stringify(expr.args, ", "))
         # so I could just do that in the condor.AppliedFunc print logic...
 
-
         newcls = super().__new__(mcl, name, bases, __dict__=__dict__, **kwargs)
-        #newcls.__mro__ = (newcls.__mro__[0], mcl,) + newcls.__mro__[1:]
+        # newcls.__mro__ = (newcls.__mro__[0], mcl,) + newcls.__mro__[1:]
         return newcls
+
 
 class TableLookup(UndefinedFunction):
     registry = {}
 
+
 class Solver(UndefinedFunction):
     registry = {}
+
 
 class assignment_cse:
     def __init__(self, assignment_dict, return_assignments=True):
         self.assignment_dict = assignment_dict
         self.return_assignments = return_assignments
-        self.reverse_assignment_dict = {
-            v: k for k, v in self.assignment_dict.items()
-        }
+        self.reverse_assignment_dict = {v: k for k, v in self.assignment_dict.items()}
 
     def __call__(self, expr):
-        if hasattr(expr, 'subs'):
+        if hasattr(expr, "subs"):
             expr_ = expr.subs(self.reverse_assignment_dict)
         else:
-            expr_ = [
-                expr__.subs(self.reverse_assignment_dict)
-                for expr__ in expr
-            ]
+            expr_ = [expr__.subs(self.reverse_assignment_dict) for expr__ in expr]
         if self.return_assignments:
-            if hasattr(expr_, '__len__'):
+            if hasattr(expr_, "__len__"):
                 expr_ = list(expr)
             else:
                 expr_ = [expr]
             expr.extend(sym.flatten(self.assignment_dict.keys()))
         return self.assignment_dict.items(), expr
+
 
 def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):
     sym_ufunc = getattr(sym, ufunc.__name__, None)
@@ -151,6 +149,7 @@ def array_ufunc(self, ufunc, method, *inputs, out=None, **kwargs):
 
 
 Expr.__array_ufunc__ = array_ufunc
+
 
 class SymbolicArray(np.ndarray):
     """ndarray containing sympy symbols, compatible with numpy methods like np.exp"""
@@ -195,12 +194,13 @@ class SymbolicArray(np.ndarray):
 # TODO: can be generalized ? certainly split up -- this lambdify/codeprinter is likely
 # more useful (at least for a "numpy" numerical implementation)
 def sympy2casadi(
-        sympy_expr,
-        sympy_vars, # really, arguments/signature
-        #cse_generator=assignment_cse,
-        #cse_generator_args=dict(
-            extra_assignments={}, return_assignments=True
-        #)
+    sympy_expr,
+    sympy_vars,  # really, arguments/signature
+    # cse_generator=assignment_cse,
+    # cse_generator_args=dict(
+    extra_assignments={},
+    return_assignments=True,
+    # )
 ):
     breakpoint()
     import casadi
@@ -221,25 +221,20 @@ def sympy2casadi(
     # presence in "modules" that adds them to namespace on `exec` line of lambdify so
     # it's a little redundant. sticking with this version for now
     # user_functions gets added to known_functions
-    printer = CodePrinter(dict(
-        fully_qualified_modules=False,
-    ))
+    printer = CodePrinter(
+        dict(
+            fully_qualified_modules=False,
+        )
+    )
     print("lambdifying...")
     f = lambdify(
         sympy_vars,
         sympy_expr,
-        modules=[
-            TableLookup.registry,
-            Solver.registry,
-            mapping,
-            casadi
-        ],
+        modules=[TableLookup.registry, Solver.registry, mapping, casadi],
         printer=printer,
         dummify=False,
-        #cse=cse_generator(**cse_generator_args),
-        cse=(
-            assignment_cse(extra_assignments, return_assignments)
-        ),
+        # cse=cse_generator(**cse_generator_args),
+        cse=(assignment_cse(extra_assignments, return_assignments)),
     )
 
     print("casadifying...")
@@ -248,8 +243,7 @@ def sympy2casadi(
     return out, ca_vars, f
 
 
-def symbol_generator(name, n, m=1, symmetric=False, diagonal=0,
-                              dynamic=False, **kwass):
+def symbol_generator(name, n, m=1, symmetric=False, diagonal=0, dynamic=False, **kwass):
     """
     construct a matrix of symbolic elements
     Parameters
@@ -285,13 +279,21 @@ def symbol_generator(name, n, m=1, symmetric=False, diagonal=0,
 
     if diagonal:
         return sp.diag(
-            *[symbol_func(
-                name+'_{}{}'.format(i+1, i+1), **kwass) for i in range(m)])
+            *[
+                symbol_func(name + "_{}{}".format(i + 1, i + 1), **kwass)
+                for i in range(m)
+            ]
+        )
     else:
-        matrix = sym.Matrix([
-            [symbol_func(name+'_{}_{}'.format(j+1, i+1), **kwass)
-             for i in range(m)] for j in range(n)
-        ])
+        matrix = sym.Matrix(
+            [
+                [
+                    symbol_func(name + "_{}_{}".format(j + 1, i + 1), **kwass)
+                    for i in range(m)
+                ]
+                for j in range(n)
+            ]
+        )
 
         if symmetric:
             for i in range(1, m):
