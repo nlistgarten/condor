@@ -1,25 +1,19 @@
+import logging
+from dataclasses import asdict, dataclass, field
+from dataclasses import fields as dc_fields
+from dataclasses import replace
+
 import numpy as np
 
-# TODO: figure out how to make this an option/setting like django?
-# from condor.backends import default as backend
-from condor.fields import (
-    Direction,
-    Field,
-    BaseElement,
-    FreeElement,
-    WithDefaultField,
-    FreeField,
-    AssignedField,
-    MatchedField,
-    InitializedField,
-    BoundedAssignmentField,
-    TrajectoryOutputField,
-)
+from condor._version import __version__
 from condor.backends.default import backend
 from condor.conf import settings
-from dataclasses import asdict, dataclass, field, replace, fields as dc_fields
-from condor._version import __version__
-import logging
+# TODO: figure out how to make this an option/setting like django?
+# from condor.backends import default as backend
+from condor.fields import (AssignedField, BaseElement, BoundedAssignmentField,
+                           Direction, Field, FreeElement, FreeField,
+                           InitializedField, MatchedField,
+                           TrajectoryOutputField, WithDefaultField)
 
 log = logging.getLogger(__name__)
 

@@ -1,10 +1,9 @@
-import numpy as np
+from dataclasses import InitVar, dataclass, field
 
+import numpy as np
 # from condor import backend
 from scipy.interpolate import make_interp_spline
 from scipy.linalg import expm
-
-from dataclasses import dataclass, field, InitVar
 
 try:
     from scikits.odes.sundials.cvode import CVODE, StatusEnum
@@ -13,9 +12,10 @@ except ModuleNotFoundError:
 else:
     has_cvode = True
 
+from typing import NamedTuple, Optional
+
 from scipy.integrate import ode as scipy_ode
 from scipy.optimize import brentq, newton
-from typing import NamedTuple, Optional
 
 
 class SolverMixin:

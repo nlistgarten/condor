@@ -1,10 +1,10 @@
-from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
 import casadi
 import numpy as np
 from scipy import interpolate
 from scipy.optimize import fsolve
-from condor.solvers.shooting_gradient_method import ResultInterpolant
 
+from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
+from condor.solvers.shooting_gradient_method import ResultInterpolant
 
 DEBUG_LEVEL = 0
 

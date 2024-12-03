@@ -1,21 +1,17 @@
-import casadi
-import condor as co
-import numpy as np
-from enum import Enum, auto
 from dataclasses import dataclass
-from condor.backends.casadi.utils import (
-    flatten,
-    wrap,
-    symbol_class,
-    substitute,
-    recurse_if_else,
-)
-from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
-import condor.solvers.shooting_gradient_method as sgm
-import condor.backends.casadi.shooting_gradient_method as ca_sgm
-from condor.backends.casadi.table_lookup import NDSplinesCallback
+from enum import Enum, auto
 
-from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
+import casadi
+import numpy as np
+from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
+
+import condor as co
+import condor.backends.casadi.shooting_gradient_method as ca_sgm
+import condor.solvers.shooting_gradient_method as sgm
+from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
+from condor.backends.casadi.table_lookup import NDSplinesCallback
+from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
+                                          symbol_class, wrap)
 
 # TODO: make SGM and SolverWithWarmStart (really, back-tracking solver and possibly only
 # needed if broyden doesn't resolve it?) generic and figure out how to separate the

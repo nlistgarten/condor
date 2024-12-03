@@ -1,13 +1,16 @@
 # TODO: figure out python version minimum
 
-from dataclasses import dataclass, make_dataclass, fields, asdict as dataclass_asdict
-import numpy as np
-from enum import Enum
-from condor.backends.default import backend
-from condor.backends import BackendSymbolData
 import importlib
-import sys
 import logging
+import sys
+from dataclasses import asdict as dataclass_asdict
+from dataclasses import dataclass, fields, make_dataclass
+from enum import Enum
+
+import numpy as np
+
+from condor.backends import BackendSymbolData
+from condor.backends.default import backend
 
 log = logging.getLogger(__name__)
 

@@ -1,30 +1,16 @@
-from condor.fields import (
-    Direction,
-    Field,
-    BaseElement,
-    FreeElement,
-    WithDefaultField,
-    FreeField,
-    AssignedField,
-    MatchedField,
-    InitializedField,
-    BoundedAssignmentField,
-    TrajectoryOutputField,
-    FreeAssignedField,
-)
-from condor.models import (
-    Model,
-    ModelType,
-    ModelTemplateType,
-    SubmodelTemplate,
-    ModelTemplate,
-)
-from condor.backends.default import backend
-from condor.backends.casadi.utils import flatten
+import logging
+
 import casadi
 import numpy as np
 
-import logging
+from condor.backends.casadi.utils import flatten
+from condor.backends.default import backend
+from condor.fields import (AssignedField, BaseElement, BoundedAssignmentField,
+                           Direction, Field, FreeAssignedField, FreeElement,
+                           FreeField, InitializedField, MatchedField,
+                           TrajectoryOutputField, WithDefaultField)
+from condor.models import (Model, ModelTemplate, ModelTemplateType, ModelType,
+                           SubmodelTemplate)
 
 log = logging.getLogger(__name__)
 
@@ -429,8 +415,9 @@ class ODESystem(ModelTemplate):
     dynamic_output = AssignedField(Direction.internal)
 
 
-from condor.models import SubmodelType, SubmodelMetaData
 from dataclasses import dataclass, field
+
+from condor.models import SubmodelMetaData, SubmodelType
 
 
 @dataclass

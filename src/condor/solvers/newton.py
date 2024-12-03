@@ -1,6 +1,6 @@
+import casadi
 import numpy as np
 from scipy import linalg
-import casadi
 
 
 def wrap_ls_func(f):

@@ -1,6 +1,7 @@
-import ndsplines
 import casadi
+import ndsplines
 import numpy as np
+
 from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
 
 

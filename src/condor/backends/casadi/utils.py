@@ -1,6 +1,7 @@
 import casadi
-import condor as co
 import numpy as np
+
+import condor as co
 
 # base symbol class is MX because only MX can go through callbacks (e.g., models that
 # use AlgebraicSystem or ODESystem)

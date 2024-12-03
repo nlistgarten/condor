@@ -1,10 +1,11 @@
+import logging
+
+import casadi
 import numpy as np
 from scipy import linalg
-import casadi
+
 from condor.backends.casadi.utils import CasadiFunctionCallbackMixin
 from condor.solvers.newton import Newton
-
-import logging
 
 log = logging.getLogger(__name__)
 

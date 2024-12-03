@@ -4,26 +4,17 @@ if False:
     logging.getLogger("condor").setLevel(logging.DEBUG)
     logging.basicConfig()
 
-from condor.fields import (
-    Direction,
-    Field,
-    BaseElement,
-    FreeElement,
-    WithDefaultField,
-    FreeField,
-    AssignedField,
-    MatchedField,
-    InitializedField,
-    BoundedAssignmentField,
-    TrajectoryOutputField,
-)
-from condor.conf import settings
 from dataclasses import asdict, dataclass, field, replace
+
 from condor._version import __version__
 from condor.backends.default import backend
+from condor.conf import settings
 from condor.contrib import *
+from condor.fields import (AssignedField, BaseElement, BoundedAssignmentField,
+                           Direction, Field, FreeElement, FreeField,
+                           InitializedField, MatchedField,
+                           TrajectoryOutputField, WithDefaultField)
 from condor.models import Options
-
 
 ##################
 """

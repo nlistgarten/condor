@@ -1,23 +1,23 @@
 import os
 import re
-
-from condor.backends.scipy import SymbolicArray, TableLookup, Solver, CodePrinter
+import warnings
 
 import casadi
 import numpy as np
-import sympy as sym
-import pandas as pd
-from openmdao.solvers.solver import NonlinearSolver
-from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
-from openmdao.components.balance_comp import BalanceComp
-from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
-from openmdao.core.problem import Problem
 import openmdao.api as om
+import pandas as pd
+import sympy as sym
+from openmdao.components.balance_comp import BalanceComp
+from openmdao.components.meta_model_structured_comp import \
+    MetaModelStructuredComp
+from openmdao.core.problem import Problem
+from openmdao.solvers.solver import NonlinearSolver
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from pycycle.elements.US1976 import USatm1976Comp, USatm1976Data
 
-import warnings
-
+from condor.backends.scipy import (CodePrinter, Solver, SymbolicArray,
+                                   TableLookup)
 
 os.environ["OPENMDAO_REPORTS"] = "none"
 
