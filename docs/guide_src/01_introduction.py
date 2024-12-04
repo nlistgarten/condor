@@ -4,33 +4,27 @@
 =========================
 """
 
+
 # %%
-# To get a sense of working with Condor, we'll start with some concrete examples making
-# use of the fundamental building blocks of models and how they are used together.
+# Condor is *modeling framework* with a *Domain Specific Language* (DSL) for
+# constructing mathematical models. The DSL is constructed by using metaprogramming to
+# change the behavior of class construction to create blackboard-like where users can
+# focus on the mathematical and engineering analysis and not get distracted by the
+# programming cruft.
 #
-# Condor provides a baseline set of what we call *model templates*, which you might
-# think of as representing specific mathematical models. In this way, Condor models
-# often look very much like what you'd see in a mathematical description of a model in
-# code form.
-#
-# Explicit Systems
-# ================
-#
-# First, there's the ``ExplicitSystem``, which takes inputs and produces outputs that
-# are functions of those inputs. As an example, suppose we want to define a system for
-# transforming Cartesian coordinates to polar form:
+# For example, if we were interested in transforming Cartesian coordinates to polar form:
 #
 # .. math::
 #    \begin{align}
-#    r &= \sqrt{x^2 + y^2} \\
-#    \theta &= tan^{-1}\left(\frac{y}{x}\right)
+#    p_r &= \sqrt{x^2 + y^2} \\
+#    p_{\theta} &= tan^{-1}\left(\frac{y}{x}\right)
 #    \end{align}
 #
-# We can implement this with an ``ExplicitSystem`` as follows:
+# We can implement this with an ``ExplicitSystem`` by declaring the inputs and outputs
+# of this system as follows:
 
 import condor
 import numpy as np
-
 
 class PolarTransform(condor.ExplicitSystem):
     x = input()
@@ -44,8 +38,8 @@ class PolarTransform(condor.ExplicitSystem):
 # In general, once you've defined any system in Condor, you can just evaulate it
 # numerically by passing in numbers:
 
-out = PolarTransform(x=3, y=4)
-print(out)
+p = PolarTransform(x=3, y=4)
+print(p)
 
 # %%
 # The output returned by such a call is designed for inspection to the extent that we
@@ -54,77 +48,35 @@ print(out)
 #
 # For example, the outputs of an explicit system are accessible directly:
 
-print(out.r)
+print(p.r)
 
 # %%
 # They can also be retrieved collectively:
 
-print(out.output)
+print(p.output)
 
 # %%
 # You can of course call it again with different arguments
 
 print(PolarTransform(x=1, y=0).output.asdict())
 
-# %%
-# Nesting Systems
-# ---------------
-#
-# Systems may be nested arbitrarily. This is done by simply calling an existing
-# system as above, but within another system definition.
-
-
-class Hypot(condor.ExplicitSystem):
-    x = input()
-    y = input()
-    output.hypot = np.sqrt(x**2 + y**2)
-
-
-class PolarTransform(condor.ExplicitSystem):
-    x = input()
-    y = input()
-    # "call" Hypot and grab its output
-    output.r = Hypot(x, y).hypot
-    output.theta = np.atan2(y, x)
-
 
 # %%
-# Note also that passing the inputs (or any intermediates) to plain numeric functions
-# works fine too, however... TODO
-
-# TODO maybe a quick sidebar/note/hint on how this works
-
-
-# %%
-# Algebraic Systems
-# =================
-#
-# With just explicit systems, you can already model quite a few things, but you're not
-# gaining much over plain functions besides getting a result object providing "dot
-# access" to retrieve outputs by name.
-#
-# Algebraic systems are used in situations where you need an iterative method to solve a
-# system of equations for which there may not be an analytic solution. Algebraic systems
-# are expressed in canonical residual form:
+# While the *binding* of the results in a datastructure is nice, the real benefit of
+# constructing condor models is in calling iterative solvers. For example, we could
+# perform symbolic manipulation to define  another ``ExplicitSystem`` with :math:`x =
+# r\cos\theta` and :math:`y = r\sin\theta`. Or we can we use Condor to
+# numerically solve this algebraic system of equations using an ``AlgebraicSystem`` by
+# declaring the input radius and angle as ``parameter``\s and the solving variables for
+# :math:`x` and :math:`y`. Mathematically, we are defining the system of algebraic
+# equations 
 #
 # .. math::
-#    R(x, u) = 0
+#    r &= p_r (x^*, y^*) =  \sqrt{x^{*^2} + y^{*^2}} \\
+#    \theta &= p_{\theta} (x^*, y^*) = \tan^{-1}\left(\frac{y^*}{x^*}\right)
 #
-# Where :math:`x` are variables a solver can vary to satisfy the residuals (to some
-# tolerance) and :math:`u` are parameters.
-#
-# Suppose we want an inverse of the ``PolarTransform`` above. Of course, this is
-# achievable by defining another ``ExplicitSystem`` with :math:`x = r\cos\theta` and
-# :math:`y = r\sin\theta`, but for demonstration let's write it as follows:
-#
-# .. math::
-#    r - \sqrt{x^{*^2} + y^{*^2}} = 0 \\
-#    \theta - \tan^{-1}\left(\frac{y^*}{x^*}\right) = 0
-#
-# The idea here is that instead of solving these coupled equations algebraically, we can
-# let an iterative solver find the solution :math:`x^*,y^*` satisfying both residual
-# equations given parameters :math:`r` and :math:`\theta`.
-
+# and letting an iterative solver find the solution :math:`x^*,y^*` satisfying both
+# residual equations given parameters :math:`r` and :math:`\theta`. In Condor,
 
 class CartesianTransform(condor.AlgebraicSystem):
     # r and theta are input parameters
@@ -132,16 +84,33 @@ class CartesianTransform(condor.AlgebraicSystem):
     theta = parameter()
 
     # solver will vary x and y to satisfy the residuals
-    x = implicit_output(initializer=1)
-    y = implicit_output(initializer=1)
+    x = variable(initializer=1)
+    y = variable(initializer=1)
 
     # get r, theta from solver's x, y
     p = PolarTransform(x=x, y=y)
 
     # residuals to converge to 0
-    residual.resid_r = r - p.r
-    residual.resid_theta = theta - p.theta
+    residual(r == p.r)
+    residual(theta == p.theta)
 
 
 out = CartesianTransform(r=1, theta=np.pi / 4)
 print(out.x, out.y)
+
+# %%
+# Note also that passing the inputs (or any intermediates) to plain numeric functions
+# that can handle symbolic objects as well as pure numerical objects (float or numpy
+# arrays) could work for this simple example. However, since we *embedded* the
+# ``PolarTransform`` model in this solver, the system evaluated with the solved variable
+# values is directly accessible if the ``bind_embedded_models`` option is ``True``
+# (which it is by default), as in:
+
+
+print(out.p.output)
+
+
+# %%
+# Condor ships with a number of useful model types, with a particular emphasis on
+# ``OptimizationProblem`` and ``TrajectoryAnalysis`` to support the vehicle analysis and
+# design work that motivated the development of Condor.
