@@ -1,17 +1,17 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 
-import casadi
-import numpy as np
-from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
-
 import condor as co
 import condor.backends.casadi.shooting_gradient_method as ca_sgm
 import condor.solvers.shooting_gradient_method as sgm
+import numpy as np
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 from condor.backends.casadi.table_lookup import NDSplinesCallback
 from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
                                           symbol_class, wrap)
+from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
+
+import casadi
 
 # TODO: make SGM and SolverWithWarmStart (really, back-tracking solver and possibly only
 # needed if broyden doesn't resolve it?) generic and figure out how to separate the
@@ -343,7 +343,8 @@ class OptimizationProblem(InitializerMixin):
 
     default_options = {
         Method.ipopt: dict(
-            warm_start_init_point=False,
+            warm_start_init_point="no",
+            sb="yes",  # suppress banner
         ),
         Method.snopt: dict(
             warm_start_init_point=False,
@@ -437,7 +438,7 @@ class OptimizationProblem(InitializerMixin):
         if self.method is OptimizationProblem.Method.ipopt:
             self.nlp_opts.update(
                 print_time=False,
-                ipopt=options,
+                ipopt=self.options,
                 # print_level = 0-2: nothing, 3-4: summary, 5: iter table (default)
                 # tol=1E-14, # tighter tol for sensitivty
                 # accept_every_trial_step="yes",

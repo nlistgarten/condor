@@ -69,7 +69,7 @@ data_xx = dict(
 table = TableLookup(data_xx, data_yy, 1)
 
 def test_table_lookup():
-    table(xbbar=.5, xhbar=0.5)
+    table(xbbar=0.5, xhbar=0.5)
     tt = table(xbbar=0, xhbar=0)
     assert tt.sigma == 0
 
