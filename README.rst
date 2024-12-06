@@ -13,53 +13,43 @@ To best understand Condor, we can consider a simple benchmark problem which cons
 .. code-block:: python
 
   class Coupling(co.AlgebraicSystem):
-      x = parameter()
-      z = parameter(shape=2)
-      # current
-      y1 = implicit_output(initializer=1.)
-      y2 = implicit_output(initializer=1.)
-      residual.y1 = y1 - z[0] ** 2 - z[1] - x + 0.2 * y2
-      residual.y2 = y2 - y1**0.5 - z[0] - z[1]
-      # ideal?
+      x = parameter(shape=3)
       y1 = variable(initializer=1.)
       y2 = variable(initializer=1.)
-      disc1 = residual(y1 == z[0] ** 2 - z[1] - x + 0.2 * y2)
-      disc2 = residual(y2 == y2 - y1**0.5 - z[0] - z[1])
+
+      residual(y1 == x[0] ** 2 + x[1] + x[2] - 0.2 * y2)
+      residual(y2 == y1**0.5 + x[0] + x[1])
 
 This parametric model can be evaluated by providing the values for the parameters; the resulting object has values for its inputs and outputs bound, so the solved values for ``y1`` and ``y2`` can be acccessed easily:
 
 .. code-block:: python
 
-   coupling = Coupling(1, [5., 2.]) # evaluate the model numerically
+   coupling = Coupling([5., 2., 1]) # evaluate the model numerically
    print(coupling.y1, coupling.y2) # individual elements are bound numerically
-   print(coupling.implicit_output) # fields are bound as a dataclass
+   print(coupling.variable) # fields are bound as a dataclass
 
 Models can also be seamlessly built-up, with parent models accessing any input or output of the child models. For example, we can optimize this coupled algebraic system,
 
 .. code-block:: python
 
   class Sellar(co.OptimizationProblem):
-      x = variable(lower_bound=0, upper_bound=10)
-      z = variable(shape=2, lower_bound=0, upper_bound=10)
-      coupling = Coupling(x, z)
+      x = variable(shape=3, lower_bound=0, upper_bound=10)
+      coupling = Coupling(x)
       y1, y2 = coupling
-  
-      objective = x**2 + z[1] + y1 + exp(-y2)
-      # current
-      constraint(y1, lower_bound=3.16, name="con1")
-      constraint(y2, upper_bound=24.)
-      # ideal
-      constraint(y1 >> 3.16, name="con1")
-      con2 = constraint(y2 << 24.)
+
+      objective = x[2]**2 + x[1] + y1 + exp(-y2)
+      constraint(y1 > 3.16)
+      constraint(24. > y2)
 
 This ``OptimizationProblem`` can be solved and the sub-model can be accesed directly,
 
 .. code-block:: python
 
+   Sellar.set_initial(x=[5,2,1])
    sellar = Sellar()
-   sellar.objective # scalar value
-   sellar.constraints # field
-   sellar.coupling.y1 # sub-model element
+   print(sellar.objective) # scalar value
+   print(sellar.constraint) # field
+   print(sellar.coupling.y1) # sub-model element
 
 
 

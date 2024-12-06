@@ -10,7 +10,7 @@ class Coupling(co.AlgebraicSystem):
     y1 = variable(initializer=1.)
     y2 = variable(initializer=1.)
 
-    y1_agreement = residual(y1 == z[0] ** 2 + z[1] + x - 0.2 * y2)
+    residual(y1 == z[0] ** 2 + z[1] + x - 0.2 * y2)
     residual(y2 == y1**0.5 + z[0] + z[1])
 
 

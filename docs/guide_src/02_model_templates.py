@@ -61,14 +61,14 @@ print(exp_out.output)
 
 class AlgebraicSys(condor.AlgebraicSystem):
     u = parameter()
-    x1 = implicit_output(initializer=1)
-    x2 = implicit_output()
-    residual.r1 = x1**2 - u
-    residual.r2 = x1 - x2
+    x1 = variable(initializer=1)
+    x2 = variable()
+    residual(x1**2 == u)
+    residual(x1 == x2)
 
 
 alg_out = AlgebraicSys(4)
-print(alg_out.implicit_output)
+print(alg_out.variable)
 
 # %%
 # :class:`OptimizationProblem`

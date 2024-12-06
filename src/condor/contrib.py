@@ -24,7 +24,21 @@ class DeferredSystem(ModelTemplate):
 
 # TODO: Move to "contrib" or something?
 class ExplicitSystem(ModelTemplate):
-    """output is an explicit function of input"""
+    r"""output is an explicit function of input
+
+    .. math::
+       \begin{align}
+       y_1 &=& f_1(x_1, x_2, \dots, x_n) \\
+       y_2 &=& f_2(x_1, x_2, \dots, x_n) \\
+       & \vdots & \\
+       y_m &=& f_m(x_1, x_2, \dots, x_n)
+       \end{align}
+
+
+    Each :math:`x_i` and :math:`y_j` may have arbitrary shape. Condor can automatically
+    calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers, etc.
+
+    """
 
     input = FreeField()
     output = AssignedField()
@@ -77,7 +91,20 @@ class AlgebraicSystemType(ModelType):
 
 
 class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
-    """"""
+    r"""Represents a system of algebraic equations, with parameters 
+    :math:`u` and implicit variables :math:`x`, which are driven to a solution
+    :math:`x^*`:
+
+    .. math::
+       \begin{align}
+       R_1(u_1, \dots, u_m, x_1^*, \dots, x_n^*) &=& 0 \\
+       \vdots & & \\
+       R_n(u_1, \dots, u_m, x_1^*, \dots, x_n^*) &=& 0
+       \end{align}
+
+    Condor solves for the :math:`x_i^*` and can automatically calculate the derivatives
+    :math:`\frac{dx_i}{du_j}` as needed for parent solvers, etc.
+    """
 
     """
     implicit_output are variables that drive residual to 0

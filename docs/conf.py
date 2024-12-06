@@ -19,6 +19,7 @@ release = version
 
 extensions = [
     "sphinx_gallery.gen_gallery",
+    "sphinx.ext.autodoc",
 ]
 
 # templates_path = ['_templates']
