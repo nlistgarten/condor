@@ -2,6 +2,8 @@ import condor as co
 import pytest
 from casadi import exp
 
+# TODO test from_values
+
 
 @pytest.mark.parametrize(
     "method",
