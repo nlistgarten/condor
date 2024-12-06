@@ -1,7 +1,9 @@
 import casadi
-import condor as co
 import ndsplines
 import numpy as np
+import pytest
+
+import condor as co
 from condor.backends.casadi.utils import wrap
 
 
@@ -66,16 +68,18 @@ data_xx = dict(
 )
 
 
-table = TableLookup(data_xx, data_yy, 1)
+@pytest.fixture
+def table():
+    return TableLookup(data_xx, data_yy, 1)
 
-def test_table_lookup():
+
+def test_table_lookup(table):
     table(xbbar=0.5, xhbar=0.5)
     tt = table(xbbar=0, xhbar=0)
     assert tt.sigma == 0
 
 
-def test_opt_on_table():
-
+def test_opt_on_table(table):
     class Opt(co.OptimizationProblem):
         xx = variable()
         yy = variable()

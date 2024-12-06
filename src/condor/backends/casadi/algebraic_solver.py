@@ -80,11 +80,12 @@ class SolverWithWarmStart(CasadiFunctionCallbackMixin, casadi.Callback):
         if self.enforce_bounds:
             self.x0 = self.newton(self.x0, p)
             self.resid, out_exp = self.resid_func(self.x0, p)
-            out_exp = out_exp.toarray().reshape(-1)
         else:
             self.x0, out_exp = self.rootfinder(self.x0, p)
             self.x0 = self.x0.toarray().reshape(-1)
-            out_exp = out_exp.toarray().reshape(-1)
+            self.resid, _ = self.resid_func(self.x0, p)
+        out_exp = out_exp.toarray().reshape(-1)
+
         log.debug(f"solved to {self.x0}")
 
         return tuple([*self.x0, *out_exp])
