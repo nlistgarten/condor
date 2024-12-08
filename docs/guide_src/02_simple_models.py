@@ -1,6 +1,6 @@
 """
 ======================
-2. The Model Templates
+2. Simple Models
 ======================
 """
 
@@ -20,10 +20,13 @@ import condor
 #    \begin{align}
 #    y_1 &=& f_1(x_1, x_2, \dots, x_n) \\
 #    y_2 &=& f_2(x_1, x_2, \dots, x_n) \\
-#    & \vdots & \\
+#    & \vdots \\
 #    y_m &=& f_m(x_1, x_2, \dots, x_n)
 #    \end{align}
 #
+#  where each :math:`y_i` is a name-assigned expression on the ``output`` field and each
+#  :math:`x_i` is an element drawn from the ``input`` field.
+# 
 # Each :math:`x_i` and :math:`y_j` may have arbitrary shape. Condor can automatically
 # calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers, etc.
 
@@ -38,6 +41,10 @@ class ExplicitSys(condor.ExplicitSystem):
 
 exp_out = ExplicitSys(x1=1, x2=[[1, 2, 3], [4, 5, 6]])
 print(exp_out.output)
+
+# %%
+# We have found it useful to embed a collection of models into a isngle ExplicitSystem
+# to 
 
 
 # %%

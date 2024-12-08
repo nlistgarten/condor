@@ -9,7 +9,10 @@ The design of Condor was heavily inspired by Django. Some key design principles 
  - Do not reinvent the wheel
 
 The authors followed a process that could be called "example-driven development", writing the user code they would want to work and then implementing it.
-The goal of Condor was to automate and facilitate as many of the steps for numerical modeling as possible and to do so with an API that is as natural and expressive as possible. [FIGURE]
+The goal of Condor was to automate and facilitate as many of the steps for numerical modeling as possible and to do so with an API that is as natural and expressive as possible.
+
+.. figure:: /images/math-model-process.png
+   :width: 100%
 
 Like the Model-View-Controller paradigm in web development, the Condor architecture has 3 key components:
 
@@ -18,6 +21,9 @@ Like the Model-View-Controller paradigm in web development, the Condor architect
 2. The Computational Engine or Computational Backend, a symbolic-computational library which provides symbolic representation of *elements* and *operations* with awareness for basic differential calculus.
 
 3. The solvers, which implement the nuemrical algorithms of interest, and the implementaiton layer that which acts as glue code operating on the model data structure using the specific backend to form the numerical function callbacks which the solvers need.
+
+.. figure:: /images/architecture.png
+   :width: 50%
 
 This loosly coupled approach allows any particular realization of each layer to be replaced. The computational engines and solver layers are generally external software, which greatly reduces the burden on the Condor team.
 
@@ -54,7 +60,6 @@ Each Model Template defines available *fields* from which *elements* are drawn t
 
 .. list-table:: Example table
    :header-rows: 1
-   :fontSize: 10
 
    * - built-in template
      - input

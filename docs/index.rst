@@ -15,7 +15,7 @@ Welcome to Condor's documentation!
 
    design
    guide/index
-   api
+   api/index
 
 
 

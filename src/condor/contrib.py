@@ -34,6 +34,8 @@ class ExplicitSystem(ModelTemplate):
        y_m &=& f_m(x_1, x_2, \dots, x_n)
        \end{align}
 
+    where each :math:`y_i` is a name-assigned expression on the ``output`` field and each
+    :math:`x_i` is an element drawn from the ``input`` field.
 
     Each :math:`x_i` and :math:`y_j` may have arbitrary shape. Condor can automatically
     calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers, etc.
@@ -45,7 +47,7 @@ class ExplicitSystem(ModelTemplate):
 
 
 class Tablelookup(ModelTemplate):
-    """ """
+    """The output is the interpolated value for each input """
 
     """
     rectilnear -> structured, rectilinear grid
@@ -218,7 +220,17 @@ class OptimizationProblemType(ModelType):
 
 
 class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType):
-    """"""
+    r"""Solve an optimization problem of the form
+
+    .. math::
+
+       \begin{aligned}
+       \operatorname*{minimize}_{x \in \mathbb{R}^3} &  &  & x_{2}^{2}+x_{1}+y_{1}+e^{-y_{2}} \\
+       \text{subject to} &  &  & 3.16\le y_{1}\\
+        &  &  & y_{2}\le24.0
+       \end{aligned}
+
+    """
 
     """
     variable are what the optimizer moves to solve problem
@@ -459,6 +471,10 @@ class TrajectoryAnalysisType(SubmodelType):
 
     A common use case will be to bind the parameters then only update the state...
 
+
+|                           |------------+-----------------------+----------------------|
+
+|                           |            | constraint            |                      |
     """
 
     metadata_class = TrajectoryAnalysisMetaData
