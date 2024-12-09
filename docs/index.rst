@@ -7,13 +7,13 @@
 
 Welcome to Condor's documentation!
 ==================================
-.. include:: ../README.rst
+..
+   .. include:: ../README.rst
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   design
    guide/index
    api/index
 
