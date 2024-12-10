@@ -24,7 +24,7 @@ sig2 = np.array(
 xbbar = np.linspace(0, 1.0, sig1.shape[0])
 xhbar = np.linspace(0, 0.3, sig1.shape[1])
 
-class Interp(co.Tablelookup):
+class Interp(co.TableLookup):
     bbar = input()
     hbar = input()
     sigma = output()
@@ -64,7 +64,7 @@ asigma = np.array(
     [0.0, 0.16, 0.285, 0.375, 0.435, 0.48, 0.52, 0.55, 0.575, 0.58, 0.59, 0.60, 0.62, 0.635, 0.65]
 )
 
-class CDIFlapInterp(co.Tablelookup):
+class CDIFlapInterp(co.TableLookup):
     flap_defl = input()
     dCL_flaps_coef = output()
     CDI_factor = output()
@@ -79,7 +79,7 @@ class CDIFlapInterp(co.Tablelookup):
 flap_defl = 7.
 cdi_flap_interp = CDIFlapInterp(flap_defl=flap_defl)
 
-class MyInterp(co.Tablelookup):
+class MyInterp(co.TableLookup):
     x = input()
     y = output()
 
@@ -96,7 +96,7 @@ class MyOpt(co.OptimizationProblem):
 
 mysol = MyOpt().xx
 
-class VDEL3_interp(co.Tablelookup):
+class VDEL3_interp(co.TableLookup):
 
     flap_span_ratio = input()
     taper_ratio = input()

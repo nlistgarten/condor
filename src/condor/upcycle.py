@@ -537,7 +537,7 @@ class UpcycleTable:
         self.symbolic_om_outputs = outputs
         self.inputs = [k for k in inputs.keys()]
         self.outputs = [k for k in outputs.keys()]
-        self.model_string = "\n".join([f"class {self.name}(co.Tablelookup):"])
+        self.model_string = "\n".join([f"class {self.name}(co.TableLookup):"])
 
 
 def mmsc_compute(self, inputs, outputs):

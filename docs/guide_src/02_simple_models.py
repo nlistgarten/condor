@@ -51,11 +51,11 @@ print(exp_out.output)
 
 
 # %%
-# :class:`Tablelookup`
+# :class:`TableLookup`
 # ============================
 #
 # It is often useful to interpolate pre-existing data. For this, the
-# :class:`Tablelookup` model template provides a convenient way to specify the
+# :class:`TableLookup` model template provides a convenient way to specify the
 # interpolant ``input`` and ``output``, which interpolates data on the ``input_data``
 # and ``output_data`` fields. This model uses the `ndsplines` library to perform the
 # interpolation and compute derivatives as needed. Note that this table model assumes
@@ -69,7 +69,7 @@ print(exp_out.output)
 # :math:`\frac{dy_i}{dx_j}` as needed.
 
 import numpy as np
-class TableExample(condor.Tablelookup):
+class TableExample(condor.TableLookup):
     x = input()
     y = output()
 
@@ -82,7 +82,7 @@ print(out.y)
 assert np.isclose(out.y, 1)
 
 
-class Table(condor.Tablelookup):
+class Table(condor.TableLookup):
     x1 = input()
     x2 = input()
 
@@ -112,7 +112,7 @@ print(tab_out.output)
 # same model-type conflict the intention is to make the argument manipulation at the
 # implementation layer as thin as possible.
 #
-# In the case of the Tablelookup
+# In the case of the TableLookup
 
 
 

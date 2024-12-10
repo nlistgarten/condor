@@ -118,7 +118,7 @@ class ExplicitSystem:
         )
 
 
-class Tablelookup:
+class TableLookup:
     def __init__(self, model_instance, args):
         model = model_instance.__class__
         self.construct(model, **options_to_kwargs(model))

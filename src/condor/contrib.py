@@ -46,7 +46,7 @@ class ExplicitSystem(ModelTemplate):
     output = AssignedField() #: the output of the model (e.g., :math:`y_i = f_i(x)`)
 
 
-class Tablelookup(ModelTemplate):
+class TableLookup(ModelTemplate):
     """The output is the interpolated value for each input """
 
     """
