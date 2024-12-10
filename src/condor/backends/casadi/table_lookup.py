@@ -118,7 +118,8 @@ class NDSplinesCallback(CasadiFunctionCallbackMixin, casadi.Callback):
         model = self.i.model
 
         self.interpolant = ndsplines.make_interp_spline(
-            self.i.input_data, self.i.output_data, degrees=self.i.degrees
+            self.i.input_data, self.i.output_data, degrees=self.i.degrees,
+            bcs=self.i.bcs
         )
 
     def eval(self, args):

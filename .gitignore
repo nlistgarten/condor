@@ -5,3 +5,4 @@ reports/
 .venv/
 _version.py
 _build/
+guide/

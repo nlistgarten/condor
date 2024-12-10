@@ -69,15 +69,15 @@ print(exp_out.output)
 # :math:`\frac{dy_i}{dx_j}` as needed.
 
 import numpy as np
-class TableExample(condor.TableLookup):
+class SinTable(condor.TableLookup):
     x = input()
     y = output()
 
-    input_data[x] = np.linspace(-1, 1, 100)*np.pi
+    input_data[x] = np.linspace(-1, 1, 5)*np.pi
     output_data[y] = ops.sin(input_data[x])
 
 
-out = TableExample(np.pi/2)
+out = SinTable(np.pi/2)
 print(out.y)
 assert np.isclose(out.y, 1)
 
@@ -104,16 +104,61 @@ tab_out = Table(x1=0.5, x2=0.1)
 print(tab_out.output)
 
 # %%
-# Options
-# ----------
+# :class:`Options`
+# ----------------
 #
 # Solver options can be passed from throught he Options attribute. Ultimately it is the
 # implementations job to parse the Options, but except where different solvers for the
 # same model-type conflict the intention is to make the argument manipulation at the
 # implementation layer as thin as possible.
 #
-# In the case of the TableLookup
+# In the case of the TableLookup, Options can be used to specify the boundary conditions
+# and interpolant degree (in each direction.) Options can be declared during the model
+# declaration, as in 
+
+class SinTable(condor.TableLookup):
+    x = input()
+    y = output()
+
+    input_data[x] = np.linspace(-1, 1, 5)*np.pi
+    output_data[y] = ops.sin(input_data[x])
+
+    class Options:
+        degrees = 0
+
+print(SinTable(np.pi/4))
 
 
+# %%
+# or by assigning an attribute directly on the Model's Option attribute, which will be
+# injected if it is not declared. For example, we can iterate over piecewise constant,
+# piecewise linear, and piecewise cubic polynomials to 
 
+class SinTable(condor.TableLookup):
+    x = input()
+    y = output()
+
+    input_data[x] = np.linspace(-1, 1, 5)*np.pi
+    output_data[y] = ops.sin(input_data[x])
+
+    # note, ``Options`` attribute will get created so it can be modified in the loop
+    # below
+
+eval_x = np.linspace(-1, 1, 100)*np.pi
+from matplotlib import pyplot as plt
+fig, ax = plt.subplots(constrained_layout=True)
+for k in [0, 1, 3]:
+    SinTable.Options.degrees = k
+    if k == 3:
+        # for cubic polynomial, use constant slope (constant first derivative, 0 second
+        # derivative) boundary condition instead of default not-a-knot (constant,
+        # non-zero, second derivative)
+        SinTable.Options.bcs = (2, 0)
+    y = [SinTable(x).y for x in eval_x]
+    plt.plot(eval_x, y, label=f"k={k}")
+plt.plot(SinTable.input_data[SinTable.x], SinTable.output_data[SinTable.y], 'ko')
+plt.plot(eval_x, np.sin(eval_x), 'k--', label="true")
+plt.grid(True)
+plt.legend()
+plt.show()
 

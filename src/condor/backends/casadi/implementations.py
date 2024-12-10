@@ -128,6 +128,7 @@ class TableLookup:
         self,
         model,
         degrees=3,
+        bcs=(-1,0),
     ):
         self.model = model
         self.symbol_inputs = model.input.list_of("backend_repr")
@@ -140,6 +141,7 @@ class TableLookup:
             axis=-1,
         )
         self.degrees = degrees
+        self.bcs = bcs
         self.callback = NDSplinesCallback(self)
 
     def __call__(self, model_instance, *args):
