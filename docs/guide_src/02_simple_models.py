@@ -103,56 +103,17 @@ class Table(condor.Tablelookup):
 tab_out = Table(x1=0.5, x2=0.1)
 print(tab_out.output)
 
-
-
 # %%
-# :class:`AlgebraicSystem`
-# ========================
+# Options
+# ----------
 #
-# An :class:`AlgebraicSystem` represents a collection of residual functions of
-# ``parameter``\s :math:`u` and ``variable``\s :math:`x`, which are driven to a solution
-# :math:`x^*`:
+# Solver options can be passed from throught he Options attribute. Ultimately it is the
+# implementations job to parse the Options, but except where different solvers for the
+# same model-type conflict the intention is to make the argument manipulation at the
+# implementation layer as thin as possible.
 #
-# .. math::
-#    \begin{align}
-#    0 &=& R_1(u_1, \dots, u_m, x_1^*, \dots, x_n^*) \\
-#    & \vdots & \\
-#    0 &=& R_n(u_1, \dots, u_m, x_1^*, \dots, x_n^*)
-#    \end{align}
-#
-# Condor solves for the :math:`x_i^*` and can automatically calculate the derivatives
-# :math:`\frac{dx_i}{du_j}` as needed for parent solvers, etc.
-
-
-class AlgebraicSys(condor.AlgebraicSystem):
-    u = parameter()
-    x1 = variable(initializer=1)
-    x2 = variable()
-    residual(x1**2 == u)
-    residual(x1 == x2)
-
-
-alg_out = AlgebraicSys(4)
-print(alg_out.variable)
-
-# %%
-# As a convenience, an additional `output` field can be used to compute additional
-# expressions as functions of the paramater and (solved) variable values.
-
-
-class AlgebraicSys(condor.AlgebraicSystem):
-    m = parameter()
-    b = parameter()
-    y = parameter()
-    x = variable()
-
-    residual(m*x + b == y)
-
-    output.r = ops.sqrt(x**2 + y**2)
+# In the case of the Tablelookup
 
 
 
-alg_out = AlgebraicSys(m=0.5, b=1., y = 3.)
-print(alg_out.variable)
-print(alg_out.output)
 
