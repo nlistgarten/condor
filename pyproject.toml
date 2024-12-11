@@ -38,3 +38,7 @@ ignore = [
 
 [tool.isort]
 profile = "black"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--pdbcls=IPython.terminal.debugger:TerminalPdb"
