@@ -35,8 +35,10 @@ html_css_files = ["overrides.css"]
 
 
 sphinx_gallery_conf = {
-    "examples_dirs": "guide_src",
-    "gallery_dirs": "guide",
+    "examples_dirs": ["tutorial_src", "howto_src"],
+    "gallery_dirs": ["tutorials", "howto"],
     "filename_pattern": ".*.py",
     "within_subsection_order": "FileNameSortKey",
+    'download_all_examples': False,
+    'copyfile_regex': r'.*\.rst',
 }

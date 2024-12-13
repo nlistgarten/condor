@@ -6,3 +6,5 @@ reports/
 _version.py
 _build/
 guide/
+tutorials/
+howto/
