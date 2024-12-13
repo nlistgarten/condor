@@ -68,8 +68,8 @@ def asdict(obj):
 
 
 class Direction(Enum):
+    """:class:`Enum` Used to indicate the direction of an element relative to a model"""
     """
-    Used to indicate the direction of a Element relative to a model
     MatchedField may need to become MatchedElement and also use direction -- might
     be useful for DAE models, etc.
     """
@@ -80,10 +80,8 @@ class Direction(Enum):
 
 
 class FieldValues:
+    """Base class for Field dataclasses -- may need to use issubclass/isinstance
     """
-    Base class for Field dataclasses -- may need to use issubclass/isinstance
-    """
-
     pass
 
 
@@ -95,13 +93,14 @@ class Field:
     in models
 
     how to create a new Field type:
-    - subclass BaseElement as needed. Will automatically try to find NameElement for NameField,
-    or provide as element_class kwarg in subclass definition
-    - update _init_kwargs to define kwargs that should get passed during inheritance
+
+    - subclass :class:`BaseElement` as needed. Will automatically try to find
+      ``NameElement`` for ``NameField``, or provide as :attr:`~Field.element_class` kwarg in subclass definition
+    - update :attr:`_init_kwargs` to define kwargs that should get passed during inheritance
       from Model templates to user models
     - until a better API is designed & implemented, instance attributes created during
-      __init__ should start with a _ so setattr on assignedfields can filter it
-    - use create_element to create elements, passing **kwargs to element dataclass as much
+      :attr:`~Field.__init__` should start with a ``_`` so ``setattr`` on :class:`AssignedField`\s can filter it
+    - use :attr:`~Field.create_element` to create elements, passing ``**kwargs`` to element dataclass as much
       as possible to keep DRY
 
     """
@@ -132,6 +131,8 @@ class Field:
         inherit_from=None,
         model_name="",
     ):
+        """create a field instance
+        """
         # TODO: currently, AssignedField types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
         # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
@@ -179,6 +180,9 @@ class Field:
         self._set_resolve_name()
 
     def bind_dataclass(self):
+        """
+        Bind dataclass module and name in an attempt to make pickle-able
+        """
         mod_name = self._model.__module__
         self._dataclass.__module__ = mod_name
         if mod_name not in sys.modules:
@@ -188,6 +192,9 @@ class Field:
         setattr(mod_obj, self._dataclass.__name__, self._dataclass)
 
     def prepare(self, cls_dict):
+        """Hook to pass reference of class dictionary to field to allow automatic name
+        extraction and assignment
+        """
         self._cls_dict = cls_dict
 
     def inherit(self, model_name, field_type_name, **kwargs):
@@ -208,6 +215,9 @@ class Field:
 
     # TODO: replace with a descriptor that can be dot accessed?
     def list_of(self, field_name):
+        """
+        create a list of a particular element attribute for all elements in field
+        """
         return [getattr(element, field_name) for element in self._elements]
 
     def __repr__(self):
@@ -256,6 +266,9 @@ class Field:
         return items
 
     def flat_index(self, of_element):
+        """
+        Helper to get the starting index of an element if 
+        """
         idx = 0
         for element in self:
             if element is of_element:
@@ -264,6 +277,8 @@ class Field:
         return idx
 
     def create_element(self, **kwargs):
+        """Create an element
+        """
         kwargs.update(dict(field_type=self))
         self._elements.append(self.element_class(**kwargs))
         if self._cls_dict and isinstance(self, FreeField):
@@ -273,6 +288,7 @@ class Field:
         # self._count += getattr(self._elements[-1], 'size', 1)
 
     def create_dataclass(self):
+        """create the dataclass for this model and field with the current elements"""
         # TODO: do processing to handle different field types
         fields = [(element.name, float) for element in self._elements]
         name = make_class_name([self._model_name, self._name])
@@ -284,6 +300,7 @@ class Field:
         )
 
     def __iter__(self):
+        """iterating over field yields elements"""
         for element in self._elements:
             yield element
 
@@ -291,6 +308,8 @@ class Field:
         return len(self._elements)
 
     def __getattr__(self, with_name):
+        """make element names dot-accessible on Field, to match behavior on field
+        dataclass"""
         return self.get(name=with_name).backend_repr
 
 

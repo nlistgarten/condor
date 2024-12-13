@@ -147,7 +147,7 @@ sellar = Sellar()
 print()
 print("objective value:", sellar.objective) # scalar value
 print(sellar.constraint) # field
-print(sellar.coupling.y1) # sub-model element
+print(sellar.coupling.y1) # embedded-model element
 
 # %%
 # As another example, if we were interested in transforming Cartesian coordinates to polar form:

@@ -15,22 +15,12 @@ from condor import operators as ops
 # :class:`ExplicitSystem`
 # =======================
 #
-# An :class:`ExplicitSystem` represents a collection of functions:
-#
-# .. math::
-#    \begin{align}
-#    y_{1}&=& f_1\left( x_1, x_2, \ldots, x_n\right) \\
-#    y_{2}&=& f_2\left( x_1, x_2, \ldots, x_n\right) \\
-#         &\vdots& \\
-#    y_{m}&=& f_m\left( x_1, x_2, \ldots, x_n\right) \\
-#    \end{align}
-#
-#
-# where each :math:`y_i` is a name-assigned expression on the ``output`` field and each
-# :math:`x_i` is an element drawn from the ``input`` field.
-# 
-# Each :math:`x_i` and :math:`y_j` may have arbitrary shape. Condor can automatically
-# calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers, etc.
+# ..
+#     .. autoclass:: condor.contrib.ExplicitSystem
+#        :member-order: bysource
+#        :members:
+#        :undoc-members:
+#        :exclude-members: placeholder
 
 
 class ExplicitShapeDemo(condor.ExplicitSystem):
@@ -46,9 +36,17 @@ print(exp_out.output)
 
 # %%
 # We have found it useful to embed a collection of models into a single
-# ``ExplicitSystem`` to ensure proper binding of the embedded models and evaluate the
+# :class:`.ExplicitSystem` to ensure proper binding of the embedded models and evaluate the
 # model separately from the evaluation of any parent solvers.
-
+#
+# Note also that passing the inputs (or any intermediates) to plain numeric functions
+# that can handle symbolic objects as well as pure numerical objects (float or numpy
+# arrays) could work in most cases. However, the binding of named *elements* and
+# *fields* is useful for more sophiticated models. We have found ``ExplicitSystem``\'s
+# particularly useful as a wrapper around a collection of related models to propagate
+# inputs and outputs, either as an end-point for analysis or to provide structure in a
+# larger heirarchy. In particular, a single "analysis" wrapper model is useful
+# immediately under an optimization.
 
 # %%
 # :class:`TableLookup`
@@ -104,8 +102,8 @@ tab_out = Table(x1=0.5, x2=0.1)
 print(tab_out.output)
 
 # %%
-# :class:`Options`
-# ----------------
+# :class:`TableLookup.Options`
+# ------------------------------
 #
 # Solver options can be passed from throught he Options attribute. Ultimately it is the
 # implementations job to parse the Options, but except where different solvers for the
@@ -114,7 +112,7 @@ print(tab_out.output)
 #
 # In the case of the TableLookup, Options can be used to specify the boundary conditions
 # and interpolant degree (in each direction.) Options can be declared during the model
-# declaration, as in 
+# declaration, as in:
 
 class SinTable(condor.TableLookup):
     x = input()

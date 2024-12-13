@@ -59,3 +59,31 @@ alg_out = AlgebraicSys(m=0.5, b=1., y = 3.)
 print(alg_out.variable)
 print(alg_out.output)
 
+# %%
+# The :attr:`.AlgebraicSystem.variable` field
+# --------------------------------------------
+#
+# The :attr:`~.AlgebraicSystem.variable` field of :class:`.AlgebraicSystem` and
+# :class:`.OptimizationProblem` is an :class:`~condor.fields.InitializedField` which means any element drawn from it has an additional
+# `initializer` attribute. This can be set at any time, and will be used as the initial
+# value to the iterative solver.
+#
+# A symbolic expression of the ``parameter`` elements can be used as well. 
+#
+# By default, when the solver is called and a solution is found, the initializer for
+# each variable will be updated to the new solution. This behavior does not apply to
+# initialzier's which are symbolic expressions. This behavior can be prevented for
+# numerical initializers by setting the ``warm_start`` attribute to ``False``.
+#
+# Just checking if :attr:`variable` is rendering correctly
+#
+# Available :class:`Options`
+# ------------------------
+#
+# The key 
+
+
+
+
+
+

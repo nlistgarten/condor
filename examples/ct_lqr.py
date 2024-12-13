@@ -58,8 +58,8 @@ S = linalg.solve_continuous_are(dblintA,dblintB, DblIntLQR.Q, DblIntLQR.R)
 K = linalg.solve(DblIntLQR.R, dblintB.T@S)
 
 lqr_are = DblIntLQR(K)
-jac_callback = lqr_are.implementation.callback.jac_callback
-jac_callback(K, [0])
+#jac_callback = lqr_are.implementation.callback.jac_callback
+#jac_callback(K, [0])
 
 print(lqr_sol._stats)
 print(lqr_are.cost, lqr_sol.objective)
