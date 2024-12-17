@@ -9,7 +9,7 @@ Polar Transformation
 # .. math::
 #    \begin{align}
 #    p_r &= \sqrt{x^2 + y^2} \\
-#    p_{\theta} &= tan^{-1}\left(\frac{y}{x}\right)
+#    p_{\theta} &= \tan^{-1}\left(\frac{y}{x}\right)
 #    \end{align}
 #
 # We can implement this with an ``ExplicitSystem`` by declaring the inputs and outputs

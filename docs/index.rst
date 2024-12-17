@@ -31,6 +31,7 @@ The documentation is organized as follows:
    tutorials/index
    howto/index
    api/index
+   topics/index
 
 
 
