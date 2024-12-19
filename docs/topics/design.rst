@@ -1,9 +1,9 @@
 =================
-Design Principles
+Condor Design
 =================
 
-Overall goals
-=============
+Overall goals and API
+======================
 
 Condor is a new mathematical modeling framework for Python, developed at NASA's Ames Research Center.
 Initial development began in April 2023 to address modeling challenges for aircraft synthesis and robust 
@@ -66,6 +66,10 @@ mathematical models in engineering analysis,
 
 .. figure:: /images/math-model-process.png
    :width: 100%
+
+
+Architecture
+============
 
 We followed modern pythonic best-practices and patterns to settle on a multi-layered
 architecture like the Model-View-Controller paradigm in web development. The
@@ -169,11 +173,19 @@ The implementation layer
 The implementation layer is responsible for using the backend to create the numerical functions 
 needed to evaluate model and call any solvers as needed.
 
+The embedded :class:`Options` class inside a model provides a name-space...
+
+
 
 The backend
 ============
 
 The backend layer 
+
+
+Using Condor for a "tool" or library
+=====================================
+
 
 
 ..

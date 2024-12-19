@@ -22,7 +22,8 @@ class PolarTransform(co.ExplicitSystem):
     y = input()
 
     output.r = ops.sqrt(x**2 + y**2)
-    output.theta = ops.atan2(y, x)
+    #output.theta = ops.atan2(y, x)
+    output.theta = ops.atan(y/x)
 
 
 # %%
@@ -76,7 +77,7 @@ class CartesianTransform(co.AlgebraicSystem):
 
     # solver will vary x and y to satisfy the residuals
     x = variable(initializer=1)
-    y = variable(initializer=1)
+    y = variable(initializer=0)
 
     # get r, theta from solver's x, y
     p = PolarTransform(x=x, y=y)
@@ -99,3 +100,27 @@ print(out.x, out.y)
 
 
 print(out.p.output)
+
+# %%
+# Note that this has multiple solutions due to the form of the algebraic relationship of
+# the polar/rectangular transformation. The :class:`AlgebraicSystem` uses Newton's
+# method as the solver, so the solution that is found depends on the initial conditions.
+# The :attr:`initializer` attribute on the :attr:`variable` field determines the initial
+# position. For example,
+
+CartesianTransform.set_initial(x=-1, y=-1)
+out = CartesianTransform(r=1, theta=ops.pi / 4)
+print(out.variable)
+
+
+# %%
+# An additional :attr:`warm_start` attribute determines whether the initializer is
+# over-wrriten. Since the default is true, we can inspect the initializer values, 
+
+print(CartesianTransform.x.initializer, CartesianTransform.y.initializer)
+
+# %%
+# and re-solve with attr:`warm_start` False
+
+CartesianTransform.y.warm_start = False 
+
