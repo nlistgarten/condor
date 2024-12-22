@@ -9,4 +9,5 @@ We provide a few simple tutorial examples to illustrate the
 
    /tutorials/sellar
    /tutorials/polar_transform
+   /tutorials/trajectory
 
