@@ -32,4 +32,13 @@ docs = ["sphinx", "sphinx-gallery"]
 write_to = "src/condor/_version.py"
 
 [tool.ruff.lint]
-ignore = ["D212"]
+ignore = [
+    "F821", # Undefined name ..."
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--pdbcls=IPython.terminal.debugger:TerminalPdb"

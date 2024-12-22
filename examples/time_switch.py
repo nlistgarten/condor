@@ -17,6 +17,7 @@ class DblInt(co.ODESystem):
 
     x = state(shape=A.shape[0])
     mode = state()
+    pos_at_switch = state()
 
 
     t1 = parameter()
@@ -37,7 +38,6 @@ class Switch1(DblInt.Event):
     at_time = t1,
     update[mode] = 1.
 
-    pos_at_switch = state()
     update[pos_at_switch] = x[0]
 
 class Decel(DblInt.Mode):
@@ -106,7 +106,7 @@ p=[1, 4]
 
 """
 
-MinimumTime.implementation.set_initial(t1=2.163165480675697, t2=4.361971866705403)
+MinimumTime.set_initial(t1=2.163165480675697, t2=4.361971866705403)
 
 from time import perf_counter
 
