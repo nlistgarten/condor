@@ -1,3 +1,7 @@
+"""
+This module uses the backend to process a Model with values for input fields to call
+solvers. 
+"""
 from dataclasses import dataclass
 from enum import Enum, auto
 
@@ -43,6 +47,8 @@ import casadi
 
 
 def options_to_kwargs(new_cls):
+    """ Process a model clasa and create the kwarg dictionary for the :class:`Options`
+    """
     Options = getattr(new_cls, "Options", None)
     if Options is not None:
         backend_option = {
@@ -85,6 +91,9 @@ class DeferredSystem:
 
 
 class ExplicitSystem:
+    """ Implementation for :class:`ExplicitSystem` model. No :class:`Options` expected.
+    """
+
     def __init__(self, model_instance, args):
         self.construct(model_instance.__class__)
         self(model_instance, *args)
@@ -119,6 +128,9 @@ class ExplicitSystem:
 
 
 class TableLookup:
+    """ Implementation for :class:`TableLookup` model.
+    Should be re-factored to use ExternalSolver representation
+    """
     def __init__(self, model_instance, args):
         model = model_instance.__class__
         self.construct(model, **options_to_kwargs(model))
@@ -130,6 +142,8 @@ class TableLookup:
         degrees=3,
         bcs=(-1,0),
     ):
+        """ Pass through 
+        """
         self.model = model
         self.symbol_inputs = model.input.list_of("backend_repr")
         self.symbol_outputs = model.output.list_of("backend_repr")
@@ -324,6 +338,36 @@ class AlgebraicSystem(InitializerMixin):
         self.x0 = self.callback.x0
         super().set_initial(*args, **kwargs)
         self.callback.x0 = self.x0
+
+import inspect
+class SciPyIterCallbackWrapper:
+    @classmethod
+    def create_or_none(cls, model, parameters, callback=None):
+        if callback is None:
+            return None
+        return cls(model, parameters, callback)
+
+    def __init__(self, model, parameters, callback):
+        self.iter = 0
+        self.callback = callback
+        self.model = model
+        self.parameters = parameters
+        self.pass_instance = len(inspect.signature(self.callback).parameters) > 4
+
+    def __call__(self, xk):
+        variable = self.model.create_bound_field_dataclass(self.model.variable, xk)
+        instance = self.model.from_values(
+            **self.parameters.asdict(),
+            **variable.asdict()
+        )
+        callback_args = (
+            self.iter, variable, instance.objective, instance.constraint,
+        )
+        if self.pass_instance:
+            callback_args += (instance,)
+
+        self.callback(*callback_args)
+        self.iter += 1
 
 
 class OptimizationProblem(InitializerMixin):
@@ -737,6 +781,12 @@ class OptimizationProblem(InitializerMixin):
                 for con in scipy_constraints:
                     con["args"] = extra_args
 
+            if self.init_callback is not None:
+                self.init_callback(
+                    model_instance.parameter,
+                    {**self.options, "lbx": self.lbx, "ubx": self.ubx},
+                )
+
             min_out = minimize(
                 lambda *args: self.f_func(*args).toarray().squeeze(),
                 self.x0,
@@ -748,7 +798,13 @@ class OptimizationProblem(InitializerMixin):
                 # tol = 1E-9,
                 # options=dict(disp=True),
                 options=self.options,
+                callback=SciPyIterCallbackWrapper.create_or_none(
+                    self.model,
+                    model_instance.parameter,
+                    self.iter_callback
+                ),
             )
+
             model_instance.bind_field(self.model.variable, min_out.x)
             model_instance.objective = min_out.fun
             self.x0 = min_out.x

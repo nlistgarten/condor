@@ -52,14 +52,49 @@ def test_callback():
 
         objective = x**2 + p
 
+    class Callback:
+        def __init__(self):
+            self.count = 0
+            self.objectives = []
+            self.parameter = None
+
+        def init_callback(self, parameter, impl_opts):
+            self.parameter = parameter
+
+        def iter_callback(self, i, variable, objective, constraint):
+            self.count += 1
+            self.objectives.append(objective)
+
+    callback = Callback()
+    Opt.Options.iter_callback = callback.iter_callback
+
+    xinit = 10
+    p = 4
+    Opt.x.initializer = xinit
+    Opt(p=p)
+
+    assert callback.parameter is None
+    assert callback.count > 0
+    assert callback.objectives[0] == xinit**2 + p
+    assert callback.objectives[-1] == p
+
+    # add init callback
+    Opt.Options.init_callback = callback.init_callback
+    Opt(p=p)
+    assert callback.parameter is not None
+
+
+def test_callback_scipy_no_instance():
+    class Opt(co.OptimizationProblem):
+        p = parameter()
+        x = variable()
+
+        objective = x**2 + p
+
         class Options:
-            print_level = 0
-
-            _callbacks = 0
-
-            @staticmethod
-            def iter_callback(i, variable, objective, constraints):
-                Options._callbacks += 1
+            method = (
+                co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
+            )
 
     class Callback:
         def __init__(self):
@@ -86,6 +121,54 @@ def test_callback():
     assert callback.count > 0
     assert callback.objectives[0] == xinit**2 + p
     assert callback.objectives[-1] == p
+
+    # add init callback
+    Opt.Options.init_callback = callback.init_callback
+    Opt(p=p)
+    assert callback.parameter is not None
+
+
+def test_callback_scipy_instance():
+    class Opt(co.OptimizationProblem):
+        p = parameter()
+        x = variable()
+
+        objective = x**2 + p
+
+        class Options:
+            method = (
+                co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
+            )
+
+    class Callback:
+        def __init__(self):
+            self.count = 0
+            self.objectives = []
+            self.parameter = None
+            self.instances = []
+
+        def init_callback(self, parameter, impl_opts):
+            self.parameter = parameter
+
+        def iter_callback(self, i, variable, objective, constraint, instance):
+            self.count += 1
+            self.objectives.append(objective)
+            self.instances.append(instance)
+
+    callback = Callback()
+    Opt.Options.iter_callback = callback.iter_callback
+
+    xinit = 10
+    p = 4
+    Opt.x.initializer = xinit
+    Opt(p=p)
+
+    assert callback.parameter is None
+    assert callback.count > 0
+    assert callback.objectives[0] == xinit**2 + p
+    assert callback.objectives[-1] == p
+    assert len(callback.instances) == callback.count
+    assert isinstance(callback.instances[-1], Opt)
 
     # add init callback
     Opt.Options.init_callback = callback.init_callback
