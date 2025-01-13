@@ -11,33 +11,43 @@ Here we will provide how-to guides (recipes) for certain tasks.
     parallel_processing
 
 ..
-   parallel_processing - quick guide on parallel processing
+   [x] parallel_processing - quick guide on parallel processing
+   [ ] external_solver
 
-   optimization_callback
-       from_values - or part of callback?
-   pareto_front - using a constraint to sweep?
-   set_initial - set initial for iterative solvers
+   [ ] optimization_callback
+   [ ]     from_values - or part of callback?
+   [ ] pareto_front - using a constraint to sweep?
 
-   variable -- warmstart, initializer, etc.
+   [ ] external solver
 
-   options (or to topic) -- inspect implementation, basic usage and philosophy? so actually topic
-   how to access model metadata
+   [ ] variable -- warmstart, initializer, etc.
+   [ ] set_initial - set initial for iterative solvers
 
-   how to dry-up 
-   alias_dict - use dictionaries for manging IO
-   functions operating on fields
+   [ ] options (or to topic) -- inspect implementation, basic usage and philosophy? so actually topic
+   [ ] how to access model metadata
 
-   model_generators - not sure what this was for? maybe just a header for the two below??
-   functional_class_factory - using metaprogramming machinery in a function
-   configuration_class_factory - using configuration to make a dynamic model
-      dynamic link?
+   [ ] how to dry-up 
+   [ ] alias_dict - use dictionaries for manging IO
+   [ ] functions operating on fields
 
-   new_model_template -- 
-     extend existing model with pre-populated fields/using placeholders
-     Defining fields/creating new fields
-     Creating a new implementaiton vs using existing
+   [ ] model_generators - not sure what this was for? maybe just a header for the two below??
+   [ ] functional_class_factory - using metaprogramming machinery in a function
+   [ ] configuration_class_factory - using configuration to make a dynamic model
+   [ ]    dynamic link?
 
-   new_solver -- create new implementation to re-route ?? :(
+
+
+
+   [ ] new_model_template -- 
+   [ ]   extend existing model with pre-populated fields/using placeholders
+   [ ]   Defining fields/creating new fields
+   [ ]   Creating a new implementaiton vs using existing
+   [ ]   custom metaclass for construction/model behaviors
+   [ ]   staticmethod vs classmethod vs (instance)method --  or is this in topics
+
+
+
+   [ ] new_solver -- create new implementation to re-route ?? :(
 
 
 

@@ -30,7 +30,9 @@ if __name__ == "__main__":
 # instead.
 def wrapper(*args, **kwargs):
     m = Model(*args, **kwargs)
-    return m.input, m.output
+    del m.implementation
+    return m
+    #return m.input, m.output
 
 if __name__ == "__main__":
     with Pool(5) as p:

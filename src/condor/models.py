@@ -1095,7 +1095,7 @@ class ModelType(BaseModelType):
     @classmethod
     def get_implementation_class(cls, new_cls):
         # process implementations
-        implementation = None
+        implementation = getattr(cls, "implementation", None)
         if hasattr(new_cls, "Options"):
             implementation = getattr(new_cls.Options, "__implementation__", None)
             if implementation is not None:

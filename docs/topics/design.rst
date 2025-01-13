@@ -167,20 +167,85 @@ The built-in model types provide a useful library to build small or one-off mode
 We also ensured that there were good mechanisms for customizing models and creating new models to
 address repeat and sophisticated modeling tasks.
 
+Fields and Elements
+-------------------
+
+Fields contain the elements. Can be 
+
+Metaprogramming class declaration
+---------------------------------
+
+..
+    as clarified by Ionel: https://blog.ionelmc.ro/2015/02/09/understanding-python-metaclasses/#putting-it-all-together
+    call order is:
+      Meta.__prepare__ creates class dict
+      process attributes of Class (class definition fills in class dict)
+      Meta.__new__ creates class (via type.__call__) and returns Class
+      (and Meta.__init__, but not as powerful, can do post-ops on constructed Class)
+
+    note, similar construction for object, instance of Class:
+      Meta.__call__ (classmethod, but located in Meta)
+      Class.__new__ (classmethod)
+      Class.__init__ (with instantiated class instance)
+
+    note, inheritance is done ~ by checking bases (well, really MRO) if the attribute is not
+    found on the leaf node. Can use this for Model's definition of __init__ etc for binding
+    the IO to the model instance, but cannot rely on it for the magic name space injection
+
+Ionel provides a nice overview of Python3 process for class declaration 
+and object instantiation. Relevant for us is the following call-order. For 
+class declaration,
+
+1. :func:`Metaclass.__prepare__` creates a class dictionary at the entry
+   of the ``class`` declaration.
+2. Each assignment within the class declaration uses the 
+   :func:`__setitem__` of the class dictionary
+3. :func:`Metaclass.__new__` is passed the (filled) class dictionary and
+   creates the class via :func:`type.__call__`. Note that
+   :func:`Metaclass.__init__` is also called after this but is not as
+   useful because the ``Class`` is already fully constructed by this point;
+   the ``__init__`` can only be used to organize post-processing.
+
+Is there any shared flow between a Template and Model?
+
+:class:`ModelTemplate` declaration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Annotated flow of how a :class:`ModelTemplate` is created
+
+:class:`Model` declaration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Annotated flow of how a :class:`Model` is created -- 
+
+
+Calling and binding
+-------------------
+
+the ``__class__`` is ``__call__``\ed
+
 The implementation layer
 ========================
 
-The implementation layer is responsible for using the backend to create the numerical functions 
-needed to evaluate model and call any solvers as needed.
+The implementation layer is responsible for using the backend to create
+the numerical functions needed to evaluate model and call any solvers as
+needed.
 
-The embedded :class:`Options` class inside a model provides a name-space...
+The embedded :class:`Options` class inside a model provides a name-space.
+Attributes without a leading underscore are placed into a ``dict`` for
+the keyword arguments to the implementation's :func:`construct`
+method. Special behavior for ``_implementation`` and ...
+
+
 
 
 
 The backend
 ============
 
-The backend layer 
+The backend layer provides a common interface to potential
+"computational engine" libraries. Currently, we support only the
+CasADi engine. 
 
 
 Using Condor for a "tool" or library

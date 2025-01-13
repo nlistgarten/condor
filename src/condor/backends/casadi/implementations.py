@@ -354,7 +354,7 @@ class SciPyIterCallbackWrapper:
         self.parameters = parameters
         self.pass_instance = len(inspect.signature(self.callback).parameters) > 4
 
-    def __call__(self, xk):
+    def __call__(self, xk, res=None):
         variable = self.model.create_bound_field_dataclass(self.model.variable, xk)
         instance = self.model.from_values(
             **self.parameters.asdict(),

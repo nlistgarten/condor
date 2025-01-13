@@ -52,7 +52,7 @@ class SolverSciPyBase(SolverMixin):
             atol=atol,
             rtol=rtol,
             max_step=max_step_size,
-            nsteps=100_000,
+            nsteps=500_000,
         )
         self.solver.set_integrator(**self.int_options)
         self.solver.set_solout(self.solout)
