@@ -1,0 +1,703 @@
+from .utils import options_to_kwargs
+from enum import Enum, auto
+import casadi
+import condor as co
+
+from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
+from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
+from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
+                                          symbol_class, wrap)
+import numpy as np
+
+class InitializerMixin:
+    def set_initial(self, *args, **kwargs):
+        if args:
+            # assume it's all initialized values, so flatten and assign
+            self.x0 = flatten(args)
+        else:
+            count_accumulator = 0
+            for field in self.parsed_initialized_fields:
+                size_cum_sum = np.cumsum([count_accumulator] + field.list_of("size"))
+                for start_idx, end_idx, name in zip(
+                    size_cum_sum, size_cum_sum[1:], field.list_of("name")
+                ):
+                    if name in kwargs:
+                        self.x0[start_idx:end_idx] = flatten(kwargs[name])
+                count_accumulator += field._count
+
+    def parse_initializers(self, fields, initializer_args):
+        # currently assuming all initializer fields get initialized together
+        # TODO: flatten -- might be done?
+        x0_at_construction = []
+        initializer_exprs = []
+        # TODO: shoud broadcasting be done elsewhere? with field? bounds needs it too
+        # bounds are definitely done in FreeField, I believe this reshape/broadcast_to
+        # is complete (just for initializer attribute on initialized field) -- I guess
+        # it might be drier in post_init of initialized field?
+
+        if isinstance(fields, co.Field):
+            fields = [fields]
+
+        for field in fields:
+            defined_initializers = field.list_of("initializer")
+            for solver_var in field:
+                if isinstance(solver_var.initializer, symbol_class):
+                    x0_at_construction.extend(np.zeros(solver_var.size))
+                    initializer_exprs.extend(
+                        casadi.vertsplit(
+                            solver_var.initializer.reshape((solver_var.size, 1))
+                        )
+                    )
+                else:
+                    initializer_val = np.array(solver_var.initializer)
+                    if initializer_val.size == solver_var.size:
+                        shaped_initial = initializer_val.reshape(-1)
+                    else:
+                        shaped_initial = np.broadcast_to(
+                            initializer_val, solver_var.shape
+                        ).reshape(-1)
+                    if solver_var.warm_start:
+                        x0_at_construction.extend(shaped_initial)
+                        initializer_exprs.extend(
+                            casadi.vertsplit(solver_var.backend_repr.reshape((-1, 1)))
+                        )
+                    else:
+                        x0_at_construction.append(shaped_initial)
+                        initializer_exprs.append(shaped_initial)
+
+        self.parsed_initialized_fields = fields
+
+        # setattr(self, f"{field._name}_at_construction", flatten(x0_at_construction))
+        self.initial_at_construction = flatten(x0_at_construction)
+        initializer_exprs = flatten(initializer_exprs)
+        # setattr(self, f"{field._name}_initializer_func",
+        self.initializer_func = casadi.Function(
+            f"{field._model_name}_{field._name}_initializer",
+            initializer_args,
+            initializer_exprs,
+        )
+
+
+class AlgebraicSystem(InitializerMixin):
+    class BoundBehavior(Enum):
+        p1 = auto()  # enforce in a p1 sense ("scalar")
+        p2 = auto()  # enforce in a p2 sense ("vector")
+        p1_hold = (
+            auto()
+        )  # enforce in a p1 sense, modify search direction to hold enforced ("wall")
+        ignore = auto()
+
+    class LineSearchCriteria(Enum):
+        armijo = auto()
+
+    def __init__(self, model_instance, args):
+        model = model_instance.__class__
+        self.construct(model, **options_to_kwargs(model))
+        self(model_instance, *args)
+
+    def construct(
+        self,
+        model,
+        # standard options
+        atol=1e-12,
+        rtol=1e-12,
+        warm_start=True,
+        exact_hessian=True,
+        max_iter=100,
+        # new options
+        re_initialize=slice(
+            None
+        ),  # slice for re-initializing at every call. will support indexing
+        default_initializer=0.0,
+        bound_behavior=BoundBehavior.p1,
+        line_search_contraction=0.5,  # 1.0 -> no line search?
+        line_search_criteria=LineSearchCriteria.armijo,
+        error_on_fail=False,
+        enforce_bounds=False,
+    ):
+        rootfinder_options = dict(
+            error_on_fail=error_on_fail, abstol=atol, abstolStep=rtol, max_iter=max_iter
+        )
+        self.x = casadi.vertcat(*flatten(model.variable))
+        self.g0 = casadi.vertcat(*flatten(model.residual))
+        self.g1 = casadi.vertcat(*flatten(model.output))
+        self.p = casadi.vertcat(*flatten(model.parameter))
+
+        self.output_func = casadi.Function(
+            f"{model.__name__}_output", [self.x, self.p], [self.g1]
+        )
+
+        self.model = model
+        self.parse_initializers(
+            model.variable,
+            [self.x, self.p],
+        )
+
+        self.callback = SolverWithWarmStart(
+            model.__name__,
+            self.x,
+            self.p,
+            self.g0,
+            self.g1,
+            flatten(model.variable.list_of("lower_bound")),
+            flatten(model.variable.list_of("upper_bound")),
+            # self.implicit_output_at_construction,
+            self.initial_at_construction,
+            rootfinder_options,
+            self.initializer_func,
+            enforce_bounds=enforce_bounds,
+            max_iter=max_iter,
+        )
+
+    def __call__(self, model_instance, *args, **kwargs):
+        self.call_args = casadi.vertcat(*flatten(args))
+        out = self.callback(self.call_args)
+        self.var_out = casadi.vertcat(*out[: self.model.variable._count])
+        model_instance.bind_field(self.model.variable, self.var_out)
+        model_instance.bind_field(
+            self.model.output, self.output_func(self.var_out, self.call_args)
+        )
+
+        if hasattr(self.callback, "resid"):
+            # TODO: verify this will never become stale
+            # TODO: it seems a bit WET to wrap each field and then, eventually, bind
+            # each field.
+            resid = self.callback.resid
+            model_instance.bind_field(
+                self.model.residual, resid, symbols_to_instance=False
+            )
+
+        for k, v in model_instance.variable.asdict().items():
+            model_var = getattr(self.model, k)
+            if model_var.warm_start and not isinstance(
+                model_var.initializer, symbol_class
+            ):
+                if not isinstance(v, symbol_class):
+                    model_var.initializer = v
+
+    def set_initial(self, *args, **kwargs):
+        self.x0 = self.callback.x0
+        super().set_initial(*args, **kwargs)
+        self.callback.x0 = self.x0
+
+import inspect
+class SciPyIterCallbackWrapper:
+    @classmethod
+    def create_or_none(cls, model, parameters, callback=None):
+        if callback is None:
+            return None
+        return cls(model, parameters, callback)
+
+    def __init__(self, model, parameters, callback):
+        self.iter = 0
+        self.callback = callback
+        self.model = model
+        self.parameters = parameters
+        self.pass_instance = len(inspect.signature(self.callback).parameters) > 4
+
+    def __call__(self, xk, res=None):
+        variable = self.model.create_bound_field_dataclass(self.model.variable, xk)
+        instance = self.model.from_values(
+            **self.parameters.asdict(),
+            **variable.asdict()
+        )
+        callback_args = (
+            self.iter, variable, instance.objective, instance.constraint,
+        )
+        if self.pass_instance:
+            callback_args += (instance,)
+
+        self.callback(*callback_args)
+        self.iter += 1
+
+
+class CasadiIterationCallback(casadi.Callback):
+    def __init__(self, name, nlpdict, model, iteration_callback, opts={}):
+        casadi.Callback.__init__(self)
+        self.iteration_callback = iteration_callback
+        self.nlpdict = nlpdict
+        self.model = model
+        self.iter = 0
+        self.construct(name, opts)
+
+    def get_n_in(self):
+        return casadi.nlpsol_n_out()
+
+    def get_n_out(self):
+        return 1
+
+    def get_name_in(self, i):
+        n = casadi.nlpsol_out(i)
+        return n
+
+    def get_name_out(self, i):
+        return "ret"
+
+    def get_sparsity_in(self, i):
+        n = casadi.nlpsol_out(i)
+        if n == "f":
+            return casadi.Sparsity.dense(1)
+        elif n in ("x", "lam_x"):
+            return self.nlpdict["x"].sparsity()
+        elif n in ("g", "lam_g"):
+            return self.nlpdict["g"].sparsity()
+        return casadi.Sparsity(0, 0)
+
+    def eval(self, args):
+        # x, f, g, lam_x, lam_g, lam_p
+        x, f, g, *_ = args
+        var_data = self.model.create_bound_field_dataclass(self.model.variable, x)
+        constraint_data = self.model.create_bound_field_dataclass(
+            self.model.constraint, g
+        )
+        self.iteration_callback(self.iter, var_data, f, constraint_data)
+        self.iter += 1
+        return [0]
+
+
+class OptimizationProblem(InitializerMixin):
+    class Method(Enum):
+        ipopt = auto()
+        snopt = auto()
+        qrsqp = auto()
+        scipy_cg = auto()
+        scipy_trust_constr = auto()
+        scipy_slsqp = auto()
+
+    def make_warm_start(self, x0=None, lam_g0=None, lam_x0=None):
+        if x0 is not None:
+            self.x0 = x0
+        if lam_g0 is not None:
+            self.lam_g0 = lam_g0
+        if lam_x0 is not None:
+            self.lam_x0 = lam_x0
+
+    default_options = {
+        Method.ipopt: dict(
+            warm_start_init_point="no",
+            sb="yes",  # suppress banner
+        ),
+        Method.snopt: dict(
+            warm_start_init_point=False,
+        ),
+    }
+
+    def __init__(self, model_instance, args):
+        model = model_instance.__class__
+        self.construct(model, **options_to_kwargs(model))
+        self(model_instance, *args)
+
+    def construct(
+        self,
+        model,
+        exact_hessian=True,  # False -> ipopt alias for limited memory
+        keep_feasible=True,  # flag that goes to scipy trust constr linear constraints
+        method=Method.ipopt,
+        calc_lam_x=False,
+        # ipopt specific, default = False may help with computing sensitivity. To do
+        # proper warm start, need to provide lam_x and lam_g so I assume need calc_lam_x
+        # = True
+        iter_callback=None,
+        init_callback=None,
+        **options,
+    ):
+        self.model = model
+        self.options = self.default_options.get(method, dict()).copy()
+        self.options.update(options)
+
+        self.keep_feasible = keep_feasible
+
+        self.f = f = getattr(model, "objective", 0)
+        self.has_p = bool(len(model.parameter))
+        self.p = p = casadi.vertcat(*flatten(model.parameter))
+        self.x = x = casadi.vertcat(*flatten(model.variable))
+        self.g = g = casadi.vertcat(*flatten(model.constraint))
+
+        self.objective_func = casadi.Function(
+            f"{model.__name__}_objective",
+            [self.x, self.p],
+            [self.f],
+        )
+        self.constraint_func = casadi.Function(
+            f"{model.__name__}_constraint",
+            [self.x, self.p],
+            [g],
+        )
+
+        self.lbx = lbx = (
+            casadi.vcat(flatten(model.variable.list_of("lower_bound")))
+            .toarray()
+            .reshape(-1)
+        )
+        self.ubx = ubx = (
+            casadi.vcat(flatten(model.variable.list_of("upper_bound")))
+            .toarray()
+            .reshape(-1)
+        )
+        self.lbg = lbg = (
+            casadi.vcat(flatten(model.constraint.list_of("lower_bound")))
+            .toarray()
+            .reshape(-1)
+        )
+        self.ubg = ubg = (
+            casadi.vcat(flatten(model.constraint.list_of("upper_bound")))
+            .toarray()
+            .reshape(-1)
+        )
+
+        self.nlp_args = dict(f=f, x=x, g=g)
+        initializer_args = [self.x]
+        if self.has_p:
+            initializer_args += [self.p]
+            self.nlp_args["p"] = p
+        self.parse_initializers(model.variable, initializer_args)
+
+        self.nlp_opts = dict()
+        self.iter_callback = iter_callback
+        self.init_callback = init_callback
+        if iter_callback is not None:
+            self.nlp_opts["iteration_callback"] = CasadiIterationCallback(
+                "iter", self.nlp_args, model, self.iter_callback
+            )
+
+        self.x0 = self.initial_at_construction.copy()
+        self.lam_g0 = None
+        self.lam_x0 = None
+        # self.variable_at_construction.copy()
+
+        self.method = method
+        if self.method is OptimizationProblem.Method.ipopt:
+            self.nlp_opts.update(
+                print_time=False,
+                ipopt=self.options,
+                # print_level = 0-2: nothing, 3-4: summary, 5: iter table (default)
+                # tol=1E-14, # tighter tol for sensitivty
+                # accept_every_trial_step="yes",
+                # max_iter=1000,
+                # constr_viol_tol=10.,
+                bound_consistency=True,
+                clip_inactive_lam=True,
+                calc_lam_x=calc_lam_x,
+                calc_lam_p=False,
+            )
+            # additional options from https://groups.google.com/g/casadi-users/c/OdRQKR13R50/m/bIbNoEHVBAAJ
+            # to try to get sensitivity from ipopt. so far no...
+            if not exact_hessian:
+                self.nlp_opts["ipopt"].update(
+                    hessian_approximation="limited-memory",
+                )
+
+            self.optimizer = casadi.nlpsol(
+                model.__name__,
+                "ipopt",
+                self.nlp_args,
+                self.nlp_opts,
+            )
+        elif self.method is OptimizationProblem.Method.snopt:
+            self.optimizer = casadi.nlpsol(
+                model.__name__,
+                "snopt",
+                self.nlp_args,
+                self.nlp_opts,
+            )
+        elif self.method is OptimizationProblem.Method.qrsqp:
+            self.nlp_opts.update(
+                qpsol="qrqp",
+                qpsol_options=dict(
+                    print_iter=False,
+                    error_on_fail=False,
+                ),
+                # qpsol='osqp',
+                verbose=False,
+                tol_pr=1e-16,
+                tol_du=1e-16,
+                # print_iteration=False,
+                print_time=False,
+                # hessian_approximation= "limited-memory",
+                print_status=False,
+            )
+
+            self.optimizer = casadi.nlpsol(
+                model.__name__, "sqpmethod", self.nlp_args, self.nlp_opts
+            )
+
+        else:
+            self.optimizer = None
+            self.f_func = self.objective_func
+            self.f_jac_func = casadi.Function(
+                f"{model.__name__}_objective_jac",
+                [self.x, self.p],
+                [casadi.jacobian(self.f, self.x)],
+            )
+
+            g_split = casadi.vertsplit(self.g)
+
+            if self.method is OptimizationProblem.Method.scipy_trust_constr:
+                g_jacs = [casadi.jacobian(g, self.x) for g in g_split]
+
+                scipy_constraints = []
+
+                nonlinear_flags = [
+                    casadi.depends_on(g_jac, self.x)
+                    or casadi.depends_on(g_expr, self.p)
+                    for g_jac, g_expr in zip(g_jacs, g_split)
+                    # could ignore dependence on parameters, but to be consistent with
+                    # ipopt specification require parameters within function not in
+                    # bounds
+                ]
+
+                # process nonlinear constraints
+                nonlinear_g_fun_exprs = [
+                    g_expr
+                    for g_expr, is_nonlinear in zip(g_split, nonlinear_flags)
+                    if is_nonlinear
+                ]
+                self.num_nonlinear_g = len(nonlinear_g_fun_exprs)
+                if self.num_nonlinear_g:
+                    nonlinear_g_jac_exprs = [
+                        g_jac
+                        for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
+                        if is_nonlinear
+                    ]
+
+                    self.g_func = casadi.Function(
+                        f"{model.__name__}_nonlinear_constraint",
+                        [self.x, self.p],
+                        [casadi.vertcat(*nonlinear_g_fun_exprs)],
+                    )
+
+                    self.g_jac_func = casadi.Function(
+                        f"{model.__name__}_nonlinear_constraint_jac",
+                        [self.x, self.p],
+                        [casadi.vertcat(*nonlinear_g_jac_exprs)],
+                    )
+
+                    self.nonlinear_ub = np.array(
+                        [
+                            ub
+                            for ub, is_nonlinear in zip(self.ubg, nonlinear_flags)
+                            if is_nonlinear
+                        ]
+                    )
+
+                    self.nonlinear_lb = np.array(
+                        [
+                            lb
+                            for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
+                            if is_nonlinear
+                        ]
+                    )
+
+                # process linear constraints
+                linear_A_exprs = [
+                    g_jac
+                    for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
+                    if not is_nonlinear
+                ]
+                self.num_linear_g = len(linear_A_exprs)
+                if self.num_linear_g:
+                    self.linear_jac_func = casadi.Function(
+                        f"{model.__name__}_A",
+                        [self.p],
+                        [casadi.vertcat(*linear_A_exprs)],
+                    )
+
+                    self.linear_ub = np.array(
+                        [
+                            ub
+                            for ub, is_nonlinear in zip(self.ubg, nonlinear_flags)
+                            if not is_nonlinear
+                        ]
+                    )
+
+                    self.linear_lb = np.array(
+                        [
+                            lb
+                            for lb, is_nonlinear in zip(self.lbg, nonlinear_flags)
+                            if not is_nonlinear
+                        ]
+                    )
+
+            elif self.method is OptimizationProblem.Method.scipy_slsqp:
+                self.equality_con_exprs = []
+                self.inequality_con_exprs = []
+                self.con = []
+                for g, lbg, ubg in zip(g_split, self.lbg, self.ubg):
+                    if lbg == ubg:
+                        self.equality_con_exprs.append(g - lbg)
+                    else:
+                        if lbg > -np.inf:
+                            self.inequality_con_exprs.append(g - lbg)
+                        if ubg < np.inf:
+                            self.inequality_con_exprs.append(ubg - g)
+
+                if self.equality_con_exprs:
+                    self.equality_con_expr = casadi.vertcat(*self.equality_con_exprs)
+                    self.eq_g_func = casadi.Function(
+                        f"{model.__name__}_equality_constraint",
+                        [self.x, self.p],
+                        [self.equality_con_expr],
+                    )
+                    self.eq_g_jac_func = casadi.Function(
+                        f"{model.__name__}_equality_constraint_jac",
+                        [self.x, self.p],
+                        [casadi.jacobian(self.equality_con_expr, self.x)],
+                    )
+                    self.con.append(
+                        dict(
+                            type="eq",
+                            fun=lambda x, p: self.eq_g_func(x, p).toarray().squeeze().T,
+                            jac=self.eq_g_jac_func,
+                        )
+                    )
+
+                if self.inequality_con_exprs:
+                    self.inequality_con_expr = casadi.vertcat(
+                        *self.inequality_con_exprs
+                    )
+                    self.ineq_g_func = casadi.Function(
+                        f"{model.__name__}_inequality_constraint",
+                        [self.x, self.p],
+                        [self.inequality_con_expr],
+                    )
+                    self.ineq_g_jac_func = casadi.Function(
+                        f"{model.__name__}_inequality_constraint_jac",
+                        [self.x, self.p],
+                        [casadi.jacobian(self.inequality_con_expr, self.x)],
+                    )
+                    self.con.append(
+                        dict(
+                            type="ineq",
+                            fun=lambda x, p: self.ineq_g_func(x, p)
+                            .toarray()
+                            .squeeze()
+                            .T,
+                            jac=self.ineq_g_jac_func,
+                        )
+                    )
+
+    def __call__(self, model_instance, *args):
+        initializer_args = [self.x0]
+        if self.has_p:
+            p = casadi.vertcat(*flatten(args))
+            initializer_args += [p]
+        if not self.has_p or not isinstance(args[0], symbol_class):
+            self.x0 = self.initializer_func(*initializer_args)
+            if not isinstance(self.x0, casadi.DM):
+                self.x0 = casadi.vertcat(*self.x0)
+            self.x0 = self.x0.toarray().reshape(-1)
+
+        if self.method in (
+            OptimizationProblem.Method.ipopt,
+            OptimizationProblem.Method.snopt,
+            OptimizationProblem.Method.qrsqp,
+        ):
+            if self.init_callback is not None:
+                self.init_callback(model_instance.parameter, self.nlp_opts)
+            call_args = dict(
+                x0=self.x0,
+                ubx=self.ubx,
+                lbx=self.lbx,
+                ubg=self.ubg,
+                lbg=self.lbg,
+            )
+            if self.options["warm_start_init_point"]:
+                if self.lam_x0 is not None:
+                    call_args.update(lam_x0=self.lam_x0)
+                if self.lam_g0 is not None:
+                    call_args.update(lam_g0=self.lam_g0)
+
+            if self.has_p:
+                call_args["p"] = p
+
+            out = self.optimizer(**call_args)
+            if not self.has_p or not isinstance(args[0], symbol_class):
+                self.x0 = out["x"]
+
+            model_instance.bind_field(self.model.variable, out["x"])
+            model_instance.bind_field(self.model.constraint, out["g"])
+            model_instance.objective = np.array(out["f"]).squeeze()
+            self.stats = self.optimizer.stats()
+            self.out = out
+            self.lam_g0 = out["lam_g"]
+            self.lam_x0 = out["lam_x"]
+        else:
+            if self.has_p:
+                extra_args = (p,)
+            else:
+                extra_args = ([],)
+
+            scipy_constraints = []
+
+            if self.method is OptimizationProblem.Method.scipy_cg:
+                method_string = "CG"
+
+            elif self.method is OptimizationProblem.Method.scipy_trust_constr:
+                method_string = "trust-constr"
+                if self.num_linear_g:
+                    scipy_constraints.append(
+                        LinearConstraint(
+                            A=self.linear_jac_func(*extra_args).sparse(),
+                            ub=self.linear_ub,
+                            lb=self.linear_lb,
+                            keep_feasible=self.keep_feasible,
+                        )
+                    )
+                if self.num_nonlinear_g:
+                    scipy_constraints.append(
+                        NonlinearConstraint(
+                            fun=(
+                                lambda *args: self.g_func(*args, *extra_args)
+                                .toarray()
+                                .squeeze()
+                            ),
+                            jac=(
+                                lambda *args: self.g_jac_func(
+                                    *args, *extra_args
+                                ).sparse()
+                            ),
+                            lb=self.nonlinear_lb,
+                            ub=self.nonlinear_ub,
+                        )
+                    )
+            elif self.method is OptimizationProblem.Method.scipy_slsqp:
+                scipy_constraints = self.con
+                method_string = "SLSQP"
+                for con in scipy_constraints:
+                    con["args"] = extra_args
+
+            if self.init_callback is not None:
+                self.init_callback(
+                    model_instance.parameter,
+                    {**self.options, "lbx": self.lbx, "ubx": self.ubx},
+                )
+
+            min_out = minimize(
+                lambda *args: self.f_func(*args).toarray().squeeze(),
+                self.x0,
+                jac=lambda *args: self.f_jac_func(*args).toarray().squeeze(),
+                method=method_string,
+                args=extra_args,
+                constraints=scipy_constraints,
+                bounds=np.vstack([self.lbx, self.ubx]).T,
+                # tol = 1E-9,
+                # options=dict(disp=True),
+                options=self.options,
+                callback=SciPyIterCallbackWrapper.create_or_none(
+                    self.model,
+                    model_instance.parameter,
+                    self.iter_callback
+                ),
+            )
+
+            model_instance.bind_field(self.model.variable, min_out.x)
+            model_instance.objective = min_out.fun
+            self.x0 = min_out.x
+            self.stats = model_instance._stats = min_out
+
+        for k, v in model_instance.variable.asdict().items():
+            model_var = getattr(self.model, k)
+            if model_var.warm_start and not isinstance(
+                model_var.initializer, symbol_class
+            ):
+                model_var.initializer = v

@@ -5,8 +5,9 @@ from dataclasses import replace
 
 import numpy as np
 
+from condor import backend
+from condor import implementations
 from condor._version import __version__
-from condor.backends.default import backend
 from condor.conf import settings
 # TODO: figure out how to make this an option/setting like django?
 # from condor.backends import default as backend
@@ -1110,7 +1111,7 @@ class ModelType(BaseModelType):
 
         if implementation is None and new_cls._meta.template:
             implementation = getattr(
-                backend.implementations, new_cls._meta.template.__name__, None
+                implementations, new_cls._meta.template.__name__, None
             )
 
         return implementation

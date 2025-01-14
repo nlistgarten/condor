@@ -3,9 +3,13 @@ import numpy as np
 
 import condor as co
 
+
 # base symbol class is MX because only MX can go through callbacks (e.g., models that
 # use AlgebraicSystem or ODESystem)
 symbol_class = casadi.MX
+
+
+vertcat = casadi.vertcat
 
 
 def substitute(expr, subs):
@@ -88,6 +92,95 @@ class CasadiFunctionCallbackMixin:
 
     def get_jacobian(self, name, inames, onames, opts):
         return self.func.jacobian()
+
+
+class CasadiFunctionCallback(casadi.Callback):
+    """Base class for wrapping a Function with a Callback"""
+
+    def __init__(
+        self, placeholder_func, wrapper_func, implementation, jacobian_of=None, opts={}
+    ):
+        casadi.Callback.__init__(self)
+        self.wrapper_func = wrapper_func
+        self.placeholder_func = placeholder_func
+        self.jacobian = None
+        self.jacobian_of = jacobian_of
+        self.implementation = implementation
+        self.opts = opts
+
+    def init(self):
+        pass
+
+    def finalize(self):
+        pass
+
+    def get_n_in(self):
+        return self.placeholder_func.n_in()
+
+    def get_n_out(self):
+        return self.placeholder_func.n_out()
+
+    def eval(self, args):
+        try:
+            out = self.wrapper_func(
+                *wrap(self.implementation.model.input, args[0])
+                # *wrap(self.implementation.model.input, args)
+            )
+        except Exception as e:
+            breakpoint()
+            pass
+        if self.jacobian_of:
+            if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
+                return (out,)
+            jac_out = (
+                np.concatenate(flatten(out))
+                .reshape(self.get_sparsity_out(0).shape[::-1])
+                .T
+            )
+            return (jac_out,)
+        return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else out
+        return [out] if self.get_n_out() == 1 else out
+        # return out,
+        return (casadi.vertcat(*flatten(out)),)
+        return [out] if self.get_n_out() == 1 else out
+
+    def get_sparsity_in(self, i):
+        if self.jacobian_of is None or i < self.jacobian_of.get_n_in():
+            return self.placeholder_func.sparsity_in(i)
+        elif i < self.jacobian_of.get_n_in() + self.jacobian_of.get_n_out():
+            # nominal outputs are 0
+            return casadi.Sparsity(
+                *self.jacobian_of.get_sparsity_out(
+                    i - self.jacobian_of.get_n_in()
+                ).shape
+            )
+        else:
+            raise ValueError
+
+    def get_sparsity_out(self, i):
+        return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
+
+    def has_forward(self, nfwd):
+        return False
+        return True
+
+    def has_reverse(self, nrev):
+        return False
+        return True
+
+    def get_forward(self, nin, name, inames, onames, opts):
+        breakpoint()
+
+    def get_reverse(self, nout, name, inames, onames, opts):
+        breakpoint()
+        # return casadi.Function(
+
+    def has_jacobian(self):
+        return self.jacobian is not None
+
+    def get_jacobian(self, name, inames, onames, opts):
+        # breakpoint()
+        return self.jacobian
 
 
 def flatten(symbols):

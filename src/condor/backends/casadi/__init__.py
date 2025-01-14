@@ -1,12 +1,12 @@
 import casadi
 import numpy as np
 
-from condor.backends import BackendSymbolData
-from condor.backends.casadi import implementations
+from condor.backends.element_mixin import BackendSymbolData
+from condor.backends.casadi import utils
 from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
                                           symbol_class, wrap)
-
 name = "Casadi"
+
 
 
 def shape_to_nm(shape):

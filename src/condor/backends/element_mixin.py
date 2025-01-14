@@ -5,6 +5,7 @@ import numpy as np
 """
 Need to keep in a separate file so backend.get_symbol_data (required by fields which
 generate the symbols) can return filled dataclass without causing a circular import
+
 """
 
 """
@@ -56,7 +57,6 @@ import condor as co
 but probably should just figure out hooks to do that? Could create local dict of backend
 that gets updated with backend.implementations at the top of this file, then libary/user
 code could update it (add/overwrite)
-
 """
 
 
@@ -83,3 +83,4 @@ class BackendSymbolData:
             assert len(shape) == 2
             assert self.shape[0] == self.shape[1]
         self.size = size
+

@@ -9,8 +9,8 @@ from enum import Enum
 
 import numpy as np
 
-from condor.backends import BackendSymbolData
-from condor.backends.default import backend
+from condor.backends.element_mixin import BackendSymbolData
+from condor import backend
 
 log = logging.getLogger(__name__)
 

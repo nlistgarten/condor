@@ -27,11 +27,11 @@ class Sellar(co.OptimizationProblem):
         pass
 
         method = (
-            #co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
-            co.backends.casadi.implementations.OptimizationProblem.Method.scipy_trust_constr
+            co.implementations.OptimizationProblem.Method.scipy_slsqp
+            #co.implementations.OptimizationProblem.Method.scipy_trust_constr
         )
-        disp = True
-        verbose=3
+        #disp = True
+        #verbose=3
         #iprint = 2
 #        tol = 1E-8
 #        maxiter = 0
@@ -55,3 +55,7 @@ print()
 print("objective value:", sellar.objective) # scalar value
 print(sellar.constraint) # field
 print(sellar.coupling.y1) # embedded-model element
+
+Sellar.Options.method = co.implementations.OptimizationProblem.Method.ipopt
+ipopt_s = Sellar()
+
