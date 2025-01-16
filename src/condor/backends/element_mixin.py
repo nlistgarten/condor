@@ -3,6 +3,37 @@ from dataclasses import dataclass, field
 import numpy as np
 
 """
+vcat/vertcat -- combine multiple backend_symbol
+flatten -- always used in cnojuction with vertcat? to make differently shaped
+           backend_reprs 
+
+vertsplit -- opposite of vertcat
+wrap -- opposite of flatten?
+--> these two pairs are really single functions of fields
+
+Function -- create a numerical/symbolic callable
+
+??? -- create a backend-compatible Op from functions for 0th derivative and more
+currently CasadiFunctionCallback, but needs to be generalized
+
+if_else -- symbolic control flow
+??? -- something for symbolic array stuffing if forecasting JAX compatibility;
+may work just to use elements everywhere? or use a wrapped JAX array as the
+backend_repr? assume replacing with elements works and JAX backend element mixin can
+include __setitem__ overwrite to replace backend_repr with .at[...].set(...) result
+would be nice if numpy ufunc dispatch mechanism worked and could be applied to elements.
+
+nlpsol -- should get moved to the solvers (uses casadi, scipy solvers)
+ideally, backend-compatible Op would see nlpsol is already an op,
+Interface >>> performance hit of nlpsol native vs wrapped, presumably
+
+
+
+
+
+"""
+
+"""
 Need to keep in a separate file so backend.get_symbol_data (required by fields which
 generate the symbols) can return filled dataclass without causing a circular import
 
@@ -33,6 +64,8 @@ Couples to Model types -- knows all fields
 who is responsible for:
 filling in fields/._dataclass?
 filling in model input/output attrs?
+
+
 
 
 """

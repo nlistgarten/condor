@@ -2,8 +2,8 @@ from .utils import options_to_kwargs
 from condor.backends.casadi.table_lookup import NDSplinesCallback
 import condor as co
 import numpy as np
-from co.backend.utils import (flatten,  
-                                            vertcat)
+#from co.backend.utils import (flatten,  
+#                                            vertcat)
 from condor import backend
 
 flatten = co.backend.utils.flatten
