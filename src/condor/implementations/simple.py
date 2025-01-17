@@ -5,9 +5,11 @@ import numpy as np
 #from co.backend.utils import (flatten,  
 #                                            vertcat)
 from condor import backend
+import casadi
 
 flatten = co.backend.utils.flatten
-vertcat = co.backend.utils.flatten
+vertcat = co.backend.utils.vertcat
+CasadiFunctionCallback = co.backend.utils.CasadiFunctionCallback
 
 class DeferredSystem:
     def construct(self, model):
@@ -109,14 +111,23 @@ class ExternalSolverModel:
                 implementation=self,
                 jacobian_of=self.callback,
             )
+            self.jacobian_callback = self.callback.jacobian
 
-            self.callback.jacobian.construct(
-                self.callback.jacobian.placeholder_func.name(),
-                self.callback.jacobian.opts,
-            )
-        self.callback.construct(
-            self.callback.placeholder_func.name(), self.callback.opts
-        )
+            if hasattr(self.wrapper, "hessian"):
+                self.jacobian_callback.jacobian = CasadiFunctionCallback(
+                    self.jacobian_callback.placeholder_func.jacobian(),
+                    self.wrapper.hessian,
+                    implementation=self,
+                    jacobian_of=self.jacobian_callback,
+                )
+
+                self.hessian_callback = self.jacobian_callback.jacobian
+                self.hessian_callback.construct()
+
+            self.jacobian_callback.construct()
+
+        self.callback.construct()
+
 
     def __call__(self, model_instance, *args):
         use_args = casadi.vertcat(*flatten(args))

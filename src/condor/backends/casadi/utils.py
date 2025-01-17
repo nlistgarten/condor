@@ -108,6 +108,10 @@ class CasadiFunctionCallback(casadi.Callback):
         self.implementation = implementation
         self.opts = opts
 
+    def construct(self):
+        super().construct(self.placeholder_func.name(), self.opts)
+
+
     def init(self):
         pass
 
@@ -137,6 +141,11 @@ class CasadiFunctionCallback(casadi.Callback):
                 .reshape(self.get_sparsity_out(0).shape[::-1])
                 .T
             )
+            if self.jacobian_of.jacobian_of:
+                # for hessian, need to provide dependence of jacobian on the original
+                # function's output. is it fair to assume always 0?
+                return (jac_out, np.zeros(self.get_sparsity_out(1).shape))
+
             return (jac_out,)
         return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else out
         return [out] if self.get_n_out() == 1 else out
@@ -158,7 +167,17 @@ class CasadiFunctionCallback(casadi.Callback):
             raise ValueError
 
     def get_sparsity_out(self, i):
-        return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
+        #if self.jacobian_of is None or i < self.jacobian_of.get_n_out():
+        if i < 1:
+            return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
+        #elif i < self.jacobian_of.get_n_in() + self.jacobian_of.get_n_out():
+        else:
+            return self.placeholder_func.sparsity_out(i)
+            return casadi.Sparsity(
+                *self.jacobian_of.get_sparsity_out(
+                    i - self.jacobian_of.get_n_in()
+                ).shape
+            )
 
     def has_forward(self, nfwd):
         return False
