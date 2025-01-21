@@ -8,6 +8,7 @@ from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
 name = "Casadi"
 
 
+from condor.backends.casadi import operators
 
 def shape_to_nm(shape):
     if len(shape) > 2:

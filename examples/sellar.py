@@ -46,7 +46,8 @@ class Sellar(co.OptimizationProblem):
             for k, v in constraints.asdict().items():
                 elem = Sellar.constraint.get(name=k)
                 print(" "*4, f"{k}: {elem.lower_bound} < {v} < {elem.upper_bound}")
-                print(" ", f"{instance.coupling.variable}")
+                if instance is not None:
+                    print(" ", f"{instance.coupling.variable}")
 
 
 Sellar.set_initial(x=[5,2,1])
@@ -56,6 +57,8 @@ print("objective value:", sellar.objective) # scalar value
 print(sellar.constraint) # field
 print(sellar.coupling.y1) # embedded-model element
 
+
 Sellar.Options.method = co.implementations.OptimizationProblem.Method.ipopt
+Sellar.set_initial(x=[5,2,1])
 ipopt_s = Sellar()
 

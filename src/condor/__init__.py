@@ -7,6 +7,7 @@ if False:
 from dataclasses import asdict, dataclass, field, replace
 
 from condor.backends.default import backend
+operators = backend.operators
 
 from condor._version import __version__
 from condor.backends.default import backend

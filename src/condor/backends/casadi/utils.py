@@ -97,6 +97,15 @@ class CasadiFunctionCallbackMixin:
 class CasadiFunctionCallback(casadi.Callback):
     """Base class for wrapping a Function with a Callback"""
 
+    def __new__(cls, *args, **kwargs):
+        """ check if this is actually something that needs to get wrapped or if it's a
+        native op...
+        """
+        obj = super().__new__(cls)
+        obj.__init__(*args, **kwargs)
+        return obj
+
+
     def __init__(
         self, placeholder_func, wrapper_func, implementation, jacobian_of=None, opts={}
     ):
