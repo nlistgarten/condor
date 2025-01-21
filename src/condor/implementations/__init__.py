@@ -40,7 +40,7 @@ import casadi
 # TODO for custom solvers like SGM, table, does the get_jacobian arguments allow you to
 # avoid computing wrt particular inputs/outputs if possible?
 
-from condor.implementations.simple import DeferredSystem, ExplicitSystem, TableLookup, ExternalSolverModel
+from condor.implementations.simple import DeferredSystem, ExplicitSystem, ExternalSolverModel
 from condor.implementations.iterative import AlgebraicSystem, OptimizationProblem
 from condor.implementations.sgm_trajectory import TrajectoryAnalysis
 

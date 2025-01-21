@@ -1,5 +1,4 @@
 from .utils import options_to_kwargs
-from condor.backends.casadi.table_lookup import NDSplinesCallback
 import condor as co
 import numpy as np
 #from co.backend.utils import (flatten,  
@@ -133,46 +132,6 @@ class ExternalSolverModel:
         use_args = casadi.vertcat(*flatten(args))
         out = self.callback(use_args)
         # out = self.callback(*args)
-        if isinstance(out, casadi.MX):
-            out = casadi.vertsplit(out)
-        model_instance.bind_field(
-            self.model.output,
-            out,
-        )
-
-class TableLookup:
-    """ Implementation for :class:`TableLookup` model.
-    Should be re-factored to use ExternalSolver representation
-    """
-    def __init__(self, model_instance, args):
-        model = model_instance.__class__
-        self.construct(model, **options_to_kwargs(model))
-        self(model_instance, *args)
-
-    def construct(
-        self,
-        model,
-        degrees=3,
-        bcs=(-1,0),
-    ):
-        """ Pass through 
-        """
-        self.model = model
-        self.symbol_inputs = model.input.list_of("backend_repr")
-        self.symbol_outputs = model.output.list_of("backend_repr")
-        self.input_data = [
-            model.input_data.get(match=inp).backend_repr for inp in model.input
-        ]
-        self.output_data = np.stack(
-            [model.output_data.get(match=out).backend_repr for out in model.output],
-            axis=-1,
-        )
-        self.degrees = degrees
-        self.bcs = bcs
-        self.callback = NDSplinesCallback(self)
-
-    def __call__(self, model_instance, *args):
-        out = self.callback(casadi.vertcat(*flatten(args)))
         if isinstance(out, casadi.MX):
             out = casadi.vertsplit(out)
         model_instance.bind_field(

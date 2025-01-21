@@ -11,6 +11,7 @@ from condor.fields import (AssignedField, BaseElement, BoundedAssignmentField,
                            TrajectoryOutputField, WithDefaultField)
 from condor.models import (Model, ModelTemplate, ModelTemplateType, ModelType,
                            SubmodelTemplate)
+import ndsplines
 
 log = logging.getLogger(__name__)
 
@@ -832,3 +833,57 @@ class ExternalSolverWrapper(
             condor_model_name, (ExternalSolverModel,), attrs
         )
         self.condor_model._meta.external_wrapper = self
+
+
+class TableLookup(ExternalSolverWrapper, ):
+    def __init__(self, xx, yy, degrees=3, bcs=(-1,0)):
+        input_data = []
+        for k, v in xx.items():
+            self.input(name=k)
+            input_data.append(v)
+        output_data = []
+        for k, v in yy.items():
+            self.output(name=k)
+            output_data.append(v)
+        output_data = np.stack(output_data, axis=-1)
+        self.interpolant = ndsplines.make_interp_spline(
+            input_data, output_data, degrees=degrees, bcs=bcs,
+        )
+        self.jac_interps = [
+            self.interpolant.derivative(idx) for idx in range(self.interpolant.xdim)
+        ]
+        self.hess_interps = [
+            [
+                interpolant.derivative(idx)
+                if interpolant.degrees[idx] > 0
+                else lambda *args: np.zeros((1,interpolant.ydim))
+                for idx in range(interpolant.xdim)
+            ]
+            for interpolant in self.jac_interps
+        ]
+
+    def function(self, *xx):
+        return self.interpolant(np.array(xx).reshape(-1))[0, :],
+
+    def jacobian(self, *xx):
+        array_vals = [
+            interp(np.array(xx).reshape(-1))[0, :]
+            for interp in self.jac_interps
+        ]
+        # TODO -- original implementation did not have transpose, but generic version
+        # needs it
+        # EVEN WORSE, adding hessian capability makes it want to have transpose again??
+        # some weird casadi issue I assume... :(
+        return_val = np.stack(array_vals, axis=1).T
+        return return_val,
+
+    def hessian(self, *xx):
+        array_vals = np.stack([
+            np.stack([
+                interp(np.array(xx).reshape(-1))[0, :]
+                for interp in interp_row
+            ], axis=0)
+            for interp_row in  self.hess_interps
+        ], axis=1)
+        return array_vals,
+
