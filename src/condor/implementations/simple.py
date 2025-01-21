@@ -90,41 +90,16 @@ class ExternalSolverModel:
         self.output = casadi.vertcat(*flatten(model.output))
         # self.input = model.input.list_of('backend_repr')
         # self.output = model.output.list_of('backend_repr')
-        self.placeholder_func = casadi.Function(
-            f"{model.__name__}_placeholder",
-            [self.input],
-            [self.output],
-            # self.input,
-            # self.output,
-            dict(
-                allow_free=True,
-            ),
-        )
-        self.callback = CasadiFunctionCallback(
-            self.placeholder_func, self.wrapper.function, self, jacobian_of=None
-        )
+        wrapper_funcs = [self.wrapper.function]
         if hasattr(self.wrapper, "jacobian"):
-            self.callback.jacobian = CasadiFunctionCallback(
-                self.placeholder_func.jacobian(),
-                self.wrapper.jacobian,
-                implementation=self,
-                jacobian_of=self.callback,
-            )
-            self.jacobian_callback = self.callback.jacobian
-
-            if hasattr(self.wrapper, "hessian"):
-                self.jacobian_callback.jacobian = CasadiFunctionCallback(
-                    self.jacobian_callback.placeholder_func.jacobian(),
-                    self.wrapper.hessian,
-                    implementation=self,
-                    jacobian_of=self.jacobian_callback,
-                )
-
-                self.hessian_callback = self.jacobian_callback.jacobian
-                self.hessian_callback.construct()
-
-            self.jacobian_callback.construct()
-
+            wrapper_funcs.append(self.wrapper.jacobian)
+        if hasattr(self.wrapper, "hessian"):
+            wrapper_funcs.append(self.wrapper.hessian)
+        self.callback = CasadiFunctionCallback(
+            wrapper_funcs, self, jacobian_of=None,
+            input_spec = self.input,
+            output_spec = self.output,
+        )
         self.callback.construct()
 
 

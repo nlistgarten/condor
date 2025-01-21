@@ -97,27 +97,59 @@ class CasadiFunctionCallbackMixin:
 class CasadiFunctionCallback(casadi.Callback):
     """Base class for wrapping a Function with a Callback"""
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, wrapper_funcs, *args, **kwargs):
         """ check if this is actually something that needs to get wrapped or if it's a
         native op...
         """
+        if isinstance(wrapper_funcs[0], casadi.Function):
+            return wrapper_funcs[0]
         obj = super().__new__(cls)
-        obj.__init__(*args, **kwargs)
+        obj.__init__(wrapper_funcs, *args, **kwargs)
         return obj
 
 
     def __init__(
-        self, placeholder_func, wrapper_func, implementation, jacobian_of=None, opts={}
+        self, wrapper_funcs, implementation, jacobian_of=None, input_spec=None, output_spec=None, opts={}
     ):
+        """
+        """
         casadi.Callback.__init__(self)
-        self.wrapper_func = wrapper_func
-        self.placeholder_func = placeholder_func
-        self.jacobian = None
+
+        self.input_spec = input_spec
+        self.output_spec = output_spec
+
+        if jacobian_of is None and input_spec is not None and output_spec is not None:
+            self.placeholder_func = casadi.Function(
+                f"{implementation.model.__name__}_placeholder",
+                [self.input_spec],
+                [self.output_spec],
+                # self.input,
+                # self.output,
+                dict(
+                    allow_free=True,
+                ),
+            )
+        else:
+            self.placeholder_func = jacobian_of.placeholder_func.jacobian()
+
+        self.wrapper_func = wrapper_funcs[0]
+        if len(wrapper_funcs) == 1:
+            self.jacobian = None
+        else:
+            self.jacobian = CasadiFunctionCallback(
+                wrapper_funcs = wrapper_funcs[1:],
+                implementation = implementation,
+                jacobian_of = self,
+                opts=opts,
+            )
+
         self.jacobian_of = jacobian_of
         self.implementation = implementation
         self.opts = opts
 
     def construct(self):
+        if self.jacobian is not None:
+            self.jacobian.construct()
         super().construct(self.placeholder_func.name(), self.opts)
 
 
