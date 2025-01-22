@@ -851,7 +851,7 @@ class TableLookup(ExternalSolverWrapper):
         ]
 
     def function(self, *xx):
-        return self.interpolant(np.array(xx).reshape(-1))[0, :],
+        return self.interpolant(np.array(xx).reshape(-1))[0, :]#.T
 
     def jacobian(self, *xx):
         array_vals = [
@@ -862,8 +862,10 @@ class TableLookup(ExternalSolverWrapper):
         # needs it
         # EVEN WORSE, adding hessian capability makes it want to have transpose again??
         # some weird casadi issue I assume... :(
-        return_val = np.stack(array_vals, axis=1).T
-        return return_val,
+        # changing API of casadi's FunctionToOperator to return the value (and letting
+        # casadi-specific do casadi-specific thing) means don't transpose?
+        return_val = np.stack(array_vals, axis=1)
+        return return_val
 
     def hessian(self, *xx):
         array_vals = np.stack([
@@ -873,5 +875,5 @@ class TableLookup(ExternalSolverWrapper):
             ], axis=0)
             for interp_row in  self.hess_interps
         ], axis=1)
-        return array_vals,
+        return array_vals
 

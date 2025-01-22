@@ -8,7 +8,8 @@ import casadi
 
 flatten = co.backend.utils.flatten
 vertcat = co.backend.utils.vertcat
-CasadiFunctionCallback = co.backend.utils.CasadiFunctionCallback
+FunctionsToOperator = co.backend.utils.FunctionsToOperator
+
 
 class DeferredSystem:
     def construct(self, model):
@@ -95,10 +96,10 @@ class ExternalSolverModel:
             wrapper_funcs.append(self.wrapper.jacobian)
         if hasattr(self.wrapper, "hessian"):
             wrapper_funcs.append(self.wrapper.hessian)
-        self.callback = CasadiFunctionCallback(
+        self.callback = FunctionsToOperator(
             wrapper_funcs, self, jacobian_of=None,
-            input_spec = self.input,
-            output_spec = self.output,
+            input_symbol = self.input,
+            output_symbol = self.output,
         )
         self.callback.construct()
 

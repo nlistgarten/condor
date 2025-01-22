@@ -93,7 +93,6 @@ class CasadiFunctionCallbackMixin:
     def get_jacobian(self, name, inames, onames, opts):
         return self.func.jacobian()
 
-
 class CasadiFunctionCallback(casadi.Callback):
     """Base class for wrapping a Function with a Callback"""
 
@@ -109,20 +108,41 @@ class CasadiFunctionCallback(casadi.Callback):
 
 
     def __init__(
-        self, wrapper_funcs, implementation, jacobian_of=None, input_spec=None, output_spec=None, opts={}
+        self, wrapper_funcs, implementation, jacobian_of=None, input_symbol=None,
+        output_symbol=None, opts={}
     ):
         """
+        wrapper_funcs -- list of callables to wrap, in order of ascending derivatives
+
+        jacobian_of -- used internally to recursively create references of related
+        callbacks, as needed.
+
+        input_symbol - single MX representing all input
+        output_symbol - single MX representing all output
+
+        input/output symbol used to identify sparsity and other metadata by creating a
+        placeholder casadi.Function. Not used if jacobian_of is provided, because
+        jacobian operator is used on jacobian_of's placeholder Function.
+
+        to think about: default casadi jacobian operator introduces additional inputs
+        (and therefore, after second derivative also introduces additional output) for
+        anti-derivative output. This is required for most "solver" type outputs.
+        However, probably don't want to use casadi machinery for retaining that solver
+        -- would be done externally. Is there ever a time we would want to use casadi
+        machinery for passing in previous solution? if so, what would the API be for
+        specifying?
+
         """
         casadi.Callback.__init__(self)
 
-        self.input_spec = input_spec
-        self.output_spec = output_spec
+        self.input_symbol = input_symbol
+        self.output_symbol = output_symbol
 
-        if jacobian_of is None and input_spec is not None and output_spec is not None:
+        if jacobian_of is None and input_symbol is not None and output_symbol is not None:
             self.placeholder_func = casadi.Function(
                 f"{implementation.model.__name__}_placeholder",
-                [self.input_spec],
-                [self.output_spec],
+                [self.input_symbol],
+                [self.output_symbol],
                 # self.input,
                 # self.output,
                 dict(
@@ -188,7 +208,7 @@ class CasadiFunctionCallback(casadi.Callback):
                 return (jac_out, np.zeros(self.get_sparsity_out(1).shape))
 
             return (jac_out,)
-        return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else out
+        return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else (out,)
         return [out] if self.get_n_out() == 1 else out
         # return out,
         return (casadi.vertcat(*flatten(out)),)
@@ -241,7 +261,7 @@ class CasadiFunctionCallback(casadi.Callback):
     def get_jacobian(self, name, inames, onames, opts):
         # breakpoint()
         return self.jacobian
-
+FunctionsToOperator = CasadiFunctionCallback
 
 def flatten(symbols):
     # TODO: is flatten alwyas getting vert-catted?
