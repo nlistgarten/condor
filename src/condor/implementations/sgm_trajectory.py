@@ -1,7 +1,7 @@
 from .utils import options_to_kwargs
 from enum import Enum, auto
 import condor as co
-import condor.solvers.shooting_gradient_method as sgm
+import condor.solvers.sweeping_gradient_method as sgm
 import numpy as np
 from condor import backend
 import casadi

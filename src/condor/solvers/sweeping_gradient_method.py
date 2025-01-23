@@ -1029,7 +1029,7 @@ class TrajectoryAnalysis:
 
 
 @dataclass
-class ShootingGradientMethod:
+class SweepingGradientMethod:
     # per system
     adjoint_system: AdjointSystem
     p_x0_p_params: callable
@@ -1215,7 +1215,7 @@ class TrajectoryAnalysisSGM:
 
         cache_size=1,
 
-        # to construct ShootingGradientMethod
+        # to construct SweepingGradientMethod
         p_x0_p_params = None,
         p_dots_p_params = None,
         dh_dps = None,
@@ -1255,7 +1255,7 @@ class TrajectoryAnalysisSGM:
             solver_class=adjoint_solver_class,
         )
 
-        self.shooting_gradient_method = ShootingGradientMethod(
+        self.sweeping_gradient_method = SweepingGradientMethod(
             adjoint_system=self.adjoint_system,
             p_x0_p_params=p_x0_p_params,
             p_dots_p_params=p_dots_p_params,
@@ -1278,6 +1278,6 @@ class TrajectoryAnalysisSGM:
     def jacobian(self, p):
         if self.cached_p is None or not np.all(self.cached_p == p):
             _ = self.function(p)
-        return self.shooting_gradient_method(self.res)
+        return self.sweeping_gradient_method(self.res)
 
 
