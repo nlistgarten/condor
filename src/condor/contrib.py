@@ -92,7 +92,7 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
     output = AssignedField()
 
     def set_initial(cls, **kwargs):
-        """set initial values for the ``variable``\s of the model.
+        r"""set initial values for the ``variable``\s of the model.
         """
         for k, v in kwargs.items():
             var = getattr(cls, k)
@@ -850,10 +850,10 @@ class TableLookup(ExternalSolverWrapper):
             for interpolant in self.jac_interps
         ]
 
-    def function(self, *xx):
+    def function(self, xx):
         return self.interpolant(np.array(xx).reshape(-1))[0, :]#.T
 
-    def jacobian(self, *xx):
+    def jacobian(self, xx):
         array_vals = [
             interp(np.array(xx).reshape(-1))[0, :]
             for interp in self.jac_interps
@@ -867,7 +867,7 @@ class TableLookup(ExternalSolverWrapper):
         return_val = np.stack(array_vals, axis=1)
         return return_val
 
-    def hessian(self, *xx):
+    def hessian(self, xx):
         array_vals = np.stack([
             np.stack([
                 interp(np.array(xx).reshape(-1))[0, :]

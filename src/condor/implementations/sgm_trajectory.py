@@ -2,11 +2,17 @@ from .utils import options_to_kwargs
 from enum import Enum, auto
 import condor as co
 import condor.solvers.shooting_gradient_method as sgm
-import condor.backends.casadi.shooting_gradient_method as ca_sgm
 import numpy as np
-from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
-                                          symbol_class, wrap)
+from condor import backend
+import casadi
 
+flatten = co.backend.utils.flatten
+vertcat = co.backend.utils.vertcat
+substitute = co.backend.utils.substitute
+recurse_if_else = co.backend.utils.recurse_if_else
+symbol_class = co.backend.utils.symbol_class
+
+FunctionsToOperator = co.backend.utils.FunctionsToOperator
 
 def get_state_setter(field, setter_args, setter_targets=None, default=0.0, subs={}):
     """
@@ -308,10 +314,6 @@ class TrajectoryAnalysis:
             set_solvers.append(solver_class)
         state_solver_class, adjoint_solver_class = set_solvers
 
-        self.trajectory_analysis = sgm.TrajectoryAnalysis(
-            traj_out_integrand_func,
-            traj_out_terminal_term_func,
-        )
         # self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
 
         if len(model.dynamic_output):
@@ -326,7 +328,7 @@ class TrajectoryAnalysis:
         else:
             self.dynamic_output_func = None
 
-        self.StateSystem = sgm.System(
+        self.state_system = sgm.System(
             dim_state=model.state._count,
             initial_state=self.state0,
             dot=state_equation_func,
@@ -352,10 +354,7 @@ class TrajectoryAnalysis:
         )
         self.at_time_slices = at_time_slices
 
-        self.callback = ca_sgm.ShootingGradientMethod(self)
 
-        if not self.can_sgm:
-            return
 
         self.p_state0_p_p_expr = casadi.jacobian(self.state0.expr, self.p)
 
@@ -535,18 +534,21 @@ class TrajectoryAnalysis:
             )
             self.dh_dps[-1].expr = dh_dp
 
-        self.AdjointSystem = sgm.AdjointSystem(
-            state_jac=state_dot_jac_func,
+        self.trajectory_analysis_sgm = sgm.TrajectoryAnalysisSGM(
+            state_system = self.state_system,
+            integrand_terms=traj_out_integrand_func,
+            terminal_terms=traj_out_terminal_term_func,
+
             dte_dxs=self.dte_dxs,
             dh_dxs=self.dh_dxs,
-            atol=adjoint_atol,
-            rtol=adjoint_rtol,
-            adaptive_max_step=adjoint_adaptive_max_step_size,
-            max_step_size=adjoint_max_step_size,
-            solver_class=adjoint_solver_class,
-        )
-        self.shooting_gradient_method = sgm.ShootingGradientMethod(
-            adjoint_system=self.AdjointSystem,
+            state_jac=state_dot_jac_func,
+
+            adjoint_atol=adjoint_atol,
+            adjoint_rtol=adjoint_rtol,
+            adjoint_adaptive_max_step_size=adjoint_adaptive_max_step_size,
+            adjoint_max_step_size=adjoint_max_step_size,
+            adjoint_solver_class=adjoint_solver_class,
+
             p_x0_p_params=p_state0_p_p,
             p_dots_p_params=param_dot_jac_func,
             dh_dps=self.dh_dps,
@@ -557,14 +559,30 @@ class TrajectoryAnalysis:
             p_integrand_terms_p_state=state_integrand_jac_funcs,
         )
 
+        wrapper_funcs = [
+            self.trajectory_analysis_sgm.function,
+            self.trajectory_analysis_sgm.jacobian,
+        ]
+
+        self.callback = FunctionsToOperator(
+            wrapper_funcs, self, jacobian_of=None,
+            input_symbol = self.p,
+            output_symbol = self.traj_out_expr,
+        )
+        self.callback.construct()
+
+        if not self.can_sgm:
+            return
+
+
     def __call__(self, model_instance, *args):
         self.callback.from_implementation = True
         self.args = casadi.vertcat(*flatten(args))
         self.out = self.callback(self.args)
         self.callback.from_implementation = False
 
-        if hasattr(self.callback, "res"):
-            res = self.callback.res
+        if hasattr(self.trajectory_analysis_sgm, "res"):
+            res = self.trajectory_analysis_sgm.res
             model_instance._res = res
             model_instance.t = np.array(res.t)
             model_instance.bind_field(

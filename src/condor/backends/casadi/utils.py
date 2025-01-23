@@ -132,6 +132,15 @@ class CasadiFunctionCallback(casadi.Callback):
         machinery for passing in previous solution? if so, what would the API be for
         specifying?
 
+        y = fun(x)
+        jac = jac_fun(x,y)
+        d_jac_x, d_jac_y = hess_fun(x, y, jac)
+
+        if we don't use casadi's mechanisms, we are technically not functional
+        but maybe when it gets wrapped by the callbacks, it effectively becomes
+        functional because new instances are always created when needed to prevent race
+        conditions, etc?
+
         """
         casadi.Callback.__init__(self)
 
@@ -188,7 +197,9 @@ class CasadiFunctionCallback(casadi.Callback):
     def eval(self, args):
         try:
             out = self.wrapper_func(
-                *wrap(self.implementation.model.input, args[0])
+                args[0],
+                # this lets 
+                #*wrap(self.implementation.model.input, args[0])
                 # *wrap(self.implementation.model.input, args)
             )
         except Exception as e:
@@ -208,6 +219,8 @@ class CasadiFunctionCallback(casadi.Callback):
                 return (jac_out, np.zeros(self.get_sparsity_out(1).shape))
 
             return (jac_out,)
+        return out,
+        #breakpoint()
         return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else (out,)
         return [out] if self.get_n_out() == 1 else out
         # return out,

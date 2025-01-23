@@ -59,7 +59,7 @@ p0 = -4., -1.
 sim = Transfer(*p0)
 #sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 
-from condor.backends.casadi.implementations import OptimizationProblem
+from condor.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
     p1 = variable()
     p2 = variable()

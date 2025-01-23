@@ -1188,3 +1188,96 @@ class ShootingGradientMethod:
             jac_rows.append(jac_row)
 
         return np.stack(jac_rows, axis=0)
+
+class TrajectoryAnalysisSGM:
+    def __init__(
+        self, 
+        state_system,
+
+
+        # to construct a trajectoryanlysis
+        # need at least one of integrand and terminal terms
+        integrand_terms=None,
+        terminal_terms=None,
+
+        # args for adjoint system
+        dte_dxs=None,
+        dh_dxs=None,
+        state_jac=None,
+        # for adjoint system, can provide here if state_system doesn't have
+
+        # adjoint system solver options
+        adjoint_solver_class=SolverSciPyDopri5,
+        adjoint_atol=1e-12,
+        adjoint_rtol=1e-6,
+        adjoint_adaptive_max_step_size=False,
+        adjoint_max_step_size=0.0,
+
+        cache_size=1,
+
+        # to construct ShootingGradientMethod
+        p_x0_p_params = None,
+        p_dots_p_params = None,
+        dh_dps = None,
+        dte_dps = None,
+        p_integrand_terms_p_params = None,
+        p_terminal_terms_p_params = None,
+        p_integrand_terms_p_state = None,
+        p_terminal_terms_p_state = None,
+    ):
+        if cache_size >1:
+            raise NotImplemented
+        self.cache_size = cache_size
+
+        self.cached_p = None
+        self.cached_output = None
+
+        self.state_system = state_system
+        self.trajectory_analysis = TrajectoryAnalysis(
+            integrand_terms, terminal_terms
+        )
+
+        if state_jac is None:
+            if state_system._jac is None:
+                raise ValueError(
+                    "must provide state jacobian through state_system.jac or state_jac"
+                )
+            state_jac = state_system._jac
+
+        self.adjoint_system = AdjointSystem(
+            state_jac=state_jac,
+            dte_dxs=dte_dxs,
+            dh_dxs=dh_dxs,
+            atol=adjoint_atol,
+            rtol=adjoint_rtol,
+            adaptive_max_step=adjoint_adaptive_max_step_size,
+            max_step_size=adjoint_max_step_size,
+            solver_class=adjoint_solver_class,
+        )
+
+        self.shooting_gradient_method = ShootingGradientMethod(
+            adjoint_system=self.adjoint_system,
+            p_x0_p_params=p_x0_p_params,
+            p_dots_p_params=p_dots_p_params,
+            dh_dps=dh_dps,
+            dte_dps=dte_dps,
+            p_terminal_terms_p_params=p_terminal_terms_p_params,
+            p_integrand_terms_p_params=p_integrand_terms_p_params,
+            p_terminal_terms_p_state=p_terminal_terms_p_state,
+            p_integrand_terms_p_state=p_integrand_terms_p_state,
+        )
+
+
+    def function(self, p):
+        if self.cached_p is None or not np.all(self.cached_p == p):
+            self.cached_p = p
+            self.res = self.state_system(p)
+            self.cached_output = self.trajectory_analysis(self.res)
+        return self.cached_output
+
+    def jacobian(self, p):
+        if self.cached_p is None or not np.all(self.cached_p == p):
+            _ = self.function(p)
+        return self.shooting_gradient_method(self.res)
+
+
