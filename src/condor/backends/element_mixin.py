@@ -94,7 +94,7 @@ code could update it (add/overwrite)
 
 
 @dataclass
-class BackendSymbolData:
+class BackendSymbolDataMixin:
     shape: tuple  # TODO: tuple of ints
     symmetric: bool
     diagonal: bool

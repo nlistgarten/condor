@@ -1,7 +1,8 @@
 import casadi
 import numpy as np
+from dataclasses import dataclass, field
 
-from condor.backends.element_mixin import BackendSymbolData
+from condor.backends.element_mixin import BackendSymbolDataMixin
 from condor.backends.casadi import utils
 from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
                                           symbol_class, wrap)
@@ -9,6 +10,8 @@ name = "Casadi"
 
 
 from condor.backends.casadi import operators
+
+vstack = casadi.vcat
 
 def shape_to_nm(shape):
     if len(shape) > 2:
@@ -19,6 +22,37 @@ def shape_to_nm(shape):
     else:
         m = 1
     return n, m
+
+@dataclass
+class BackendSymbolData(BackendSymbolDataMixin):
+    def __post_init__(self, *args, **kwargs):
+        # might potentially want to overwrite for casadi-specific validation, etc.
+        super().__post_init__(self, *args, **kwargs)
+
+
+    def flatten_value(self, value):
+        if self.size == 1 and isinstance(value, (float, int)):
+            return value
+        else:
+            return value.reshape((-1,1))
+
+        #if isinstance(value, backend.symbol_class):
+
+    def wrap_value(self, value):
+        if self.size == 1 and isinstance(value, (float, int)):
+            ret_value = value
+        else:
+            ret_value = value.reshape(self.shape)
+        if (
+            (isinstance(ret_value, symbol_class) and ret_value.is_constant())
+            or isinstance(ret_value, casadi.DM)
+        ):
+            return np.array(ret_value)
+
+        return ret_value
+        return symbol_class(value).reshape(self.shape)
+
+
 
 
 def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
@@ -53,7 +87,8 @@ def get_symbol_data(symbol):
     n, m = shape_to_nm(shape)
     size = n * m
 
-    # TODO: actually check these
+    # TODO: actually check these?
+    # and automatically reduce size if true? or should these be flags?
     diagonal = False
     symmetric = False
 

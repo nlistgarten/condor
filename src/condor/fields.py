@@ -9,7 +9,7 @@ from enum import Enum
 
 import numpy as np
 
-from condor.backends.element_mixin import BackendSymbolData
+#from condor.backends.element_mixin import BackendSymbolData
 from condor import backend
 
 log = logging.getLogger(__name__)
@@ -82,7 +82,29 @@ class Direction(Enum):
 class FieldValues:
     """Base class for Field dataclasses -- may need to use issubclass/isinstance
     """
-    pass
+    def asdict(self):
+        """ call the :mod:`dataclasses` module :func:`asdict` function on this field
+        datacalss """
+        return dataclass_asdict(self)
+
+    def flatten(self):
+        """ turn the bound values of this field instance into a single symbol -- may be
+        numeric or in the backend representation (symbol class)"""
+        return backend.vstack([
+            elem.flatten_value(v) for elem, v in zip(self.Field, self.asdict().values())
+        ])
+
+    @classmethod
+    def wrap(cls, values):
+        """ turn a single symbol into a bound field dataclasss """
+        count_accumulator = 0
+        size_cum_sum = np.cumsum([0] + cls.Field.list_of("size"))
+        new_values = {}
+        for start_idx, end_idx, elem in zip(
+            size_cum_sum, size_cum_sum[1:], cls.Field,
+        ):
+            new_values[elem.name] = elem.wrap_value(values[start_idx:end_idx])
+        return cls(**new_values)
 
 
 class Field:
@@ -296,8 +318,8 @@ class Field:
             name,
             fields,
             bases=(FieldValues,),
-            namespace=dict(asdict=dataclass_asdict),
         )
+        self._dataclass.Field = self
 
     def __iter__(self):
         """iterating over field yields elements"""
@@ -311,6 +333,15 @@ class Field:
         """make element names dot-accessible on Field, to match behavior on field
         dataclass"""
         return self.get(name=with_name).backend_repr
+
+    def create_symbol(self):
+        """ create a single backend symbol"""
+
+    def flatten(self):
+        return self._dataclass(
+            **{elem.name: elem.backend_repr for elem in self}
+        ).flatten()
+
 
 
 def make_class_name(components):
@@ -337,7 +368,7 @@ import operator
 @dataclass
 class BaseElement(
     FrontendElementData,
-    BackendSymbolData,
+    backend.BackendSymbolData,
 ):
     def __post_init__(self, *args, **kwargs):
         super().__post_init__(self, *args, **kwargs)
@@ -367,6 +398,8 @@ class BaseElement(
             name=element.backend_repr.name(), shape=new_shape
         )
         element.shape = new_shape
+        # TODO: this is wrong, need to use get symbol data or something? because need to
+        # check for symmetry, etc.
         element.size = np.prod(new_shape)
         return element
 

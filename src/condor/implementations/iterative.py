@@ -139,6 +139,7 @@ class AlgebraicSystem(InitializerMixin):
             self.p,
             self.g0,
             self.g1,
+            # use field dataclass to bind bounds?? then can flatten
             flatten(model.variable.list_of("lower_bound")),
             flatten(model.variable.list_of("upper_bound")),
             # self.implicit_output_at_construction,

@@ -51,11 +51,13 @@ class ExplicitSystem:
         self(model_instance, *args)
 
     def construct(self, model):
-        symbol_inputs = model.input.list_of("backend_repr")
-        symbol_outputs = model.output.list_of("backend_repr")
+        #symbol_inputs = model.input.list_of("backend_repr")
+        #symbol_outputs = model.output.list_of("backend_repr")
 
-        self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
-        self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
+        #self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
+        #self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
+        self.symbol_inputs = model.input.flatten()
+        self.symbol_outputs = model.output.flatten()
 
         name_inputs = model.input.list_of("name")
         name_outputs = model.output.list_of("name")
@@ -63,14 +65,15 @@ class ExplicitSystem:
         # self.func =  casadi.Function(model.__name__, self.symbol_inputs, self.symbol_outputs)
         self.func = casadi.Function(
             model.__name__,
-            self.symbol_inputs,
-            self.symbol_outputs,
+            [self.symbol_inputs],
+            [self.symbol_outputs],
             dict(
                 allow_free=True,
             ),
         )
 
     def __call__(self, model_instance, *args):
+        #model_instance.input.assymbol()
         self.args = casadi.vertcat(*flatten(args))
         self.out = self.func(self.args)
         model_instance.bind_field(
