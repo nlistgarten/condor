@@ -13,19 +13,14 @@ FunctionsToOperator = co.backend.utils.FunctionsToOperator
 
 class DeferredSystem:
     def construct(self, model):
-        symbol_inputs = model.input.list_of("backend_repr")
-        symbol_outputs = model.output.list_of("backend_repr")
+        self.symbol_inputs = model.input.flatten()
+        self.symbol_outputs = model.output.flatten()
 
-        self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
-        self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
-
-        name_inputs = model.input.list_of("name")
-        name_outputs = model.output.list_of("name")
         self.model = model
         self.func = casadi.Function(
             model.__name__,
-            symbol_inputs,
-            symbol_outputs,
+            self.symbol_inputs,
+            self.symbol_outputs,
             dict(
                 allow_free=True,
             ),
@@ -38,7 +33,7 @@ class DeferredSystem:
     def __call__(self, model_instance, *args):
         model_instance.bind_field(
             self.model.output,
-            self.symbol_outputs[0],
+            self.symbol_outputs,
         )
 
 
@@ -51,18 +46,10 @@ class ExplicitSystem:
         self(model_instance, *args)
 
     def construct(self, model):
-        #symbol_inputs = model.input.list_of("backend_repr")
-        #symbol_outputs = model.output.list_of("backend_repr")
-
-        #self.symbol_inputs = [casadi.vertcat(*flatten(symbol_inputs))]
-        #self.symbol_outputs = [casadi.vertcat(*flatten(symbol_outputs))]
         self.symbol_inputs = model.input.flatten()
         self.symbol_outputs = model.output.flatten()
 
-        name_inputs = model.input.list_of("name")
-        name_outputs = model.output.list_of("name")
         self.model = model
-        # self.func =  casadi.Function(model.__name__, self.symbol_inputs, self.symbol_outputs)
         self.func = casadi.Function(
             model.__name__,
             [self.symbol_inputs],
@@ -73,8 +60,7 @@ class ExplicitSystem:
         )
 
     def __call__(self, model_instance, *args):
-        #model_instance.input.assymbol()
-        self.args = casadi.vertcat(*flatten(args))
+        self.args = model_instance.input.flatten()
         self.out = self.func(self.args)
         model_instance.bind_field(
             self.model.output,
@@ -90,8 +76,8 @@ class ExternalSolverModel:
     def construct(self, model):
         self.model = model
         self.wrapper = model._meta.external_wrapper
-        self.input = casadi.vertcat(*flatten(model.input))
-        self.output = casadi.vertcat(*flatten(model.output))
+        self.input = model.input.flatten()
+        self.output = model.output.flatten()
         # self.input = model.input.list_of('backend_repr')
         # self.output = model.output.list_of('backend_repr')
         wrapper_funcs = [self.wrapper.function]

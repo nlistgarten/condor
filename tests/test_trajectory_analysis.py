@@ -31,7 +31,7 @@ def test_ct_lqr():
         class Options:
             exact_hessian = False
             method = (
-                co.backends.casadi.implementations.OptimizationProblem.Method.scipy_cg
+                co.implementations.OptimizationProblem.Method.scipy_cg
             )
 
     lqr_sol = CtOptLQR()
@@ -180,7 +180,7 @@ def test_time_switched():
         class Options:
             exact_hessian = False
             method = (
-                co.backends.casadi.implementations.OptimizationProblem.Method.scipy_cg
+                co.implementations.OptimizationProblem.Method.scipy_cg
             )
 
     MinimumTime.set_initial(t1=2.163165480675697, t2=4.361971866705403)
@@ -262,7 +262,7 @@ def test_state_switched():
 
         class Options:
             exact_hessian = False
-            method = co.backends.casadi.implementations.OptimizationProblem.Method.scipy_cg
+            method = co.implementations.OptimizationProblem.Method.scipy_cg
 
     MinimumTime.set_initial(p1=-4, p2=-1)
 

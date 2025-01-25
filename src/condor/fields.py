@@ -334,9 +334,6 @@ class Field:
         dataclass"""
         return self.get(name=with_name).backend_repr
 
-    def create_symbol(self):
-        """ create a single backend symbol"""
-
     def flatten(self):
         return self._dataclass(
             **{elem.name: elem.backend_repr for elem in self}

@@ -13,11 +13,11 @@ class Component(co.models.ModelTemplate):
     output.z = x**2 + y
 
 
-class ComponentImplementation(co.backend.implementations.ExplicitSystem):
+class ComponentImplementation(co.implementations.ExplicitSystem):
     pass
 
 
-co.backend.implementations.Component = ComponentImplementation
+co.implementations.Component = ComponentImplementation
 
 
 def test_default_impl():

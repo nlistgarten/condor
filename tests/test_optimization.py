@@ -8,8 +8,8 @@ from casadi import exp
 @pytest.mark.parametrize(
     "method",
     [
-        co.backend.implementations.OptimizationProblem.Method.ipopt,
-        co.backend.implementations.OptimizationProblem.Method.scipy_slsqp,
+        co.implementations.OptimizationProblem.Method.ipopt,
+        co.implementations.OptimizationProblem.Method.scipy_slsqp,
     ],
 )
 def test_sellar(method):
@@ -93,7 +93,7 @@ def test_callback_scipy_no_instance():
 
         class Options:
             method = (
-                co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
+                co.implementations.OptimizationProblem.Method.scipy_slsqp
             )
 
     class Callback:
@@ -137,7 +137,7 @@ def test_callback_scipy_instance():
 
         class Options:
             method = (
-                co.backends.casadi.implementations.OptimizationProblem.Method.scipy_slsqp
+                co.implementations.OptimizationProblem.Method.scipy_slsqp
             )
 
     class Callback:
