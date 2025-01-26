@@ -249,7 +249,7 @@ class BaseModelType(type):
     # BaseModelType
     baseclass_for_inheritance = None
     reserved_words = [
-        "_meta",
+        "_meta", "reserved_words",
     ]
 
     def __init_subclass__(cls, **kwargs):
@@ -679,7 +679,9 @@ class BaseModelType(type):
 
         if attr_name in cls.reserved_words:
             log.debug(
+            #raise ValueError(
                 "NOT passing on %s because it is a reserved word for %s", attr_name, cls
+            #)
             )
             pass_attr = False
 
@@ -688,8 +690,6 @@ class BaseModelType(type):
             setattr(new_cls, attr_name, attr_val)
 
     def register(cls, subclass):
-        if subclass.__name__ == "b0Burn":
-            breakpoint()
         cls._meta.subclasses.append(subclass)
 
 
@@ -902,9 +902,9 @@ class ModelType(BaseModelType):
     """Type class for user models"""
 
     reserved_words = BaseModelType.reserved_words + [
-        "Options",
-        "Casadi",
-        "dynamic_link",
+        "Options", # should pass on, used to mark condor_attr
+        "Casadi", # deprecated Options name
+        "dynamic_link", # raise error on user assignment
     ]
 
     def __repr__(cls):
@@ -1212,22 +1212,17 @@ class Model(metaclass=ModelType):
 
     def bind_input_fields(self):
         cls = self.__class__
-
-        all_values = list(self.input_kwargs.values())
-
-        slice_start = 0
         for field in cls._meta.input_fields:
-            slice_end = slice_start + len(field)
-            values = all_values[slice_start:slice_end]
-            slice_start = slice_end
-            self.bind_field(field, values, symbols_to_instance=True, wrap=False)
+            field_dc = field._dataclass(**{
+                elem.name: self.input_kwargs[elem.name] for elem in field
+            })
+            self.bind_field(field_dc, symbols_to_instance=True)
 
-    def bind_field(self, field, values, symbols_to_instance=True, wrap=True):
-        dataclass = self.create_bound_field_dataclass(field, values, wrap=wrap)
+    def bind_field(self, dataclass, symbols_to_instance=True):
         if symbols_to_instance:
             for k, v in dataclass.asdict().items():
                 setattr(self, k, v)
-        setattr(self, field._name, dataclass)
+        setattr(self, dataclass.field._name, dataclass)
         return dataclass
 
     @staticmethod

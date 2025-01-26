@@ -586,23 +586,24 @@ class TrajectoryAnalysis:
             model_instance._res = res
             model_instance.t = np.array(res.t)
             model_instance.bind_field(
-                self.model.state,
-                np.array(res.x).T,
-                wrap=True,
+                self.model.state.wrap(
+                    np.array(res.x).T,
+                )
             )
             if self.dynamic_output_func:
                 yy = np.empty((model_instance.t.size, self.model.dynamic_output._count))
                 for idx, (t, x) in enumerate(zip(res.t, res.x)):
                     yy[idx, None] = self.dynamic_output_func(res.p, t, x).T
                 model_instance.bind_field(
-                    self.model.dynamic_output,
-                    yy.T,
-                    wrap=True,
+                    self.model.dynamic_output.wrap(
+                        yy.T,
+                    )
                 )
 
         model_instance.bind_field(
-            self.model.trajectory_output,
-            self.out,
+            self.model.trajectory_output.wrap(
+                self.out,
+            )
         )
 
 

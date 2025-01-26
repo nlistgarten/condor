@@ -1,13 +1,9 @@
 from .utils import options_to_kwargs
 import condor as co
 import numpy as np
-#from co.backend.utils import (flatten,  
-#                                            vertcat)
 from condor import backend
 import casadi
 
-flatten = co.backend.utils.flatten
-vertcat = co.backend.utils.vertcat
 FunctionsToOperator = co.backend.utils.FunctionsToOperator
 
 
@@ -32,8 +28,7 @@ class DeferredSystem:
 
     def __call__(self, model_instance, *args):
         model_instance.bind_field(
-            self.model.output,
-            self.symbol_outputs,
+            self.model.output.wrap(self.symbol_outputs)
         )
 
 
@@ -63,8 +58,7 @@ class ExplicitSystem:
         self.args = model_instance.input.flatten()
         self.out = self.func(self.args)
         model_instance.bind_field(
-            self.model.output,
-            self.out,
+            self.model.output.wrap(self.out)
         )
 
 class ExternalSolverModel:
@@ -78,8 +72,6 @@ class ExternalSolverModel:
         self.wrapper = model._meta.external_wrapper
         self.input = model.input.flatten()
         self.output = model.output.flatten()
-        # self.input = model.input.list_of('backend_repr')
-        # self.output = model.output.list_of('backend_repr')
         wrapper_funcs = [self.wrapper.function]
         if hasattr(self.wrapper, "jacobian"):
             wrapper_funcs.append(self.wrapper.jacobian)
@@ -94,13 +86,9 @@ class ExternalSolverModel:
 
 
     def __call__(self, model_instance, *args):
-        use_args = casadi.vertcat(*flatten(args))
+        use_args = model_instance.input.flatten()
         out = self.callback(use_args)
-        # out = self.callback(*args)
-        if isinstance(out, casadi.MX):
-            out = casadi.vertsplit(out)
         model_instance.bind_field(
-            self.model.output,
-            out,
+            self.model.output.wrap(out)
         )
 

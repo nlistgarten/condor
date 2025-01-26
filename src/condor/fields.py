@@ -91,17 +91,17 @@ class FieldValues:
         """ turn the bound values of this field instance into a single symbol -- may be
         numeric or in the backend representation (symbol class)"""
         return backend.vstack([
-            elem.flatten_value(v) for elem, v in zip(self.Field, self.asdict().values())
+            elem.flatten_value(v) for elem, v in zip(self.field, self.asdict().values())
         ])
 
     @classmethod
     def wrap(cls, values):
         """ turn a single symbol into a bound field dataclasss """
         count_accumulator = 0
-        size_cum_sum = np.cumsum([0] + cls.Field.list_of("size"))
+        size_cum_sum = np.cumsum([0] + cls.field.list_of("size"))
         new_values = {}
         for start_idx, end_idx, elem in zip(
-            size_cum_sum, size_cum_sum[1:], cls.Field,
+            size_cum_sum, size_cum_sum[1:], cls.field,
         ):
             new_values[elem.name] = elem.wrap_value(values[start_idx:end_idx])
         return cls(**new_values)
@@ -319,7 +319,7 @@ class Field:
             fields,
             bases=(FieldValues,),
         )
-        self._dataclass.Field = self
+        self._dataclass.field = self
 
     def __iter__(self):
         """iterating over field yields elements"""
@@ -339,6 +339,8 @@ class Field:
             **{elem.name: elem.backend_repr for elem in self}
         ).flatten()
 
+    def wrap(self, values):
+        return self._dataclass.wrap(values)
 
 
 def make_class_name(components):

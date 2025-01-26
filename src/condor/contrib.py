@@ -255,7 +255,7 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
             casadi.vertcat(*flatten(self.parameter.asdict().values())),
         ]
         constraints = cls._meta.constraint_func(*args)
-        self.bind_field(cls.constraint, constraints)
+        self.bind_field(cls.constraint.wrap(constraints))
 
         self.objective = cls._meta.objective_func(*args)
 

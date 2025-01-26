@@ -26,7 +26,8 @@ def test_ct_lqr():
 
     class CtOptLQR(co.OptimizationProblem):
         K = variable(shape=DblIntLQR.K.shape)
-        objective = DblIntLQR(K).cost
+        sim = DblIntLQR(K)
+        objective = sim.cost
 
         class Options:
             exact_hessian = False
@@ -75,7 +76,8 @@ def test_sp_lqr():
 
     class SampledOptLQR(co.OptimizationProblem):
         K = variable(shape=DblIntSampledLQR.K.shape)
-        objective = DblIntSampledLQR(K).cost
+        sim = DblIntSampledLQR(K)
+        objective = sim.cost
 
         class Casadi(co.Options):
             exact_hessian = False

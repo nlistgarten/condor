@@ -21,6 +21,21 @@ def test_placeholder_on_explicitsystem():
             output.y = x**2
             z = placeholder()
 
+def test_reserved_word_input():
+    with pytest.raises(ValueError):
+
+        class ShouldFail(co.ExplicitSystem):
+            _meta = input()
+            output.y = _meta**2
+
+@pytest.mark.skip(reason="Need to fix reserve words API")
+def test_reserved_word_output():
+    with pytest.raises(ValueError):
+
+        class ShouldFail(co.ExplicitSystem):
+            x = input()
+            output._meta = x**2
+
 
 def test_objective_shape():
     class Check(co.OptimizationProblem):

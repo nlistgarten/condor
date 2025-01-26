@@ -118,10 +118,10 @@ class AlgebraicSystem(InitializerMixin):
         rootfinder_options = dict(
             error_on_fail=error_on_fail, abstol=atol, abstolStep=rtol, max_iter=max_iter
         )
-        self.x = casadi.vertcat(*flatten(model.variable))
-        self.g0 = casadi.vertcat(*flatten(model.residual))
-        self.g1 = casadi.vertcat(*flatten(model.output))
-        self.p = casadi.vertcat(*flatten(model.parameter))
+        self.x = model.variable.flatten()
+        self.g0 = model.residual.flatten()
+        self.g1 = model.output.flatten()
+        self.p = model.parameter.flatten()
 
         self.output_func = casadi.Function(
             f"{model.__name__}_output", [self.x, self.p], [self.g1]
@@ -151,12 +151,16 @@ class AlgebraicSystem(InitializerMixin):
         )
 
     def __call__(self, model_instance, *args, **kwargs):
-        self.call_args = casadi.vertcat(*flatten(args))
+        self.call_args = model_instance.parameter.flatten()
         out = self.callback(self.call_args)
-        self.var_out = casadi.vertcat(*out[: self.model.variable._count])
-        model_instance.bind_field(self.model.variable, self.var_out)
+        self.var_out = self.model.variable.wrap(
+            out[: self.model.variable._count]
+        )
+        model_instance.bind_field(self.var_out)
         model_instance.bind_field(
-            self.model.output, self.output_func(self.var_out, self.call_args)
+            self.model.output.wrap(
+                self.output_func(self.var_out.flatten(), self.call_args)
+            )
         )
 
         if hasattr(self.callback, "resid"):
@@ -165,7 +169,7 @@ class AlgebraicSystem(InitializerMixin):
             # each field.
             resid = self.callback.resid
             model_instance.bind_field(
-                self.model.residual, resid, symbols_to_instance=False
+                self.model.residual.wrap(resid), symbols_to_instance=False
             )
 
         for k, v in model_instance.variable.asdict().items():
@@ -197,7 +201,7 @@ class SciPyIterCallbackWrapper:
         self.pass_instance = len(inspect.signature(self.callback).parameters) > 4
 
     def __call__(self, xk, res=None):
-        variable = self.model.create_bound_field_dataclass(self.model.variable, xk)
+        variable = self.model.variable.wrap(xk)
         instance = self.model.from_values(
             **self.parameters.asdict(),
             **variable.asdict()
@@ -247,10 +251,8 @@ class CasadiIterationCallback(casadi.Callback):
     def eval(self, args):
         # x, f, g, lam_x, lam_g, lam_p
         x, f, g, *_ = args
-        var_data = self.model.create_bound_field_dataclass(self.model.variable, x)
-        constraint_data = self.model.create_bound_field_dataclass(
-            self.model.constraint, g
-        )
+        var_data = self.model.variable.wrap(x)
+        constraint_data = self.model.constraint.wrap(g)
         self.iteration_callback(self.iter, var_data, f, constraint_data)
         self.iter += 1
         return [0]
@@ -615,8 +617,8 @@ class OptimizationProblem(InitializerMixin):
             if not self.has_p or not isinstance(args[0], symbol_class):
                 self.x0 = out["x"]
 
-            model_instance.bind_field(self.model.variable, out["x"])
-            model_instance.bind_field(self.model.constraint, out["g"])
+            model_instance.bind_field(self.model.variable.wrap(out["x"]))
+            model_instance.bind_field(self.model.constraint.wrap(out["g"]))
             model_instance.objective = np.array(out["f"]).squeeze()
             self.stats = self.optimizer.stats()
             self.out = out
@@ -691,7 +693,7 @@ class OptimizationProblem(InitializerMixin):
                 ),
             )
 
-            model_instance.bind_field(self.model.variable, min_out.x)
+            model_instance.bind_field(self.model.variable.wrap(min_out.x))
             model_instance.objective = min_out.fun
             self.x0 = min_out.x
             self.stats = model_instance._stats = min_out

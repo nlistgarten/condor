@@ -34,22 +34,31 @@ class BackendSymbolData(BackendSymbolDataMixin):
         if self.size == 1 and isinstance(value, (float, int)):
             return value
         else:
+            if not isinstance(value, (np.ndarray, symbol_class)):
+                value = np.array(value)
             return value.reshape((-1,1))
 
-        #if isinstance(value, backend.symbol_class):
 
     def wrap_value(self, value):
-        if self.size == 1 and isinstance(value, (float, int)):
-            ret_value = value
-        else:
-            ret_value = value.reshape(self.shape)
-        if (
-            (isinstance(ret_value, symbol_class) and ret_value.is_constant())
-            or isinstance(ret_value, casadi.DM)
-        ):
-            return np.array(ret_value)
+        if self.size == 1:
+            if isinstance(value, (float, int, symbol_class)):
+                return value
+            elif hasattr(value, "__iter__"):
+                return np.array(value).reshape(-1)[0]
 
-        return ret_value
+        if (
+            (isinstance(value, symbol_class) and value.is_constant())
+            #or isinstance(value, casadi.DM)
+            or not isinstance(value, np.ndarray)
+        ):
+            value = np.array(value)
+
+        try:
+            value = value.reshape(self.shape)
+        except ValueError:
+            value = value.reshape(self.shape + (-1,))
+
+        return value
         return symbol_class(value).reshape(self.shape)
 
 

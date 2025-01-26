@@ -39,7 +39,7 @@ LTI_plot(ct_sim)
 
 
 
-from condor.backends.casadi.implementations import OptimizationProblem
+from condor.implementations import OptimizationProblem
 class CtOptLQR(co.OptimizationProblem):
     K = variable(shape=DblIntLQR.K.shape)
     objective = DblIntLQR(K).cost
@@ -58,11 +58,6 @@ S = linalg.solve_continuous_are(dblintA,dblintB, DblIntLQR.Q, DblIntLQR.R)
 K = linalg.solve(DblIntLQR.R, dblintB.T@S)
 
 lqr_are = DblIntLQR(K)
-<<<<<<< HEAD
-#jac_callback = lqr_are.implementation.callback.jac_callback
-#jac_callback(K, [0])
-=======
->>>>>>> dev/init-tests
 
 print(lqr_sol._stats)
 print(lqr_are.cost, lqr_sol.objective)
