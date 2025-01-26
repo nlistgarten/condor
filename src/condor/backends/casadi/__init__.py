@@ -11,7 +11,15 @@ name = "Casadi"
 
 from condor.backends.casadi import operators
 
-vstack = casadi.vcat
+
+def concat(arrs, axis=0):
+    """ implement concat from array API for casadi """
+    if axis == 0:
+        return casadi.vcat(arrs)
+    elif axis == 1:
+        return casadi.hcat(arrs)
+    else:
+        raise ValueError("casadi only supports matrices")
 
 def shape_to_nm(shape):
     if len(shape) > 2:
