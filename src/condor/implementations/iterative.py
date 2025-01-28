@@ -312,9 +312,9 @@ class OptimizationProblem(InitializerMixin):
 
         self.f = f = getattr(model, "objective", 0)
         self.has_p = bool(len(model.parameter))
-        self.p = p = casadi.vertcat(*flatten(model.parameter))
-        self.x = x = casadi.vertcat(*flatten(model.variable))
-        self.g = g = casadi.vertcat(*flatten(model.constraint))
+        self.p = p = model.parameter.flatten()
+        self.x = x = model.variable.flatten()
+        self.g = g = model.constraint.flatten()
 
         self.objective_func = casadi.Function(
             f"{model.__name__}_objective",

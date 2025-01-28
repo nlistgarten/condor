@@ -96,15 +96,6 @@ class CasadiFunctionCallbackMixin:
 class CasadiFunctionCallback(casadi.Callback):
     """Base class for wrapping a Function with a Callback"""
 
-    def __new__(cls, wrapper_funcs, *args, **kwargs):
-        """ check if this is actually something that needs to get wrapped or if it's a
-        native op...
-        """
-        if isinstance(wrapper_funcs[0], casadi.Function):
-            return wrapper_funcs[0]
-        obj = super().__new__(cls)
-        obj.__init__(wrapper_funcs, *args, **kwargs)
-        return obj
 
 
     def __init__(
@@ -123,23 +114,6 @@ class CasadiFunctionCallback(casadi.Callback):
         input/output symbol used to identify sparsity and other metadata by creating a
         placeholder casadi.Function. Not used if jacobian_of is provided, because
         jacobian operator is used on jacobian_of's placeholder Function.
-
-        to think about: default casadi jacobian operator introduces additional inputs
-        (and therefore, after second derivative also introduces additional output) for
-        anti-derivative output. This is required for most "solver" type outputs.
-        However, probably don't want to use casadi machinery for retaining that solver
-        -- would be done externally. Is there ever a time we would want to use casadi
-        machinery for passing in previous solution? if so, what would the API be for
-        specifying?
-
-        y = fun(x)
-        jac = jac_fun(x,y)
-        d_jac_x, d_jac_y = hess_fun(x, y, jac)
-
-        if we don't use casadi's mechanisms, we are technically not functional
-        but maybe when it gets wrapped by the callbacks, it effectively becomes
-        functional because new instances are always created when needed to prevent race
-        conditions, etc?
 
         """
         casadi.Callback.__init__(self)
@@ -274,7 +248,70 @@ class CasadiFunctionCallback(casadi.Callback):
     def get_jacobian(self, name, inames, onames, opts):
         # breakpoint()
         return self.jacobian
-FunctionsToOperator = CasadiFunctionCallback
+
+def callables_to_operator(wrapper_funcs, *args, **kwargs):
+    """ check if this is actually something that needs to get wrapped or if it's a
+    native op... if latter, return directly; if former, create callback.
+
+    this function ultimately contains the generic API, CasadiFunctionCallback can be
+    casadi specific interface
+
+
+    to think about: default casadi jacobian operator introduces additional inputs
+    (and therefore, after second derivative also introduces additional output) for
+    anti-derivative output. This is required for most "solver" type outputs.
+    However, probably don't want to use casadi machinery for retaining that solver
+    -- would be done externally. Is there ever a time we would want to use casadi
+    machinery for passing in previous solution? if so, what would the API be for
+    specifying?
+
+    y = fun(x)
+    jac = jac_fun(x,y)
+    d_jac_x, d_jac_y = hess_fun(x, y, jac)
+
+    if we don't use casadi's mechanisms, we are technically not functional
+    but maybe when it gets wrapped by the callbacks, it effectively becomes
+    functional because new instances are always created when needed to prevent race
+    conditions, etc?
+
+    similarly, how to specify alternate types/details of derivative, like
+    forward/reverse mode, matrix-vector product form, etc.
+
+    by definition, since we are consuming functions and cannot arbitrarily take
+    derivatives (could look at how casadi does trajectory but even if useful for our
+    trajectory, may not generalize to other external solvers) so need to implement
+    and declare manually. Assuming this take is right, seems somewhat reasonable to
+    assume we get functions, list of callables (at least 1) that evaluates 0th+
+    functions (dense jacobians, hessians, etc). Then a totally different spec track for
+    jacobian-vector or vector-jacobian products. Could cap out at 2nd derivative, not
+    sure what the semantics for hessian-vector vs vector-hessian products, tensor etc.
+
+
+
+    """
+    if isinstance(wrapper_funcs[0], casadi.Function):
+        return wrapper_funcs[0]
+    return CasadiFunctionCallback(wrapper_funcs, *args, **kwargs)
+
+def expression_to_operator(input_symbols, output_expressions, name="", **kwargs):
+    """ take a symbolic expression and create an operator -- callable that can be used
+    with jacobian, etc. operators """
+    if not name:
+        name = "function_from_expression"
+    return casadi.Function(
+        name,
+        [input_symbols],
+        [output_expressions],
+    )
+
+def jacobian(of, wrt):
+    """ create a callable that computes dense jacobian """
+    return casadi.jacobian(of, wrt)
+
+def jac_prod(of, wrt, rev=True):
+    """ create directional derivative """
+    return casadi.jtimes(of, wrt, not rev)
+
 
 def flatten(symbols):
     # TODO: is flatten alwyas getting vert-catted?

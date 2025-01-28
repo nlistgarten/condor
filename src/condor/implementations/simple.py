@@ -2,25 +2,16 @@ from .utils import options_to_kwargs
 import condor as co
 import numpy as np
 from condor import backend
-import casadi
 
-FunctionsToOperator = co.backend.utils.FunctionsToOperator
+callables_to_operator = co.backend.utils.callables_to_operator
+expression_to_operator = co.backend.utils.expression_to_operator
 
 
 class DeferredSystem:
     def construct(self, model):
         self.symbol_inputs = model.input.flatten()
         self.symbol_outputs = model.output.flatten()
-
         self.model = model
-        self.func = casadi.Function(
-            model.__name__,
-            self.symbol_inputs,
-            self.symbol_outputs,
-            dict(
-                allow_free=True,
-            ),
-        )
 
     def __init__(self, model_instance, args):
         self.construct(model_instance.__class__)
@@ -45,13 +36,10 @@ class ExplicitSystem:
         self.symbol_outputs = model.output.flatten()
 
         self.model = model
-        self.func = casadi.Function(
-            model.__name__,
-            [self.symbol_inputs],
-            [self.symbol_outputs],
-            dict(
-                allow_free=True,
-            ),
+        self.func = expression_to_operator(
+            self.symbol_inputs,
+            self.symbol_outputs,
+            name=model.__name__,
         )
 
     def __call__(self, model_instance, *args):
@@ -77,7 +65,7 @@ class ExternalSolverModel:
             wrapper_funcs.append(self.wrapper.jacobian)
         if hasattr(self.wrapper, "hessian"):
             wrapper_funcs.append(self.wrapper.hessian)
-        self.callback = FunctionsToOperator(
+        self.callback = callables_to_operator(
             wrapper_funcs, self, jacobian_of=None,
             input_symbol = self.input,
             output_symbol = self.output,

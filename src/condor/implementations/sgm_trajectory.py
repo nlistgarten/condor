@@ -12,7 +12,7 @@ substitute = co.backend.utils.substitute
 recurse_if_else = co.backend.utils.recurse_if_else
 symbol_class = co.backend.utils.symbol_class
 
-FunctionsToOperator = co.backend.utils.FunctionsToOperator
+callables_to_operator = co.backend.utils.callables_to_operator
 
 def get_state_setter(field, setter_args, setter_targets=None, default=0.0, subs={}):
     """
@@ -564,7 +564,7 @@ class TrajectoryAnalysis:
             self.trajectory_analysis_sgm.jacobian,
         ]
 
-        self.callback = FunctionsToOperator(
+        self.callback = callables_to_operator(
             wrapper_funcs, self, jacobian_of=None,
             input_symbol = self.p,
             output_symbol = self.traj_out_expr,

@@ -172,7 +172,13 @@ class OptimizationProblemType(ModelType):
             if re_append_elem:
                 new_cls.constraint._elements.append(elem)
 
-        # handle
+        # TODO: dataclass hasn't been created yet, any reason for that? yes, in general
+        # process placeholders might be changing the field. so this processing should be
+        # done elsewhere... persistent callable from field should happen elsewhere.
+
+        #p = new_cls.parameter.flatten()
+        #x = new_cls.variable.flatten()
+        #g = new_cls.constraint.flatten()
         p = casadi.vertcat(*flatten(new_cls.parameter))
         x = casadi.vertcat(*flatten(new_cls.variable))
         g = casadi.vertcat(*flatten(new_cls.constraint))

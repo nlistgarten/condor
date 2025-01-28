@@ -7,8 +7,8 @@ from enum import Enum, auto
 
 import condor as co
 import numpy as np
-from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
-                                          symbol_class, wrap)
+from condor.backends.casadi.utils import (recurse_if_else, substitute,
+                                          symbol_class)
 
 import casadi
 
