@@ -1,7 +1,4 @@
 import condor as co
-from condor.backends.casadi.utils import (
-    flatten, wrap, symbol_class, substitute, recurse_if_else
-)
 import casadi
 import os
 import numpy as np

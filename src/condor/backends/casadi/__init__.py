@@ -213,7 +213,8 @@ class CasadiFunctionCallback(casadi.Callback):
             if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
                 return (out,)
             jac_out = (
-                np.concatenate(flatten(out))
+                #np.concatenate(flatten(out))
+                out
                 .reshape(self.get_sparsity_out(0).shape[::-1])
                 .T
             )

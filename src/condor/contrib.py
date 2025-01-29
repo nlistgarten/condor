@@ -844,17 +844,25 @@ class TableLookup(ExternalSolverWrapper):
             input_data, output_data, degrees=degrees, bcs=bcs,
         )
         self.jac_interps = [
-            self.interpolant.derivative(idx) for idx in range(self.interpolant.xdim)
+            self.derivative_or_zero(self.interpolant, idx)
+            for idx in range(self.interpolant.xdim)
         ]
         self.hess_interps = [
             [
-                interpolant.derivative(idx)
-                if interpolant.degrees[idx] > 0
-                else lambda *args: np.zeros((1,interpolant.ydim))
+                self.derivative_or_zero(interpolant, idx)
                 for idx in range(interpolant.xdim)
             ]
             for interpolant in self.jac_interps
         ]
+
+    @staticmethod
+    def derivative_or_zero(interpolant, idx):
+        if interpolant.degrees[idx] > 0:
+            return interpolant.derivative(idx)
+        return ndsplines.make_interp_spline(
+            np.zeros(1), np.zeros((1,interpolant.ydim)), degrees=0
+        )
+        raise ValueError
 
     def function(self, xx):
         return self.interpolant(np.array(xx).reshape(-1))[0, :]#.T

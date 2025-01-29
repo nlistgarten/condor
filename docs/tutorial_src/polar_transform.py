@@ -16,7 +16,7 @@ Polar Transformation
 # of this system as follows:
 
 import condor as co
-from condor import operators as ops
+from condor.backend import operators as ops
 class PolarTransform(co.ExplicitSystem):
     x = input()
     y = input()

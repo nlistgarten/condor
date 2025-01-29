@@ -63,7 +63,7 @@ print(coupling.variable) # fields are bound as a dataclass
 # where :math:`y_1` and :math:`y_2` are the solution to the system of algebraic
 # equations described above. In condor, we can write this as
 
-from condor import operators as ops
+from condor.backend import operators as ops
 
 class Sellar(co.OptimizationProblem):
     x = variable(shape=3, lower_bound=0, upper_bound=10)

@@ -37,7 +37,7 @@ Working with trajectories
 # can implement this as,
 
 import condor
-from condor import operators as ops
+from condor.backend import operators as ops
 class Glider(condor.ODESystem):
     r = state()
     h = state()

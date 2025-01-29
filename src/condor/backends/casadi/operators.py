@@ -1,6 +1,8 @@
 from numpy import *
 import casadi
 
+pi = casadi.pi
+
 def concat(arrs, axis=0):
     """ implement concat from array API for casadi """
     if axis == 0:

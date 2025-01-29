@@ -17,6 +17,7 @@ backend_mod = get_backend()
 
 #    - NOT callable/expression to operator
 
+pi = backend_mod.operators.pi
 jacobian = backend_mod.operators.jacobian
 recurse_if_else = backend_mod.operators.recurse_if_else
 substitute = backend_mod.operators.substitute
@@ -32,4 +33,5 @@ exp = backend_mod.operators.exp
 log = backend_mod.operators.log
 log10 = backend_mod.operators.log10
 concat = backend_mod.operators.concat
+sqrt = backend_mod.operators.sqrt
 

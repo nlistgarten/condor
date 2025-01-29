@@ -11,6 +11,7 @@ Here we will provide how-to guides (recipes) for certain tasks.
     parallel_processing
 
 ..
+   [ ]  how to learn about condor
    [x] parallel_processing - quick guide on parallel processing
    [ ] external_solver
 
