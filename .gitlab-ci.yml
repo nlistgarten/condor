@@ -7,7 +7,7 @@ before_script:
   - python -m pip install -e .[docs]
 pages:
   script:
-    - make -C docs
+    - make -C docs html
     - cp -r docs/_build/html public
   artifacts:
     paths:
