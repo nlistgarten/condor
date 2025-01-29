@@ -44,7 +44,7 @@ class BackendSymbolData(BackendSymbolDataMixin):
                 ret_val = np.array(value).reshape(-1)[0]
                 if isinstance(ret_val, symbol_class):
                     return ret_val
-                return np.array(value).reshape(1,-1)
+                return np.array(value).reshape(-1)
 
         if (
             (isinstance(value, symbol_class) and value.is_constant())
