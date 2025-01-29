@@ -22,16 +22,20 @@ test:
     - pip install -e .[test]
     - pytest
 
-pages:
+docs:
   script:
     - pip install -e .[docs]
     - make -C docs html
+  artifacts:
+    paths:
+      - docs/_build/html
+
+pages:
+  needs: ['docs']
+  script:
     - mv docs/_build/html/ public/
   artifacts:
     paths:
-      # The folder that contains the files to be exposed at the Page URL
       - public
   rules:
-    # This ensures that only pushes to the default branch will trigger
-    # a pages deploy
     - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
