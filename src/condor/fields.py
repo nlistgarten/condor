@@ -90,7 +90,7 @@ class FieldValues:
     def flatten(self):
         """ turn the bound values of this field instance into a single symbol -- may be
         numeric or in the backend representation (symbol class)"""
-        return backend.concat([
+        return backend.operators.concat([
             elem.flatten_value(v) for elem, v in zip(self.field, self.asdict().values())
         ])
 
@@ -269,7 +269,7 @@ class Field:
                     if not isinstance(field_value, backend.symbol_class):
                         this_item = False
                         break
-                    this_item = this_item and backend.utils.symbol_is(
+                    this_item = this_item and backend.symbol_is(
                         item_value, field_value
                     )
                 elif isinstance(item_value, BaseElement):

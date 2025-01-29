@@ -5,8 +5,8 @@ import condor as co
 
 from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
-from condor.backends.casadi.utils import (flatten, recurse_if_else, substitute,
-                                          symbol_class, wrap)
+from condor.backends.casadi.utils import (flatten, wrap)
+from condor.backend import symbol_class
 import numpy as np
 
 class InitializerMixin:

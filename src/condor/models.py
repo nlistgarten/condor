@@ -1089,7 +1089,7 @@ class ModelType(BaseModelType):
 
         for field in new_cls._meta.noninput_fields:
             for elem in field:
-                elem.backend_repr = backend.utils.substitute(
+                elem.backend_repr = backend.operators.substitute(
                     elem.backend_repr, placeholder_assignment_dict
                 )
 
@@ -1292,7 +1292,7 @@ class Model(metaclass=ModelType):
                     else:
                         value_found = False
                         for kk, vv in model_assignments.items():
-                            if backend.utils.symbol_is(v, kk):
+                            if backend.symbol_is(v, kk):
                                 value_found = True
                                 break
                         embedded_model_kwargs[k] = vv

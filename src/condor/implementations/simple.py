@@ -3,10 +3,7 @@ import condor as co
 import numpy as np
 from condor import backend
 
-callables_to_operator = co.backend.utils.callables_to_operator
-expression_to_operator = co.backend.utils.expression_to_operator
-
-
+from condor.backend import callables_to_operator, expression_to_operator
 class DeferredSystem:
     def construct(self, model):
         self.symbol_inputs = model.input.flatten()

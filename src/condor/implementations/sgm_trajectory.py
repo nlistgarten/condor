@@ -6,13 +6,11 @@ import numpy as np
 from condor import backend
 import casadi
 
-flatten = co.backend.utils.flatten
-vertcat = co.backend.utils.vertcat
-substitute = co.backend.utils.substitute
-recurse_if_else = co.backend.utils.recurse_if_else
-symbol_class = co.backend.utils.symbol_class
+flatten = backend.backend_mod.utils.flatten
+vertcat = backend.backend_mod.utils.vertcat
 
-callables_to_operator = co.backend.utils.callables_to_operator
+from condor.backend import symbol_class, callables_to_operator
+from condor.backend.operators import recurse_if_else, substitute
 
 def get_state_setter(field, setter_args, setter_targets=None, default=0.0, subs={}):
     """

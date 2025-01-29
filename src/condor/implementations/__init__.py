@@ -7,10 +7,6 @@ from enum import Enum, auto
 
 import condor as co
 import numpy as np
-from condor.backends.casadi.utils import (recurse_if_else, substitute,
-                                          symbol_class)
-
-import casadi
 
 # TODO: make SGM and SolverWithWarmStart (really, back-tracking solver and possibly only
 # needed if broyden doesn't resolve it?) generic and figure out how to separate the
