@@ -10,7 +10,7 @@ Condor contrib models
 
 .. autoclass:: condor.contrib.TableLookup
    :member-order: bysource
-   :members:
+   :members: __original_init__
    :undoc-members:
    :exclude-members: placeholder, user_model_metaclass
 

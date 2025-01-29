@@ -810,7 +810,9 @@ class ExternalSolverWrapper(
 
 
 class TableLookup(ExternalSolverWrapper):
-    """The output is the interpolated value for each input """
+    """The output is the interpolated value for each input
+
+    """
 
     # TODO enforce shape = 1 for input/output??
     """
@@ -831,6 +833,25 @@ class TableLookup(ExternalSolverWrapper):
 
     """
     def __init__(self, xx, yy, degrees=3, bcs=(-1,0)):
+        """ construct a :class:`TableLookup` model
+
+        :attr:`xx` : dict
+            a dictionary where keys are input element names and values are the grid
+            points for data on that axis, so the collection of values can be passed to
+            ``np.meshgrid`` to construct a rectilinear grid; input should be a single 
+            dimension.
+        :attr:`yy` : dict
+            a dictionary where keys are output element names and values are the values
+            on the input grid to be interpolated
+        :attr:`degrees` : ndarray, shape=(xdim,), dtype=np.intc
+            Degree of interpolant for each axis (or broadcastable). Optional, 
+            default is 3.
+        :attr:`bcs` : ndarray, broadcastable to (xdim, 2, 2)
+            bc[xdim, 0 for left | 1 for right, :] = (order, value) for specifying
+            derivative conditions. Use order (-1,0) to specify the not-a-knot boundary 
+            conditions (default), where the boundary polynomial is the same as its
+            neighbor.
+        """
         input_data = []
         for k, v in xx.items():
             self.input(name=k)
@@ -857,6 +878,8 @@ class TableLookup(ExternalSolverWrapper):
 
     @staticmethod
     def derivative_or_zero(interpolant, idx):
+        """ convenience function for creating a derivative in a particular direction or
+        a 0-interpolant if the degree in that direction is 0 """
         if interpolant.degrees[idx] > 0:
             return interpolant.derivative(idx)
         return ndsplines.make_interp_spline(
@@ -865,9 +888,11 @@ class TableLookup(ExternalSolverWrapper):
         raise ValueError
 
     def function(self, xx):
+        """ evaluate the table-interpolating spline at :attr:`xx` """
         return self.interpolant(np.array(xx).reshape(-1))[0, :]#.T
 
     def jacobian(self, xx):
+        """ evaluate the dense jacobian at :attr:`xx` """
         array_vals = [
             interp(np.array(xx).reshape(-1))[0, :]
             for interp in self.jac_interps
@@ -882,6 +907,7 @@ class TableLookup(ExternalSolverWrapper):
         return return_val
 
     def hessian(self, xx):
+        """ evaluate the dense hessian at :attr:`xx` """
         array_vals = np.stack([
             np.stack([
                 interp(np.array(xx).reshape(-1))[0, :]

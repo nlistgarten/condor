@@ -236,6 +236,38 @@ Attributes without a leading underscore are placed into a ``dict`` for
 the keyword arguments to the implementation's :func:`construct`
 method. Special behavior for ``_implementation`` and ...
 
+Solver options can be passed from throught he Options attribute. Ultimately it is the
+implementations job to parse the Options, but except where different solvers for the
+same model-type conflict the intention is to make the argument manipulation at the
+implementation layer as thin as possible.
+
+the :attr:`Options` can be considered model inputs that make sense to have a default. They
+are also intended to be inputs that don't define the mathematical meaning of the model. 
+
+..
+    #
+    # In the case of the TableLookup, Options can be used to specify the boundary conditions
+    # and interpolant degree (in each direction.) Options can be declared during the model
+    # declaration, as in:
+
+
+    class SinTable(condor.TableLookup):
+        x = input()
+        y = output()
+
+        input_data[x] = np.linspace(-1, 1, 5)*np.pi
+        output_data[y] = ops.sin(input_data[x])
+        class Options:
+            degrees = 0
+
+    print(SinTable(np.pi/4))
+
+
+    # %%
+    # or by assigning an attribute directly on the Model's Option attribute, which will be
+    # injected if it is not declared. For example, we can iterate over piecewise constant,
+    # piecewise linear, and piecewise cubic polynomials to 
+
 
 
 
