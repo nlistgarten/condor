@@ -203,7 +203,7 @@ class declaration,
 3. :func:`Metaclass.__new__` is passed the (filled) class dictionary and
    creates the class via :func:`type.__call__`. Note that
    :func:`Metaclass.__init__` is also called after this but is not as
-   useful because the ``Class`` is already fully constructed by this point;
+   useful because the ``class`` is already fully constructed by this point;
    the ``__init__`` can only be used to organize post-processing.
 
 Is there any shared flow between a Template and Model?
