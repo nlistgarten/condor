@@ -33,6 +33,7 @@ docs:
 pages:
   needs: ['docs']
   script:
+    - ls -l docs/_build/html
     - mv docs/_build/html/ public/
   artifacts:
     paths:
