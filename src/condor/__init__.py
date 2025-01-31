@@ -16,22 +16,6 @@ from condor.models import Options
 
 ##################
 """
-as clarified by Ionel: https://blog.ionelmc.ro/2015/02/09/understanding-python-metaclasses/#putting-it-all-together
-call order is:
-  Meta.__prepare__ creates class dict
-  process attributes of Class (class definition fills in class dict)
-  Meta.__new__ creates class (via type.__call__) and returns Class
-  (and Meta.__init__, but not as powerful, can do post-ops on constructed Class)
-
-note, similar construction for object, instance of Class:
-  Meta.__call__ (classmethod, but located in Meta)
-  Class.__new__ (classmethod)
-  Class.__init__ (with instantiated class instance)
-
-note, inheritance is done ~ by checking bases (well, really MRO) if the attribute is not
-found on the leaf node. Can use this for Model's definition of __init__ etc for binding
-the IO to the model instance, but cannot rely on it for the magic name space injection
-
 ModelTemplate flag for user_model (default True)
 If false, can add placeholders, returns a tempalte instead of model
 

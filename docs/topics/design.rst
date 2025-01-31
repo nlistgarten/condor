@@ -196,17 +196,17 @@ Ionel provides a nice overview of Python3 process for class declaration
 and object instantiation. Relevant for us is the following call-order. For 
 class declaration,
 
-1. :func:`Metaclass.__prepare__` creates a class dictionary at the entry
+1. :meth:`Metaclass.__prepare__` creates a class dictionary at the entry
    of the ``class`` declaration.
 2. Each assignment within the class declaration uses the 
-   :func:`__setitem__` of the class dictionary
+   :meth:`__setitem__` of the class dictionary
 3. :func:`Metaclass.__new__` is passed the (filled) class dictionary and
-   creates the class via :func:`type.__call__`. Note that
-   :func:`Metaclass.__init__` is also called after this but is not as
-   useful because the ``class`` is already fully constructed by this point;
-   the ``__init__`` can only be used to organize post-processing.
+   creates the class via :meth:`type.__call__`. Note that
+   :meth:`Metaclass.__init__` is also called after this but is not as
+   useful because the :code:`class` is already fully constructed by this point;
+   the :code:`__init__` can only be used to organize post-processing. 
 
-Is there any shared flow between a Template and Model?
+Is there any shared flow between a Template and Model? Yes, show Template first then Model.
 
 :class:`ModelTemplate` declaration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -222,7 +222,11 @@ Annotated flow of how a :class:`Model` is created --
 Calling and binding
 -------------------
 
-the ``__class__`` is ``__call__``\ed
+the :code:`__class__` is :meth:`__call__`\ed which calls the :meth:`__new__` which creates
+the :code:`self` object which is then passed to :meth:`__init__`.
+
+The :meth:`condor.Model.__init__` parses the positional and keyword arguments to bind
+the values for the input field(s). Then the 
 
 The implementation layer
 ========================
@@ -277,12 +281,35 @@ The backend
 
 The backend layer provides a common interface to potential
 "computational engine" libraries. Currently, we support only the
-CasADi engine. 
+CasADi engine. Condor uses a "shim" so that the capability needed by the computational
+engine can be accessed from the same import within the library. For each engine, a 
+:mod:`backends` module must be provided to adapt the engine to a common API.
 
 
 Using Condor for a "tool" or library
 =====================================
 
+
+
+Useful engineering analysis tools can be built as a Python library simply by
+constructing the desired model witht he :mod:`contrib` models. Since the Model is
+defined by constructing a :code:`class`, Python class variable scoping prevents the dynamic
+definition of models inside a factory function. To get around this, a "configuration" pattern 
+was defined with a :meth:`dynamic_link` helper. The Systems Analysis Office at NASA's Ames
+Research Center has used this approach to build an aircraft synthesis and analysis tool using
+Condor.
+
+More recently, the metaprogramming back-bone of Condor was refactored to facilitate
+the customization of symbolic processing to facilitate the creation of custom 
+:class:`ModelTemplate`\s. To create a new type of analysis tool, we now recommend leveraging
+this capability. A design process might include:
+
+  1. Identify the data required to specify the analysis, and identify the :class:`Field` (or
+     create a custom :class:`Field`) that would be appropriate for holding that data
+  2. Identify (or create) what solver and implementation is needed, including a mapping
+     from the new type of Model to the an existing model or solver.
+  3. Implement a :meth:`process_placeholder` for processing the models data so the implementation
+     can call the solver.
 
 
 ..
