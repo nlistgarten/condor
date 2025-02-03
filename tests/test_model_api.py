@@ -28,7 +28,6 @@ def test_reserved_word_input():
             _meta = input()
             output.y = _meta**2
 
-@pytest.mark.skip(reason="Need to fix reserve words API")
 def test_reserved_word_output():
     with pytest.raises(ValueError):
 

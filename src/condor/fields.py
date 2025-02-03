@@ -139,6 +139,8 @@ class Field:
             # TODO: ensure this works for different file organizations? e.g., will it
             # find a symbol defined in another file that the field subclass has access
             # to? NO! need to figure out how to access parent scope dictionary?
+            # no it does not! Libraries need to be explicit, maybe core condor should be
+            # as well.
 
             element_class = globals().get(cls.__name__.replace("Field", "Element"))
         cls.element_class = element_class
@@ -611,9 +613,14 @@ class AssignedElement(BaseElement):
 
 class AssignedField(Field, default_direction=Direction.output):
     def __setattr__(self, name, value):
-        if name.startswith("_"):
+        if name.startswith("_") and not isinstance(value, backend.symbol_class):
+            # TODO: iirc the reason we need to prefix field attributes that are directly
+            # assigned with _ is to allow this check to work, bypassing the creation of
+            # a new element. Is it actually sufficient to just if the value is a
+            # symbol_class??
             super().__setattr__(name, value)
         else:
+
             # TODO: resolve circular imports so we can use dataclass
             if isinstance(value, BaseElement):
                 value = value.backend_repr
@@ -630,6 +637,8 @@ class AssignedField(Field, default_direction=Direction.output):
             )
             if self._direction == Direction.output and self._cls_dict:
                 # self._cls_dict.__set_item__(name, value)
+                #breakpoint()
+                #check_attr_name(name, value, self._cls_dict)
                 self._cls_dict[name] = value
             # super().__setattr__(name, self._symbols[-1])
 
