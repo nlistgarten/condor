@@ -19,7 +19,6 @@ def test_embedded_explicit():
     assert WrapSys(a=3).c == 7
 
 
-@pytest.mark.xfail
 def test_embedded_algebraic():
     class EmbSys(condor.AlgebraicSystem):
         a = parameter()
@@ -35,7 +34,6 @@ def test_embedded_algebraic():
     assert WrapSys().b == 9
 
 
-@pytest.mark.xfail
 def test_embedded_optimization():
     class EmbSys(condor.OptimizationProblem):
         a = parameter()

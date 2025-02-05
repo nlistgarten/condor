@@ -700,7 +700,11 @@ def check_attr_name(attr_name, attr_val, new_cls):
         )
     existing_attr = getattr(new_cls, attr_name, None)
     if existing_attr is not None and attr_val is not existing_attr:
-        if attr_val.backend_repr is existing_attr.backend_repr:
+        if isinstance(existing_attr, BaseElement):
+            compare_attr = existing_attr.backend_repr
+        else:
+            compare_attr = existing_attr
+        if attr_val.backend_repr is compare_attr:
             return
         raise NameError(
             f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is already set to {getattr(new_cls, attr_name)}"
@@ -1333,7 +1337,7 @@ class Model(metaclass=ModelType):
                         sym_val: ran_val
                         for sym_val, ran_val in zip(
                             sym_bound_field_dict.values(), ran_bound_field_dict.values()
-                        )
+                        ) if isinstance(sym_val, backend.symbol_class)
                     }
                 )
 
