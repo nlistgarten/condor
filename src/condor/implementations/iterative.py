@@ -61,7 +61,7 @@ class InitializerMixin:
                         shaped_initial = np.broadcast_to(
                             initializer_val, solver_var.shape
                         ).reshape(-1)
-                    if solver_var.warm_start.any():
+                    if np.array(solver_var.warm_start).any():
                         x0_at_construction.extend(shaped_initial)
                         initializer_exprs.extend(
                             casadi.vertsplit(solver_var.backend_repr.reshape((-1, 1)))
@@ -695,7 +695,7 @@ class OptimizationProblem(InitializerMixin):
 
         for k, v in model_instance.variable.asdict().items():
             model_var = getattr(self.model, k)
-            if model_var.warm_start.any() and not isinstance(
+            if np.array(model_var.warm_start).any() and not isinstance(
                 model_var.initializer, symbol_class
             ):
                 model_var.initializer = v
