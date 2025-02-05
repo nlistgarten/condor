@@ -9,7 +9,12 @@ from condor.backends.casadi.utils import (flatten, wrap)
 from condor.backend import symbol_class
 import numpy as np
 
+
+
 class InitializerMixin:
+    def __init__(self, model):
+        self.model = model
+
     def set_initial(self, *args, **kwargs):
         if args:
             # assume it's all initialized values, so flatten and assign
@@ -56,7 +61,7 @@ class InitializerMixin:
                         shaped_initial = np.broadcast_to(
                             initializer_val, solver_var.shape
                         ).reshape(-1)
-                    if solver_var.warm_start:
+                    if solver_var.warm_start.any():
                         x0_at_construction.extend(shaped_initial)
                         initializer_exprs.extend(
                             casadi.vertsplit(solver_var.backend_repr.reshape((-1, 1)))
@@ -90,10 +95,10 @@ class AlgebraicSystem(InitializerMixin):
     class LineSearchCriteria(Enum):
         armijo = auto()
 
-    def __init__(self, model_instance, args):
+    def __init__(self, model_instance):
         model = model_instance.__class__
         self.construct(model, **options_to_kwargs(model))
-        self(model_instance, *args)
+        self(model_instance)
 
     def construct(
         self,
@@ -150,7 +155,7 @@ class AlgebraicSystem(InitializerMixin):
             max_iter=max_iter,
         )
 
-    def __call__(self, model_instance, *args, **kwargs):
+    def __call__(self, model_instance):
         self.call_args = model_instance.parameter.flatten()
         out = self.callback(self.call_args)
         self.var_out = self.model.variable.wrap(
@@ -245,7 +250,12 @@ class CasadiIterationCallback(casadi.Callback):
         elif n in ("x", "lam_x"):
             return self.nlpdict["x"].sparsity()
         elif n in ("g", "lam_g"):
-            return self.nlpdict["g"].sparsity()
+            g = self.nlpdict["g"]
+            if not hasattr(g, "sparsity"):
+                return casadi.Sparsity.dense(
+                    np.atleast_2d(g).shape
+                )
+            return g.sparsity()
         return casadi.Sparsity(0, 0)
 
     def eval(self, args):
@@ -285,10 +295,10 @@ class OptimizationProblem(InitializerMixin):
         ),
     }
 
-    def __init__(self, model_instance, args):
+    def __init__(self, model_instance):
         model = model_instance.__class__
         self.construct(model, **options_to_kwargs(model))
-        self(model_instance, *args)
+        self(model_instance)
 
     def construct(
         self,
@@ -327,26 +337,10 @@ class OptimizationProblem(InitializerMixin):
             [g],
         )
 
-        self.lbx = lbx = (
-            casadi.vcat(flatten(model.variable.list_of("lower_bound")))
-            .toarray()
-            .reshape(-1)
-        )
-        self.ubx = ubx = (
-            casadi.vcat(flatten(model.variable.list_of("upper_bound")))
-            .toarray()
-            .reshape(-1)
-        )
-        self.lbg = lbg = (
-            casadi.vcat(flatten(model.constraint.list_of("lower_bound")))
-            .toarray()
-            .reshape(-1)
-        )
-        self.ubg = ubg = (
-            casadi.vcat(flatten(model.constraint.list_of("upper_bound")))
-            .toarray()
-            .reshape(-1)
-        )
+        self.lbx = lbx = model.variable.flatten("lower_bound")
+        self.ubx = ubx = model.variable.flatten("upper_bound")
+        self.lbg = lbg = model.constraint.flatten("lower_bound")
+        self.ubg = ubg = model.constraint.flatten("upper_bound")
 
         self.nlp_args = dict(f=f, x=x, g=g)
         initializer_args = [self.x]
@@ -425,6 +419,7 @@ class OptimizationProblem(InitializerMixin):
             )
 
         else:
+            # non-
             self.optimizer = None
             self.f_func = self.objective_func
             self.f_jac_func = casadi.Function(
@@ -579,12 +574,12 @@ class OptimizationProblem(InitializerMixin):
                         )
                     )
 
-    def __call__(self, model_instance, *args):
+    def __call__(self, model_instance):
         initializer_args = [self.x0]
         if self.has_p:
-            p = casadi.vertcat(*flatten(args))
+            p = model_instance.parameter.flatten()
             initializer_args += [p]
-        if not self.has_p or not isinstance(args[0], symbol_class):
+        if not self.has_p or not isinstance(p, symbol_class):
             self.x0 = self.initializer_func(*initializer_args)
             if not isinstance(self.x0, casadi.DM):
                 self.x0 = casadi.vertcat(*self.x0)
@@ -614,7 +609,7 @@ class OptimizationProblem(InitializerMixin):
                 call_args["p"] = p
 
             out = self.optimizer(**call_args)
-            if not self.has_p or not isinstance(args[0], symbol_class):
+            if not self.has_p or not isinstance(p, symbol_class):
                 self.x0 = out["x"]
 
             model_instance.bind_field(self.model.variable.wrap(out["x"]))
@@ -700,7 +695,7 @@ class OptimizationProblem(InitializerMixin):
 
         for k, v in model_instance.variable.asdict().items():
             model_var = getattr(self.model, k)
-            if model_var.warm_start and not isinstance(
+            if model_var.warm_start.any() and not isinstance(
                 model_var.initializer, symbol_class
             ):
                 model_var.initializer = v

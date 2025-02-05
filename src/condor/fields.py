@@ -90,9 +90,12 @@ class FieldValues:
     def flatten(self):
         """ turn the bound values of this field instance into a single symbol -- may be
         numeric or in the backend representation (symbol class)"""
-        return backend.operators.concat([
+        flat_val =  backend.operators.concat([
             elem.flatten_value(v) for elem, v in zip(self.field, self.asdict().values())
         ])
+        if not isinstance(flat_val, backend.symbol_class):
+            flat_val = np.array(flat_val).reshape(-1)
+        return flat_val
 
     @classmethod
     def wrap(cls, values):
@@ -336,9 +339,9 @@ class Field:
         dataclass"""
         return self.get(name=with_name).backend_repr
 
-    def flatten(self):
+    def flatten(self, attr="backend_repr"):
         return self._dataclass(
-            **{elem.name: elem.backend_repr for elem in self}
+            **{elem.name: getattr(elem, attr) for elem in self}
         ).flatten()
 
     def wrap(self, values):
@@ -512,6 +515,7 @@ class BoundedElement(FreeElement):
 
     def __post_init__(self):
         super().__post_init__()
+        # since bounds generally must be numeric, broadcasting should just work
         self.upper_bound = np.broadcast_to(self.upper_bound, self.shape)
         self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
 
@@ -522,6 +526,19 @@ class InitializedElement(
 ):
     initializer: float = 0.0  # TODO union[numeric, expression]
     warm_start: bool = True
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.warm_start = np.broadcast_to(self.warm_start, self.shape)
+        # initializer may be an expression and cause an error here.
+        # TODO: test this behavior? lol
+        if isinstance(self.initializer, BaseElement):
+            self.initializer = np.ones( self.shape) * self.initializer.backend_repr
+        elif isinstance(self.initializer, backend.symbol_class):
+            self.initializer = np.ones( self.shape) * self.initializer
+        else:
+            self.initializer = np.broadcast_to(self.initializer, self.shape)
+
 
 
 class InitializedField(FreeField):

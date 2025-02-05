@@ -10,11 +10,11 @@ class DeferredSystem:
         self.symbol_outputs = model.output.flatten()
         self.model = model
 
-    def __init__(self, model_instance, args):
+    def __init__(self, model_instance):
         self.construct(model_instance.__class__)
-        self(model_instance, *args)
+        self(model_instance)
 
-    def __call__(self, model_instance, *args):
+    def __call__(self, model_instance):
         model_instance.bind_field(
             self.model.output.wrap(self.symbol_outputs)
         )
@@ -24,9 +24,9 @@ class ExplicitSystem:
     """ Implementation for :class:`ExplicitSystem` model. No :class:`Options` expected.
     """
 
-    def __init__(self, model_instance, args):
+    def __init__(self, model_instance):
         self.construct(model_instance.__class__)
-        self(model_instance, *args)
+        self(model_instance)
 
     def construct(self, model):
         self.symbol_inputs = model.input.flatten()
@@ -39,7 +39,7 @@ class ExplicitSystem:
             name=model.__name__,
         )
 
-    def __call__(self, model_instance, *args):
+    def __call__(self, model_instance):
         self.args = model_instance.input.flatten()
         self.out = self.func(self.args)
         model_instance.bind_field(
@@ -47,10 +47,10 @@ class ExplicitSystem:
         )
 
 class ExternalSolverModel:
-    def __init__(self, model_instance, args):
+    def __init__(self, model_instance):
         model = model_instance.__class__
         self.construct(model, **options_to_kwargs(model))
-        self(model_instance, *args)
+        self(model_instance)
 
     def construct(self, model):
         self.model = model
@@ -70,7 +70,7 @@ class ExternalSolverModel:
         self.callback.construct()
 
 
-    def __call__(self, model_instance, *args):
+    def __call__(self, model_instance):
         use_args = model_instance.input.flatten()
         out = self.callback(use_args)
         model_instance.bind_field(

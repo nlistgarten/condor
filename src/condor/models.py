@@ -1147,38 +1147,31 @@ class ModelType(BaseModelType):
 class Model(metaclass=ModelType):
     """handles binding etc. for user models"""
 
-    def __init__(self, *args, name="", **kwargs):
-        cls = self.__class__
-        self.name = name
-
-        # bind *args and **kwargs to to appropriate signature
-        # TODO: is there a better way to do this?
-        # yes, can refactor (including from_values, will need to do this for the
-        # trajectory analysis convenience models, etc.
-        # OR just get rid of *args, only accept by kwarg and do it how
-        # OptimizationProblem.from_values currently does it
-
-        input_kwargs = {}
-        for input_name, input_val in zip(cls._meta.input_names, args):
+    @staticmethod
+    def function_call_to_fields(fields, *args, **kwargs):
+        input_names = {elem.name: field for field in fields for elem in field}
+        fields_kwargs = {field: dict() for field in fields}
+        for (input_name, field), input_val in zip(input_names.items(), args):
             if input_name in kwargs:
                 raise ValueError(
                     f"Argument {input_name} has value {input_val} from args and {kwargs[input_name]} from kwargs"
                 )
-            input_kwargs[input_name] = input_val
-        input_kwargs.update(kwargs)
+            fields_kwargs[field][input_name] = input_val
+
         missing_args = []
         extra_args = []
-        self.input_kwargs = {}
-        for name in cls._meta.input_names:
-            if name in input_kwargs:
-                self.input_kwargs[name] = input_kwargs[name]
-            else:
-                missing_args.append(name)
 
-        # TODO: skip this one with a flag?
-        for key in kwargs:
-            if key not in self.input_kwargs:
-                extra_args.append(key)
+        for input_name, input_val in kwargs.items():
+            if input_name not in input_names:
+                # TODO: skip this one with a flag?
+                extra_args.append(input_name)
+                continue
+            fields_kwargs[input_names[input_name]][input_name] = input_val
+
+
+        for input_name, field in input_names.items():
+            if input_name not in fields_kwargs[field]:
+                missing_args.append(input_name)
 
         if missing_args or extra_args:
             error_message = f"While calling {cls.__name__}, "
@@ -1192,12 +1185,29 @@ class Model(metaclass=ModelType):
 
         # TODO: check bounds on model inputs?
         # pack into dot-able storage, over-writting fields and elements
-        self.bind_input_fields()
+
+        out_fields = [field._dataclass(**fields_kwargs[field]) for field in fields]
+        return out_fields
+
+
+
+    def __init__(self, *args, name="", **kwargs):
+        cls = self.__class__
+        self.name = name
+
+        # bind *args and **kwargs to to appropriate signature
+        # TODO: is there a better way to do this?
+        # yes, can refactor (including from_values, will need to do this for the
+        # trajectory analysis convenience models, etc.
+        # OR just get rid of *args, only accept by kwarg and do it how
+        # OptimizationProblem.from_values currently does it
+
+        self.bind_input_fields(*args, **kwargs)
 
         implementation_class = cls.get_implementation_class(cls)
-        self.implementation = implementation_class(
-            self, list(self.input_kwargs.values())
-        )
+        self.implementation = implementation_class(self)
+            #self, list(self.input_kwargs.values())
+        #)
 
         # generally implementations are responsible for binding computed values.
         # implementations know about models, models don't know about implementations
@@ -1210,13 +1220,17 @@ class Model(metaclass=ModelType):
 
         self.bind_embedded_models()
 
-    def bind_input_fields(self):
+    def bind_input_fields(self, *args, **kwargs):
         cls = self.__class__
-        for field in cls._meta.input_fields:
-            field_dc = field._dataclass(**{
-                elem.name: self.input_kwargs[elem.name] for elem in field
-            })
+        bound_input_fields = cls.function_call_to_fields(
+            cls._meta.input_fields,
+            *args, **kwargs
+        )
+        self.input_kwargs = {}
+
+        for field_dc in bound_input_fields:
             self.bind_field(field_dc, symbols_to_instance=True)
+            self.input_kwargs.update(field_dc.asdict())
 
     def bind_field(self, dataclass, symbols_to_instance=True):
         if symbols_to_instance:

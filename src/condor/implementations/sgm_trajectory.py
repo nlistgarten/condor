@@ -75,10 +75,10 @@ class TrajectoryAnalysis:
         dopri5 = auto()
         dop853 = auto()
 
-    def __init__(self, model_instance, args):
+    def __init__(self, model_instance):
         model = model_instance.__class__
         self.construct(model, **options_to_kwargs(model))
-        self(model_instance, *args)
+        self(model_instance)
 
     def construct(
         self,
@@ -573,9 +573,9 @@ class TrajectoryAnalysis:
             return
 
 
-    def __call__(self, model_instance, *args):
+    def __call__(self, model_instance):
         self.callback.from_implementation = True
-        self.args = casadi.vertcat(*flatten(args))
+        self.args = model_instance.parameter.flatten()
         self.out = self.callback(self.args)
         self.callback.from_implementation = False
 
