@@ -907,6 +907,7 @@ class ModelType(BaseModelType):
 
     reserved_words = BaseModelType.reserved_words + [
         "Options", # should pass on, used to mark condor_attr
+        "options_dict", # bound values of Options
         "Casadi", # deprecated Options name
         "dynamic_link", # raise error on user assignment
         "name", "model_name",

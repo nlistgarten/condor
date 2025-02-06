@@ -33,7 +33,8 @@ class TrajectoryAnalysis:
 
     def __init__(self, model_instance):
         model = model_instance.__class__
-        self.construct(model, **options_to_kwargs(model))
+        model_instance.options_dict=options_to_kwargs(model)
+        self.construct(model, **model_instance.options_dict)
         self(model_instance)
 
     def construct(
