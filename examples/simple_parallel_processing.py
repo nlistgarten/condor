@@ -4,9 +4,9 @@ Parallel Processing
 ============================
 """
 # %%
-# In Python, parallel processing requires a call-able that returns fully pickle-able
-# results. The instance of a Condor model is not pickle-able so it causes an error when
-# used directly.
+# You should be able to treat models like any other function in terms of parallelization.
+# This example shows using the built-in :mod:`multiprocessing` to do thread-based
+# parallelization of an explicit system.
 
 import condor
 class Model(condor.ExplicitSystem):
