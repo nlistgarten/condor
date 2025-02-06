@@ -35,7 +35,17 @@ class Settings:
         # TODO: defensive check on unused self.settings? Or maybe it's a feature to
         # allow unused settings so a big dict can be used for a project
 
-        return {k: self.settings[-1].get(k, defaults[k]) for k in defaults}
+        configured_kwargs = {k: self.settings[-1].get(k, defaults[k]) for k in defaults}
+        extra_kwargs = {}
+        for k, v in self.settings[-1].items():
+            if k not in defaults:
+                extra_kwargs[k] = v
+        if extra_kwargs:
+            raise ValueError(
+                "Extra keyword arguments were provided to configuration", extra_kwargs
+            )
+
+        return configured_kwargs
 
 
 settings = Settings()

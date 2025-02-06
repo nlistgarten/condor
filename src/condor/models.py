@@ -909,6 +909,7 @@ class ModelType(BaseModelType):
         "Options", # should pass on, used to mark condor_attr
         "Casadi", # deprecated Options name
         "dynamic_link", # raise error on user assignment
+        "name", "model_name",
     ]
 
     def __repr__(cls):

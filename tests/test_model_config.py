@@ -1,5 +1,6 @@
 import condor as co
 import numpy as np
+import pytest
 
 
 def test_model_config():
@@ -17,3 +18,10 @@ def test_model_config():
     assert len(sp_dbl_int.Event._meta.subclasses) == 1
 
     assert dbl_int is not sp_dbl_int
+
+
+    with pytest.raises(ValueError):
+        failing_mod = co.settings.get_module(
+            "modules.configured_model", A=A, B=B, extra="something"
+        )
+
