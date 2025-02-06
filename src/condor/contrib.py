@@ -483,7 +483,7 @@ class TrajectoryAnalysisType(SubmodelType):
     ):
         cls_dict = super().__prepare__(*args, **kwargs)
         if exclude_events is not None and include_events is not None:
-            raise ValueError("Use only one of include or include events")
+            raise ValueError("Use only one of include or exclude events")
 
         if include_events is None:
             cls_dict.meta.events = list(cls_dict.meta.primary.Event)
@@ -496,7 +496,7 @@ class TrajectoryAnalysisType(SubmodelType):
             ]
 
         if exclude_modes is not None and include_modes is not None:
-            raise ValueError("Use only one of include or include modes")
+            raise ValueError("Use only one of include or exclude modes")
 
         if include_modes is None:
             cls_dict.meta.modes = list(cls_dict.meta.primary.Mode)

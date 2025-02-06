@@ -147,6 +147,7 @@ class BounceSim(Glider.TrajectoryAnalysis):
     tf = 20.
 
 bounce_sim = BounceSim(**first_sim.parameter.asdict(), mu=0.9)
+first_sim = FirstSim(CL_alpha = 0.11*A, CD_0 = 0.05*A, CD_i_q = 0.05, g=1.)
 
 flight_path_plot([bounce_sim, first_sim])
 plt.legend(["with bounce", "original sim"])
