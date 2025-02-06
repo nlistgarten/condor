@@ -8,7 +8,9 @@ from condor.backends.default import backend
 from condor.fields import (AssignedField, BaseElement, BoundedAssignmentField,
                            Direction, Field, FreeAssignedField, FreeElement,
                            FreeField, InitializedField, MatchedField,
-                           TrajectoryOutputField, WithDefaultField)
+                           TrajectoryOutputField, WithDefaultField,
+                           pass_through, zero_like,
+                           )
 from condor.models import (Model, ModelTemplate, ModelTemplateType, ModelType,
                            SubmodelTemplate)
 import ndsplines
@@ -437,9 +439,9 @@ class ODESystem(ModelTemplate):
     t = placeholder(default=None)  # TODO use placeholder with default = None
 
     state = FreeField(Direction.internal)
-    initial = MatchedField(state)
+    initial = MatchedField(state, default_factory = zero_like)
     parameter = FreeField()
-    dot = MatchedField(state)
+    dot = MatchedField(state, default_factory = zero_like)
     modal = WithDefaultField(Direction.internal)
     dynamic_output = AssignedField(Direction.internal)
 
@@ -603,7 +605,9 @@ class Event(
     # TODO: singleton field event.function is very similar to objective in
     # OptimizationProblem. And at_time. Need to be able to define such singleton
     # assignment fields by name so there's no clash for repeated symbols.
-    update = MatchedField(ODESystem.state, direction=Direction.output)
+    update = MatchedField(
+        ODESystem.state, direction=Direction.output, default_factory=pass_through,
+    )
     # make[mode_var] = SomeModeSubclass
     # actually, just update it
     # make = MatchedField(ODESystem.finite_state)
@@ -632,7 +636,9 @@ class Mode(
     deferred subsystems? Yes but only for ODESystems..
     """
     condition = placeholder(default=1.0)
-    action = MatchedField(ODESystem.modal, direction=Direction.internal)
+    action = MatchedField(
+        ODESystem.modal, direction=Direction.internal, default_factory=zero_like,
+    )
 
 
 def LTI(

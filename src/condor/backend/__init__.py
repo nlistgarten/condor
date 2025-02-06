@@ -13,3 +13,5 @@ BackendSymbolData = backend_mod.BackendSymbolData
 callables_to_operator = backend_mod.callables_to_operator
 expression_to_operator = backend_mod.expression_to_operator
 
+zeros = backend_mod.zeros
+

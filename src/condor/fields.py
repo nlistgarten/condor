@@ -674,13 +674,17 @@ class MatchedElement(
 ):
     pass
 
+zero_like = lambda match: backend.zeros(match.shape)
+pass_through = lambda match: match.backend_repr
 
 class MatchedField(
     Field,
 ):
-    def __init__(self, matched_to=None, **kwargs):
+    def __init__(self, matched_to=None, default_factory=pass_through, **kwargs):
         """
         matched_to is Field instance that this MatchedField is matched to.
+        default_factory is a function that takes matched to element and returns the
+        backend_repr for the match (this field)
         """
         # TODO: add matches_required flag? e.g. for initializer
         # TODO: a flag for application direction? Field._diretion is relative to model;
@@ -692,7 +696,8 @@ class MatchedField(
 
         super().__init__(**kwargs)
         self._matched_to = matched_to
-        self._init_kwargs.update(matched_to=matched_to)
+        self._default_factory = default_factory
+        self._init_kwargs.update(matched_to=matched_to, default_factory=default_factory)
 
     def key_to_matched_element(self, key):
         if isinstance(key, backend.symbol_class):
@@ -734,13 +739,16 @@ class MatchedField(
         return item.backend_repr
 
     def flatten(self, attr="backend_repr"):
+        if attr != "backend_repr":
+            raise ValueError(
+                "flatten for matched field only makes sense for backend_repr"
+            )
         dc_kwargs = {}
-        for base_elem in self._matched_to:
-            elem = self.get(match=base_elem)
+        for match_elem in self._matched_to:
+            elem = self.get(match=match_elem)
             if elem:
-                dc_kwargs[base_elem.name] = getattr(elem, attr)
+                dc_kwargs[match_elem.name] = elem.backend_repr
             else:
-                breakpoint()
-                raise ValueError("missing an element")
+                dc_kwargs[match_elem.name] = self._default_factory(match_elem)
 
         return self._matched_to._dataclass(**dc_kwargs).flatten()

@@ -31,15 +31,14 @@ class BackendSymbolData(BackendSymbolDataMixin):
 
     def flatten_value(self, value):
         if self.symmetric:
-            unique_values = symmetric_to_unique(value, symbolic=isinstance(value, symbol_class))
+            unique_values = symmetric_to_unique(
+                value,
+                symbolic=isinstance(value, symbol_class)
+            )
             if isinstance(value, symbol_class):
                 syms = casadi.symvar(value)
-                if len(syms) == 1:
-                    if (
-                        (unique_values.shape == syms[0].shape) and
-                        casadi.is_equal(unique_to_symmetric(syms[0]), value, int(1E10))
-                    ):
-                        return syms[0]
+                if len(syms) == 1 and symbol_is(unique_to_symmetric(syms[0]), value):
+                    return syms[0]
             return unique_values
         if self.size == 1 and isinstance(value, (float, int)):
             return value
@@ -111,7 +110,8 @@ def unique_to_symmetric(unique, symbolic=True):
         ])
     return matrix_symbols
 
-
+def zeros(shape=(1,1)):
+    return symbol_class(*shape)
 
 
 def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
@@ -161,7 +161,10 @@ def get_symbol_data(symbol, symmetric=None):
 
 
 def symbol_is(a, b):
-    return (a.shape == b.shape) and (a == b).is_one()
+    return (a.shape == b.shape) and (
+        (a == b).is_one() or
+        casadi.is_equal(a, b, int(1E10))
+    )
 
 
 def evalf(expr, backend_repr2value):

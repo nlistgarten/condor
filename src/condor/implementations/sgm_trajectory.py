@@ -120,9 +120,8 @@ class TrajectoryAnalysis:
 
         traj_out_names = model.trajectory_output.list_of("name")
 
-        integrand_terms = model.trajectory_output.flatten("integrand")
-        terminal_terms = model.trajectory_output.flatten("terminal_term")
-        self.traj_out_integrand = casadi.vertcat(*integrand_terms)
+        integrand_terms = [elem.flatten_value(elem.integrand) for elem in model.trajectory_output]
+        self.traj_out_integrand = model.trajectory_output.flatten("integrand")
         traj_out_integrand_func = casadi.Function(
             f"{model.__name__}_trajectory_output_integrand",
             self.simulation_signature,
@@ -132,8 +131,8 @@ class TrajectoryAnalysis:
             ),
         )
 
-        terminal_terms = flatten(model.trajectory_output.list_of("terminal_term"))
-        self.traj_out_terminal_term = casadi.vertcat(*terminal_terms)
+        terminal_terms = [elem.flatten_value(elem.terminal_term) for elem in model.trajectory_output]
+        self.traj_out_terminal_term = model.trajectory_output.flatten("terminal_term")
         traj_out_terminal_term_func = casadi.Function(
             f"{model.__name__}_trajectory_output_terminal_term",
             self.simulation_signature,
