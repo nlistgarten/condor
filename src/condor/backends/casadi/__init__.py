@@ -97,7 +97,11 @@ def unique_to_symmetric(unique, symbolic=True):
         # iniddividual elements from a list works
         matrix_symbols = np.empty((n, m), dtype=np.object_)
     else:
-        matrix_symbols = np.empty((n, m))
+        if unique.shape[1] > 1:
+            use_shape = (n,m,unique.shape[1])
+        else:
+            use_shape = (n,m)
+        matrix_symbols = np.empty(use_shape)
     indices = np.tril_indices(n)
     for kk, (i,j) in enumerate(zip(*indices)):
         matrix_symbols[i,j] = unique[kk]
