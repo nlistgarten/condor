@@ -16,24 +16,9 @@ class Model(condor.ExplicitSystem):
 
 from multiprocessing import Pool
 if __name__ == "__main__":
-    try:
-        with Pool(5) as p:
-            print(p.map(Model, [1, 2, 3]))
-    except Exception as e:
-        print("Error when trying to return a model instance in parallel")
-        print(e)
-    else:
-        raise ValueError("expected an error")
-
-# %%
-# a simple wrapper that extracts the fields, which are simple dataclasses, can be used
-# instead.
-def wrapper(*args, **kwargs):
-    m = Model(*args, **kwargs)
-    del m.implementation
-    return m
-    #return m.input, m.output
-
-if __name__ == "__main__":
     with Pool(5) as p:
-        print(p.map(wrapper, [1, 2, 3]))
+        models = p.map(Model, [1, 2, 3])
+
+    for model in models:
+        print(model.input, model.output)
+

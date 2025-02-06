@@ -1152,6 +1152,12 @@ class ModelType(BaseModelType):
 class Model(metaclass=ModelType):
     """handles binding etc. for user models"""
 
+    def __getstate__(self):
+        d = {k: v for k, v in self.__dict__.items() if k not in [
+            "implementation"
+        ]}
+        return d
+
     @staticmethod
     def function_call_to_fields(fields, *args, **kwargs):
         input_names = {elem.name: field for field in fields for elem in field}

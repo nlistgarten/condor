@@ -2,9 +2,9 @@
 Parallel Processing
 ============================
 
-In Python, parallel processing requires a call-able that returns fully pickle-able
-results. The instance of a Condor model is not pickle-able so it causes an error when
-used directly.
+You should be able to treat models like any other function in terms of parallelization.
+This example shows using the built-in :mod:`multiprocessing` to do thread-based
+parallelization of an explicit system.
 
 .. code-block:: python
 
@@ -15,35 +15,16 @@ used directly.
 
     from multiprocessing import Pool
     if __name__ == "__main__":
-        try:
-            with Pool(5) as p:
-                print(p.map(Model, [1, 2, 3]))
-        except Exception as e:
-            print("Error when trying to return a model instance in parallel")
-            print(e)
-        else:
-            raise ValueError("expected an error")
-
-    # produces...
-    """
-    Error when trying to return a model instance in parallel
-    Error sending result: '[<Model: x=1>]'. Reason: 'TypeError("cannot pickle 'SwigPyObject' object")'
-    """
-
-a simple wrapper that extracts the fields, which are simple dataclasses, can be used
-instead.
-
-.. code-block:: python
-
-    def wrapper(*args, **kwargs):
-        m = Model(*args, **kwargs)
-        return m.input, m.output
-
-    if __name__ == "__main__":
         with Pool(5) as p:
-            print(p.map(wrapper, [1, 2, 3]))
+            models = p.map(Model, [1, 2, 3])
+
+        for model in models:
+            print(model.input, model.output)
+
 
     # produces...
     """
-    [(ModelInput(x=1), ModelOutput(y=np.float64(2.0))), (ModelInput(x=2), ModelOutput(y=np.float64(1.0))), (ModelInput(x=3), ModelOutput(y=np.float64(-2.0)))]
+    ModelInput(x=1) ModelOutput(y=array([2.]))
+    ModelInput(x=2) ModelOutput(y=array([1.]))
+    ModelInput(x=3) ModelOutput(y=array([-2.]))
     """
