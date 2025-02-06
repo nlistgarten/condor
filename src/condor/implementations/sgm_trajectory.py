@@ -4,69 +4,25 @@ import condor as co
 import condor.solvers.sweeping_gradient_method as sgm
 import numpy as np
 from condor import backend
-import casadi
 
-flatten = backend.backend_mod.utils.flatten
-vertcat = backend.backend_mod.utils.vertcat
+from condor.backend import (
+    symbol_class, callables_to_operator, expression_to_operator,
+)
+from condor.backend.operators import (
+    recurse_if_else, substitute, jacobian, concat, inf, sin, pi
+)
 
-from condor.backend import symbol_class, callables_to_operator
-from condor.backend.operators import recurse_if_else, substitute
-
-def get_state_setter(field, setter_args, setter_targets=None, default=0.0, subs={}):
-    """
-    used for building functions from matched fields to their match (loops over "state"
-    but is generalized for any matched fields)
-    used for dot, update, initial condition,
-
-    field is MatchedField
-    default None to pass through
-    setter_args are arguments for generalized
-
-    """
-    setter_exprs = []
-    if not isinstance(setter_args, list):
-        setter_args = [setter_args]
-
-    if setter_targets is None:
-        setter_targets = [state for state in field._matched_to]
-
-    target_sizes = [target.size for target in setter_targets]
-    start_indexes = np.cumsum([0] + target_sizes)
-
-    setter_exprs = symbol_class(sum(target_sizes), 1)
-    for state, start_index, end_index in zip(
-        setter_targets, start_indexes, start_indexes[1:]
-    ):
-        setter_element = field.get(match=state)
-        if isinstance(setter_element, list) and len(setter_element) == 0:
-            if default is not None:
-                setter_exprs[start_index:end_index] = default
-            else:
-                # setter_element = casadi.vertcat(*flatten(state.backend_repr)
-                setter_exprs[start_index:end_index] = (state.backend_repr).reshape(
-                    (-1, 1)
-                )
-        elif isinstance(setter_element, co.BaseElement):
-            setter_exprs[start_index:end_index] = setter_element.backend_repr.reshape(
-                (-1, 1)
-            )
-        else:
-            raise ValueError
-
-    setter_exprs = substitute(setter_exprs, subs)
-    setter_exprs = [setter_exprs]
-    setter_func = casadi.Function(
+def get_state_setter(field, signature, on_field=None, subs=None):
+    expr = field.flatten(on_field)
+    if subs is not None:
+        expr = substitute(expr, subs)
+    func = expression_to_operator(
+        signature,
+        expr,
         f"{field._model_name}_{field._matched_to._name}_{field._name}",
-        setter_args,
-        setter_exprs,
-        dict(
-            allow_free=True,
-        ),
     )
-    setter_func.expr = setter_exprs[0]
-    if setter_func.expr.shape != setter_args[-1].shape and len(setter_args) > 1:
-        raise ValueError("This must be a bug... a shape mismatch")
-    return setter_func
+    func.expr = expr
+    return func
 
 
 class TrajectoryAnalysis:
@@ -114,38 +70,29 @@ class TrajectoryAnalysis:
         ]
 
         self.traj_out_expr = model.trajectory_output.flatten()
-        self.can_sgm = isinstance(self.p, casadi.MX) and isinstance(
-            self.traj_out_expr, casadi.MX
+        self.can_sgm = isinstance(self.p, symbol_class) and isinstance(
+            self.traj_out_expr, symbol_class
         )
 
         traj_out_names = model.trajectory_output.list_of("name")
 
         integrand_terms = [elem.flatten_value(elem.integrand) for elem in model.trajectory_output]
         self.traj_out_integrand = model.trajectory_output.flatten("integrand")
-        traj_out_integrand_func = casadi.Function(
-            f"{model.__name__}_trajectory_output_integrand",
+        traj_out_integrand_func = expression_to_operator(
             self.simulation_signature,
-            [self.traj_out_integrand],
-            dict(
-                allow_free=True,
-            ),
+            self.traj_out_integrand,
+            f"{model.__name__}_trajectory_output_integrand",
         )
 
         terminal_terms = [elem.flatten_value(elem.terminal_term) for elem in model.trajectory_output]
         self.traj_out_terminal_term = model.trajectory_output.flatten("terminal_term")
-        traj_out_terminal_term_func = casadi.Function(
-            f"{model.__name__}_trajectory_output_terminal_term",
+        traj_out_terminal_term_func = expression_to_operator(
             self.simulation_signature,
-            [self.traj_out_terminal_term],
-            dict(
-                allow_free=True,
-            ),
+            self.traj_out_terminal_term,
+            f"{model.__name__}_trajectory_output_terminal_term",
         )
 
-        self.state0 = get_state_setter(
-            model.initial,
-            self.p,
-        )
+        self.state0 = get_state_setter(model.initial, [self.p])
 
         control_subs_pairs = {
             control.backend_repr: [(control.default,)] for control in ode_model.modal
@@ -164,27 +111,25 @@ class TrajectoryAnalysis:
         state_equation_func = get_state_setter(
             model.dot,
             self.simulation_signature,
-            subs=control_sub_expression,
+            subs=control_sub_expression
         )
-        lamda_jac = casadi.jacobian(state_equation_func.expr, self.x).T
-        state_dot_jac_func = casadi.Function(
-            f"{ode_model.__name__}_state_jacobian",
+
+        lamda_jac = jacobian(state_equation_func.expr, self.x).T
+        state_dot_jac_func = expression_to_operator(
             self.simulation_signature,
-            [lamda_jac.T],
-            dict(
-                allow_free=True,
-            ),
+            lamda_jac.T,
+            f"{ode_model.__name__}_state_jacobian",
         )
 
         self.e_exprs = []
         self.h_exprs = []
         at_time_slices = [
             sgm.NextTimeFromSlice(
-                casadi.Function(
-                    f"{ode_model.__name__}_at_times_t0",
+                expression_to_operator(
                     [self.p],
                     # TODO in future allow t0 to occur at arbitrary times
-                    [0.0, 0.0, casadi.inf],
+                    [0.0, 0.0, inf],
+                    f"{ode_model.__name__}_at_times_t0",
                 )
             )
         ]
@@ -223,14 +168,13 @@ class TrajectoryAnalysis:
 
                     e_expr = (
                         at_time.step
-                        * casadi.sin(
-                            casadi.pi * (model.t - at_time_start) / at_time.step
+                        * sin(
+                            pi * (model.t - at_time_start) / at_time.step
                         )
-                        / (casadi.pi * 100)
+                        / (pi * 100)
                     )
                     # self.events(solver_res.values.t, solver_res.values.y, gs)
-                    # e_expr = casadi.sin(casadi.pi*(ode_model.t-at_time_start)/at_time.step)
-                    e_expr = casadi.fmod(model.t - at_time_start, at_time.step)
+                    e_expr = fmod(model.t - at_time_start, at_time.step)
 
                     # TODO: verify start and stop for at_time slice
                     if isinstance(at_time_start, symbol_class) or at_time_start != 0.0:
@@ -248,22 +192,22 @@ class TrajectoryAnalysis:
                         # if there is an end-time, hold constant to prevent additional
                         # zero crossings -- hopefully works even if stop is on an event
                         # post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
-                        post_term = (model.t >= at_time.stop) * casadi.fmod(
+                        post_term = (model.t >= at_time.stop) * fmod(
                             at_time.stop - at_time_start, at_time.step
                         )
                         at_time_stop = at_time.stop
                     else:
                         post_term = 0
-                        at_time_stop = casadi.inf
+                        at_time_stop = inf
 
                     e_expr = e_expr + pre_term + post_term
 
                     at_time_slices.append(
                         sgm.NextTimeFromSlice(
-                            casadi.Function(
-                                f"{ode_model.__name__}_at_times_{event_idx}",
+                            expression_to_operator(
                                 [self.p],
                                 [at_time_start, at_time_stop, at_time.step],
+                                f"{ode_model.__name__}_at_times_{event_idx}",
                             )
                         )
                     )
@@ -275,10 +219,10 @@ class TrajectoryAnalysis:
                     e_expr = at_time0 - model.t
                     at_time_slices.append(
                         sgm.NextTimeFromSlice(
-                            casadi.Function(
-                                f"{ode_model.__name__}_at_times_{event_idx}",
+                            expression_to_operator(
                                 [self.p],
-                                [at_time0, at_time0, casadi.inf],
+                                concat([at_time0, at_time0, inf]),
+                                f"{ode_model.__name__}_at_times_{event_idx}",
                             )
                         )
                     )
@@ -296,8 +240,7 @@ class TrajectoryAnalysis:
             h_expr = get_state_setter(
                 event.update,
                 self.simulation_signature,
-                setter_targets=[state for state in model.state],
-                default=None,
+                on_field = model.state,
                 subs=control_sub_expression,
             )
             self.h_exprs.append(h_expr)
@@ -313,16 +256,14 @@ class TrajectoryAnalysis:
             set_solvers.append(solver_class)
         state_solver_class, adjoint_solver_class = set_solvers
 
-        # self.e_exprs = substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)
 
         if len(model.dynamic_output):
-            # self.y_expr = casadi.vertcat(*flatten(ode_model.dynamic_output))
-            self.y_expr = casadi.vertcat(*flatten(model.dynamic_output))
+            self.y_expr = model.dynamic_output.flatten()
             self.y_expr = substitute(self.y_expr, control_sub_expression)
-            self.dynamic_output_func = casadi.Function(
-                f"{ode_model.__name__}_dynamic_output",
+            self.dynamic_output_func = expression_to_operator(
                 self.simulation_signature,
-                [self.y_expr],
+                self.y_expr,
+                f"{ode_model.__name__}_dynamic_output",
             )
         else:
             self.dynamic_output_func = None
@@ -333,13 +274,10 @@ class TrajectoryAnalysis:
             dot=state_equation_func,
             jac=state_dot_jac_func,
             time_generator=sgm.TimeGeneratorFromSlices(at_time_slices),
-            events=casadi.Function(
-                f"{ode_model.__name__}_event",
+            events=expression_to_operator(
                 self.simulation_signature,
-                [substitute(casadi.vertcat(*self.e_exprs), control_sub_expression)],
-                dict(
-                    allow_free=True,
-                ),
+                substitute(concat(self.e_exprs), control_sub_expression),
+                f"{ode_model.__name__}_event",
             ),
             updates=self.h_exprs,
             num_events=num_events,
@@ -355,15 +293,12 @@ class TrajectoryAnalysis:
 
 
 
-        self.p_state0_p_p_expr = casadi.jacobian(self.state0.expr, self.p)
+        self.p_state0_p_p_expr = jacobian(self.state0.expr, self.p)
 
-        p_state0_p_p = casadi.Function(
-            f"{model.__name__}_x0_jacobian",
+        p_state0_p_p = expression_to_operator(
             [self.p],
-            [self.p_state0_p_p_expr],
-            dict(
-                allow_free=True,
-            ),
+            self.p_state0_p_p_expr,
+            f"{model.__name__}_x0_jacobian",
         )
         p_state0_p_p.expr = self.p_state0_p_p_expr
 
@@ -376,64 +311,58 @@ class TrajectoryAnalysis:
         # TODO: is there something more pythonic than repeated, very similar list
         # comprehensions?
         self.lamdaFs = [
-            casadi.jacobian(terminal_term, self.x) for terminal_term in terminal_terms
+            jacobian(terminal_term, self.x) for terminal_term in terminal_terms
         ]
         self.lamdaF_funcs = [
-            casadi.Function(
-                f"{model.__name__}_{traj_name}_lamdaF",
+            expression_to_operator(
                 self.simulation_signature,
-                [lamdaF],
+                lamdaF,
+                f"{model.__name__}_{traj_name}_lamdaF",
             )
             for lamdaF, traj_name in zip(self.lamdaFs, traj_out_names)
         ]
         self.gradFs = [
-            casadi.jacobian(terminal_term, self.p) for terminal_term in terminal_terms
+            jacobian(terminal_term, self.p) for terminal_term in terminal_terms
         ]
         self.gradF_funcs = [
-            casadi.Function(
-                f"{model.__name__}_{traj_name}_gradF",
+            expression_to_operator(
                 self.simulation_signature,
-                [gradF],
+                gradF,
+                f"{model.__name__}_{traj_name}_gradF",
             )
             for gradF, traj_name in zip(self.gradFs, traj_out_names)
         ]
 
-        grad_jac = casadi.jacobian(state_equation_func.expr, self.p)
+        grad_jac = jacobian(state_equation_func.expr, self.p)
 
-        param_dot_jac_func = casadi.Function(
-            f"{model.__name__}_param_jacobian",
+        param_dot_jac_func = expression_to_operator(
             self.simulation_signature,
-            [grad_jac],
-            dict(
-                allow_free=True,
-            ),
+            grad_jac,
+            f"{model.__name__}_param_jacobian",
         )
 
         state_integrand_jacs = [
-            casadi.jacobian(integrand_term, self.x).T
+            jacobian(integrand_term, self.x).T
             for integrand_term in integrand_terms
         ]
         state_integrand_jac_funcs = [
-            casadi.Function(
-                f"{model.__name__}_state_integrand_jac_{ijac_expr_idx}",
+            expression_to_operator(
                 self.simulation_signature,
-                [ijac_expr],
-                dict(
-                    allow_free=True,
-                ),
+                ijac_expr,
+                f"{model.__name__}_state_integrand_jac_{ijac_expr_idx}",
             )
             for ijac_expr_idx, ijac_expr in enumerate(state_integrand_jacs)
         ]
 
         param_integrand_jacs = [
-            casadi.jacobian(integrand_term, self.p).T
+            jacobian(integrand_term, self.p).T
             for integrand_term in integrand_terms
         ]
         param_integrand_jac_funcs = [
-            casadi.Function(
-                f"{model.__name__}_param_integrand_jac_{ijac_expr_idx}",
+            expression_to_operator(
                 self.simulation_signature,
-                [ijac_expr],
+                ijac_expr,
+                f"{model.__name__}_param_integrand_jac_{ijac_expr_idx}",
             )
             for ijac_expr_idx, ijac_expr in enumerate(param_integrand_jacs)
         ]
@@ -450,15 +379,15 @@ class TrajectoryAnalysis:
         self.dh_dps = []
 
         for event, e_expr, h_expr in zip(events, self.e_exprs, self.h_exprs):
-            dg_dx = casadi.jacobian(e_expr, self.x)
-            dg_dt = casadi.jacobian(e_expr, model.t)
-            dg_dp = casadi.jacobian(e_expr, self.p)
+            dg_dx = jacobian(e_expr, self.x)
+            dg_dt = jacobian(e_expr, model.t)
+            dg_dp = jacobian(e_expr, self.p)
 
             dte_dx = dg_dx / (dg_dx @ state_equation_func.expr)
             dte_dp = -dg_dp / (dg_dx @ state_equation_func.expr + dg_dt)
 
-            dh_dx = casadi.jacobian(h_expr.expr, self.x)
-            dh_dp = casadi.jacobian(h_expr.expr, self.p)
+            dh_dx = jacobian(h_expr.expr, self.x)
+            dh_dp = jacobian(h_expr.expr, self.p)
 
             """
             te = ode_model.t
@@ -501,34 +430,34 @@ class TrajectoryAnalysis:
 
             dte_dx = substitute(dte_dx, control_sub_expression)
             self.dte_dxs.append(
-                casadi.Function(
-                    f"{event.__name__}_dte_dx",
+                expression_to_operator(
                     self.simulation_signature,
-                    [dte_dx],
+                    dte_dx,
+                    f"{event.__name__}_dte_dx",
                 )
             )
             self.dte_dxs[-1].expr = dte_dx
 
             dte_dp = substitute(dte_dp, control_sub_expression)
             self.dte_dps.append(
-                casadi.Function(
-                    f"{event.__name__}_dte_dp", self.simulation_signature, [dte_dp]
+                expression_to_operator(
+                    self.simulation_signature, dte_dp, f"{event.__name__}_dte_dp"
                 )
             )
             self.dte_dps[-1].expr = dte_dp
 
             dh_dx = substitute(dh_dx, control_sub_expression)
             self.dh_dxs.append(
-                casadi.Function(
-                    f"{event.__name__}_dh_dx", self.simulation_signature, [dh_dx]
+                expression_to_operator(
+                    self.simulation_signature, dh_dx, f"{event.__name__}_dh_dx"
                 )
             )
             self.dh_dxs[-1].expr = dh_dx
 
             dh_dp = substitute(dh_dp, control_sub_expression)
             self.dh_dps.append(
-                casadi.Function(
-                    f"{event.__name__}_dh_dp", self.simulation_signature, [dh_dp]
+                expression_to_operator(
+                    self.simulation_signature, dh_dp, f"{event.__name__}_dh_dp"
                 )
             )
             self.dh_dps[-1].expr = dh_dp

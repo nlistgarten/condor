@@ -738,11 +738,13 @@ class MatchedField(
             raise KeyError
         return item.backend_repr
 
-    def flatten(self, attr="backend_repr"):
-        if attr != "backend_repr":
-            raise ValueError(
-                "flatten for matched field only makes sense for backend_repr"
-            )
+    def flatten(self, on_field=None):
+        #if attr != "backend_repr":
+        #    raise ValueError(
+        #        "flatten for matched field only makes sense for backend_repr"
+        #    )
+        if on_field is None:
+            on_field = self._matched_to
         dc_kwargs = {}
         for match_elem in self._matched_to:
             elem = self.get(match=match_elem)
@@ -751,4 +753,4 @@ class MatchedField(
             else:
                 dc_kwargs[match_elem.name] = self._default_factory(match_elem)
 
-        return self._matched_to._dataclass(**dc_kwargs).flatten()
+        return on_field._dataclass(**dc_kwargs).flatten()

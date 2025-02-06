@@ -1,7 +1,9 @@
 from numpy import *
 import casadi
+import condor.backends.casadi as backend
 
 pi = casadi.pi
+inf = casadi.inf
 
 def concat(arrs, axis=0):
     """ implement concat from array API for casadi """
@@ -41,6 +43,10 @@ def jac_prod(of, wrt, rev=True):
     return casadi.jtimes(of, wrt, not rev)
 
 def substitute(expr, subs):
+    original_expr = expr
+    if isinstance(expr, backend.symbol_class):
+        expr = casadi.substitute([expr], list(subs.keys()), list(subs.values()))[0]
+    return expr
     for key, val in subs.items():
         expr = casadi.substitute(expr, key, val)
     return expr

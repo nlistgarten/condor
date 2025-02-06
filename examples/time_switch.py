@@ -82,7 +82,7 @@ sim = Transfer(t1=1., t2= 4.,)
 print(sim.pos_at_switch)
 #jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 
-from condor.backends.casadi.implementations import OptimizationProblem
+from condor.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
     t1 = variable(lower_bound=0)
     t2 = variable(lower_bound=0)

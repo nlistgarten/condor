@@ -18,11 +18,14 @@ backend_mod = get_backend()
 #    - NOT callable/expression to operator
 
 pi = backend_mod.operators.pi
+inf = backend_mod.operators.inf
+
 jacobian = backend_mod.operators.jacobian
 recurse_if_else = backend_mod.operators.recurse_if_else
 substitute = backend_mod.operators.substitute
 fmin = backend_mod.operators.fmin
 fmax = backend_mod.operators.fmax
+fmod = backend_mod.operators.fmod
 atan = backend_mod.operators.atan
 atan2 = backend_mod.operators.atan2
 sin = backend_mod.operators.sin
