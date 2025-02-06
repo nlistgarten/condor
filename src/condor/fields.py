@@ -464,7 +464,7 @@ def make_backend_symbol(
     out = backend.symbol_generator(
         name=backend_name, shape=shape, symmetric=symmetric, diagonal=diagonal
     )
-    symbol_data = backend.get_symbol_data(out)
+    symbol_data = backend.get_symbol_data(out, symmetric=symmetric)
     kwargs.update(
         backend_repr=out,
         **asdict(symbol_data),
@@ -654,8 +654,6 @@ class AssignedField(Field, default_direction=Direction.output):
             )
             if self._direction == Direction.output and self._cls_dict:
                 # self._cls_dict.__set_item__(name, value)
-                #breakpoint()
-                #check_attr_name(name, value, self._cls_dict)
                 self._cls_dict[name] = value
             # super().__setattr__(name, self._symbols[-1])
 
@@ -734,3 +732,15 @@ class MatchedField(
             # get vs set? or is that a separate type of matchedfield?
             raise KeyError
         return item.backend_repr
+
+    def flatten(self, attr="backend_repr"):
+        dc_kwargs = {}
+        for base_elem in self._matched_to:
+            elem = self.get(match=base_elem)
+            if elem:
+                dc_kwargs[base_elem.name] = getattr(elem, attr)
+            else:
+                breakpoint()
+                raise ValueError("missing an element")
+
+        return self._matched_to._dataclass(**dc_kwargs).flatten()

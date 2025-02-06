@@ -8,6 +8,15 @@ class MatSys(co.ExplicitSystem):
 
 ms = MatSys(np.random.rand(3,4), np.random.rand(4,2))
 
+
+class SymMatSys(co.ExplicitSystem):
+    A = input(shape=(3,3), symmetric=True)
+    B = input(shape=(3,3))
+    output.C = A@B + B.T @ A
+
+a = np.random.rand(3,3)
+sms = SymMatSys(a + a.T, np.random.rand(3,3))
+
 class Sys(co.ExplicitSystem):
     x = input()
     y = input()

@@ -34,7 +34,7 @@ class ExplicitSystem:
 
         self.model = model
         self.func = expression_to_operator(
-            self.symbol_inputs,
+            [self.symbol_inputs],
             self.symbol_outputs,
             name=model.__name__,
         )

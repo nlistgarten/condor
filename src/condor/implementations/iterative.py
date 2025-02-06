@@ -269,6 +269,15 @@ class CasadiIterationCallback(casadi.Callback):
 
 
 class OptimizationProblem(InitializerMixin):
+    # take an OptimizationProblem model with or without iteration spec and other Options
+    # process options, create appropriate callback hooks
+    # create appropriate operator --
+    # "direct" nlpsol, nlpsol with warmstartwrapper, operator for scipy
+    # technically even direct nlpsol should go through a set of functions so that it can
+    # be used with a different backend
+    # use expression_to_operator to create f, g, and if needed init_x0 and update_x0
+    # hook to call other non-casadi optimizer using scipy infrastructure? cvxopt, cvxpy
+    # was there a similar library to cvxopt?
     class Method(Enum):
         ipopt = auto()
         snopt = auto()

@@ -11,6 +11,8 @@ vertcat = casadi.vertcat
 symbol_class = casadi.MX
 
 def shape_to_nm(shape):
+    if isinstance(shape, (int, np.int64)):
+        shape = (shape,1)
     if len(shape) > 2:
         raise ValueError
     n = shape[0]
@@ -28,6 +30,17 @@ class BackendSymbolData(BackendSymbolDataMixin):
 
 
     def flatten_value(self, value):
+        if self.symmetric:
+            unique_values = symmetric_to_unique(value, symbolic=isinstance(value, symbol_class))
+            if isinstance(value, symbol_class):
+                syms = casadi.symvar(value)
+                if len(syms) == 1:
+                    if (
+                        (unique_values.shape == syms[0].shape) and
+                        casadi.is_equal(unique_to_symmetric(syms[0]), value, int(1E10))
+                    ):
+                        return syms[0]
+            return unique_values
         if self.size == 1 and isinstance(value, (float, int)):
             return value
         else:
@@ -46,6 +59,10 @@ class BackendSymbolData(BackendSymbolDataMixin):
                     return ret_val
                 return np.array(value).reshape(-1)
 
+        if self.symmetric:
+            value = unique_to_symmetric(value, symbolic=isinstance(value, symbol_class))
+
+
         if (
             (isinstance(value, symbol_class) and value.is_constant())
             #or isinstance(value, casadi.DM)
@@ -61,30 +78,60 @@ class BackendSymbolData(BackendSymbolDataMixin):
         return value
         return symbol_class(value).reshape(self.shape)
 
+def symmetric_to_unique(value, symbolic=True):
+    n = value.shape[0]
+    unique_shape = (int(n*(n+1)/2), 1)
+    indices = np.tril_indices(n)
+    if symbolic:
+        unique_values = symbol_class(*unique_shape)
+    else:
+        unique_values = np.empty(unique_shape)
+    for kk, (i,j) in enumerate(zip(*indices)):
+        unique_values[kk] = value[i,j]
+    return unique_values
+
+def unique_to_symmetric(unique, symbolic=True):
+    count = unique.shape[0]
+    n = m = int((np.sqrt(1+8*count)-1)/2)
+    if symbolic:
+        # using an empty MX is unverifiable by casadi.is_equal, but concatenating the
+        # iniddividual elements from a list works
+        matrix_symbols = np.empty((n, m), dtype=np.object_)
+    else:
+        matrix_symbols = np.empty((n, m))
+    indices = np.tril_indices(n)
+    for kk, (i,j) in enumerate(zip(*indices)):
+        matrix_symbols[i,j] = unique[kk]
+        if i != j:
+            matrix_symbols[j,i] = unique[kk]
+    if symbolic:
+        symbol_list = matrix_symbols.tolist()
+        matrix_symbols = casadi.vcat([
+            casadi.hcat(row) for row in symbol_list
+        ])
+    return matrix_symbols
+
 
 
 
 def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
     n, m = shape_to_nm(shape)
-    sym = symbol_class.sym(name, (n, m))
-    # sym = MixedMX.sym(name, (n, m))
-    # TODO: symmetric and diagonal,
-
-    if symmetric:
-        raise NotImplemented
     if diagonal:
-        raise NotImplemented
-
-    if symmetric:
-        assert n == m
-        return casadi.tril2symm(casadi.tril(sym))
-    if diagonal:
-        assert m == 1
+        #assert m == 1
         sym = casadi.diag(sym)
-    return sym
+        raise NotImplemented
+    elif symmetric:
+        assert n == m
+        unique_shape = (int(n*(n+1)/2), 1)
+        unique_symbols = symbol_class.sym(name, unique_shape)
+        matrix_symbols = unique_to_symmetric(unique_symbols)
+        return matrix_symbols
+    else:
+        sym = symbol_class.sym(name, (n, m))
+        return sym
 
 
-def get_symbol_data(symbol):
+def get_symbol_data(symbol, symmetric=None):
     if not isinstance(symbol, (symbol_class, casadi.DM)):
         symbol = np.atleast_1d(symbol)
         # I'm not sure why, but before I reshaped this to a vector always. Only
@@ -99,7 +146,12 @@ def get_symbol_data(symbol):
     # TODO: actually check these?
     # and automatically reduce size if true? or should these be flags?
     diagonal = False
-    symmetric = False
+    if symmetric is None:
+        # if unprovided, try to determine if symmetric
+        if isinstance( symbol, (symbol_class, casadi.DM)):
+            symmetric = symbol.sparsity().is_symmetric() and size > 1
+        else:
+            symmetric = np.isclose(0, symbol - symbol.T).all() and len(shape) == 2 and size > 1
 
     return BackendSymbolData(
         shape=shape,
@@ -169,7 +221,9 @@ class CasadiFunctionCallback(casadi.Callback):
         if len(wrapper_funcs) == 1:
             self.jacobian = None
         else:
-            self.jacobian = CasadiFunctionCallback(
+            # using callables_to_operator SHOULD mean that casadi backend for one-layer
+            # callable can re-enter native casadi -- infinite differentiable, etc.
+            self.jacobian = callables_to_operator(
                 wrapper_funcs = wrapper_funcs[1:],
                 implementation = implementation,
                 jacobian_of = self,
@@ -326,11 +380,14 @@ def callables_to_operator(wrapper_funcs, *args, **kwargs):
 
 def expression_to_operator(input_symbols, output_expressions, name="", **kwargs):
     """ take a symbolic expression and create an operator -- callable that can be used
-    with jacobian, etc. operators """
+    with jacobian, etc. operators 
+
+    assume "MISO" -- but slightly misleading since output can be arbitrary size
+    """
     if not name:
         name = "function_from_expression"
     return casadi.Function(
         name,
-        [input_symbols],
+        input_symbols,
         [output_expressions],
     )

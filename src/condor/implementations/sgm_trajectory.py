@@ -101,10 +101,11 @@ class TrajectoryAnalysis:
         self.model = model
         self.ode_model = ode_model = model._meta.primary
 
-        self.x = casadi.vertcat(*flatten(model.state))
-        self.lamda = symbol_class.sym("lambda", model.state._count)
+        self.x = model.state.flatten()
+        dot = model.dot.flatten()
+        self.lamda = backend.symbol_generator("lambda", model.state._count)
 
-        self.p = casadi.vertcat(*flatten(model.parameter))
+        self.p = model.parameter.flatten()
 
         self.simulation_signature = [
             self.p,
@@ -112,14 +113,15 @@ class TrajectoryAnalysis:
             self.x,
         ]
 
-        self.traj_out_expr = casadi.vertcat(*flatten(model.trajectory_output))
+        self.traj_out_expr = model.trajectory_output.flatten()
         self.can_sgm = isinstance(self.p, casadi.MX) and isinstance(
             self.traj_out_expr, casadi.MX
         )
 
         traj_out_names = model.trajectory_output.list_of("name")
 
-        integrand_terms = flatten(model.trajectory_output.list_of("integrand"))
+        integrand_terms = model.trajectory_output.flatten("integrand")
+        terminal_terms = model.trajectory_output.flatten("terminal_term")
         self.traj_out_integrand = casadi.vertcat(*integrand_terms)
         traj_out_integrand_func = casadi.Function(
             f"{model.__name__}_trajectory_output_integrand",
