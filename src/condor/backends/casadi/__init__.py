@@ -114,9 +114,6 @@ def unique_to_symmetric(unique, symbolic=True):
         ])
     return matrix_symbols
 
-def zeros(shape=(1,1)):
-    return symbol_class(*shape)
-
 
 def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
     n, m = shape_to_nm(shape)

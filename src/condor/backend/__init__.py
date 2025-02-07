@@ -1,10 +1,7 @@
 from ._get_backend import get_backend
 backend_mod = get_backend()
 
-
-#
-
-# non-operators
+# non-operators -- more utility-like, ~outside scope of array API
 symbol_class = backend_mod.symbol_class
 symbol_generator = backend_mod.symbol_generator
 get_symbol_data = backend_mod.get_symbol_data
@@ -13,5 +10,4 @@ BackendSymbolData = backend_mod.BackendSymbolData
 callables_to_operator = backend_mod.callables_to_operator
 expression_to_operator = backend_mod.expression_to_operator
 
-zeros = backend_mod.zeros
 

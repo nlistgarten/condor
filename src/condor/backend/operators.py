@@ -17,12 +17,24 @@ backend_mod = get_backend()
 
 #    - NOT callable/expression to operator
 
+# constants
 pi = backend_mod.operators.pi
 inf = backend_mod.operators.inf
 
+# calculus & symbolic
 jacobian = backend_mod.operators.jacobian
 recurse_if_else = backend_mod.operators.recurse_if_else
 substitute = backend_mod.operators.substitute
+
+# creation functions
+zeros = backend_mod.operators.zeros
+
+# "manipulation functions"
+concat = backend_mod.operators.concat
+#stack?
+unstack = backend_mod.operators.unstack
+
+# "element-wise functions"
 fmin = backend_mod.operators.fmin
 fmax = backend_mod.operators.fmax
 fmod = backend_mod.operators.fmod
@@ -35,6 +47,5 @@ acos = backend_mod.operators.acos
 exp = backend_mod.operators.exp
 log = backend_mod.operators.log
 log10 = backend_mod.operators.log10
-concat = backend_mod.operators.concat
 sqrt = backend_mod.operators.sqrt
 

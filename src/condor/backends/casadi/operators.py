@@ -9,10 +9,19 @@ def concat(arrs, axis=0):
     """ implement concat from array API for casadi """
     if axis == 0:
         return casadi.vcat(arrs)
-    elif axis == 1:
+    elif axis in (1,-1):
         return casadi.hcat(arrs)
     else:
         raise ValueError("casadi only supports matrices")
+
+def unstack(arr, axis=0):
+    if axis == 0:
+        return casadi.vertsplit(arr)
+    elif axis in (1, -1):
+        return casadi.horzsplit(arr)
+
+def zeros(shape=(1,1)):
+    return backend.symbol_class(*shape)
 
 def jacobian(of, wrt=None):
     """ create a callable that computes dense jacobian """

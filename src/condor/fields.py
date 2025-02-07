@@ -674,7 +674,7 @@ class MatchedElement(
 ):
     pass
 
-zero_like = lambda match: backend.zeros(match.shape)
+zero_like = lambda match: backend.operators.zeros(match.shape)
 pass_through = lambda match: match.backend_repr
 
 class MatchedField(
