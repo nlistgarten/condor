@@ -6,6 +6,7 @@ import sys
 from dataclasses import asdict as dataclass_asdict
 from dataclasses import dataclass, fields, make_dataclass
 from enum import Enum
+import operator
 
 import numpy as np
 
@@ -68,7 +69,7 @@ def asdict(obj):
 
 
 class Direction(Enum):
-    """:class:`Enum` Used to indicate the direction of an element relative to a model"""
+    """:class:`Enum` used to indicate the direction of an element relative to a model"""
     """
     MatchedField may need to become MatchedElement and also use direction -- might
     be useful for DAE models, etc.
@@ -80,8 +81,8 @@ class Direction(Enum):
 
 
 class FieldValues:
-    """Base class for Field dataclasses -- may need to use issubclass/isinstance
-    """
+    """Base class for Field dataclasses"""
+
     def asdict(self):
         """ call the :mod:`dataclasses` module :func:`asdict` function on this field
         datacalss """
@@ -111,22 +112,23 @@ class FieldValues:
 
 
 class Field:
-    r"""
-    base field
+    """Base field
 
-    model templates have field instances added to them which are parents of elements used
-    in models
+    Model templates have field instances added to them which are parents of elements
+    used in models.
 
-    how to create a new Field type:
+    How to create a new Field type:
 
-    - subclass :class:`BaseElement` as needed. Will automatically try to find
-      ``NameElement`` for ``NameField``, or provide as :attr:`~Field.element_class` kwarg in subclass definition
-    - update :attr:`_init_kwargs` to define kwargs that should get passed during inheritance
-      from Model templates to user models
-    - until a better API is designed & implemented, instance attributes created during
-      :attr:`~Field.__init__` should start with a ``_`` so ``setattr`` on :class:`AssignedField`\s can filter it
-    - use :attr:`~Field.create_element` to create elements, passing ``**kwargs`` to element dataclass as much
-      as possible to keep DRY
+    - Subclass :class:`BaseElement` as needed. Will automatically try to find
+      ``NameElement`` for ``NameField``, or provide as :attr:`~Field.element_class`
+      kwarg in subclass definition
+    - Update :attr:`_init_kwargs` to define kwargs that should get passed during
+      inheritance from Model templates to user models
+    - Until a better API is designed & implemented, instance attributes created during
+      :attr:`~Field.__init__` should start with a ``_`` so ``setattr`` on
+      :class:`AssignedField`\s can filter it
+    - Use :attr:`~Field.create_element` to create elements, passing ``**kwargs`` to
+      element dataclass as much as possible to keep DRY
 
     """
 
@@ -158,8 +160,7 @@ class Field:
         inherit_from=None,
         model_name="",
     ):
-        """create a field instance
-        """
+        """Create a field instance"""
         # TODO: currently, AssignedField types are defined using setattr, which needs
         # to know what already exists. The attributes here, like name, model, count,
         # etc, don't exist until instantiated. Currently pre-fix with `_` to mark as
@@ -189,14 +190,8 @@ class Field:
     def _count(self):
         return sum(self.list_of("size"))
 
-    def bind(
-        self,
-        name,
-        model,
-    ):
-        """
-        bind an existing Field instance to a model
-        """
+    def bind(self, name, model):
+        """Bind an existing Field instance to a model"""
         self._name = name
         self._model = model
         if self._model_name:
@@ -207,9 +202,7 @@ class Field:
         self._set_resolve_name()
 
     def bind_dataclass(self):
-        """
-        Bind dataclass module and name in an attempt to make pickle-able
-        """
+        """Bind dataclass module and name in an attempt to make pickle-able"""
         mod_name = self._model.__module__
         self._dataclass.__module__ = mod_name
         if mod_name not in sys.modules:
@@ -242,9 +235,7 @@ class Field:
 
     # TODO: replace with a descriptor that can be dot accessed?
     def list_of(self, field_name):
-        """
-        create a list of a particular element attribute for all elements in field
-        """
+        """Create a list of a particular element attribute for all elements in field"""
         return [getattr(element, field_name) for element in self._elements]
 
     def __repr__(self):
@@ -252,9 +243,9 @@ class Field:
             return f"<{self.__class__.__name__}: {self._resolve_name}>"
 
     def get(self, *args, **kwargs):
-        """
-        return list of field elements where every field matches kwargs
-        if only one, return element without list wrapper
+        """Get a list of field elements where every field matches kwargs
+
+        If only one, return element without list wrapper.
         """
         # TODO: what's the lightest-weight way to be able query? these should get called
         # very few times, so hopefully don't need to stress too much about
@@ -293,9 +284,7 @@ class Field:
         return items
 
     def flat_index(self, of_element):
-        """
-        Helper to get the starting index of an element if 
-        """
+        """Helper to get the starting index of an element"""
         idx = 0
         for element in self:
             if element is of_element:
@@ -304,8 +293,7 @@ class Field:
         return idx
 
     def create_element(self, **kwargs):
-        """Create an element
-        """
+        """Create an element"""
         kwargs.update(dict(field_type=self))
         self._elements.append(self.element_class(**kwargs))
         if self._cls_dict and isinstance(self, FreeField):
@@ -315,7 +303,7 @@ class Field:
         # self._count += getattr(self._elements[-1], 'size', 1)
 
     def create_dataclass(self):
-        """create the dataclass for this model and field with the current elements"""
+        """Create the dataclass for this model and field with the current elements"""
         # TODO: do processing to handle different field types
         fields = [(element.name, float) for element in self._elements]
         name = make_class_name([self._model_name, self._name])
@@ -327,7 +315,7 @@ class Field:
         self._dataclass.field = self
 
     def __iter__(self):
-        """iterating over field yields elements"""
+        """Iterate over field elements"""
         for element in self._elements:
             yield element
 
@@ -335,7 +323,7 @@ class Field:
         return len(self._elements)
 
     def __getattr__(self, with_name):
-        """make element names dot-accessible on Field, to match behavior on field
+        """Make element names dot-accessible on Field, to match behavior on field
         dataclass"""
         return self.get(name=with_name).backend_repr
 
@@ -364,9 +352,6 @@ class FrontendElementData:
 
     def flat_index(self):
         return self.field_type.flat_index(self)
-
-
-import operator
 
 
 @dataclass
@@ -453,7 +438,6 @@ class BaseElement(
 
 class FreeElement(BaseElement):
     pass
-    # TODO: long description?
 
 
 def make_backend_symbol(
@@ -473,9 +457,8 @@ def make_backend_symbol(
 
 
 class FreeField(Field, default_direction=Direction.input):
-    """
-    Mixin for fields which generate a symbol that are assigned to a class attribute
-    during model definition.
+    """Field that generates a symbol assigned to a class attribute during model
+    definition.
     """
 
     def __call__(self, **kwargs):
@@ -483,8 +466,6 @@ class FreeField(Field, default_direction=Direction.input):
         new_kwargs = make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_element(**new_kwargs)
         return self._elements[-1].backend_repr
-
-    pass
 
 
 class FreeAssignedField(
@@ -497,9 +478,10 @@ class FreeAssignedField(
 
 
 @dataclass(repr=False)
-class WithDefaultElement(
-    FreeElement,
-):
+class WithDefaultElement(FreeElement):
+    """Element with an optional default value"""
+
+    #: default value
     default: float = 0.0  # TODO union[numeric, expression] or None?
 
 
@@ -509,8 +491,13 @@ class WithDefaultField(FreeField):
 
 @dataclass(repr=False)
 class BoundedElement(FreeElement):
+    """Element with upper and lower bounds"""
+
+    #: upper bound
     upper_bound: float = np.inf
+    #: lower bound
     lower_bound: float = -np.inf
+
     # Then if bounds are here, must follow broadcasting rules
 
     def __post_init__(self):
@@ -521,10 +508,12 @@ class BoundedElement(FreeElement):
 
 
 @dataclass(repr=False)
-class InitializedElement(
-    BoundedElement,
-):
+class InitializedElement(BoundedElement):
+    """Element with an initial value"""
+
+    #: initial value or expression depending on other existing elements
     initializer: float = 0.0  # TODO union[numeric, expression]
+    #: whether the initial value should come from the implementation/solver
     warm_start: bool = True
 
     def __post_init__(self):
@@ -561,7 +550,11 @@ class BoundedAssignmentField(
 
 @dataclass(repr=False)
 class TrajectoryOutputElement(FreeElement):
+    """Element with terminal and integrand terms for trajectory analysis"""
+
+    #: expression for the terminal term
     terminal_term: BaseElement = 0.0
+    #: expression for the integrand term
     integrand: BaseElement = 0.0
 
 
@@ -668,18 +661,14 @@ class MatchedElementMixin:
 
 
 @dataclass(repr=False)
-class MatchedElement(
-    BaseElement,
-    MatchedElementMixin,
-):
+class MatchedElement(BaseElement, MatchedElementMixin):
+    """Element matched with another element of another field"""
     pass
 
 zero_like = lambda match: backend.zeros(match.shape)
 pass_through = lambda match: match.backend_repr
 
-class MatchedField(
-    Field,
-):
+class MatchedField(Field):
     def __init__(self, matched_to=None, default_factory=pass_through, **kwargs):
         """
         matched_to is Field instance that this MatchedField is matched to.
