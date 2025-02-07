@@ -1,6 +1,6 @@
-============================
-Condor contrib models
-============================
+==============
+Contrib Models
+==============
 
 .. automodule:: condor.contrib
 

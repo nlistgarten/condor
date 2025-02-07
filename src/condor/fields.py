@@ -128,7 +128,7 @@ class Field:
       inheritance from Model templates to user models
     - Until a better API is designed & implemented, instance attributes created during
       :attr:`~Field.__init__` should start with a ``_`` so ``setattr`` on
-      :class:`AssignedField`\s can filter it
+      :class:`AssignedField` can filter it
     - Use :attr:`~Field.create_element` to create elements, passing ``**kwargs`` to
       element dataclass as much as possible to keep DRY
 
