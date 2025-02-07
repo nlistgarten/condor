@@ -1,19 +1,33 @@
 import logging
+from dataclasses import dataclass, field
 
 import casadi
+import ndsplines
 import numpy as np
 
 from condor.backends.casadi.utils import flatten
 from condor.backends.default import backend
-from condor.fields import (AssignedField, BaseElement, BoundedAssignmentField,
-                           Direction, Field, FreeAssignedField, FreeElement,
-                           FreeField, InitializedField, MatchedField,
-                           TrajectoryOutputField, WithDefaultField,
-                           pass_through, zero_like,
-                           )
-from condor.models import (Model, ModelTemplate, ModelTemplateType, ModelType,
-                           SubmodelTemplate)
-import ndsplines
+from condor.fields import (
+    AssignedField,
+    BoundedAssignmentField,
+    Direction,
+    FreeAssignedField,
+    FreeField,
+    InitializedField,
+    MatchedField,
+    TrajectoryOutputField,
+    WithDefaultField,
+    pass_through,
+    zero_like,
+)
+from condor.models import (
+    ModelTemplate,
+    ModelTemplateType,
+    ModelType,
+    SubmodelMetaData,
+    SubmodelTemplate,
+    SubmodelType,
+)
 
 log = logging.getLogger(__name__)
 
@@ -25,9 +39,10 @@ class DeferredSystem(ModelTemplate):
     output = FreeField(Direction.output)
 
 
-# TODO: Move to "contrib" or something?
 class ExplicitSystem(ModelTemplate):
-    r"""output is an explicit function of input
+    r"""Representation of a system of explicit equations
+
+    Outputs are functions solely of inputs:
 
     .. math::
        \begin{align}
@@ -42,14 +57,12 @@ class ExplicitSystem(ModelTemplate):
 
     Each :math:`x_i` and :math:`y_j` may have arbitrary shape. Condor can automatically
     calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers, etc.
-
     """
 
-    input = FreeField() #: the inputs of the model (e.g., :math:`x_i`)
-    output = AssignedField() #: the output of the model (e.g., :math:`y_i = f_i(x)`)
-
-
-import casadi as ca
+    #: the inputs of the model (e.g., :math:`x_i`)
+    input = FreeField()
+    #: the outputs of the model (e.g., :math:`y_i = f_i(x)`)
+    output = AssignedField()
 
 
 class AlgebraicSystemType(ModelType):
@@ -57,16 +70,17 @@ class AlgebraicSystemType(ModelType):
     def process_placeholders(cls, new_cls, attrs):
         super().process_placeholders(new_cls, attrs)
         for elem in new_cls.residual:
-            if elem.backend_repr.op() == ca.OP_EQ:
+            if elem.backend_repr.op() == casadi.OP_EQ:
                 lhs = elem.backend_repr.dep(0)
                 rhs = elem.backend_repr.dep(1)
                 elem.backend_repr = lhs - rhs
 
 
 class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
-    r"""Represents a system of algebraic equations, with parameters 
-    :math:`u` and implicit variables :math:`x`, which are driven to a solution
-    :math:`x^*`:
+    r"""Representation of a system of algebraic equations
+
+    An algebraic system with parameters :math:`u` and implicit variables :math:`x`,
+    is driven to a solution at :math:`x^*`:
 
     .. math::
        \begin{align}
@@ -78,24 +92,34 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
     Condor solves for the :math:`x_i^*` and can automatically calculate the derivatives
     :math:`\frac{dx_i}{du_j}` as needed for parent solvers, etc.
 
-    variable are variables that drive residual to 0
-    parameters are additional variables parameterizing system's explicit_output and
-    residuals
-    output are additional fields that depend on (solved) value of variable and parameters
+    Additional explicit outputs at the solution may also be included:
 
-    uses AlgebraicSystem type as model metaclass to support relational declaration of
-    residual.
+    .. math::
+        \begin{align}
+        y_1 &=& f_1(u_1, \dots, u_m, x_1^*, \dots, x_n^*) \\
+        & \vdots & \\
+        y_l &=& f_m(x_1, \dots, u_m, x_1^*, \dots, x_n^*)
+        \end{align}
+
     """
-    parameter = FreeField() #:
+
+    # uses AlgebraicSystem type as model metaclass to support relational declaration of
+    # residual
+
+    #: parameters held constant during solution of the system, :math:`u`
+    parameter = FreeField()
+    #: variables used to drive residuals to 0, :math:`x`
     variable = InitializedField(Direction.output)
+    #: residuals to satisfy, :math:`R`
     residual = FreeAssignedField(Direction.internal)
-    # unmatched, but maybe a subclass or imp might check lengths of residuals and
-    # implicit_outputs to ensure enough DOF?
+    #: additional explicit outputs, :math:`y`
     output = AssignedField()
 
+    # TODO: output is unmatched, but maybe a subclass or imp might check lengths of
+    # residuals and implicit_outputs to ensure enough DOF?
+
     def set_initial(cls, **kwargs):
-        r"""set initial values for the ``variable``\s of the model.
-        """
+        """Set initial values for the ``variable``\\s of the model"""
         for k, v in kwargs.items():
             var = getattr(cls, k)
             if var.field_type is not cls.variable:
@@ -134,15 +158,15 @@ class OptimizationProblemType(ModelType):
             else:
                 real_upper_bound = False
 
-            if elem.backend_repr.op() in (ca.OP_LT, ca.OP_LE):
+            if elem.backend_repr.op() in (casadi.OP_LT, casadi.OP_LE):
                 relational_op = True
                 elem.backend_repr = rhs - lhs
                 elem.lower_bound = 0.0
-            # elif elem.backend_repr.op() in (ca.OP_GT, ca.OP_GE):
+            # elif elem.backend_repr.op() in (casadi.OP_GT, casadi.OP_GE):
             #    relational_op = True
             #    elem.backend_repr = rhs - lhs
             #    elem.upper_bound = 0.0
-            elif elem.backend_repr.op() == ca.OP_EQ:
+            elif elem.backend_repr.op() == casadi.OP_EQ:
                 relational_op = True
                 elem.backend_repr = rhs - lhs
                 elem.upper_bound = 0.0
@@ -178,9 +202,9 @@ class OptimizationProblemType(ModelType):
         # process placeholders might be changing the field. so this processing should be
         # done elsewhere... persistent callable from field should happen elsewhere.
 
-        #p = new_cls.parameter.flatten()
-        #x = new_cls.variable.flatten()
-        #g = new_cls.constraint.flatten()
+        # p = new_cls.parameter.flatten()
+        # x = new_cls.variable.flatten()
+        # g = new_cls.constraint.flatten()
         p = casadi.vertcat(*flatten(new_cls.parameter))
         x = casadi.vertcat(*flatten(new_cls.variable))
         g = casadi.vertcat(*flatten(new_cls.constraint))
@@ -199,7 +223,9 @@ class OptimizationProblemType(ModelType):
 
 
 class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType):
-    r"""Solve an optimization problem of the form
+    r"""Representation of a general optimization problem
+
+    The problem is of the form:
 
     .. math::
 
@@ -207,28 +233,34 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
        \operatorname*{minimize}_{x_{1}, \ldots, x_{n}} &  &  &
             f (x_1, \ldots, x_n, p_1, \ldots p_m ) \\
        \text{subject to} &  &  & l_{x_i} \le x_i \le u_{x_i} \\
-       & & & l_{g_i} \le g_i (x_1, \ldots , x_n, p_1, \ldots p_m ) \le u_{g_i} \\
+       & & & l_{g_j} \le g_j (x_1, \ldots , x_n, p_1, \ldots p_m ) \le u_{g_j} \\
        \end{aligned}
 
+    The variables :math:`x_i` are driven by the optimization algorithm to minimize the
+    objective function :math:`f` while respecting bounds on the variables as well as
+    constraint functions :math:`g_j`.
 
-    variable are what the optimizer moves to solve problem, bounded and initialized
-    parameter are fixed wrt optimization, but parameterize solution
-    constraints get assigned as relationals
-
-    user provides objective to minimize -- defaults to 0. (a feasibility problem)
-
-
+    If an objective isn't provided, the default is constant 0 (i.e. a feasibility
+    problem).
     """
+
+    #: variables driven to solve the problem, :math:`x`
     variable = InitializedField(Direction.output)
+    #: parameters held constant during solution of the system, :math:`p`
     parameter = FreeField()
-    # TODO: add objective descriptor? so user code `objetive = ...` can get intercepted and
-    # handled?  or it's just a contract in the API that user writes one? feasibility
-    # problem if not? Add hook for metaclass to handle it?
-    # needs validation for size == 1
+    #: constraints :math:`g` expressed as relationals
     constraint = BoundedAssignmentField(Direction.internal)
+    #: scalar objective to minimize, :math:`f`
     objective = placeholder()
 
+    # TODO: need validation for objective size == 1
+
     def set_initial(cls, **kwargs):
+        """Set initial values for the ``variable``\s of the model
+
+        Overrides initial values provided to the ``variable`` field in the model
+        declaration.
+        """
         for k, v in kwargs.items():
             var = getattr(cls, k)
             if var.field_type is not cls.variable:
@@ -238,6 +270,7 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
             var.initializer = v
 
     def from_values(cls, **kwargs):
+        """Construct an instance of a solved model from variable and parameter values"""
         self = cls.__new__(cls)
         parameters = {}
         for elem in cls.parameter:
@@ -273,7 +306,10 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
 
 
 class ODESystem(ModelTemplate):
-    r""" Representation of a dynamical system defined by
+    r"""Representation of a dynamical system
+
+    The system is defined by a set of ordinary differential equations (ODEs) and
+    optionally additional outputs :math:`y`:
 
     .. math::
        \begin{align}
@@ -281,16 +317,15 @@ class ODESystem(ModelTemplate):
        y_i &= h(t,x_1,\ldots,x_n,p_1,\ldots,p_m)
        \end{align}
 
-    - ``modal`` - independent field, must always have an active ``action`` (or default)
-    - ``state`` - independent field
-    - ``dot`` - matched field, ``dot[x1] = ...``
-    - ``initial`` - arguably belongs on TrajectoryAnalysis, not ODEsystem. matched field
-      ``initial[x1] = ...``
+    where :math:`x` are the states fully defining the evolution of the system, :math:`t`
+    is the independent variable (typically time, but may be anything), and :math:`p` are
+    constant parameters.
 
-
-    """
+    Typically used in combination with one or more :class:`TrajectoryAnalysis`
+    submodels. :class:`Mode` and :class:`Event` submodels may also be added.
     """
 
+    """
     t - indepdendent variable of ODE, notionally time but can be used
     for anything. Used directly by subclasses (e.g., user code may use
     `u=DynamicsModel.t`, implementations will use this symbol
@@ -434,21 +469,21 @@ class ODESystem(ModelTemplate):
     # TODO: don't like hacks to simupy to make it work... especially the success
     # checking stuff -- is that neccessary anymore?
 
-    # tf and t0 as placeholders with default 0 and inf, respectively
-    # t = backend.symbol_generator('t') # TODO use placeholder with default = None
-    t = placeholder(default=None)  # TODO use placeholder with default = None
-
+    #: independent variable :math:`t`
+    t = placeholder(default=None)
+    #: state variables :math:`x`
     state = FreeField(Direction.internal)
-    initial = MatchedField(state, default_factory = zero_like)
+    #: initial values for the states; may also/instead be specified at the
+    #: :class:`TrajectoryAnalysis` level
+    initial = MatchedField(state, default_factory=zero_like)
+    #: constant (in time) parameters :math:`p`
     parameter = FreeField()
-    dot = MatchedField(state, default_factory = zero_like)
+    #: derivatives of the state variables with respect to :math:`t`, :math:`\dot{x}`
+    dot = MatchedField(state, default_factory=zero_like)
+    #: elements with deferred behavior, for implementing things such as control inputs
     modal = WithDefaultField(Direction.internal)
+    #: additional time-varying outputs :math:`y`
     dynamic_output = AssignedField(Direction.internal)
-
-
-from dataclasses import dataclass, field
-
-from condor.models import SubmodelMetaData, SubmodelType
 
 
 @dataclass
@@ -459,14 +494,14 @@ class TrajectoryAnalysisMetaData(SubmodelMetaData):
 
 class TrajectoryAnalysisType(SubmodelType):
     """Handle kwargs for including/excluding events (also need to include/exlcude
-    modes?), injecting bound events (event functions, updates) to model, etc.
+        modes?), injecting bound events (event functions, updates) to model, etc.
 
-    A common use case will be to bind the parameters then only update the state...
+        A common use case will be to bind the parameters then only update the state...
 
 
-|                           |------------+-----------------------+----------------------|
+    |                           |------------+-----------------------+----------------------|
 
-|                           |            | constraint            |                      |
+    |                           |            | constraint            |                      |
     """
 
     metadata_class = TrajectoryAnalysisMetaData
@@ -530,30 +565,32 @@ class TrajectoryAnalysis(
     primary=ODESystem,
     copy_fields=True,
 ):
-    """"""
+    """Simulation of an :class:`ODESystem`
 
+    The trajectory analysis specifies the parameters for numerical integration of the
+    ODE system.
+
+    The parameters, final states and state rates, and final time from the ODE system are
+    all available for use in expressions for ``trajectory_output``.
     """
-    this is what simulates an ODE system
-    tf parameter 
-    define trajectory outputs
-    modify parameters and initial (local copy)
 
-    gets _res, t, state, output (from odesystem) assigned from simulation
-
-    """
+    #: additional output calculated from the terminal state and/or integrand terms
     trajectory_output = TrajectoryOutputField()
+    #: final time; may not be reached if the system has a terminating :class:`Event`
+    #: occuring before ``tf``
     tf = placeholder(default=np.inf)  # TODO use placeholder with default = None
-    t0 = placeholder(default=0.0)  # TODO use placeholder with default = None
+    #: intitial time (default 0)
+    t0 = placeholder(default=0.0)
 
     # TODO: how to make trajectory outputs that depend on other state's outputs without
     # adding an accumulator state and adding the updates to each event? Maybe that
     # doesn't make sense...
 
     def point_analysis(cls, t, *args, **kwargs):
-        self = ODESystem.__new__(ODESystem)
-        """Compute the rates for the ODESystems that were bound (at the time of
-        construction). Need equivalent for dynamic outputs, and ???
+        """Compute the state rates for the ODESystems that were bound (at the time of
+        construction).
         """
+        self = ODESystem.__new__(ODESystem)
         # bind paramaeters, state, call implementation functions (dot, dynamic output)
 
         # apply to dynamic output, as well? but needs the embedded models? hmm...
@@ -573,7 +610,11 @@ class Event(
     SubmodelTemplate,
     primary=ODESystem,
 ):
-    """"""
+    """Instantaneous event for :class:`ODESystem` models.
+
+    Events may be declared at a specific time (``at_time``) or as a function with
+    zero-crossings dictating the event time (``function``).
+    """
 
     """
     update for any state that needs it
@@ -605,16 +646,25 @@ class Event(
     # TODO: singleton field event.function is very similar to objective in
     # OptimizationProblem. And at_time. Need to be able to define such singleton
     # assignment fields by name so there's no clash for repeated symbols.
+
+    #: instantaneous updates for any states in the ODE system
     update = MatchedField(
-        ODESystem.state, direction=Direction.output, default_factory=pass_through,
+        ODESystem.state,
+        direction=Direction.output,
+        default_factory=pass_through,
     )
     # make[mode_var] = SomeModeSubclass
     # actually, just update it
     # make = MatchedField(ODESystem.finite_state)
     # terminate = True -> return nan instead of update?
 
+    #: flag to specify whether the event should terminate the simulation (overriding
+    #: ``tf`` on the :class:`TrajectoryAnalysis`)
     terminate = placeholder(default=False)
+    #: expression where zero-crossings indicate event times
     function = placeholder(default=np.nan)
+    #: time at which the event occurs; periodic events may be specified with a slice
+    #: object (stop=None for infinite) with both start and stop inclusive
     at_time = placeholder(default=np.nan)
 
 
@@ -627,7 +677,7 @@ class Mode(
     SubmodelTemplate,
     primary=ODESystem,
 ):
-    """"""
+    """Conditional behavior of dynamics and/or controls for :class:`ODESystem`"""
 
     """
     convenience for defining conditional behavior for state dynamics and/or controls
@@ -635,9 +685,14 @@ class Mode(
     do inheritance for ODESystems which is otherwise hard? Can this be used instead of
     deferred subsystems? Yes but only for ODESystems..
     """
+
+    #: expression for triggering the mode
     condition = placeholder(default=1.0)
+    #: behaviors of the declared ``modal``\s in this mode
     action = MatchedField(
-        ODESystem.modal, direction=Direction.internal, default_factory=zero_like,
+        ODESystem.modal,
+        direction=Direction.internal,
+        default_factory=zero_like,
     )
 
 
@@ -816,9 +871,7 @@ class ExternalSolverWrapper(
 
 
 class TableLookup(ExternalSolverWrapper):
-    """The output is the interpolated value for each input
-
-    """
+    """Spline interpolation for gridded data"""
 
     # TODO enforce shape = 1 for input/output??
     """
@@ -838,25 +891,27 @@ class TableLookup(ExternalSolverWrapper):
     spline degree
 
     """
-    def __init__(self, xx, yy, degrees=3, bcs=(-1,0)):
-        """ construct a :class:`TableLookup` model
 
-        :attr:`xx` : dict
+    def __init__(self, xx, yy, degrees=3, bcs=(-1, 0)):
+        """Construct a :class:`TableLookup` model from data
+
+        Parameters
+        ----------
+        xx : dict
             a dictionary where keys are input element names and values are the grid
             points for data on that axis, so the collection of values can be passed to
-            ``np.meshgrid`` to construct a rectilinear grid; input should be a single 
+            ``np.meshgrid`` to construct a rectilinear grid; input should be a single
             dimension.
-        :attr:`yy` : dict
+        yy : dict
             a dictionary where keys are output element names and values are the values
             on the input grid to be interpolated
-        :attr:`degrees` : ndarray, shape=(xdim,), dtype=np.intc
-            Degree of interpolant for each axis (or broadcastable). Optional, 
-            default is 3.
-        :attr:`bcs` : ndarray, broadcastable to (xdim, 2, 2)
-            bc[xdim, 0 for left | 1 for right, :] = (order, value) for specifying
-            derivative conditions. Use order (-1,0) to specify the not-a-knot boundary 
-            conditions (default), where the boundary polynomial is the same as its
-            neighbor.
+        degrees : float or array-like, optional
+            Degree of interpolant for each axis (or broadcastable). Default is 3.
+        bcs : array-like, optional
+            Array of boundary conditions broadcastable to ``(xdim, 2, 2)``. ``bc[xdim, 0
+            for left | 1 for right, :] = (order, value)`` for specifying derivative
+            conditions. Use (-1, 0) to specify the not-a-knot boundary conditions
+            (default), where the boundary polynomial is the same as it neighbor.
         """
         input_data = []
         for k, v in xx.items():
@@ -868,7 +923,10 @@ class TableLookup(ExternalSolverWrapper):
             output_data.append(v)
         output_data = np.stack(output_data, axis=-1)
         self.interpolant = ndsplines.make_interp_spline(
-            input_data, output_data, degrees=degrees, bcs=bcs,
+            input_data,
+            output_data,
+            degrees=degrees,
+            bcs=bcs,
         )
         self.jac_interps = [
             self.derivative_or_zero(self.interpolant, idx)
@@ -884,24 +942,23 @@ class TableLookup(ExternalSolverWrapper):
 
     @staticmethod
     def derivative_or_zero(interpolant, idx):
-        """ convenience function for creating a derivative in a particular direction or
-        a 0-interpolant if the degree in that direction is 0 """
+        """convenience function for creating a derivative in a particular direction or
+        a 0-interpolant if the degree in that direction is 0"""
         if interpolant.degrees[idx] > 0:
             return interpolant.derivative(idx)
         return ndsplines.make_interp_spline(
-            np.zeros(1), np.zeros((1,interpolant.ydim)), degrees=0
+            np.zeros(1), np.zeros((1, interpolant.ydim)), degrees=0
         )
         raise ValueError
 
     def function(self, xx):
-        """ evaluate the table-interpolating spline at :attr:`xx` """
-        return self.interpolant(np.array(xx).reshape(-1))[0, :]#.T
+        """evaluate the table-interpolating spline at :attr:`xx`"""
+        return self.interpolant(np.array(xx).reshape(-1))[0, :]  # .T
 
     def jacobian(self, xx):
-        """ evaluate the dense jacobian at :attr:`xx` """
+        """evaluate the dense jacobian at :attr:`xx`"""
         array_vals = [
-            interp(np.array(xx).reshape(-1))[0, :]
-            for interp in self.jac_interps
+            interp(np.array(xx).reshape(-1))[0, :] for interp in self.jac_interps
         ]
         # TODO -- original implementation did not have transpose, but generic version
         # needs it
@@ -913,13 +970,15 @@ class TableLookup(ExternalSolverWrapper):
         return return_val
 
     def hessian(self, xx):
-        """ evaluate the dense hessian at :attr:`xx` """
-        array_vals = np.stack([
-            np.stack([
-                interp(np.array(xx).reshape(-1))[0, :]
-                for interp in interp_row
-            ], axis=0)
-            for interp_row in  self.hess_interps
-        ], axis=1)
+        """evaluate the dense hessian at :attr:`xx`"""
+        array_vals = np.stack(
+            [
+                np.stack(
+                    [interp(np.array(xx).reshape(-1))[0, :] for interp in interp_row],
+                    axis=0,
+                )
+                for interp_row in self.hess_interps
+            ],
+            axis=1,
+        )
         return array_vals
-

@@ -18,6 +18,7 @@ release = version
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    "sphinx.ext.napoleon",
     "sphinx_gallery.gen_gallery",
     "sphinx.ext.autodoc",
 ]
@@ -29,7 +30,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/README.rst"]
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = "alabaster"
+html_theme = "furo"
 html_static_path = ["_static"]
 html_css_files = ["overrides.css"]
 
@@ -39,6 +40,9 @@ sphinx_gallery_conf = {
     "gallery_dirs": ["tutorials", "howto"],
     "filename_pattern": ".*.py",
     "within_subsection_order": "FileNameSortKey",
-    'download_all_examples': False,
-    'copyfile_regex': r'.*\.rst',
+    "download_all_examples": False,
+    "copyfile_regex": r".*\.rst",
+    "reference_url": {
+        "sphinx_gallery": None,
+    },
 }
