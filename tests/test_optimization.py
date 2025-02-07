@@ -8,8 +8,8 @@ from casadi import exp
 @pytest.mark.parametrize(
     "method",
     [
-        co.implementations.OptimizationProblem.Method.ipopt,
-        co.implementations.OptimizationProblem.Method.scipy_slsqp,
+        co.implementations.OptimizationProblem,
+        co.implementations.ScipySLSQP,
     ],
 )
 def test_sellar(method):
@@ -39,7 +39,7 @@ def test_sellar(method):
     # Sellar.implementation.set_initial(x=1., z=[5., 2.,])
     Sellar.x.initializer = 1.0
     Sellar.z.initializer = [5.0, 2.0]
-    Sellar.Options.method = method
+    Sellar.Options.__implementation__ = method
     sellar_opt = Sellar()
 
     # TODO meaningful asserts?
@@ -92,9 +92,7 @@ def test_callback_scipy_no_instance():
         objective = x**2 + p
 
         class Options:
-            method = (
-                co.implementations.OptimizationProblem.Method.scipy_slsqp
-            )
+            __implementation__ = co.implementations.ScipySLSQP
 
     class Callback:
         def __init__(self):
@@ -136,9 +134,7 @@ def test_callback_scipy_instance():
         objective = x**2 + p
 
         class Options:
-            method = (
-                co.implementations.OptimizationProblem.Method.scipy_slsqp
-            )
+            __implementation__ = co.implementations.ScipySLSQP
 
     class Callback:
         def __init__(self):

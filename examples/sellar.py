@@ -25,11 +25,12 @@ class Sellar(co.OptimizationProblem):
 
     class Options:
         pass
+        __implementation__ = co.implementations.ScipySLSQP
 
-        method = (
-            co.implementations.OptimizationProblem.Method.scipy_slsqp
-            #co.implementations.OptimizationProblem.Method.scipy_trust_constr
-        )
+        #method = (
+        #    co.implementations.OptimizationProblem.Method.scipy_slsqp
+        #    #co.implementations.OptimizationProblem.Method.scipy_trust_constr
+        #)
         #disp = True
         #verbose=3
         #iprint = 2
@@ -58,7 +59,7 @@ print(sellar.constraint) # field
 print(sellar.coupling.y1) # embedded-model element
 
 
-Sellar.Options.method = co.implementations.OptimizationProblem.Method.ipopt
+Sellar.Options.__implementation__ = co.implementations.OptimizationProblem
 Sellar.set_initial(x=[5,2,1])
 ipopt_s = Sellar()
 

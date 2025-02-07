@@ -68,7 +68,7 @@ class MinimumTime(co.OptimizationProblem):
 
     class Options:
         exact_hessian = False
-        method = OptimizationProblem.Method.scipy_cg
+        __implementation__ = co.implementations.ScipyCG
 
 
 MinimumTime.set_initial(p1=p0[0], p2=p0[1])

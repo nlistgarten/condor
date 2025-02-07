@@ -37,7 +37,10 @@ import numpy as np
 # avoid computing wrt particular inputs/outputs if possible?
 
 from condor.implementations.simple import DeferredSystem, ExplicitSystem, ExternalSolverModel
-from condor.implementations.iterative import AlgebraicSystem, OptimizationProblem
+from condor.implementations.iterative import (
+    AlgebraicSystem, CasadiNlpsolImplementation as OptimizationProblem, ScipyCG,
+    ScipySLSQP, ScipyTrustConstr
+)
 from condor.implementations.sgm_trajectory import TrajectoryAnalysis
 
 

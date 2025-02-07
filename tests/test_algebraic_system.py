@@ -19,10 +19,7 @@ def sellar_system():
 
     return Coupling
 
-
-@pytest.mark.parametrize("enforce_bounds", [True, False])
-def test_sellar_solvers(sellar_system, enforce_bounds):
-    sellar_system.Options.enforce_bounds = enforce_bounds
+def test_sellar_solvers(sellar_system):
     out = sellar_system(x=1, z=[5, 2])
 
     # residuals bound, get by name

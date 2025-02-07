@@ -1108,7 +1108,8 @@ class ModelType(BaseModelType):
             if implementation is not None:
                 # inject so subclasses get this implementation
                 # TODO: a better way? registration? etc?
-                backend.implementation.__dict__[name] = implementation
+                #implementation.__dict__[name] = implementation
+                pass
 
             # TODO: other validation?
             # TODO: inherit options? No, defaults come from implementation itself
