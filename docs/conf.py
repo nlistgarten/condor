@@ -26,6 +26,9 @@ extensions = [
 # templates_path = ['_templates']
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/README.rst"]
 
+gallery_src_dirs = ["tutorial_src", "howto_src"]
+exclude_patterns.extend(gallery_src_dirs)
+
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -36,8 +39,8 @@ html_css_files = ["overrides.css"]
 
 
 sphinx_gallery_conf = {
-    "examples_dirs": ["tutorial_src", "howto_src"],
-    "gallery_dirs": ["tutorials", "howto"],
+    "examples_dirs": gallery_src_dirs,
+    "gallery_dirs": [name.split("_")[0] for name in gallery_src_dirs],
     "filename_pattern": ".*.py",
     "within_subsection_order": "FileNameSortKey",
     "download_all_examples": False,
