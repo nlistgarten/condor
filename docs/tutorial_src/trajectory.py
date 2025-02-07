@@ -229,8 +229,8 @@ ax.legend(["original sim", "with bounce", "glide mode"])
 # and modes.
 #
 # We can form the area under the flight-path curve by taking the derivative
-# $\dot{r} and using it to form the integrand. We can also just take the final max
-# altitude state we added with the ``MaxAlt`` event and the final range.
+# :math:`\dot{r}` and using it to form the integrand. We can also just take the final
+# max altitude state we added with the ``MaxAlt`` event and the final range.
 
 
 class AlphaSim(Glider.TrajectoryAnalysis):
