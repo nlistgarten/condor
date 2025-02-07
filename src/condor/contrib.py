@@ -1,3 +1,5 @@
+"""Built-in model templates"""
+
 import logging
 from dataclasses import dataclass, field
 

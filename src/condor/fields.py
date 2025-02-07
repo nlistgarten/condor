@@ -1,3 +1,5 @@
+"""Fields and elements for use with model templates"""
+
 # TODO: figure out python version minimum
 
 import importlib
