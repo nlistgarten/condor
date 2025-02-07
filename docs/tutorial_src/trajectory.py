@@ -74,12 +74,13 @@ class Glider(condor.ODESystem):
 # %%
 # The :attr:`modal` field is used to define elements with deferred and possibly varying
 # behavior, so we use this for the angle-of-attack so we can simulate multiple
-# behaviors. To simulate this model, we create a :class:`TrajectoryAnalysis`, a sub-model
-# to an ODE Sysstem, which is ultimately responsible for defining the specifics of
-# integrating the ODE. In this example, the :class:`TrajectoryAnalysis` model only
-# specifies the final simulation time of the model.  It is more mathematically
-# consistent to have the initial values defined in the trajectory analysis, but for
-# convience we declared it as part of the ODE system.
+# behaviors. To simulate this model, we create a
+# :class:`~condor.contrib.TrajectoryAnalysis`, a sub-model to an ODE Sysstem, which is
+# ultimately responsible for defining the specifics of integrating the ODE. In this
+# example, the :class:`TrajectoryAnalysis` model only specifies the final simulation
+# time of the model.  It is more mathematically consistent to have the initial values
+# defined in the trajectory analysis, but for convenience we declared it as part of the
+# ODE system.
 
 
 class FirstSim(Glider.TrajectoryAnalysis):
@@ -314,9 +315,9 @@ ax.text(
 # We can store the iteration history using :attr:`iter_callback` option on
 # :class:`TrajectoryAnalysis`, pointing it to the method of a class to store the
 # simulation data on each call. Since it only gets information relevant to the
-# optimization problem itself, we use :meth:`TrajectoryAnalysis.from_values` to
-# reconstruct the internals of the analysis with the simulation outputs bound to the
-# ``sim`` attribute.
+# optimization problem itself, we use
+# :meth:`~condor.contrib.OptimizationProblem.from_values` to reconstruct the internals of
+# the analysis with the simulation outputs bound to the ``sim`` attribute.
 
 
 class IterStore:
