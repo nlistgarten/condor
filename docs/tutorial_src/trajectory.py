@@ -175,31 +175,30 @@ plt.legend(["original sim", "with bounce"])
 # holding a constant angle of attack after reaching peak altitude to reduce
 # rate of descent.
 #
-# To ensure proper numerical behavior, we follow [orbital ref] and use
-# an accumulator state to encode the flight controller logic. In this case we track the
-# altitude at the start of descent, and use that as a trigger for holding a non-zero
-# angle of attack.
+# To ensure proper numerical behavior, we follow [orbital ref] and use an accumulator
+# state to encode the flight controller logic. In this case, we create an event to
+# detect the switch from ascent to descent and perform a state update.
 
 
 class MaxAlt(Glider.Event):
     function = gamma
     accum_state = state(name="max_alt")
-    initial[accum_state] = 0
-    update[accum_state] = h * (h > accum_state) + accum_state * (h <= accum_state)
+    update[accum_state] = h
 
 
 # %%
-#
+# The mode can now be triggered by the accumulator state update, where we set
+# :math:`\alpha` to a new constant parameter.
 
 
-class AlphaAttack(Glider.Mode):
-    condition = 1  # gamma < 0
+class DescentAlphaHold(Glider.Mode):
+    condition = MaxAlt.accum_state > 0
     hold_alpha = parameter()
     action[alpha] = hold_alpha
 
 
 # %%
-#
+# The glider now travels a little further with this control behavior.
 
 
 class AlphaSim(Glider.TrajectoryAnalysis):
@@ -209,7 +208,7 @@ class AlphaSim(Glider.TrajectoryAnalysis):
 alpha_sim = AlphaSim(**bounce_sim.parameter.asdict(), hold_alpha=0.5)
 
 ax = flight_path_plot([first_sim, bounce_sim, alpha_sim])
-ax.legend(["original sim", "with bounce", "glide mode"])
+ax.legend(["original sim", "with bounce", "gradual descent"])
 
 
 # %%
@@ -229,6 +228,16 @@ ax.legend(["original sim", "with bounce", "glide mode"])
 # term, and :math:`x\left(t\right)` is the solution to the system of ODEs with events
 # and modes.
 #
+# First we'll change the control behavior to use a constant angle of attack through the
+# whole trajectory the previous angle of attack controller and use one that holds a
+# constant angle of attack throughout the trajectory to get the peak altitude to vary.
+# We'll also make the bounce event terminal since we're interested in the flown range.
+
+
+DescentAlphaHold.condition = 1
+Bounce.terminate = True
+
+# %%
 # We can form the area under the flight-path curve by taking the derivative
 # :math:`\dot{r}` and using it to form the integrand. We can also just take the final
 # max altitude state we added with the ``MaxAlt`` event and the final range.
@@ -245,26 +254,21 @@ class AlphaSim(Glider.TrajectoryAnalysis):
     max_h = trajectory_output(MaxAlt.accum_state)
     max_r = trajectory_output(r)
 
-    # class Options:
-    #     state_rtol = 1e-12
-    #     state_atol = 1e-15
-    #     adjoint_rtol = 1e-12
-    #     adjoint_atol = 1e-15
+    class Options:
+        state_rtol = 1e-12
+        state_atol = 1e-15
+        adjoint_rtol = 1e-12
+        adjoint_atol = 1e-15
 
 
 # %%
-# Disable simulating a bounce by making it a terminal event.
+# Then we can compare areas with different hold angles of attack:
 
-Bounce.terminate = True
-
-
-# %%
-# Then we can compare areas,
-
+params = bounce_sim.parameter.asdict()
 results = {
-    "alpha = +0.5 deg": AlphaSim(**bounce_sim.parameter.asdict(), hold_alpha=0.5),
-    "alpha = 0.0 deg": AlphaSim(**bounce_sim.parameter.asdict(), hold_alpha=0.0),
-    "alpha = -0.5 deg": AlphaSim(**bounce_sim.parameter.asdict(), hold_alpha=-0.5),
+    "alpha = +0.5 deg": AlphaSim(**params, hold_alpha=0.5),
+    "alpha = 0.0 deg": AlphaSim(**params, hold_alpha=0.0),
+    "alpha = -0.5 deg": AlphaSim(**params, hold_alpha=-0.5),
 }
 
 print(*[f"{k}: {v.area}" for k, v in results.items()], sep="\n")
