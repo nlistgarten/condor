@@ -157,7 +157,12 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, casadi.Callback):
             [p],
             [self.sym_opt_out["x"]],
         )
-        self.jacobian = self.placeholder_func.jacobian()
+        try:
+            self.jacobian = self.placeholder_func.jacobian()
+        except RuntimeError as e:
+            self.jacobian = None
+
+
         #self.jacobian = casadi.jacobian(self.placeholder_func_xp(x,p), p)
 
 

@@ -299,7 +299,8 @@ class MaxArea(condor.OptimizationProblem):
         exact_hessian = False
         print_level = 0
         tol = 1E-3
-        max_iter = 10
+        max_iter = 8
+
 
 Callback.attach(MaxArea.Options)
 for title, to in {
