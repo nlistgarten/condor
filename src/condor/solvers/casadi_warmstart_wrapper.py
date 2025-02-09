@@ -54,12 +54,25 @@ class CasadiWarmstartWrapperBase:
         #if self.update_x0 is None:
         #    self.update_x0 = lambda x, p: self.init_x0(p)
         self.any_warm_start = np.any(self.warm_start)
+        self.all_warm_start = np.all(self.warm_start)
         if self.options is None:
             self.options = {}
 
+    def has_jacobian(self):
+        return self.jacobian is not None
+
+    def get_jacobian(self, name, inames, onames, opts):
+        return self.jacobian
+
+    def get_sparsity_in(self, i):
+        return self.placeholder_func.sparsity_in(i)
+
+    def get_sparsity_out(self, i):
+        return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
+
 
 @dataclass
-class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase):
+class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, casadi.Callback):
     """
     nlpsol
     """
@@ -88,16 +101,44 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase):
 
         self.lam_g0 = None
         self.lam_x0 = None
+        self.last_x = None
         # self.variable_at_construction.copy()
+        self.apply_lamda_initial = self.options.get(
+            "ipopt", {}
+        ).get("warm_start_init_point", "no") == "yes"
 
         self.optimizer = casadi.nlpsol(
-            self.model_name,
+            f"{self.model_name}_optimizer",
             self.method_string,
             self.nlp_args,
             self.options,
         )
+        if not self.init_var.jacobian()(self.p, []).nnz():
+            sym_x0 = self.init_var(np.zeros(self.p.shape))
+        self.sym_opt_out = self.optimizer(
+            x0=sym_x0,
+            p=p,
+            lbx=self.lbx,
+            ubx=self.ubx,
+            lbg=self.lbg,
+            ubg=self.ubg,
+        )
 
-        self.optimizer_func = casadi.Function(
+
+        self.placeholder_func = casadi.Function(
+            f"{self.model_name}_func",
+            [p],
+            [self.optimizer(
+                x0=x,
+                p=p,
+                lbx=self.lbx,
+                ubx=self.ubx,
+                lbg=self.lbg,
+                ubg=self.ubg,
+            )["x"]],
+            dict(allow_free=True),
+        )
+        self.placeholder_func_xp = casadi.Function(
             f"{self.model_name}_func",
             [x,p],
             [self.optimizer(
@@ -107,21 +148,73 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase):
                 ubx=self.lbx,
                 lbg=self.lbg,
                 ubg=self.ubg,
-            )["x"]]
+            )["x"]],
         )
 
 
+        self.placeholder_func = casadi.Function(
+            f"{self.model_name}_func",
+            [p],
+            [self.sym_opt_out["x"]],
+        )
+        self.jacobian = self.placeholder_func.jacobian()
+        #self.jacobian = casadi.jacobian(self.placeholder_func_xp(x,p), p)
 
-    @property
-    def function(self):
-        pass
 
-    @property
-    def jacobian(self):
-        # compute casadi jacobian object thing, and return it
-        # if overallbackend is casadi, will re-enter casadi native for additional
-        # derivatives
-        return casadi.jacobian(self.optimizer_func(x,p), p)
+        casadi.Callback.__init__(self)
+        self.construct(f"{self.model_name}_Callback", {})
+        self.last_p = None
+
+    def eval(self, args):
+        run_p = args[0]
+
+        run_kwargs = dict(
+            ubx=self.ubx,
+            lbx=self.lbx,
+            ubg=self.ubg,
+            lbg=self.lbg,
+        )
+
+        if self.n_parameter:
+            run_kwargs.update(p=run_p)
+
+        x0 = self.init_var(run_p)
+        if self.any_warm_start and self.last_x is not None:
+            for idx, warm_start in enumerate(self.warm_start):
+                if warm_start:
+                    x0[idx] = self.last_x[idx]
+        if self.any_warm_start and self.last_x is not None:
+            #breakpoint()
+            pass
+        run_kwargs.update(x0=x0)
+        if self.all_warm_start and self.apply_lamda_initial:
+            if self.lam_x0 is not None:
+                run_kwargs.update(
+                    lam_x0=self.lam_x0,
+                )
+            if self.lam_g0 is not None:
+                run_kwargs.update(
+                    lam_g0=self.lam_g0,
+                )
+
+        if np.any(run_kwargs["ubx"] <= run_kwargs["lbx"]):
+            breakpoint()
+        if self.last_p == run_p:
+            print("repeat call", run_p)
+            out = self.out
+        else:
+            print("new call running with", run_p)
+            out = self.out = self.optimizer(**run_kwargs)
+            self._stats = self.optimizer.stats()
+
+        self.last_p = run_p
+
+        self.last_x = out["x"]
+        self.lam_g0 = out["lam_g"]
+        self.lam_x0 = out["lam_x"]
+
+        return out["x"],
+
 
 
 class CasadiRootfinderWarmstart(CasadiWarmstartWrapperBase):

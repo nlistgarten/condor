@@ -52,6 +52,7 @@ class Sellar(co.OptimizationProblem):
 
 
 Sellar.set_initial(x=[5,2,1])
+Sellar.Options.__implementation__ = co.implementations.OptimizationProblem
 sellar = Sellar()
 print()
 print("objective value:", sellar.objective) # scalar value
@@ -61,5 +62,5 @@ print(sellar.coupling.y1) # embedded-model element
 
 Sellar.Options.__implementation__ = co.implementations.OptimizationProblem
 Sellar.set_initial(x=[5,2,1])
-ipopt_s = Sellar()
+#ipopt_s = Sellar()
 

@@ -252,6 +252,7 @@ class OptimizationProblem(InitializerMixin):
             f"{model.__name__}_initializer",
         )
 
+
         self.lbx = lbx = model.variable.flatten("lower_bound")
         self.ubx = ubx = model.variable.flatten("upper_bound")
         self.lbg = lbg = model.constraint.flatten("lower_bound")
@@ -260,12 +261,6 @@ class OptimizationProblem(InitializerMixin):
 
 
 
-        initializer_args = [self.x]
-        if self.has_p:
-            initializer_args += [self.p]
-        self.parse_initializers(model.variable, initializer_args)
-
-        self.x0 = self.initial_at_construction.copy()
 
     def load_initializer(self, model_instance):
         initializer_args = [self.x0]
@@ -288,7 +283,7 @@ class OptimizationProblem(InitializerMixin):
             model_var = getattr(self.model, k)
             if np.array(model_var.warm_start).any() and not isinstance(
                 model_var.initializer, symbol_class
-            ):
+            ) and not isinstance(v, symbol_class):
                 model_var.initializer = v
 
 class CasadiNlpsolImplementation(OptimizationProblem):
@@ -306,7 +301,8 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
     method_default_options = {
         Method.ipopt: dict(
-            warm_start_init_point="no",
+            #warm_start_init_point="no",
+            warm_start_init_point="yes",
             sb="yes",  # suppress banner
         ),
         Method.snopt: dict(
@@ -333,7 +329,7 @@ class CasadiNlpsolImplementation(OptimizationProblem):
         super().construct(model, **options)
 
         self.nlp_args = dict(f=self.f, x=self.x, g=self.g)
-        if self.p.size >1:
+        if co.backend.get_symbol_data(self.p).size > 1:
             self.nlp_args["p"] = self.p
 
         self.nlp_opts = dict()
@@ -404,37 +400,33 @@ class CasadiNlpsolImplementation(OptimizationProblem):
         self.lam_g0 = None
         self.lam_x0 = None
 
-
-
-
+    def __call__(self, model_instance):
+        self.run_optimizer(model_instance)
+        self.write_initializer(model_instance)
 
     def run_optimizer(self, model_instance):
         if self.init_callback is not None:
             self.init_callback(model_instance.parameter, self.nlp_opts)
-        call_args = dict(
-            x0=self.x0,
-            ubx=self.ubx,
-            lbx=self.lbx,
-            ubg=self.ubg,
-            lbg=self.lbg,
-        )
-        if self.options["warm_start_init_point"]:
-            if self.lam_x0 is not None:
-                call_args.update(lam_x0=self.lam_x0)
-            if self.lam_g0 is not None:
-                call_args.update(lam_g0=self.lam_g0)
 
-        if self.has_p:
-            call_args["p"] = self.eval_p
+        run_p = model_instance.parameter.flatten()
+        var_out = self.callback(run_p)
 
-        out = self.optimizer(**call_args)
-        if not self.has_p or not isinstance(self.eval_p, symbol_class):
-            self.x0 = out["x"]
+        if isinstance(var_out, symbol_class):
+            out = dict(
+                x = var_out,
+                p = run_p,
+                g = self.constraint_func(var_out, run_p),
+                f = self.objective_func(var_out, run_p),
+                lam_g = None,
+                lam_x = None,
+            )
+        else:
+            out = self.callback.out
+            model_instance._stats = self.callback._stats
 
         model_instance.bind_field(self.model.variable.wrap(out["x"]))
         model_instance.bind_field(self.model.constraint.wrap(out["g"]))
         model_instance.objective = np.array(out["f"]).squeeze()
-        model_instance._stats = self.optimizer.stats()
         self.out = out
         self.lam_g0 = out["lam_g"]
         self.lam_x0 = out["lam_x"]
@@ -454,6 +446,11 @@ class ScipyMinimizeBase(OptimizationProblem):
             [casadi.jacobian(self.f, self.x)],
         )
         self.g_split = casadi.vertsplit(self.g)
+        initializer_args = [self.x]
+        if self.has_p:
+            initializer_args += [self.p]
+        self.parse_initializers(model.variable, initializer_args)
+        self.x0 = self.initial_at_construction.copy()
 
     def prepare_constraints(self, extra_args):
         return []
