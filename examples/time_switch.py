@@ -92,7 +92,7 @@ class MinimumTime(co.OptimizationProblem):
     #class Casadi(co.Options):
     class Options:
         exact_hessian = False
-        method = OptimizationProblem.Method.scipy_cg
+        __implementation__ = co.implementations.ScipyCG
 
 
 """

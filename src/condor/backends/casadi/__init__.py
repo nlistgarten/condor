@@ -257,13 +257,18 @@ class CasadiFunctionCallback(casadi.Callback):
         return self.placeholder_func.n_out()
 
     def eval(self, args):
+        #if self.jacobian_of:
+        #    pass_args = args[:-1]
+        #else:
+        #    pass_args = args
+        #out = self.wrapper_func(
+        #    *pass_args,
+        #)
+        out = self.wrapper_func(
+            args[0],
+        )
         try:
-            out = self.wrapper_func(
-                args[0],
-                # this lets 
-                #*wrap(self.implementation.model.input, args[0])
-                # *wrap(self.implementation.model.input, args)
-            )
+            pass
         except Exception as e:
             breakpoint()
             pass

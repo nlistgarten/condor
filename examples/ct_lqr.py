@@ -46,7 +46,7 @@ class CtOptLQR(co.OptimizationProblem):
 
     class Options:
         exact_hessian = False
-        method = OptimizationProblem.Method.scipy_cg
+        __implementation__ = co.implementations.ScipyCG
 
 from time import perf_counter
 

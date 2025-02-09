@@ -6,7 +6,9 @@ import condor as co
 from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 from condor.backends.casadi.utils import (flatten, wrap)
-from condor.solvers.casadi_warmstart_wrapper import (CasadiIterationCallback)
+from condor.solvers.casadi_warmstart_wrapper import (
+    CasadiIterationCallback, CasadiNlpsolWarmstart
+)
 import numpy as np
 
 
@@ -231,6 +233,9 @@ class OptimizationProblem(InitializerMixin):
         self.x = x = model.variable.flatten()
         self.g = g = model.constraint.flatten()
 
+        self.warm_start = model.variable.flatten("warm_start")
+        self.initializer = model.variable.flatten("initializer")
+
         self.objective_func = expression_to_operator(
             [self.x, self.p],
             f,
@@ -241,11 +246,19 @@ class OptimizationProblem(InitializerMixin):
             g,
             f"{model.__name__}_constraint",
         )
+        self.initializer_func = expression_to_operator(
+            [self.p],
+            self.initializer,
+            f"{model.__name__}_initializer",
+        )
 
         self.lbx = lbx = model.variable.flatten("lower_bound")
         self.ubx = ubx = model.variable.flatten("upper_bound")
         self.lbg = lbg = model.constraint.flatten("lower_bound")
         self.ubg = ubg = model.constraint.flatten("upper_bound")
+
+
+
 
         initializer_args = [self.x]
         if self.has_p:
@@ -284,6 +297,13 @@ class CasadiNlpsolImplementation(OptimizationProblem):
         snopt = auto()
         qrsqp = auto()
 
+    method_strings = {
+        Method.ipopt: "ipopt",
+        Method.snopt: "snopt",
+        Method.qrsqp: "sqpmethod",
+    }
+
+
     method_default_options = {
         Method.ipopt: dict(
             warm_start_init_point="no",
@@ -312,23 +332,15 @@ class CasadiNlpsolImplementation(OptimizationProblem):
         self.method = method
         super().construct(model, **options)
 
-        f = self.f
-        x = self.x
-        g = self.g
-
-        self.nlp_args = dict(f=f, x=x, g=g)
+        self.nlp_args = dict(f=self.f, x=self.x, g=self.g)
+        if self.p.size >1:
+            self.nlp_args["p"] = self.p
 
         self.nlp_opts = dict()
         if self.iter_callback is not None:
             self.nlp_opts["iteration_callback"] = CasadiIterationCallback(
                 "iter", self.nlp_args, model, self.iter_callback
             )
-        if self.has_p:
-            self.nlp_args["p"] = self.p
-
-        self.lam_g0 = None
-        self.lam_x0 = None
-        # self.variable_at_construction.copy()
 
         self.method = method
         if self.method is CasadiNlpsolImplementation.Method.ipopt:
@@ -352,19 +364,8 @@ class CasadiNlpsolImplementation(OptimizationProblem):
                     hessian_approximation="limited-memory",
                 )
 
-            self.optimizer = casadi.nlpsol(
-                model.__name__,
-                "ipopt",
-                self.nlp_args,
-                self.nlp_opts,
-            )
         elif self.method is OptimizationProblem.Method.snopt:
-            self.optimizer = casadi.nlpsol(
-                model.__name__,
-                "snopt",
-                self.nlp_args,
-                self.nlp_opts,
-            )
+            pass
         elif self.method is OptimizationProblem.Method.qrsqp:
             self.nlp_opts.update(
                 qpsol="qrqp",
@@ -382,9 +383,30 @@ class CasadiNlpsolImplementation(OptimizationProblem):
                 print_status=False,
             )
 
-            self.optimizer = casadi.nlpsol(
-                model.__name__, "sqpmethod", self.nlp_args, self.nlp_opts
-            )
+        self.callback = CasadiNlpsolWarmstart(
+            primary_function = self.objective_func,
+            constraint_function = self.constraint_func,
+            n_variable = model.variable._count,
+            n_parameter = model.parameter._count,
+            init_var = self.initializer_func,
+            warm_start = self.warm_start,
+            lbx = self.lbx,
+            ubx = self.ubx,
+            lbg = self.lbg,
+            ubg = self.ubg,
+            method_string = CasadiNlpsolImplementation.method_strings[method],
+            options = self.nlp_opts,
+            model_name = model.__name__,
+        )
+
+        self.optimizer = self.callback.optimizer
+        self.nlp_args = self.callback.nlp_args
+        self.lam_g0 = None
+        self.lam_x0 = None
+
+
+
+
 
     def run_optimizer(self, model_instance):
         if self.init_callback is not None:

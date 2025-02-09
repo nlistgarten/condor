@@ -1,18 +1,28 @@
 from numpy import *
+import numpy as np
 import casadi
 import condor.backends.casadi as backend
 
 pi = casadi.pi
 inf = casadi.inf
 
+min = casadi.mmin
+max = casadi.mmax
+
 def concat(arrs, axis=0):
     """ implement concat from array API for casadi """
-    if axis == 0:
-        return casadi.vcat(arrs)
-    elif axis in (1,-1):
-        return casadi.hcat(arrs)
+    if not arrs:
+        return arrs
+    if np.any([isinstance(arr, backend.symbol_class) for arr in arrs]):
+        if axis == 0:
+            return casadi.vcat(arrs)
+        elif axis in (1,-1):
+            return casadi.hcat(arrs)
+        else:
+            raise ValueError("casadi only supports matrices")
     else:
-        raise ValueError("casadi only supports matrices")
+        return np.concat([np.atleast_2d(arr) for arr in arrs], axis=axis)
+
 
 def unstack(arr, axis=0):
     if axis == 0:
