@@ -185,7 +185,7 @@ class CasadiFunctionCallback(casadi.Callback):
 
 
     def __init__(
-        self, wrapper_funcs, implementation, jacobian_of=None, input_symbol=None,
+        self, wrapper_funcs, implementation=None, model_name="", jacobian_of=None, input_symbol=None,
         output_symbol=None, opts={}
     ):
         """
@@ -207,9 +207,15 @@ class CasadiFunctionCallback(casadi.Callback):
         self.input_symbol = input_symbol
         self.output_symbol = output_symbol
 
+        if (not model_name) == (implementation is None):
+            raise ValueError
+        if not model_name:
+            model_name = implementation.model.__name__
+
+
         if jacobian_of is None and input_symbol is not None and output_symbol is not None:
             self.placeholder_func = casadi.Function(
-                f"{implementation.model.__name__}_placeholder",
+                f"{model_name}_placeholder",
                 [self.input_symbol],
                 [self.output_symbol],
                 # self.input,
@@ -229,7 +235,8 @@ class CasadiFunctionCallback(casadi.Callback):
             # callable can re-enter native casadi -- infinite differentiable, etc.
             self.jacobian = callables_to_operator(
                 wrapper_funcs = wrapper_funcs[1:],
-                implementation = implementation,
+                implementation = None,
+                model_name = model_name,
                 jacobian_of = self,
                 opts=opts,
             )

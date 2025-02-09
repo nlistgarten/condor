@@ -409,7 +409,10 @@ class CasadiNlpsolImplementation(OptimizationProblem):
             self.init_callback(model_instance.parameter, self.nlp_opts)
 
         run_p = model_instance.parameter.flatten()
-        var_out = self.callback(run_p)
+        if "p" not in self.nlp_args:
+            var_out = self.callback(np.array([]))
+        else:
+            var_out = self.callback(run_p)
 
         if isinstance(var_out, symbol_class):
             out = dict(

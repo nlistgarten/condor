@@ -52,7 +52,6 @@ print(3*"\n")
 
 
 
-iter_count
 for use_warm_start in [False, True]:
     print("=== with warm_start =",use_warm_start)
     RosenbrockOnCircle.x.warm_start = use_warm_start
