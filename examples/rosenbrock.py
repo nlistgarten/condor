@@ -3,6 +3,30 @@ import condor
 def rosenbrock(x, y, a=1, b=100):
     return (a - x)**2 + b * (y - x**2) **2
 
+call_from_count = []
+param_count = []
+
+# these two callback data arrays end up being 7 elements long,
+# 3 calls as a top level (1 with warm start off, 2 with warm start on)
+# then Outer gets called twice (once with warm start off, once off)
+# each outer results in two elements to the callback data arrays, 
+# 1 is used by outer to solve the embedded problem (initiated with a variable, but then
+# called at least once for each iter), which only goes through casadi infrastructure as
+# Callback, and doesn't hit implementation after binding the variable
+# 1 is used by the bind_embedded_models with the final solution, which is essentially
+# "top level" and goes through implementation
+# currently not able to link the final solution of the embedded to the implementation --
+# might be able to fix that?
+# definitely have access to the embedded solution, in bind_embedded_model, the
+# embedded_model.implementation.callback definitely has the correct last_x. e.g., line
+# 1333 of models.py
+# need an API for using the callback effectively -- probably applies to SGM as well.
+# maybe if the implementation and model API was more defined, with more hooks for the
+# call process.
+
+# ok, figured out a decent API I think. iter_count for the two bind_embedded_model calls
+# is 0. can use call_from_count [-4], [-2] to show warm start worked?
+
 
 class RosenbrockOnCircle(condor.OptimizationProblem):
     r = parameter()
@@ -19,10 +43,13 @@ class RosenbrockOnCircle(condor.OptimizationProblem):
         @staticmethod
         def init_callback(parameter, opts):
             print("  inner init:", parameter)
+            call_from_count.append(0)
+            param_count.append(parameter)
 
         @staticmethod
         def iter_callback(i, variable, objective, constraint):
             print("  inner: ", i, variable, objective)
+            call_from_count[-1] += 1
 
 
 print("=== Call twice, should see same iters")

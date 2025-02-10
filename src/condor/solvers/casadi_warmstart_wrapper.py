@@ -47,7 +47,20 @@ class CasadiWarmstartWrapperBase:
     # and even more confusing/inconsistent, casadi rootfinder takes MIMO function that
     # x,p input and residual,explicit outptus.
 
-    # TODO
+    # and accctually, casadinlpsolwarmstart should not directly be a
+    # CasadiFunctionCallback, it should be generic. IF making a warm-start casadi solver
+    # wrapper that is independent of condor (e.g., could be spun out) Process needs to
+    # be:
+    # 0. iterative implementation creates necessary callables for primary/secondary
+    # functions AND their derivatives to pass to the condor-independent solver.
+    # 1. Casadi solver wrapper constructs correct nlpsol/rootfinder, most likely by
+    # creating CasadiFunctionCallback for functions + derivatives (again, pending API
+    # for general diff geom/multi-V calculus), including derivatives of warm-started
+    # iterative solver
+    # 2. I guess implementation then creates backend.callable_to_operator from step 1?
+    # 3. call and bind?
+
+
 
     def __post_init__(self):
         #super().__post_init__()

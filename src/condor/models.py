@@ -1203,7 +1203,6 @@ class Model(metaclass=ModelType):
         return out_fields
 
 
-
     def __init__(self, *args, name="", **kwargs):
         cls = self.__class__
         self.name = name
@@ -1331,7 +1330,18 @@ class Model(metaclass=ModelType):
                     # not working because python is checking equality of stuff??
                     # model_assignments[v] = embedded_model_kwargs[k]
 
-            bound_embedded_model = embedded_model(**embedded_model_kwargs)
+            # call alternate method, it's pretty small -- just do it here.
+            # pattern is similar to from_values, etc. so maybe dry it up but this is
+            # pretty small.
+            bound_embedded_model = embedded_model.__new__(embedded_model)
+            bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
+            bound_embedded_model.implementation = embedded_model_instance.implementation(
+                bound_embedded_model
+            )
+
+
+
+
             setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
 
             for field in embedded_model._meta.output_fields:
