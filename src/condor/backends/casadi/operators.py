@@ -8,6 +8,7 @@ inf = casadi.inf
 
 min = casadi.mmin
 max = casadi.mmax
+mod = casadi.fmod
 
 def concat(arrs, axis=0):
     """ implement concat from array API for casadi """

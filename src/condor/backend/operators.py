@@ -37,7 +37,8 @@ unstack = backend_mod.operators.unstack
 # "element-wise functions"
 fmin = backend_mod.operators.fmin
 fmax = backend_mod.operators.fmax
-fmod = backend_mod.operators.fmod
+mod = backend_mod.operators.mod
+
 atan = backend_mod.operators.atan
 atan2 = backend_mod.operators.atan2
 sin = backend_mod.operators.sin

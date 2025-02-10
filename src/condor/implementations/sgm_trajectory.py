@@ -9,7 +9,7 @@ from condor.backend import (
     symbol_class, callables_to_operator, expression_to_operator,
 )
 from condor.backend.operators import (
-    recurse_if_else, substitute, jacobian, concat, inf, sin, pi
+    recurse_if_else, substitute, jacobian, concat, inf, sin, pi, mod
 )
 
 def get_state_setter(field, signature, on_field=None, subs=None):
@@ -175,7 +175,7 @@ class TrajectoryAnalysis:
                         / (pi * 100)
                     )
                     # self.events(solver_res.values.t, solver_res.values.y, gs)
-                    e_expr = fmod(model.t - at_time_start, at_time.step)
+                    e_expr = mod(model.t - at_time_start, at_time.step)
 
                     # TODO: verify start and stop for at_time slice
                     if isinstance(at_time_start, symbol_class) or at_time_start != 0.0:
@@ -193,7 +193,7 @@ class TrajectoryAnalysis:
                         # if there is an end-time, hold constant to prevent additional
                         # zero crossings -- hopefully works even if stop is on an event
                         # post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
-                        post_term = (model.t >= at_time.stop) * fmod(
+                        post_term = (model.t >= at_time.stop) * mod(
                             at_time.stop - at_time_start, at_time.step
                         )
                         at_time_stop = at_time.stop
