@@ -484,7 +484,35 @@ class FreeField(Field, default_direction=Direction.input):
         self.create_element(**new_kwargs)
         return self._elements[-1].backend_repr
 
-    pass
+    def create_from(self, other, **aliases):
+        """Get or create elements based on another field
+
+        Elements from `other` are created on this field unless it already exists or is
+        supplied in `aliases`.
+
+        Parameters
+        ----------
+        other : Field
+            Other field to get elements from
+        **aliases
+            Name-element aliases to use in place of elements of `other`
+
+        Returns
+        -------
+        elem_map : dict
+            Dictionary mapping element names to elements
+        """
+        elem_map = {}
+        for elem in other:
+            check = self.get(name=elem.name)
+            # TODO check additional attributes of retrieved element
+            if elem.name in aliases:
+                elem_map[elem.name] = aliases[elem.name]
+            elif isinstance(check, BaseElement):
+                elem_map[elem.name] = check.backend_repr
+            else:
+                elem_map[elem.name] = self(name=elem.name, shape=elem.shape)
+        return elem_map
 
 
 class FreeAssignedField(
