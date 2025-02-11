@@ -26,7 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
-docs = ["sphinx", "sphinx-gallery", "matplotlib"]
+docs = ["sphinx", "sphinx-gallery", "matplotlib", "furo"]
 
 [tool.setuptools_scm]
 write_to = "src/condor/_version.py"

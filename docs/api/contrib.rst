@@ -1,6 +1,8 @@
-============================
-Condor contrib models
-============================
+==============
+Contrib Models
+==============
+
+.. automodule:: condor.contrib
 
 .. autoclass:: condor.contrib.ExplicitSystem
    :member-order: bysource

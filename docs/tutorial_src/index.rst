@@ -1,13 +1,13 @@
-============
+=========
 Tutorials
-============
+=========
 
-We provide a few simple tutorial examples to illustrate the 
+We provide a few simple tutorial examples to illustrate modeling with Condor.
 
 .. toctree::
    :maxdepth: 2
 
-   /tutorials/sellar
-   /tutorials/polar_transform
-   /tutorials/trajectory
+   /tutorial/sellar
+   /tutorial/polar_transform
+   /tutorial/trajectory
 

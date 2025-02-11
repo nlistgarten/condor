@@ -12,7 +12,7 @@ Welcome to Condor's documentation!
 
 The documentation is organized as follows:
 
-* :doc:`Tutorials </tutorials/index>` have several small examples that show you the basics of translating a mathematical model into condor code, evaluating the model, and using it other scientific python tools. Start here if you're new to condor.
+* :doc:`Tutorials </tutorial/index>` have several small examples that show you the basics of translating a mathematical model into condor code, evaluating the model, and using it other scientific python tools. Start here if you're new to condor.
 
 * :doc:`Topic guides <topics/index>` discuss key topics and concepts at a
   fairly high level and provide useful background information and explanation.
@@ -28,14 +28,10 @@ The documentation is organized as follows:
    :maxdepth: 2
    :caption: Contents:
 
-   tutorials/index
+   tutorial/index
    howto/index
    api/index
-   topics/design
-
-..
    topics/index
-
 
 
 Indices and tables
