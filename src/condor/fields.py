@@ -720,9 +720,18 @@ class MatchedField(
             # TODO verify shape etc?
             existing_elem.backend_repr = value
         else:
-            symbol_data = backend.get_symbol_data(value)
+            if isinstance(value, BaseElement):
+                symbol_data = backend.BackendSymbolData(
+                    shape=value.shape,
+                    symmetric=value.symmetric,
+                    diagonal=value.diagonal
+                )
+                backend_repr = value.backend_repr
+            else:
+                symbol_data = backend.get_symbol_data(value)
+                backend_repr = value
             self.create_element(
-                name=None, match=match, backend_repr=value, **asdict(symbol_data)
+                name=None, match=match, backend_repr=backend_repr, **asdict(symbol_data)
             )
 
     def __getitem__(self, key):
