@@ -314,7 +314,7 @@ def test_mode_param_to_mode(odesys):
 
     class ModeB(odesys.Mode):
         condition = 1
-        action[u] = 1 * ModeA.u_hold  # breaks without the 1*
+        action[u] = ModeA.u_hold
 
     class Sim(odesys.TrajectoryAnalysis):
         tf = 10
