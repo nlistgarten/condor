@@ -1,4 +1,4 @@
-from numpy import *
+#from numpy import *
 import numpy as np
 import casadi
 import condor.backends.casadi as backend
@@ -9,6 +9,18 @@ inf = casadi.inf
 min = casadi.mmin
 max = casadi.mmax
 mod = casadi.fmod
+
+atan = casadi.atan
+atan2 = casadi.atan2
+sin = casadi.sin
+cos = casadi.cos
+asin = casadi.asin
+acos = casadi.acos
+exp = casadi.exp
+log = casadi.log
+log10 = casadi.log10
+sqrt = casadi.sqrt
+
 
 def concat(arrs, axis=0):
     """ implement concat from array API for casadi """

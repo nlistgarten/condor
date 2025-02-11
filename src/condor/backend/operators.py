@@ -35,8 +35,8 @@ concat = backend_mod.operators.concat
 unstack = backend_mod.operators.unstack
 
 # "element-wise functions"
-fmin = backend_mod.operators.fmin
-fmax = backend_mod.operators.fmax
+min = backend_mod.operators.min
+max = backend_mod.operators.max
 mod = backend_mod.operators.mod
 
 atan = backend_mod.operators.atan
