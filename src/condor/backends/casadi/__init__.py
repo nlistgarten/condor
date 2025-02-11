@@ -136,6 +136,9 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
 
 
 def get_symbol_data(symbol, symmetric=None):
+    if hasattr(symbol, "backend_repr"):
+        symbol = symbol.backend_repr
+
     if not isinstance(symbol, (symbol_class, casadi.DM)):
         symbol = np.atleast_1d(symbol)
         # I'm not sure why, but before I reshaped this to a vector always. Only
@@ -143,6 +146,7 @@ def get_symbol_data(symbol, symmetric=None):
         # .reshape(-1)
         if symbol.ndim > 2:
             symbol.reshape(-1)
+
     shape = symbol.shape
     n, m = shape_to_nm(shape)
     size = n * m

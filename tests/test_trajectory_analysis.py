@@ -31,9 +31,7 @@ def test_ct_lqr():
 
         class Options:
             exact_hessian = False
-            method = (
-                co.implementations.OptimizationProblem.Method.scipy_cg
-            )
+            method = co.implementations.OptimizationProblem.Method.scipy_cg
 
     lqr_sol = CtOptLQR()
 
@@ -181,9 +179,7 @@ def test_time_switched():
 
         class Options:
             exact_hessian = False
-            method = (
-                co.implementations.OptimizationProblem.Method.scipy_cg
-            )
+            method = co.implementations.OptimizationProblem.Method.scipy_cg
 
     MinimumTime.set_initial(t1=2.163165480675697, t2=4.361971866705403)
     opt = MinimumTime()
@@ -273,3 +269,54 @@ def test_state_switched():
     assert opt._stats.success
     np.testing.assert_allclose(opt.p1, -3, rtol=1e-5)
     np.testing.assert_allclose(opt.p2, 1, rtol=1e-5)
+
+
+@pytest.fixture
+def odesys():
+    class MassSpring(co.ODESystem):
+        x = state()
+        v = state()
+        wn = parameter()
+        u = modal()
+        dot[x] = v
+        dot[v] = u - wn**2 * x
+        initial[x] = 1
+
+    return MassSpring
+
+
+def test_event_state_to_mode(odesys):
+    # verify you can reference a state created in an event from a mode
+
+    class Event(odesys.Event):
+        function = v
+        count = state(name="count_")
+        update[count] = count + 1
+
+    class Mode(odesys.Mode):
+        condition = Event.count > 0
+        action[u] = 1
+
+    class Sim(odesys.TrajectoryAnalysis):
+        total_count = trajectory_output(Event.count)
+        tf = 10
+
+    print(Sim(wn=10).total_count)
+
+
+def test_mode_param_to_mode(odesys):
+    # verify you can reference a parameter created in a mode in another mode
+
+    class ModeA(odesys.Mode):
+        condition = v > 0
+        u_hold = parameter()
+        action[u] = u_hold
+
+    class ModeB(odesys.Mode):
+        condition = 1
+        action[u] = 1 * ModeA.u_hold  # breaks without the 1*
+
+    class Sim(odesys.TrajectoryAnalysis):
+        tf = 10
+
+    out = Sim(wn=10, u_hold=0.8)

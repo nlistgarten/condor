@@ -229,12 +229,15 @@ ax.legend(["original sim", "with bounce", "gradual descent"])
 # and modes.
 #
 # First we'll change the control behavior to use a constant angle of attack through the
-# whole trajectory the previous angle of attack controller and use one that holds a
-# constant angle of attack throughout the trajectory to get the peak altitude to vary.
-# We'll also make the bounce event terminal since we're interested in the flown range.
+# whole trajectory to get the peak altitude to vary. We'll also make the bounce event
+# terminal since we're interested in the flown range.
 
 
-DescentAlphaHold.condition = 1
+class ConstantAlphaHold(Glider.Mode):
+    condition = 1
+    action[alpha] = 1 * DescentAlphaHold.hold_alpha
+
+
 Bounce.terminate = True
 
 # %%
@@ -312,7 +315,9 @@ opt_range = GlideOpt(trade_off=0)
 
 ax = flight_path_plot([opt_range.sim])
 ax.text(
-    0.05, 0.92, f"$\\alpha$ for max range: {opt_range.alpha}", transform=ax.transAxes
+    *(0.05, 0.92),
+    f"max range: {opt_range.sim.max_r} ($\\alpha={opt_range.alpha}$",
+    transform=ax.transAxes,
 )
 
 # %%
