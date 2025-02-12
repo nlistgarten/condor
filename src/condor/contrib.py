@@ -258,7 +258,7 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
     # TODO: need validation for objective size == 1
 
     def set_initial(cls, **kwargs):
-        """Set initial values for the ``variable``\s of the model
+        r"""Set initial values for the ``variable``\s of the model
 
         Overrides initial values provided to the ``variable`` field in the model
         declaration.
