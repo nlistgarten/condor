@@ -423,7 +423,7 @@ class BaseModelType(type):
                                     f"an inheritance bug, {base}.{k} = {v} to {name}"
                                 )
                             continue
-                        else:
+                        elif cls.is_condor_attr(k,v):
                             raise ValueError(
                                 f"an inheritance incompatibility "
                                 f"{base}.{k} = {v} does not match "

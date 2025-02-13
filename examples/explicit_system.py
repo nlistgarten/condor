@@ -37,13 +37,7 @@ class MyComponentA(ComponentAT):
     u = input()
     output.w = z+u
 
-
-
-MyComponentR(u=1.23)
-MyComponentA(u=1.23)
-
-import sys
-sys.exit()
+MyComponentR(u=1.23).z == MyComponentA(u=1.23).z
 
 comp = MyComponent(u=1., z=5.)
 
