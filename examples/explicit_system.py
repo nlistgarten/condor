@@ -1,6 +1,65 @@
 import condor as co
 import numpy as np
 
+
+class ComponentRaw(co.models.ModelTemplate):
+    """ Raw Component base """
+    input = co.FreeField(co.Direction.input)
+    output = co.AssignedField(co.Direction.output)
+
+    x = placeholder(default=2.0)
+    y = placeholder(default=1.0)
+
+    output.z = x**2 + y
+
+
+class ComponentImplementation(co.implementations.ExplicitSystem):
+    pass
+
+
+co.implementations.ComponentRaw = ComponentImplementation
+
+
+class ComponentAT(co.ExplicitSystem, as_template=True):
+    """ AT component base """
+    x = placeholder(default=2.0)
+    y = placeholder(default=1.0)
+
+    output.z = x**2 + y
+
+class MyComponentR(ComponentRaw):
+    """ my component R """
+    u = input()
+    output.w = z+u
+
+class MyComponentA(ComponentAT):
+    """ my component A """
+    u = input()
+    output.w = z+u
+
+
+
+MyComponentR(u=1.23)
+MyComponentA(u=1.23)
+
+import sys
+sys.exit()
+
+comp = MyComponent(u=1., z=5.)
+
+class MyComponent1(Component):
+    pass
+
+comp1 = MyComponent1()
+
+
+class MyComponent2(Component):
+    u = input()
+    output.x = z+u
+
+comp2 = MyComponent2(u=1.)
+
+
 class MatSys(co.ExplicitSystem):
     A = input(shape=(3,4))
     B = input(shape=(4,2))

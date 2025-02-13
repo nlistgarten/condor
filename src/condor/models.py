@@ -377,15 +377,24 @@ class BaseModelType(type):
             _dict = base._meta.user_set
 
             for k, v in _dict.items():
-                if name in ("Coupling",) and k == "parameter":
-                    # breakpoint()
-                    log.debug("processing parameter on coupling")
                 if k in base._meta.inherited_items:
                     log.debug("should this be injected? %s=%s", k, v)
                     breakpoint()
                 # inherit fields from base -- bound in __new__
                 if isinstance(v, Field):
-                    cls.inherit_field(v, cls_dict)
+                    if k in cls_dict:
+                        if (
+                            (cls_dict[k].__class__ is v.__class__) and
+                            (tuple(cls_dict[k]._init_kwargs.values()) ==
+                             tuple(v._init_kwargs.values()))
+                        ):
+                            pass # compatible field inheritance
+                        else:
+                            raise ValueError(
+                                f"inheriting incompatibility {base}.{k} = {v} to {name}"
+                            )
+                    else:
+                        cls.inherit_field(v, cls_dict)
                     field_from_inherited[v] = cls_dict[v._name]
                     if v._elements:
                         if not isinstance(v, FreeField):
@@ -401,40 +410,63 @@ class BaseModelType(type):
                 # a BaseModelType would find a template/model attribute.
                 # Submodels will get assigned like this, but Model should declare that
                 # what about a Model(Template) that is being declared in the class boy?
-
-                elif isinstance(v, BaseElement):
-                    # should only be used for placeholder and placeholder-adjacent
-                    if v.field_type in field_from_inherited:
-                        new_elem = v.copy_to_field(field_from_inherited[v.field_type])
+                else:
+                    if k in cls_dict:
+                        if cls_dict[k] is v:
+                            # only ensure that this is marked as inherited, don't need
+                            # to re-copy
+                            if k not in meta.inherited_items:
+                                meta.inherited_items[k] = v
+                            elif meta.inherited_items[k] is not v:
+                                # should not get here, inheritance tracking broke
+                                raise ValueError(
+                                    f"an inheritance bug, {base}.{k} = {v} to {name}"
+                                )
+                            continue
+                        else:
+                            raise ValueError(
+                                f"an inheritance incompatibility "
+                                f"{base}.{k} = {v} does not match "
+                                f"{name}.{k} = {cls_dict[k]}"
+                            )
+                    else:
                         log.debug(
-                            "Element %s=%s copied from %s to %s",
+                            f"Independent element/symbol being inherited from {base}.{k} = {v} to {name}"
+                        )
+
+                    if isinstance(v, BaseElement):
+                        # should only be used for placeholder and placeholder-adjacent
+                        if v.field_type in field_from_inherited:
+                            new_elem = v.copy_to_field(field_from_inherited[v.field_type])
+                            log.debug(
+                                "Element %s=%s copied from %s to %s",
+                                k,
+                                v,
+                                meta.template,
+                                name,
+                            )
+                            cls_dict[k] = new_elem.backend_repr
+                            continue
+
+                        log.debug(
+                            "Element not inheriting %s=%s from %s to %s",
                             k,
                             v,
                             meta.template,
                             name,
                         )
-                        cls_dict[k] = new_elem.backend_repr
-                        continue
-
-                    log.debug(
-                        "Element not inheriting %s=%s from %s to %s",
-                        k,
-                        v,
-                        meta.template,
-                        name,
-                    )
-                    cls_dict[k] = v
-                elif isinstance(v, backend.symbol_class):
-                    # TODO: check what hits this. Previously, time dummy variable. But I
-                    # think that might be captured by placeholders now?
-                    log.debug(
-                        "Element inheriting %s=%s from %s to %s",
-                        k,
-                        v,
-                        meta.template,
-                        name,
-                    )
-                    cls_dict[k] = v
+                        cls_dict[k] = v
+                    elif isinstance(v, backend.symbol_class):
+                        # TODO: check what hits this. Previously, time dummy variable. But I
+                        # think that might be captured by placeholders now?
+                        log.debug(
+                            "Element inheriting %s=%s from %s to %s",
+                            k,
+                            v,
+                            meta.template,
+                            name,
+                        )
+                        cls_dict[k] = v
 
                 if k in cls_dict:
                     meta.inherited_items[k] = cls_dict[k]
@@ -786,6 +818,7 @@ class ModelTemplateType(BaseModelType):
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
         pass_super = True
+
         if attr_name == "placeholder":
             new_cls.placeholder = attr_val
             pass_super = False
@@ -815,10 +848,16 @@ class ModelTemplateType(BaseModelType):
             )
             return user_model
 
+
         if cls.creating_base_class_for_inheritance(model_name):
             immediate_return = True
         else:
             immediate_return = False
+
+        if as_template:
+            for k, v in attrs.meta.inherited_items.items():
+                attrs.meta.user_set[k] = v
+            attrs.meta.inherited_items = {}
 
         new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
 
@@ -829,6 +868,13 @@ class ModelTemplateType(BaseModelType):
             new_cls.user_model_metaclass = model_metaclass
             model_metaclass.baseclass_for_inheritance = new_cls
             log.debug("prcessing for model metaclass asssigned, new")
+
+        if as_template:
+            setattr(
+                implementations,
+                new_cls.__name__,
+                getattr(implementations, new_cls.__mro__[1].__name__)
+            )
 
         return new_cls
 
@@ -1044,9 +1090,6 @@ class ModelType(BaseModelType):
         how to do an embedded model placeholder? use a deferred system to define? would
         user models need to substitue, or would same basic mechanism work?
         """
-        if new_cls._meta.model_name == "MyScenario":
-            # breakpoint()
-            log.debug("why isn't this going to parent")
         # process placeholders
         # TODO -- if default = None, keep it as a dummy variable
         placeholder_assignment_dict = {}
