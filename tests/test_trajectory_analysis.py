@@ -149,7 +149,7 @@ def test_time_switched():
         action[u] = 1.0
 
     class Switch(DblInt.Event):
-        at_time = (t1,)
+        at_time = t1
         update[mode] = 1
         # TODO should it be possible to add a state here?
         # pos_at_switch = state()
@@ -160,7 +160,7 @@ def test_time_switched():
         action[u] = -1.0
 
     class Terminate(DblInt.Event):
-        at_time = (t2 + t1,)
+        at_time = t2 + t1
         terminate = True
 
     class Transfer(DblInt.TrajectoryAnalysis):

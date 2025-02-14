@@ -35,7 +35,7 @@ class Accel(DblInt.Mode):
 
 class Switch1(DblInt.Event):
     #function = t - t1
-    at_time = t1,
+    at_time = t1
     update[mode] = 1.
 
     update[pos_at_switch] = x[0]
@@ -48,7 +48,7 @@ class Switch2(DblInt.Event):
     #function = t - t2 - t1
     #mode == 2.
 
-    at_time = t2 + t1,
+    at_time = t2 + t1
     #update[mode] = 2.
     terminate = True
 

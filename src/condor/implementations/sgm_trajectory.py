@@ -158,6 +158,12 @@ class TrajectoryAnalysis:
                 e_expr = event.function
             else:
                 at_time = event.at_time
+                if hasattr(at_time, "__len__"):
+                    if len(at_time) in [2,3]:
+                        at_time = slice(*tuple(at_time))
+                    else:
+                        at_time = at_time[0]
+
                 if isinstance(at_time, slice):
                     if at_time.step is None:
                         raise ValueError
@@ -213,10 +219,10 @@ class TrajectoryAnalysis:
                         )
                     )
                 else:
-                    if isinstance(at_time[0], co.BaseElement):
-                        at_time0 = at_time[0].backend_repr
+                    if isinstance(at_time, co.BaseElement):
+                        at_time0 = at_time.backend_repr
                     else:
-                        at_time0 = at_time[0]
+                        at_time0 = at_time
                     e_expr = at_time0 - model.t
                     at_time_slices.append(
                         sgm.NextTimeFromSlice(
