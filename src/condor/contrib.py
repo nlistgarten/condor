@@ -7,7 +7,6 @@ import casadi
 import ndsplines
 import numpy as np
 
-from condor.backends.casadi.utils import flatten
 from condor.backends.default import backend
 from condor.fields import (
     AssignedField,
@@ -200,16 +199,14 @@ class OptimizationProblemType(ModelType):
             if re_append_elem:
                 new_cls.constraint._elements.append(elem)
 
-        # TODO: dataclass hasn't been created yet, any reason for that? yes, in general
-        # process placeholders might be changing the field. so this processing should be
-        # done elsewhere... persistent callable from field should happen elsewhere.
 
-        # p = new_cls.parameter.flatten()
-        # x = new_cls.variable.flatten()
-        # g = new_cls.constraint.flatten()
-        p = casadi.vertcat(*flatten(new_cls.parameter))
-        x = casadi.vertcat(*flatten(new_cls.variable))
-        g = casadi.vertcat(*flatten(new_cls.constraint))
+    @classmethod
+    def bind_model_fields(cls, new_cls, attrs):
+        super().bind_model_fields(new_cls, attrs)
+
+        p = new_cls.parameter.flatten()
+        x = new_cls.variable.flatten()
+        g = new_cls.constraint.flatten()
         f = getattr(new_cls, "objective", 0.0)
 
         new_cls._meta.objective_func = casadi.Function(
@@ -294,8 +291,8 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
         self.variable = cls.variable._dataclass(**variables)
 
         args = [
-            casadi.vertcat(*flatten(self.variable.asdict().values())),
-            casadi.vertcat(*flatten(self.parameter.asdict().values())),
+            self.variable.flatten(),
+            self.parameter.flatten(),
         ]
         constraints = cls._meta.constraint_func(*args)
         self.bind_field(cls.constraint.wrap(constraints))

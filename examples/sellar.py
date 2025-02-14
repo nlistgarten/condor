@@ -25,19 +25,8 @@ class Sellar(co.OptimizationProblem):
     constraint(24. > y2)
 
     class Options:
-        pass
-        __implementation__ = co.implementations.ScipySLSQP
-
-        #method = (
-        #    co.implementations.OptimizationProblem.Method.scipy_slsqp
-        #    #co.implementations.OptimizationProblem.Method.scipy_trust_constr
-        #)
-        #disp = True
-        #verbose=3
-        #iprint = 2
-#        tol = 1E-8
-#        maxiter = 0
-
+        __implementation__ = co.implementations.OptimizationProblem
+        print_level = 0
 
         @staticmethod
         def iter_callback(
@@ -54,8 +43,6 @@ class Sellar(co.OptimizationProblem):
 
 
 Sellar.set_initial(x=[5,2,1])
-Sellar.Options.__implementation__ = co.implementations.OptimizationProblem
-Sellar.Options.print_level = 0
 import numpy as np
 for idx in range(2):
     sellar = Sellar()

@@ -1,11 +1,8 @@
 from .utils import options_to_kwargs
 from enum import Enum, auto
-import casadi
 import condor as co
 
 from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
-from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
-from condor.backends.casadi.utils import (flatten, wrap)
 from condor.solvers.casadi_warmstart_wrapper import (
     CasadiIterationCallback, CasadiNlpsolWarmstart, CasadiRootfinderWarmstart
 )
@@ -14,6 +11,9 @@ import numpy as np
 
 from condor.backend import (
     symbol_class, callables_to_operator, expression_to_operator,
+)
+from condor.backend.operators import (
+    concat, jacobian, unstack,
 )
 
 class InitializerMixin:
@@ -122,11 +122,6 @@ class AlgebraicSystem(InitializerMixin):
                 if not isinstance(v, symbol_class):
                     model_var.initializer = v
 
-    def set_initial(self, *args, **kwargs):
-        self.x0 = self.callback.x0
-        super().set_initial(*args, **kwargs)
-        self.callback.x0 = self.x0
-
 
 class OptimizationProblem(InitializerMixin):
     # take an OptimizationProblem model with or without iteration spec and other Options
@@ -199,9 +194,7 @@ class OptimizationProblem(InitializerMixin):
             initializer_args = [self.x0]
         if not self.has_p or not isinstance(p, symbol_class):
             self.x0 = self.initializer_func(*initializer_args)
-            if not isinstance(self.x0, casadi.DM):
-                self.x0 = casadi.vertcat(*self.x0)
-            self.x0 = self.x0.toarray().reshape(-1)
+            self.x0 = np.array(self.x0).reshape(-1)
 
     def __call__(self, model_instance):
         self.load_initializer(model_instance)
@@ -359,21 +352,6 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
 
 class ScipyMinimizeBase(OptimizationProblem):
-    def set_initial(self, *args, **kwargs):
-        if args:
-            # assume it's all initialized values, so flatten and assign
-            self.x0 = flatten(args)
-        else:
-            count_accumulator = 0
-            for field in self.parsed_initialized_fields:
-                size_cum_sum = np.cumsum([count_accumulator] + field.list_of("size"))
-                for start_idx, end_idx, name in zip(
-                    size_cum_sum, size_cum_sum[1:], field.list_of("name")
-                ):
-                    if name in kwargs:
-                        self.x0[start_idx:end_idx] = flatten(kwargs[name])
-                count_accumulator += field._count
-
     def construct(
         self,
         model,
@@ -381,12 +359,12 @@ class ScipyMinimizeBase(OptimizationProblem):
     ):
         super().construct(model, **options)
         self.f_func = self.objective_func
-        self.f_jac_func = casadi.Function(
-            f"{model.__name__}_objective_jac",
+        self.f_jac_func = expression_to_operator(
             [self.x, self.p],
-            [casadi.jacobian(self.f, self.x)],
+            jacobian(self.f, self.x),
+            f"{model.__name__}_objective_jac",
         )
-        self.g_split = casadi.vertsplit(self.g)
+        self.g_split = unstack(self.g)
         initializer_args = [self.x]
         if self.has_p:
             initializer_args += [self.p]
@@ -394,10 +372,10 @@ class ScipyMinimizeBase(OptimizationProblem):
         self.initial_at_construction = model.variable.flatten("initializer")
 
         # setattr(self, f"{field._name}_initializer_func",
-        self.initializer_func = casadi.Function(
-            f"{model.__class__.__name__}_var_initializer",
+        self.initializer_func = expression_to_operator(
             initializer_args,
             self.initial_at_construction,
+            f"{model.__class__.__name__}_var_initializer",
         )
 
         self.x0 = self.initial_at_construction.copy()
@@ -465,16 +443,16 @@ class ScipySLSQP(ScipyMinimizeBase):
                     self.inequality_con_exprs.append(ubg - g)
 
         if self.equality_con_exprs:
-            self.equality_con_expr = casadi.vertcat(*self.equality_con_exprs)
-            self.eq_g_func = casadi.Function(
+            self.equality_con_expr = concat(self.equality_con_exprs)
+            self.eq_g_func = expression_to_operator(
+                [self.x, self.p],
+                self.equality_con_expr,
                 f"{model.__name__}_equality_constraint",
-                [self.x, self.p],
-                [self.equality_con_expr],
             )
-            self.eq_g_jac_func = casadi.Function(
-                f"{model.__name__}_equality_constraint_jac",
+            self.eq_g_jac_func = expression_to_operator(
                 [self.x, self.p],
-                [casadi.jacobian(self.equality_con_expr, self.x)],
+                jacobian(self.equality_con_expr, self.x),
+                f"{model.__name__}_equality_constraint_jac",
             )
             self.con.append(
                 dict(
@@ -485,18 +463,18 @@ class ScipySLSQP(ScipyMinimizeBase):
             )
 
         if self.inequality_con_exprs:
-            self.inequality_con_expr = casadi.vertcat(
-                *self.inequality_con_exprs
+            self.inequality_con_expr = concat(
+                self.inequality_con_exprs
             )
-            self.ineq_g_func = casadi.Function(
+            self.ineq_g_func = expression_to_operator(
+                [self.x, self.p],
+                self.inequality_con_expr,
                 f"{model.__name__}_inequality_constraint",
-                [self.x, self.p],
-                [self.inequality_con_expr],
             )
-            self.ineq_g_jac_func = casadi.Function(
-                f"{model.__name__}_inequality_constraint_jac",
+            self.ineq_g_jac_func = expression_to_operator(
                 [self.x, self.p],
-                [casadi.jacobian(self.inequality_con_expr, self.x)],
+                jacobian(self.inequality_con_expr, self.x),
+                f"{model.__name__}_inequality_constraint_jac",
             )
             self.con.append(
                 dict(
@@ -531,13 +509,14 @@ class ScipyTrustConstr(ScipyMinimizeBase):
     ):
         super().construct(model, **options)
         self.keep_feasible = keep_feasible
-        g_jacs = [casadi.jacobian(g, self.x) for g in g_split]
+        g_split=self.g_split
+        g_jacs = [jacobian(g, self.x) for g in self.g_split]
 
         scipy_constraints = []
 
         nonlinear_flags = [
-            casadi.depends_on(g_jac, self.x)
-            or casadi.depends_on(g_expr, self.p)
+            not jacobian(g_jac, self.x).nnz()
+            or not jacobian(g_expr, self.p).nnz()
             for g_jac, g_expr in zip(g_jacs, g_split)
             # could ignore dependence on parameters, but to be consistent with
             # ipopt specification require parameters within function not in
@@ -558,16 +537,16 @@ class ScipyTrustConstr(ScipyMinimizeBase):
                 if is_nonlinear
             ]
 
-            self.g_func = casadi.Function(
-                f"{model.__name__}_nonlinear_constraint",
+            self.g_func = expression_to_operator(
                 [self.x, self.p],
-                [casadi.vertcat(*nonlinear_g_fun_exprs)],
+                concat(nonlinear_g_fun_exprs),
+                f"{model.__name__}_nonlinear_constraint",
             )
 
-            self.g_jac_func = casadi.Function(
-                f"{model.__name__}_nonlinear_constraint_jac",
+            self.g_jac_func = expression_to_operator(
                 [self.x, self.p],
-                [casadi.vertcat(*nonlinear_g_jac_exprs)],
+                concat(nonlinear_g_jac_exprs),
+                f"{model.__name__}_nonlinear_constraint_jac",
             )
 
             self.nonlinear_ub = np.array(
@@ -594,10 +573,10 @@ class ScipyTrustConstr(ScipyMinimizeBase):
         ]
         self.num_linear_g = len(linear_A_exprs)
         if self.num_linear_g:
-            self.linear_jac_func = casadi.Function(
-                f"{model.__name__}_A",
+            self.linear_jac_func = expression_to_operator(
                 [self.p],
-                [casadi.vertcat(*linear_A_exprs)],
+                concat(linear_A_exprs),
+                f"{model.__name__}_A",
             )
 
             self.linear_ub = np.array(

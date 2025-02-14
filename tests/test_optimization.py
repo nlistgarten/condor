@@ -1,6 +1,6 @@
 import condor as co
 import pytest
-from casadi import exp
+from condor.backend.operators import exp
 
 # TODO test from_values
 
@@ -10,6 +10,7 @@ from casadi import exp
     [
         co.implementations.OptimizationProblem,
         co.implementations.ScipySLSQP,
+        co.implementations.ScipyTrustConstr,
     ],
 )
 def test_sellar(method):
