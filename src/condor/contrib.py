@@ -7,7 +7,11 @@ import casadi
 import ndsplines
 import numpy as np
 
-from condor.backends.default import backend
+from condor.backend import (
+    symbol_class, expression_to_operator,
+)
+
+from condor.backend.operators import (recurse_if_else, substitute, concat)
 from condor.fields import (
     AssignedField,
     BoundedAssignmentField,
@@ -181,7 +185,7 @@ class OptimizationProblemType(ModelType):
 
             original_backend_repr = elem.backend_repr
             if real_lower_bound:
-                if isinstance(elem.lower_bound, backend.symbol_class):
+                if isinstance(elem.lower_bound, symbol_class):
                     if not elem.lower_bound.is_constant():
                         # new_elem = elem.copy_to_field(new_cls.constraint)
                         new_elem = new_cls.constraint(
@@ -189,7 +193,7 @@ class OptimizationProblemType(ModelType):
                         )
                         re_append_elem = False
             if real_upper_bound:
-                if isinstance(elem.upper_bound, backend.symbol_class):
+                if isinstance(elem.upper_bound, symbol_class):
                     if not elem.upper_bound.is_constant():
                         # new_elem = elem.copy_to_field(new_cls.constraint)
                         new_elem = new_cls.constraint(
@@ -210,15 +214,15 @@ class OptimizationProblemType(ModelType):
         g = new_cls.constraint.flatten()
         f = getattr(new_cls, "objective", 0.0)
 
-        new_cls._meta.objective_func = casadi.Function(
+        new_cls._meta.objective_func = expression_to_operator(
+            [x, p],
+            f,
             f"{new_cls.__name__}_objective",
-            [x, p],
-            [f],
         )
-        new_cls._meta.constraint_func = casadi.Function(
-            f"{new_cls.__name__}_constraint",
+        new_cls._meta.constraint_func = expression_to_operator(
             [x, p],
-            [g],
+            g,
+            f"{new_cls.__name__}_constraint",
         )
 
 
@@ -561,6 +565,42 @@ class TrajectoryAnalysisType(SubmodelType):
     @classmethod
     def bind_model_fields(cls, new_cls, attrs):
         super().bind_model_fields(new_cls, attrs)
+        p = new_cls.parameter.flatten()
+        x = new_cls.state.flatten()
+
+
+        ode_model = new_cls._meta.primary
+        model = new_cls
+        control_subs_pairs = {
+            control.backend_repr: [(control.default,)] for control in ode_model.modal
+        }
+        for mode in model._meta.modes:
+            for act in mode.action:
+                control_subs_pairs[act.match.backend_repr].append(
+                    (mode.condition, act.backend_repr)
+                )
+        control_sub_expression = {}
+        for k, v in control_subs_pairs.items():
+            control_sub_expression[k] = substitute(
+                recurse_if_else(v), control_sub_expression
+            )
+
+        new_cls._meta.state_equation_function = expression_to_operator(
+            [new_cls.t, x, p],
+            substitute(new_cls.dot.flatten(), control_sub_expression),
+            f"{new_cls.__name__}_state_equation"
+        )
+        new_cls._meta.output_equation_function = expression_to_operator(
+            [new_cls.t, x, p],
+            substitute(new_cls.dynamic_output.flatten(), control_sub_expression),
+            f"{new_cls.__name__}_output_equation"
+        )
+        new_cls._meta.modal_eval = expression_to_operator(
+            [new_cls.t, x, p],
+            concat(control_sub_expression.values()),
+            f"{new_cls.__name__}_modal_evaluation"
+        )
+
 
 
 class TrajectoryAnalysis(
@@ -595,7 +635,28 @@ class TrajectoryAnalysis(
         """Compute the state rates for the ODESystems that were bound (at the time of
         construction).
         """
-        self = ODESystem.__new__(ODESystem)
+        self = cls._meta.primary.__new__(cls._meta.primary)
+        xx, pp = cls.function_call_to_fields(
+            [cls.state, cls.parameter],
+            *args, **kwargs
+        )
+        x = xx.flatten()
+        p = pp.flatten()
+
+        self.input_kwargs = dict(t=t, **xx.asdict(), **pp.asdict())
+
+        dot = cls._meta.state_equation_function(t, x, p)
+        yy = cls._meta.output_equation_function(t, x, p)
+        modals = cls._meta.modal_eval(t, x, p)
+
+        self.bind_field(xx)
+        self.bind_field(pp)
+        self.bind_field(cls.dot.wrap(dot))
+        self.bind_field(cls.dynamic_output.wrap(yy))
+        self.bind_field(cls.modal.wrap(modals))
+        self.bind_embedded_models
+        return self
+
         # bind paramaeters, state, call implementation functions (dot, dynamic output)
 
         # apply to dynamic output, as well? but needs the embedded models? hmm...
