@@ -12,13 +12,9 @@ class CasadiWarmstartWrapperBase:
     """
     primary_function: callable # callable f(x, p). nlpsol's objective or rootfinder's residual
 
-
-
     n_variable: int
     n_parameter: int
 
-    lbx: list # lower bounds for variable
-    ubx: list # upper bounds for variable
     init_var: list # initial guess function of p,  x0(p)
     warm_start: list
     method_string: str
@@ -48,28 +44,94 @@ class CasadiWarmstartWrapperBase:
     # x,p input and residual,explicit outptus.
 
     # and accctually, casadinlpsolwarmstart should not directly be a
-    # CasadiFunctionCallback, it should be generic. IF making a warm-start casadi solver
-    # wrapper that is independent of condor (e.g., could be spun out) Process needs to
-    # be:
-    # 0. iterative implementation creates necessary callables for primary/secondary
-    # functions AND their derivatives to pass to the condor-independent solver.
-    # 1. Casadi solver wrapper constructs correct nlpsol/rootfinder, most likely by
-    # creating CasadiFunctionCallback for functions + derivatives (again, pending API
-    # for general diff geom/multi-V calculus), including derivatives of warm-started
-    # iterative solver
-    # 2. I guess implementation then creates backend.callable_to_operator from step 1?
-    # 3. call and bind?
-
-
+    # CasadiFunctionCallback, it should be generic
 
     def __post_init__(self):
         #super().__post_init__()
         #if self.update_x0 is None:
         #    self.update_x0 = lambda x, p: self.init_x0(p)
-        self.any_warm_start = np.any(self.warm_start)
-        self.all_warm_start = np.all(self.warm_start)
+        self.update_warmstart(self.warm_start)
         if self.options is None:
             self.options = {}
+
+        self.last_x = None
+        self.last_p = None
+
+    def update_warmstart(self, warm_start):
+        self.warm_start = warm_start
+        self.any_warm_start = np.any(self.warm_start)
+        self.all_warm_start = np.all(self.warm_start)
+
+    def update_guess(self, run_p):
+        x0 = self.init_var(run_p)
+        if self.any_warm_start and self.last_x is not None:
+            for idx, warm_start in enumerate(self.warm_start):
+                if warm_start:
+                    x0[idx] = self.last_x[idx]
+        return x0
+
+
+    def construct_jacobian_and_callback(self):
+        # put in try block because if exact_hessian is False, won't be able to compute
+        # jacobian
+        try:
+            self.placeholder_jacobian = self.placeholder_func_xp.jacobian()
+            #self.placeholder_jacobian = casadi.Function(
+            #    f"{self.model_name}_func_xp__jac_p",
+            #    [x,p],
+            #    [casadi.jacobian(self.sym_solved_inp_x0["x"], p)],
+            #)
+        except RuntimeError as e:
+            self.placeholder_jacobian = None
+
+        # stuff attributes expected by CasadiFunctionCallback, including jacobian
+        # relationship
+        self.wrapper_func = self.function
+        self.jacobian_of = None
+        self.opts = {}
+
+        if self.placeholder_jacobian is not None:
+            try:
+                self.placeholder_hessian = self.placeholder_jacobian.jacobian()
+            except RuntimeError as e:
+                self.placeholder_hessian = None
+
+            wrap_funcs = [self.eval_jacobian]
+            if self.placeholder_hessian is not None:
+                wrap_funcs += [self.eval_hessian]
+
+
+            self.jacobian = callables_to_operator(
+                wrapper_funcs = wrap_funcs,
+                model_name = self.model_name,
+                jacobian_of = self,
+                opts=self.opts,
+            )
+        else:
+            self.jacobian = None
+
+        casadi.Callback.__init__(self)
+        self.construct()
+
+    def eval_jacobian(self, run_p, ):
+        if np.all(self.last_p == run_p):
+            # defensive check that last solution was right, then just use last_x
+            jac_x, jac_p = self.placeholder_jacobian(self.last_x, run_p, [])
+        else:
+            # if not, try to update guess?
+            jac_x, jac_p = self.placeholder_jacobian(self.update_guess(run_p), run_p, [])
+        return jac_p
+
+    def eval_hessian(self, run_p, ):
+        if np.all(self.last_p == run_p):
+            # defensive check that last solution was right, then just use last_x
+            *_jac_nz, jac_pp, jac_px = self.placeholder_hessian(self.last_x, run_p, [], [], [])
+        else:
+            # if not, try to update guess?
+            *_jac_nz, jac_pp, jac_px = self.placeholder_hessian(
+                self.update_guess(run_p), run_p, [], [], []
+            )
+        return jac_pp, jac_px
 
 
 @dataclass
@@ -77,6 +139,8 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
     """
     nlpsol
     """
+    lbx: list = None # lower bounds for vari
+    ubx: list = None # upper bounds for variable
 
     constraint_function: ... = None # optional constraint function g(x, p)
     lbg: ... = None
@@ -88,12 +152,12 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
 
     def __post_init__(self):
         super().__post_init__()
-        self.objective = self.primary_function
+        self.objective_function = self.primary_function
 
         self.output_symbol = self.x = x = symbol_class.sym(f"{self.model_name}_variable", (self.n_variable,1))
         self.input_symbol = self.p = p = symbol_class.sym(f"{self.model_name}_parameter", (self.n_parameter,1))
 
-        f = self.primary_function(x,p)
+        f = self.objective_function(x,p)
         g = self.constraint_function(x,p)
 
         self.nlp_args = dict(f=f, x=x, g=g)
@@ -102,8 +166,7 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
 
         self.lam_g0 = None
         self.lam_x0 = None
-        self.last_x = None
-        self.last_p = None
+
         # self.variable_at_construction.copy()
         self.apply_lamda_initial = self.options.get(
             "ipopt", {}
@@ -123,7 +186,7 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
         # create corresponding function (so CasadiFunctionCallback can get sparsity,
         # etc.
 
-        self.sym_opt_out_const_x0 = self.optimizer(
+        self.sym_solved_const_x0 = self.optimizer(
             x0=sym_x0,
             p=p,
             lbx=self.lbx,
@@ -135,11 +198,11 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
         self.placeholder_func = casadi.Function(
             f"{self.model_name}_func",
             [p],
-            [self.sym_opt_out_const_x0["x"]],
+            [self.sym_solved_const_x0["x"]],
         )
 
         # create a symbolic representation of optimizaiton result that has a provided x0
-        self.sym_opt_out_inp_x0 = self.optimizer(
+        self.sym_solved_inp_x0 = self.optimizer(
             x0=x,
             p=p,
             lbx=self.lbx,
@@ -153,57 +216,10 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
         self.placeholder_func_xp = casadi.Function(
             f"{self.model_name}_func_xp",
             [x,p],
-            [self.sym_opt_out_inp_x0["x"]],
+            [self.sym_solved_inp_x0["x"]],
         )
 
-        # put in try block because if exact_hessian is False, won't be able to compute
-        # jacobian
-        try:
-            self.placeholder_jacobian = self.placeholder_func_xp.jacobian()
-            #self.placeholder_jacobian = casadi.Function(
-            #    f"{self.model_name}_func_xp__jac_p",
-            #    [x,p],
-            #    [casadi.jacobian(self.sym_opt_out_inp_x0["x"], p)],
-            #)
-        except RuntimeError as e:
-            self.placeholder_jacobian = None
-
-        # stuff attributes expected by CasadiFunctionCallback, including jacobian
-        # relationship
-        self.wrapper_func = self.function
-        self.jacobian_of = None
-        self.opts = {}
-
-
-        casadi.Callback.__init__(self)
-        if self.placeholder_jacobian is not None:
-            self.jacobian = callables_to_operator(
-                wrapper_funcs = [self.eval_jacobian],
-                model_name = self.model_name,
-                jacobian_of = self,
-                opts=self.opts,
-            )
-        else:
-            self.jacobian = None
-
-        self.construct()
-
-    def eval_jacobian(self, run_p, ):
-        if run_p == self.last_p:
-            # defensive check that last solution was right, then just use last_x
-            jac_x, jac_p = self.placeholder_jacobian(self.last_x, run_p, [])
-        else:
-            # if not, try to update guess?
-            jac_x, jac_p = self.placeholder_jacobian(self.update_guess(run_p), run_p, [])
-        return jac_p
-
-    def update_guess(self, run_p):
-        x0 = self.init_var(run_p)
-        if self.any_warm_start and self.last_x is not None:
-            for idx, warm_start in enumerate(self.warm_start):
-                if warm_start:
-                    x0[idx] = self.last_x[idx]
-        return x0
+        self.construct_jacobian_and_callback()
 
     def function(self, run_p):
         run_kwargs = dict(
@@ -233,11 +249,11 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
 
         if np.any(run_kwargs["ubx"] <= run_kwargs["lbx"]):
             breakpoint()
-        if self.last_p == run_p:
-            print("repeat call", run_p)
+        if np.all(self.last_p == run_p):
+            #print("repeat call", run_p)
             out = self.out
         else:
-            print("new call running with", run_p)
+            #print("new call running with", run_p)
             out = self.out = self.optimizer(**run_kwargs)
             self._stats = self.optimizer.stats()
 
@@ -251,11 +267,69 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
         return out["x"]
 
 
+@dataclass
+class CasadiRootfinderWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
+    output_function: callable = None
 
-class CasadiRootfinderWarmstart(CasadiWarmstartWrapperBase):
     def __post_init__(self):
         super().__post_init__()
-        self.residual = self.primary_function
+        self.residual_function = self.primary_function
+
+        self.output_symbol = self.x = x = symbol_class.sym(f"{self.model_name}_variable", (self.n_variable,1))
+        self.input_symbol = self.p = p = symbol_class.sym(f"{self.model_name}_parameter", (self.n_parameter,1))
+
+        g0 = self.residual_function(x, p)
+        g1 = self.output_function(x, p)
+
+        name = self.model_name
+
+        self.rootfinder_f_arg = casadi.Function(f"{name}_rootfinder_f_arg", [x, p], [g0, g1])
+        self.rootfinder = casadi.rootfinder(
+            f"{name}_rootfinder",
+            "newton",
+            self.rootfinder_f_arg,
+            self.options,
+        )
+
+        if not self.init_var.jacobian()(self.p, []).nnz():
+            sym_x0 = self.init_var(np.zeros(self.p.shape))
+
+        self.sym_solved_const_x0 = [casadi.vertcat(*self.rootfinder(sym_x0, self.p))]
+        #self.sym_solved_const_x0 = self.rootfinder(sym_x0, self.p)
+        self.placeholder_func = casadi.Function(
+            f"{name}_func",
+            [p],
+            self.sym_solved_const_x0,
+        )
+
+
+        self.sym_solved_inp_x0 = [casadi.vertcat(*self.rootfinder(self.x, self.p))]
+        #self.sym_solved_inp_x0 = self.rootfinder(self.x, self.p)
+        self.placeholder_func_xp = casadi.Function(
+            f"{name}_func",
+            [x, p],
+            self.sym_solved_const_x0,
+        )
+
+        self.total_iters = 0
+        self.construct_jacobian_and_callback()
+
+    def function(self, run_p):
+        x0 = self.update_guess(run_p)
+        if np.all(self.last_p == run_p):
+            #print("repeat call", run_p)
+            out = self.out
+        else:
+            #print("new call running with", run_p)
+            out = self.out = self.rootfinder(x0, run_p)
+            self._stats = self.rootfinder.stats()
+            self.total_iters += self._stats['iter_count']
+        self.last_p = run_p
+        self.last_x = out[0]
+        self.last_r = self.residual_function(self.last_x, self.last_p)
+        self.last_o = out[1]
+        return casadi.vertcat(*out)
+
 
 
 

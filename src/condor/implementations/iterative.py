@@ -7,7 +7,7 @@ from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
 from condor.backends.casadi.algebraic_solver import SolverWithWarmStart
 from condor.backends.casadi.utils import (flatten, wrap)
 from condor.solvers.casadi_warmstart_wrapper import (
-    CasadiIterationCallback, CasadiNlpsolWarmstart
+    CasadiIterationCallback, CasadiNlpsolWarmstart, CasadiRootfinderWarmstart
 )
 import numpy as np
 
@@ -16,86 +16,33 @@ from condor.backend import (
     symbol_class, callables_to_operator, expression_to_operator,
 )
 
-
-
 class InitializerMixin:
-    def __init__(self, model):
-        self.model = model
-
-    def set_initial(self, *args, **kwargs):
-        if args:
-            # assume it's all initialized values, so flatten and assign
-            self.x0 = flatten(args)
-        else:
-            count_accumulator = 0
-            for field in self.parsed_initialized_fields:
-                size_cum_sum = np.cumsum([count_accumulator] + field.list_of("size"))
-                for start_idx, end_idx, name in zip(
-                    size_cum_sum, size_cum_sum[1:], field.list_of("name")
-                ):
-                    if name in kwargs:
-                        self.x0[start_idx:end_idx] = flatten(kwargs[name])
-                count_accumulator += field._count
-
-    def parse_initializers(self, fields, initializer_args):
-        # currently assuming all initializer fields get initialized together
-        # TODO: flatten -- might be done?
-        x0_at_construction = []
-        initializer_exprs = []
-        # TODO: shoud broadcasting be done elsewhere? with field? bounds needs it too
-        # bounds are definitely done in FreeField, I believe this reshape/broadcast_to
-        # is complete (just for initializer attribute on initialized field) -- I guess
-        # it might be drier in post_init of initialized field?
-
-        if isinstance(fields, co.Field):
-            fields = [fields]
-
-        for field in fields:
-            defined_initializers = field.list_of("initializer")
-            for solver_var in field:
-                if isinstance(solver_var.initializer, symbol_class):
-                    x0_at_construction.extend(np.zeros(solver_var.size))
-                    initializer_exprs.extend(
-                        casadi.vertsplit(
-                            solver_var.initializer.reshape((solver_var.size, 1))
-                        )
-                    )
-                else:
-                    initializer_val = np.array(solver_var.initializer)
-                    if initializer_val.size == solver_var.size:
-                        shaped_initial = initializer_val.reshape(-1)
-                    else:
-                        shaped_initial = np.broadcast_to(
-                            initializer_val, solver_var.shape
-                        ).reshape(-1)
-                    if np.array(solver_var.warm_start).any():
-                        x0_at_construction.extend(shaped_initial)
-                        initializer_exprs.extend(
-                            casadi.vertsplit(solver_var.backend_repr.reshape((-1, 1)))
-                        )
-                    else:
-                        x0_at_construction.append(shaped_initial)
-                        initializer_exprs.append(shaped_initial)
-
-        self.parsed_initialized_fields = fields
-
-        # setattr(self, f"{field._name}_at_construction", flatten(x0_at_construction))
-        self.initial_at_construction = flatten(x0_at_construction)
-        initializer_exprs = flatten(initializer_exprs)
-        # setattr(self, f"{field._name}_initializer_func",
-        self.initializer_func = casadi.Function(
-            f"{field._model_name}_{field._name}_initializer",
-            initializer_args,
-            initializer_exprs,
-        )
-
-
-class AlgebraicSystem(InitializerMixin):
     def __init__(self, model_instance):
         model = model_instance.__class__
         model_instance.options_dict=options_to_kwargs(model)
         self.construct(model, **model_instance.options_dict)
         self(model_instance)
+
+    def construct(self, model):
+        # could be shared between optimization and algebraic
+        self.warm_start = model.variable.flatten("warm_start")
+        self.initializer = model.variable.flatten("initializer")
+        self.initializer_func = expression_to_operator(
+            [self.p],
+            self.initializer,
+            f"{model.__name__}_initializer",
+        )
+
+
+    def write_initializer(self, model_instance):
+        for k, v in model_instance.variable.asdict().items():
+            model_var = getattr(self.model, k)
+            if np.array(model_var.warm_start).any() and not isinstance(
+                model_var.initializer, symbol_class
+            ) and not isinstance(v, symbol_class):
+                model_var.initializer = v
+
+class AlgebraicSystem(InitializerMixin):
 
     def construct(
         self,
@@ -121,30 +68,28 @@ class AlgebraicSystem(InitializerMixin):
         self.g1 = model.output.flatten()
         self.p = model.parameter.flatten()
 
+        self.residual_func = expression_to_operator(
+            [self.x, self.p], self.g0, f"{model.__name__}_output"
+        )
+
         self.output_func = expression_to_operator(
             [self.x, self.p], self.g1, f"{model.__name__}_output"
         )
 
         self.model = model
-        self.parse_initializers(
-            model.variable,
-            [self.x, self.p],
-        )
 
-        self.callback = SolverWithWarmStart(
-            model.__name__,
-            self.x,
-            self.p,
-            self.g0,
-            self.g1,
-            # use field dataclass to bind bounds?? then can flatten
-            flatten(model.variable.list_of("lower_bound")),
-            flatten(model.variable.list_of("upper_bound")),
-            # self.implicit_output_at_construction,
-            self.initial_at_construction,
-            rootfinder_options,
-            self.initializer_func,
-            max_iter=max_iter,
+        InitializerMixin.construct(self, model)
+
+        self.callback = CasadiRootfinderWarmstart(
+            primary_function = self.residual_func,
+            output_function = self.output_func,
+            n_variable = model.variable._count,
+            n_parameter = model.parameter._count,
+            init_var = self.initializer_func,
+            warm_start = self.warm_start,
+            method_string = "newton",
+            options = rootfinder_options,
+            model_name = model.__name__,
         )
 
     def __call__(self, model_instance):
@@ -154,17 +99,17 @@ class AlgebraicSystem(InitializerMixin):
             out[: self.model.variable._count]
         )
         model_instance.bind_field(self.var_out)
-        model_instance.bind_field(
-            self.model.output.wrap(
-                self.output_func(self.var_out.flatten(), self.call_args)
-            )
-        )
 
-        if hasattr(self.callback, "resid"):
+        self.out_out = self.model.output.wrap(
+            out[self.model.variable._count : ]
+        )
+        model_instance.bind_field(self.out_out)
+
+        if hasattr(self.callback, "last_r"):
             # TODO: verify this will never become stale
             # TODO: it seems a bit WET to wrap each field and then, eventually, bind
             # each field.
-            resid = self.callback.resid
+            resid = self.callback.last_r
             model_instance.bind_field(
                 self.model.residual.wrap(resid), symbols_to_instance=False
             )
@@ -204,13 +149,6 @@ class OptimizationProblem(InitializerMixin):
         if lam_x0 is not None:
             self.lam_x0 = lam_x0
 
-
-    def __init__(self, model_instance):
-        model = model_instance.__class__
-        model_instance.options_dict=options_to_kwargs(model)
-        self.construct(model, **model_instance.options_dict)
-        self(model_instance)
-
     default_options = {}
 
     def construct(
@@ -233,8 +171,7 @@ class OptimizationProblem(InitializerMixin):
         self.x = x = model.variable.flatten()
         self.g = g = model.constraint.flatten()
 
-        self.warm_start = model.variable.flatten("warm_start")
-        self.initializer = model.variable.flatten("initializer")
+        InitializerMixin.construct(self, model)
 
         self.objective_func = expression_to_operator(
             [self.x, self.p],
@@ -246,11 +183,6 @@ class OptimizationProblem(InitializerMixin):
             g,
             f"{model.__name__}_constraint",
         )
-        self.initializer_func = expression_to_operator(
-            [self.p],
-            self.initializer,
-            f"{model.__name__}_initializer",
-        )
 
 
         self.lbx = lbx = model.variable.flatten("lower_bound")
@@ -259,14 +191,12 @@ class OptimizationProblem(InitializerMixin):
         self.ubg = ubg = model.constraint.flatten("upper_bound")
 
 
-
-
-
     def load_initializer(self, model_instance):
-        initializer_args = [self.x0]
         if self.has_p:
             self.eval_p = p = model_instance.parameter.flatten()
-            initializer_args += [p]
+            initializer_args = [self.x0, p]
+        else:
+            initializer_args = [self.x0]
         if not self.has_p or not isinstance(p, symbol_class):
             self.x0 = self.initializer_func(*initializer_args)
             if not isinstance(self.x0, casadi.DM):
@@ -278,13 +208,6 @@ class OptimizationProblem(InitializerMixin):
         self.run_optimizer(model_instance)
         self.write_initializer(model_instance)
 
-    def write_initializer(self, model_instance):
-        for k, v in model_instance.variable.asdict().items():
-            model_var = getattr(self.model, k)
-            if np.array(model_var.warm_start).any() and not isinstance(
-                model_var.initializer, symbol_class
-            ) and not isinstance(v, symbol_class):
-                model_var.initializer = v
 
 class CasadiNlpsolImplementation(OptimizationProblem):
     class Method(Enum):
@@ -436,6 +359,21 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
 
 class ScipyMinimizeBase(OptimizationProblem):
+    def set_initial(self, *args, **kwargs):
+        if args:
+            # assume it's all initialized values, so flatten and assign
+            self.x0 = flatten(args)
+        else:
+            count_accumulator = 0
+            for field in self.parsed_initialized_fields:
+                size_cum_sum = np.cumsum([count_accumulator] + field.list_of("size"))
+                for start_idx, end_idx, name in zip(
+                    size_cum_sum, size_cum_sum[1:], field.list_of("name")
+                ):
+                    if name in kwargs:
+                        self.x0[start_idx:end_idx] = flatten(kwargs[name])
+                count_accumulator += field._count
+
     def construct(
         self,
         model,
@@ -452,7 +390,16 @@ class ScipyMinimizeBase(OptimizationProblem):
         initializer_args = [self.x]
         if self.has_p:
             initializer_args += [self.p]
-        self.parse_initializers(model.variable, initializer_args)
+
+        self.initial_at_construction = model.variable.flatten("initializer")
+
+        # setattr(self, f"{field._name}_initializer_func",
+        self.initializer_func = casadi.Function(
+            f"{model.__class__.__name__}_var_initializer",
+            initializer_args,
+            self.initial_at_construction,
+        )
+
         self.x0 = self.initial_at_construction.copy()
 
     def prepare_constraints(self, extra_args):
@@ -460,41 +407,42 @@ class ScipyMinimizeBase(OptimizationProblem):
 
     def run_optimizer(self, model_instance):
 
-            if self.has_p:
-                extra_args = (self.eval_p,)
-            else:
-                extra_args = ([],)
+        print(self.has_p)
+        if self.has_p:
+            extra_args = (self.eval_p,)
+        else:
+            extra_args = ([],)
 
-            scipy_constraints = self.prepare_constraints(extra_args)
+        scipy_constraints = self.prepare_constraints(extra_args)
 
-            if self.init_callback is not None:
-                self.init_callback(
-                    model_instance.parameter,
-                    {**self.options, "lbx": self.lbx, "ubx": self.ubx},
-                )
-
-            min_out = minimize(
-                lambda *args: self.f_func(*args).toarray().squeeze(),
-                self.x0,
-                jac=lambda *args: self.f_jac_func(*args).toarray().squeeze(),
-                method=self.method_string,
-                args=extra_args,
-                constraints=scipy_constraints,
-                bounds=np.vstack([self.lbx, self.ubx]).T,
-                # tol = 1E-9,
-                # options=dict(disp=True),
-                options=self.options,
-                callback=SciPyIterCallbackWrapper.create_or_none(
-                    self.model,
-                    model_instance.parameter,
-                    self.iter_callback
-                ),
+        if self.init_callback is not None:
+            self.init_callback(
+                model_instance.parameter,
+                {**self.options, "lbx": self.lbx, "ubx": self.ubx},
             )
 
-            model_instance.bind_field(self.model.variable.wrap(min_out.x))
-            model_instance.objective = min_out.fun
-            self.x0 = min_out.x
-            self.stats = model_instance._stats = min_out
+        min_out = minimize(
+            lambda *args: self.f_func(*args).toarray().squeeze(),
+            self.x0,
+            jac=lambda *args: self.f_jac_func(*args).toarray().squeeze(),
+            method=self.method_string,
+            args=extra_args,
+            constraints=scipy_constraints,
+            bounds=np.vstack([self.lbx, self.ubx]).T,
+            # tol = 1E-9,
+            # options=dict(disp=True),
+            options=self.options,
+            callback=SciPyIterCallbackWrapper.create_or_none(
+                self.model,
+                model_instance.parameter,
+                self.iter_callback
+            ),
+        )
+
+        model_instance.bind_field(self.model.variable.wrap(min_out.x))
+        model_instance.objective = min_out.fun
+        self.x0 = min_out.x
+        self.stats = model_instance._stats = min_out
 
 class ScipyCG(ScipyMinimizeBase):
     method_string = "CG"

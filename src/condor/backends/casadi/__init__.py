@@ -286,13 +286,16 @@ class CasadiFunctionCallback(casadi.Callback):
         if self.jacobian_of:
             if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
                 return (out,)
-            jac_out = (
-                #np.concatenate(flatten(out))
-                out
-                .reshape(self.get_sparsity_out(0).shape[::-1])
-                .T
-            )
-            if self.jacobian_of.jacobian_of:
+            if self.jacobian_of is None: # first derivative
+                jac_out = (
+                    #np.concatenate(flatten(out))
+                    out
+                    .reshape(self.get_sparsity_out(0).shape[::-1])
+                    .T
+                )
+            else:
+                if isinstance(out, tuple) and len(out) == 2:
+                    return out
                 # for hessian, need to provide dependence of jacobian on the original
                 # function's output. is it fair to assume always 0?
                 return (jac_out, np.zeros(self.get_sparsity_out(1).shape))

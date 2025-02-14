@@ -116,3 +116,7 @@ for use_warm_start in [False, True]:
     out = Outer()
     print(out.r)
     #break
+
+
+print(call_from_count)
+print(param_count)
