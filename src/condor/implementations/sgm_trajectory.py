@@ -213,7 +213,7 @@ class TrajectoryAnalysis:
                         sgm.NextTimeFromSlice(
                             expression_to_operator(
                                 [self.p],
-                                [at_time_start, at_time_stop, at_time.step],
+                                concat([at_time_start, at_time_stop, at_time.step]),
                                 f"{ode_model.__name__}_at_times_{event_idx}",
                             )
                         )

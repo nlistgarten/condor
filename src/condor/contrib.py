@@ -28,6 +28,7 @@ from condor.models import (
     SubmodelMetaData,
     SubmodelTemplate,
     SubmodelType,
+    check_attr_name,
 )
 
 log = logging.getLogger(__name__)
@@ -557,6 +558,11 @@ class TrajectoryAnalysisType(SubmodelType):
         return new_cls
 
 
+    @classmethod
+    def bind_model_fields(cls, new_cls, attrs):
+        super().bind_model_fields(new_cls, attrs)
+
+
 class TrajectoryAnalysis(
     # ModelTemplate,
     SubmodelTemplate,
@@ -604,9 +610,36 @@ class TrajectoryAnalysis(
 # new state) etc.
 # maybe allow creation of new parameters (into ODESystem parameter field), access to
 # state, etc.
+
+class EventType(SubmodelType):
+    @classmethod
+    def process_condor_attr(cls, attr_name, attr_val, new_cls):
+        state_elem = new_cls._meta.primary.state.get(backend_repr=attr_val)
+        if state_elem != []:
+            primary_attr = getattr(new_cls._meta.primary, state_elem.name, None)
+            if primary_attr is None:
+                check_attr_name(state_elem.name, attr_val, new_cls._meta.primary)
+                setattr(new_cls._meta.primary, state_elem.name, state_elem)
+                new_cls._meta.primary._meta.user_set[state_elem.name] = attr_val
+            else:
+                if primary_attr is not state_elem:
+                    raise NameError(
+                        f"{new_cls} attempting to assign state {attr_name} = {attr_val}"
+                        f" but {new_cls._meta.primary} already has {attr_name} ="
+                        f"{primary_attr}"
+                    )
+            if state_elem.name != attr_name:
+                super().process_condor_attr(attr_name, attr_val, new_cls)
+        else:
+            super().process_condor_attr(attr_name, attr_val, new_cls)
+
+
+
+
 class Event(
     # ModelTemplate,
     SubmodelTemplate,
+    model_metaclass=EventType,
     primary=ODESystem,
 ):
     """Instantaneous event for :class:`ODESystem` models.

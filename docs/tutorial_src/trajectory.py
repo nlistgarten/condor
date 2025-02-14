@@ -182,8 +182,8 @@ plt.legend(["original sim", "with bounce"])
 
 class MaxAlt(Glider.Event):
     function = gamma
-    accum_state = state(name="max_alt")
-    update[accum_state] = h
+    max_alt = state()
+    update[max_alt] = h
 
 
 # %%
@@ -192,7 +192,7 @@ class MaxAlt(Glider.Event):
 
 
 class DescentAlphaHold(Glider.Mode):
-    condition = MaxAlt.accum_state > 0
+    condition = max_alt > 0
     hold_alpha = parameter()
     action[alpha] = hold_alpha
 
@@ -254,7 +254,7 @@ class AlphaSim(Glider.TrajectoryAnalysis):
     tf = 100.0
 
     area = trajectory_output(integrand=dot[r] * h)
-    max_h = trajectory_output(MaxAlt.accum_state)
+    max_h = trajectory_output(max_alt)
     max_r = trajectory_output(r)
 
     class Options:
