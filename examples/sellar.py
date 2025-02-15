@@ -21,8 +21,8 @@ class Sellar(co.OptimizationProblem):
     y1, y2 = coupling
 
     objective = x[2]**2 + x[1] + y1 + ops.exp(-y2)
-    constraint(y1 > 3.16)
-    constraint(24. > y2)
+    constraint(y1 >= 3.16)
+    constraint(24. >= y2)
 
     class Options:
         __implementation__ = co.implementations.OptimizationProblem
