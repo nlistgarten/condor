@@ -7,7 +7,51 @@ from condor.backends.casadi import CasadiFunctionCallback, symbol_class, callabl
 @dataclass
 class CasadiWarmstartWrapperBase:
     """
-    baseclass to wrap Casadi nlpsol and rootfinder with a warmstart
+    baseclass to wrap Casadi nlpsol and rootfinder with a warmstart, without requiring
+    casadi in the condor implementations module
+    """
+    """
+
+    Future work:
+    if we wanted to release a casadi-only library that supplied these solvers in way
+    that was independent of condor, we would need to pass in enough information to make
+    a casadi Callback -- jacobians, hessians, etc.
+
+    since we do not intend to release a casadi-only library that supplies these solvers,
+    we can assume we are working within condor and have at least an "Operator" and we
+    can use condor to perform calculus on any backend. Would still require transforming
+    generic Operator into casadi-specific (casadi.Callback)
+
+    Similalry, the callback construction is going straight to a casadi.Callback, and
+    in the future actually use the condor backend shims to build an operator for
+    whichever backend is being used
+
+    for now, since condor only has casadi as a backend, we will assume it is a casadi
+    Callback, and don't need to perform any modification for casadi to know how do
+    autodiff on it. And we will just become a casadi.Callback, rather than using the
+    shim to construct an operator.
+
+    addiitonal notes:
+
+    I like having all the direct casadi stuff outside of implementaitons.iterative,
+    so not having casadi-speicifc constructions, but maybe it's OK for this case since
+    the solver is casadi itself?
+    basically because of the API requirements of casadi, either condor needs to better
+    define its MIMO (or maybe still MISO?) calculus API so we can go from
+    {condor.backend} operator to casadi for NLPSOL or we allow a bit of tighter
+    coupling.
+
+    for now, assume I'm getting casadi MISO operator (which for now means
+    casadi.Function of x and p, but in the future should be backend-agnostic Operator)
+    and we'll just take for granted we can construct a full casadi expression for
+    objective and constraints.
+
+    and even more confusing/inconsistent, casadi rootfinder takes MIMO function that
+    x,p input and residual,explicit outptus.
+
+    and accctually, casadinlpsolwarmstart should not directly be a
+    CasadiFunctionCallback, it should be generic
+
 
     """
     primary_function: callable # callable f(x, p). nlpsol's objective or rootfinder's residual
@@ -23,33 +67,7 @@ class CasadiWarmstartWrapperBase:
     options: dict = None
 
 
-    # I guess technically should provide jacobians and hessian wrt variable to construct
-    # the casadi.callables_to_operator... perfectly sufficient for top-level/single call
-    # but gets a bit clunky with parameter (e.g., embedded models that we want to take
-    # derivative of), and the callables_to_operator currently assumes SISO.
-
-    # I like having all the direct casadi stuff outside of implementaitons.iterative,
-    # so not having casadi-speicifc constructions, but maybe it's OK for this case since
-    # the solver is casadi itself?
-    # basically because of the API requirements of casadi, either condor needs to better
-    # define its MIMO (or maybe still MISO?) calculus API so we can go from
-    # {condor.backend} operator to casadi for NLPSOL or we allow a bit of tighter
-    # coupling.
-
-    # for now, assume I'm getting backend-agnostic MISO operator (which for now means
-    # casadi.Function of x and p) and we'll just take for granted we can construct a
-    # full casadi expression for objective and constraints.
-
-    # and even more confusing/inconsistent, casadi rootfinder takes MIMO function that
-    # x,p input and residual,explicit outptus.
-
-    # and accctually, casadinlpsolwarmstart should not directly be a
-    # CasadiFunctionCallback, it should be generic
-
     def __post_init__(self):
-        #super().__post_init__()
-        #if self.update_x0 is None:
-        #    self.update_x0 = lambda x, p: self.init_x0(p)
         self.update_warmstart(self.warm_start)
         if self.options is None:
             self.options = {}

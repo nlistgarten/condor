@@ -3,12 +3,13 @@
 import logging
 from dataclasses import dataclass, field
 
-import casadi
 import ndsplines
 import numpy as np
 
 from condor.backend import (
     symbol_class, expression_to_operator,
+    process_relational_element,
+    is_constant
 )
 
 from condor.backend.operators import (recurse_if_else, substitute, concat)
@@ -76,10 +77,7 @@ class AlgebraicSystemType(ModelType):
     def process_placeholders(cls, new_cls, attrs):
         super().process_placeholders(new_cls, attrs)
         for elem in new_cls.residual:
-            if elem.backend_repr.op() == casadi.OP_EQ:
-                lhs = elem.backend_repr.dep(0)
-                rhs = elem.backend_repr.dep(1)
-                elem.backend_repr = lhs - rhs
+            process_relational_element(elem)
 
 
 class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
@@ -142,64 +140,20 @@ class OptimizationProblemType(ModelType):
         original_elements = list(new_cls.constraint)
         new_cls.constraint._elements = []
         for elem in original_elements:
-            # check if the backend_repr is a comparison op
-            # check if the bounds are constant
             re_append_elem = True
-            relational_op = False
-            if elem.backend_repr.is_binary():
-                lhs = elem.backend_repr.dep(0)
-                rhs = elem.backend_repr.dep(1)
-
-            if not isinstance(elem.lower_bound, np.ndarray) or np.any(
-                np.isfinite(elem.lower_bound)
-            ):
-                real_lower_bound = True
-            else:
-                real_lower_bound = False
-
-            if not isinstance(elem.upper_bound, np.ndarray) or np.any(
-                np.isfinite(elem.upper_bound)
-            ):
-                real_upper_bound = True
-            else:
-                real_upper_bound = False
-
-            if elem.backend_repr.op() in (casadi.OP_LT, casadi.OP_LE):
-                relational_op = True
-                elem.backend_repr = rhs - lhs
-                elem.lower_bound = 0.0
-            # elif elem.backend_repr.op() in (casadi.OP_GT, casadi.OP_GE):
-            #    relational_op = True
-            #    elem.backend_repr = rhs - lhs
-            #    elem.upper_bound = 0.0
-            elif elem.backend_repr.op() == casadi.OP_EQ:
-                relational_op = True
-                elem.backend_repr = rhs - lhs
-                elem.upper_bound = 0.0
-                elem.lower_bound = 0.0
-
-            if relational_op and (real_lower_bound or real_upper_bound):
-                raise ValueError(
-                    f"Do not use relational constraints with bounds for {elem}"
+            process_relational_element(elem)
+            if not is_constant(elem.lower_bound):
+                # new_elem = elem.copy_to_field(new_cls.constraint)
+                new_elem = new_cls.constraint(
+                    elem.backend_repr - elem.lower_bound, lower_bound=0.0
                 )
-
-            original_backend_repr = elem.backend_repr
-            if real_lower_bound:
-                if isinstance(elem.lower_bound, symbol_class):
-                    if not elem.lower_bound.is_constant():
-                        # new_elem = elem.copy_to_field(new_cls.constraint)
-                        new_elem = new_cls.constraint(
-                            original_backend_repr - elem.lower_bound, lower_bound=0.0
-                        )
-                        re_append_elem = False
-            if real_upper_bound:
-                if isinstance(elem.upper_bound, symbol_class):
-                    if not elem.upper_bound.is_constant():
-                        # new_elem = elem.copy_to_field(new_cls.constraint)
-                        new_elem = new_cls.constraint(
-                            original_backend_repr - elem.upper_bound, upper_bound=0.0
-                        )
-                        re_append_elem = False
+                re_append_elem = False
+            if not is_constant(elem.upper_bound):
+                # new_elem = elem.copy_to_field(new_cls.constraint)
+                new_elem = new_cls.constraint(
+                    elem.backend_repr - elem.upper_bound, upper_bound=0.0
+                )
+                re_append_elem = False
 
             if re_append_elem:
                 new_cls.constraint._elements.append(elem)

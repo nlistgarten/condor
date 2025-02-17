@@ -10,6 +10,121 @@ from condor.backends.casadi import operators
 vertcat = casadi.vertcat
 symbol_class = casadi.MX
 
+
+def is_constant(symbol):
+    return not isinstance(symbol, symbol_class) or symbol.is_constant()
+
+def process_relational_element(elem):
+    """
+    modify an element if the backend_repr is relational
+
+    if backend_repr is lhs == rhs,
+        replace with lhs - rhs
+        set upper_bound = lower_bound = 0 (if element has bounds)
+
+    if backend_repr is inequality, e.g., lhs < mhs < rhs
+        attach lhs to lower bound, mhs to backend_repr, and rhs to upper_bound
+
+    """
+    # check if the backend_repr is a comparison op
+    # check if the bounds are constant
+    re_append_elem = True
+    relational_op = False
+    if elem.backend_repr.is_binary():
+        lhs = elem.backend_repr.dep(0)
+        rhs = elem.backend_repr.dep(1)
+
+    if (
+        hasattr(elem, "lower_bound") and
+        (not isinstance(elem.lower_bound, np.ndarray) or
+        np.any(np.isfinite(elem.lower_bound)))
+    ):
+        real_lower_bound = True
+    else:
+        real_lower_bound = False
+
+    if (
+        hasattr(elem, "upper_bound") and
+        (not isinstance(elem.upper_bound, np.ndarray)
+        or np.any(np.isfinite(elem.upper_bound)))
+    ):
+        real_upper_bound = True
+    else:
+        real_upper_bound = False
+
+    if elem.backend_repr.op() in (casadi.OP_LT, casadi.OP_LE):
+        relational_op = True
+        mhs = casadi.MX()
+
+        # validation
+        if not hasattr(elem, "lower_bound"):
+            raise ValueError(
+                "Setting inequality for an element without bounds doesn't make snse"
+            )
+        if casadi.OP_EQ in (lhs.op(), rhs.op()):
+            raise ValueError(
+                "setting inequality and equality relation doesn't make sense"
+            )
+        if lhs.op() in (casadi.OP_LT, casadi.OP_LE):
+            mhs = lhs.dep(1)
+            lhs = lhs.dep(0)
+            if rhs.backend_repr.op() in (casadi.OP_LT, casadi.OP_LE):
+                raise ValueError("Too many inequalities deep")
+        if rhs.op() in (casadi.OP_LT, casadi.OP_LE):
+            mhs = rhs.dep(0)
+            rhs = rhs.dep(1)
+            if lhs.backend_repr.op() in (casadi.OP_LT, casadi.OP_LE):
+                raise ValueError("Too many inequalities deep")
+
+        if lhs.op() in (casadi.OP_LT, casadi.OP_LE):
+            mhs = lhs.dep(1)
+            lhs = lhs.dep(0)
+        if rhs.op() in (casadi.OP_LT, casadi.OP_LE):
+            mhs = rhs.dep(0)
+            rhs = rhs.dep(1)
+
+        if (
+            (lhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT)) or
+            (rhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT)) or
+            (mhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT))
+        ):
+            raise ValueError("Too many inequalities deep")
+
+        if mhs.shape == (0,0):
+            if rhs.is_constant() == lhs.is_constant():
+                raise ValueError("Unexpected inequality of constants")
+            elif rhs.is_constant():
+                mhs = lhs
+                lhs = elem.lower_bound
+                rhs = rhs.to_DM().toarray()
+            elif lhs.is_constant():
+                mhs = rhs
+                rhs = elem.upper_bound
+                lhs = lhs.to_DM().toarray()
+
+        elem.lower_bound = lhs
+        elem.backend_repr = mhs
+        elem.upper_bound = rhs
+
+    # elif elem.backend_repr.op() in (casadi.OP_GT, casadi.OP_GE):
+    #    relational_op = True
+    #    elem.backend_repr = rhs - lhs
+    #    elem.upper_bound = 0.0
+    elif elem.backend_repr.op() == casadi.OP_EQ:
+        relational_op = True
+        elem.backend_repr = rhs - lhs
+        if hasattr(elem, "upper_bound"):
+            elem.upper_bound = 0.0
+        if hasattr(elem, "lower_bound"):
+            elem.lower_bound = 0.0
+
+    if relational_op and (real_lower_bound or real_upper_bound):
+        raise ValueError(
+            f"Do not use relational constraints with bounds for {elem}"
+        )
+
+
+
 def shape_to_nm(shape):
     if isinstance(shape, (int, np.int64)):
         shape = (shape,1)
