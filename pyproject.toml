@@ -28,6 +28,9 @@ dependencies = [
 test = ["pytest"]
 docs = ["sphinx", "sphinx-gallery", "matplotlib", "furo"]
 
+[project.urls]
+Documentation = "https://nasa.github.io/condor"
+
 [tool.setuptools_scm]
 write_to = "src/condor/_version.py"
 
