@@ -22,7 +22,7 @@ To best understand Condor, we can consider a simple benchmark problem which cons
       residual(y1 == x[0] ** 2 + x[1] + x[2] - 0.2 * y2)
       residual(y2 == y1**0.5 + x[0] + x[1])
 
-This parametric model can be evaluated by providing the values for the parameters; the resulting object has values for its inputs and outputs bound, so the solved values for ``y1`` and ``y2`` can be acccessed easily:
+This parametric model can be evaluated by providing the values for the parameters; the resulting object has values for its inputs and outputs bound, so the solved values for ``y1`` and ``y2`` can be accessed easily:
 
 .. code-block:: python
 
@@ -43,7 +43,7 @@ Models can also be seamlessly built-up, with parent models accessing any input o
       constraint(y1 > 3.16)
       constraint(24. > y2)
 
-This ``OptimizationProblem`` can be solved and the sub-model can be accesed directly,
+This ``OptimizationProblem`` can be solved and the sub-model can be accessed directly,
 
 .. code-block:: python
 
@@ -59,18 +59,17 @@ In Condor, users construct parameterized ``Model``'s from a particular `Model Te
 
 Condor is a new mathematical modeling framework for Python, developed at NASA's Ames Research Center. Initial development began in April 2023 to address modeling challenges for aircraft synthesis and robust orbital trajectory design. Condor emphasizes modern approaches from the scientific python community, and leverages many open-source software packages to expedite development and ensure robust and efficient run-time. Most of the modifications needed to complete the user exercises are not Condor-specific, but general Python programming.
 
-Condor is unique in that it uses "metaprogramming" to create an mathematical and expressive "domain specific language" (DSL) for defining models. The declrative nature of this DSL can be seen in the definition of the LinCov models in ``DemoCW.py``. In Condor, ``ODESystem``'s have fields for ``state``, ``initial`` values, ``dynamic_output``, and ``parameter`` elements. The ``TrajectoryAnalysis`` inner model simulates the inner model, inheriting the ``ODESystem``'s field's elements  and adding the ``trajectory_output`` field for defining overall performance metrics. When a model like ``TrajectoryAnalysis`` is created, it defines a new class that can be instantiated with values for each of the ``parameter`` elements. The object that is created has "dot" access to the ``parameter`` and ``trajectory_output`` values, as well as time-histories for ``state`` and ``dynamic_output``. The ``TrajectoryAnalysis`` model will simulate the ``ODESystem`` along with any ``Event``'s that have been defined at the time the ``TrajectoryAnalysis`` model is created. A raw datastructure with the simulation time ``t``, state ``x``, dynamic output ``y``, and event log ``e`` is available from a simulation's ``_res`` attribute, e.g., ``sim._res.t`` is a list of the timesteps for the simulation. See the functions in ``plot.py`` for examples of accessing and manipulating time histories.
+Condor is unique in that it uses "metaprogramming" to create an mathematical and expressive "domain specific language" (DSL) for defining models. The declarative nature of this DSL can be seen in the definition of the LinCov models in ``DemoCW.py``. In Condor, ``ODESystem``'s have fields for ``state``, ``initial`` values, ``dynamic_output``, and ``parameter`` elements. The ``TrajectoryAnalysis`` inner model simulates the inner model, inheriting the ``ODESystem``'s field's elements  and adding the ``trajectory_output`` field for defining overall performance metrics. When a model like ``TrajectoryAnalysis`` is created, it defines a new class that can be instantiated with values for each of the ``parameter`` elements. The object that is created has "dot" access to the ``parameter`` and ``trajectory_output`` values, as well as time-histories for ``state`` and ``dynamic_output``. The ``TrajectoryAnalysis`` model will simulate the ``ODESystem`` along with any ``Event``'s that have been defined at the time the ``TrajectoryAnalysis`` model is created. A raw data structure with the simulation time ``t``, state ``x``, dynamic output ``y``, and event log ``e`` is available from a simulation's ``_res`` attribute, e.g., ``sim._res.t`` is a list of the timesteps for the simulation. See the functions in ``plot.py`` for examples of accessing and manipulating time histories.
 
 Installation
 ------------
 
-To install, clone the repository and install with pip
+Condor is available on `PyPI <https://pypi.org/project/condor/>`_, so you can
+install with pip:
 
 .. code:: bash
 
-   $ git clone https://github.com/nasa/condor.git
-   $ cd condor/
-   $ pip install .
+   $ pip install condor
 
 
 License
