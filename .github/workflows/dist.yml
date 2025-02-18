@@ -28,6 +28,22 @@ jobs:
           name: dist
           path: dist/
 
+  check:
+    name: Debug checks
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+
+      - name: ls
+        run: ls -R
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1
+
   publish:
     name: Publish to PyPI
     needs: [build]
