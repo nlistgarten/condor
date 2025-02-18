@@ -1,0 +1,38 @@
+div.sphx-glr-download-link-note {
+    display: none;
+}
+
+div.sphx-glr-footer {
+    display: none;
+}
+
+div.sphx-glr-thumbnails {
+    grid: none;
+    grid-template-columns: none;
+    display: block;
+    position: static;
+}
+
+div.sphx-glr-thumbcontainer {
+    box-shadow: none;
+    display: block;
+    position: relative;
+}
+
+div.sphx-glr-thumbcontainer img {
+    display: none;
+}
+
+.sphx-glr-thumbcontainer a.internal {
+    padding: 0px 10px;
+    padding: 0px 0px;
+    border-bottom: none;
+}
+
+.sphx-glr-thumbcontainer[tooltip]:hover::after {
+    padding: 10px 0px;
+}
+
+table {
+    font-size: 10pt;
+}
