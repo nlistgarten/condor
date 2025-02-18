@@ -76,7 +76,7 @@ To install, clone the repository and install with pip
 License
 -------
 
-This software is released under the `NASA Open Source Agreement Version 1.3 <https://github.com/nasa/condor/raw/master/license.pdf>`_.
+This software is released under the `NASA Open Source Agreement Version 1.3 <https://github.com/nasa/condor/raw/main/license.pdf>`_.
 
 Notices
 -------
