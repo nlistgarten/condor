@@ -3,7 +3,7 @@ Condor
 
 NASA's Condor is a framework for mathematical modeling of engineering systems in Python. For engineers with a deadline.
 
-`Documentation <https://condor.pages.fit.nasa.gov/condor/>`_
+`Documentation <https://nasa.github.io/condor/>`_
 
 Condor is a new mathematical modeling framework for Python, developed at NASA's Ames Research Center. Initial development began in April 2023 to address modeling challenges for aircraft synthesis and robust orbital trajectory design.
 Condor emphasizes modern approaches from the scientific python community, and leverages many open-source software packages to expedite development and ensure robust and efficient run-time.
