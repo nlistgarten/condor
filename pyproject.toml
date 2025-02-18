@@ -21,7 +21,7 @@ dependencies = [
     "numpy",
     "scipy",
     "casadi",
-    "ndsplines",
+    "ndsplines>=0.2.0post0",
 ]
 
 [project.optional-dependencies]
