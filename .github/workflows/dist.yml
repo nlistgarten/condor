@@ -37,9 +37,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
+          path: dist
 
       - name: ls
-        run: ls -R
+        run: ls -R && ls -R dist
 
   publish:
     name: Publish to PyPI
