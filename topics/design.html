@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="prev" title="Topics" href="index.html" />
 
     <!-- Generated with Sphinx 8.2.0 and Furo 2024.08.06 -->
-        <title>Condor Design - Condor 0.1.dev1+gc9db17c documentation</title>
+        <title>Condor Design - Condor 0.1.dev1+g2661d99 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.1.dev1+gc9db17c documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.1.dev1+g2661d99 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -195,7 +195,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
   
-  <span class="sidebar-brand-text">Condor 0.1.dev1+gc9db17c documentation</span>
+  <span class="sidebar-brand-text">Condor 0.1.dev1+g2661d99 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -270,15 +270,19 @@
 <h1>Condor Design<a class="headerlink" href="#condor-design" title="Link to this heading">¶</a></h1>
 <section id="overall-goals-and-api">
 <h2>Overall goals and API<a class="headerlink" href="#overall-goals-and-api" title="Link to this heading">¶</a></h2>
-<p>Condor is a new mathematical modeling framework for Python, developed at NASA’s Ames Research Center.
-Initial development began in April 2023 to address modeling challenges for aircraft synthesis and robust
-orbital trajectory design.  Condor emphasizes modern approaches from the scientific python community, and
-leverages many open-source software packages to expedite development and ensure robust and efficient
-run-time.</p>
-<p>The goal is for Condor to help evaluate numerical models and then get out of the way. One key aspect to
-achieve this goal was to create an API that looked as much like the mathematical description as
-possible with as little distraction from programming cruft as possible.  For example, Sellar
-introduces an arbitrary system of algebraic equations to represent coupling in multi-disciplinary analysis,</p>
+<p>Condor is a new mathematical modeling framework for Python, developed at
+NASA’s Ames Research Center. Initial development began in April 2023 to
+address model implementation challenges for aircraft synthesis and
+robust orbital trajectory design.  Condor emphasizes modern approaches
+from the scientific python community, and leverages many open-source
+software packages to expedite development and ensure robust and
+efficient run-time.</p>
+<p>The goal is for Condor to help evaluate numerical models and then get
+out of the way. One key aspect to achieve this goal was to create an API
+that looked as much like the mathematical description as possible with
+as little distraction from programming cruft as possible.  For example,
+Sellar <a class="reference internal" href="../tutorial/sellar.html#sellar" id="id1"><span>[sellar]</span></a> introduces an arbitrary system of algebraic equations to
+represent coupling in multi-disciplinary analysis,</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
 \[\begin{split}\begin{align}
@@ -568,6 +572,13 @@ from the new type of Model to the an existing model or solver.</p></li>
 can call the solver.</p></li>
 </ol>
 </div></blockquote>
+<p class="rubric">References</p>
+<div role="list" class="citation-list">
+<div class="citation" id="sellar" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">sellar</a><span class="fn-bracket">]</span></span>
+<p>Sellar, R., Batill, S., and Renaud, J., “Response Surface Based, Concurrent Subspace Optimization for Multidisciplinary System Design,” 1996. <a class="reference external" href="https://doi.org/10.2514/6.1996-714">https://doi.org/10.2514/6.1996-714</a></p>
+</div>
+</div>
 </section>
 </section>
 
@@ -645,7 +656,7 @@ can call the solver.</p></li>
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=66938d7a"></script>
+</div><script src="../_static/documentation_options.js?v=b8d0eed3"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=5fa4622c"></script>
