@@ -1,16 +1,20 @@
 Condor
 ======
 
-NASA's Condor is a framework for mathematical modeling of engineering systems in Python. For engineers with a deadline.
+.. image:: https://github.com/nasa/simupy-flight/actions/workflows/docs.yml/badge.svg
+   :target: https://nasa.github.io/condor
 
-`Documentation <https://nasa.github.io/condor/>`_
+Condor is a new mathematical modeling framework for Python, developed at
+NASA's Ames Research Center. Initial development began in April 2023 to
+address model implementation challenges for aircraft synthesis and
+robust orbital trajectory design. The goal is for Condor to help
+evaluate numerical models and then get out of the way.
 
-Condor is a new mathematical modeling framework for Python, developed at NASA's Ames Research Center. Initial development began in April 2023 to address modeling challenges for aircraft synthesis and robust orbital trajectory design.
-Condor emphasizes modern approaches from the scientific python community, and leverages many open-source software packages to expedite development and ensure robust and efficient run-time.
-Condor follows modern python principles and best practices and leverages existing solvers and tools wherever possible.
-Condor is unique in that it uses "metaprogramming" to create an mathematical and expressive "domain specific language" (DSL) for defining models. The declarative nature of this DSL means that user models look nearly identical to mathematical descriptions making it easy to write and maintain models. Condor has been used for aircraft hybrid-electric propulsion conceptual design analysis and optimal robust orbital trajectory design. However, Condor is a general modeling framework and is not designed to solve any particular problem; the user is responsible for modeling choices and Condor makes it easy to implement them.
-
-To best understand Condor, we can consider a simple benchmark problem which consists of a set of coupled algebraic expressions, which can be represented as a system of algebraic equations
+One key aspect to achieve this goal was to create an API that looked as
+much like the mathematical description as possible with as little
+distraction from programming cruft as possible. To best understand
+this approach, we can consider a simple benchmark problem which consists of a set of coupled algebraic expressions. This can be represented as a
+system of algebraic equations,
 
 .. code-block:: python
 
@@ -22,7 +26,9 @@ To best understand Condor, we can consider a simple benchmark problem which cons
       residual(y1 == x[0] ** 2 + x[1] + x[2] - 0.2 * y2)
       residual(y2 == y1**0.5 + x[0] + x[1])
 
-This parametric model can be evaluated by providing the values for the parameters; the resulting object has values for its inputs and outputs bound, so the solved values for ``y1`` and ``y2`` can be accessed easily:
+This parametric model can be evaluated by providing the values for the
+parameters; the resulting object has values for its inputs and outputs
+bound, so the solved values for ``y1`` and ``y2`` can be accessed easily:
 
 .. code-block:: python
 
@@ -30,7 +36,9 @@ This parametric model can be evaluated by providing the values for the parameter
    print(coupling.y1, coupling.y2) # individual elements are bound numerically
    print(coupling.variable) # fields are bound as a dataclass
 
-Models can also be seamlessly built-up, with parent models accessing any input or output of the child models. For example, we can optimize this coupled algebraic system,
+Models can also be seamlessly built-up, with parent models accessing any
+input or output of the child models. For example, we can optimize this
+coupled algebraic system, with an ``OptimizationProblem`` model,
 
 .. code-block:: python
 
@@ -40,10 +48,11 @@ Models can also be seamlessly built-up, with parent models accessing any input o
       y1, y2 = coupling
 
       objective = x[2]**2 + x[1] + y1 + exp(-y2)
-      constraint(y1 > 3.16)
-      constraint(24. > y2)
+      constraint(y1 >= 3.16)
+      constraint(24. >= y2)
 
-This ``OptimizationProblem`` can be solved and the sub-model can be accessed directly,
+This optimizaiton problem can be solved and the sub-model can be
+accessed directly:
 
 .. code-block:: python
 
@@ -53,13 +62,8 @@ This ``OptimizationProblem`` can be solved and the sub-model can be accessed dir
    print(sellar.constraint) # field
    print(sellar.coupling.y1) # sub-model element
 
-
-
-In Condor, users construct parameterized ``Model``'s from a particular `Model Template` which defines the fields from which the Model can draw elements., which defines , when called, performs the numerical evaluation of the model and binds the values to a Python object. For example, 
-
-Condor is a new mathematical modeling framework for Python, developed at NASA's Ames Research Center. Initial development began in April 2023 to address modeling challenges for aircraft synthesis and robust orbital trajectory design. Condor emphasizes modern approaches from the scientific python community, and leverages many open-source software packages to expedite development and ensure robust and efficient run-time. Most of the modifications needed to complete the user exercises are not Condor-specific, but general Python programming.
-
-Condor is unique in that it uses "metaprogramming" to create an mathematical and expressive "domain specific language" (DSL) for defining models. The declarative nature of this DSL can be seen in the definition of the LinCov models in ``DemoCW.py``. In Condor, ``ODESystem``'s have fields for ``state``, ``initial`` values, ``dynamic_output``, and ``parameter`` elements. The ``TrajectoryAnalysis`` inner model simulates the inner model, inheriting the ``ODESystem``'s field's elements  and adding the ``trajectory_output`` field for defining overall performance metrics. When a model like ``TrajectoryAnalysis`` is created, it defines a new class that can be instantiated with values for each of the ``parameter`` elements. The object that is created has "dot" access to the ``parameter`` and ``trajectory_output`` values, as well as time-histories for ``state`` and ``dynamic_output``. The ``TrajectoryAnalysis`` model will simulate the ``ODESystem`` along with any ``Event``'s that have been defined at the time the ``TrajectoryAnalysis`` model is created. A raw data structure with the simulation time ``t``, state ``x``, dynamic output ``y``, and event log ``e`` is available from a simulation's ``_res`` attribute, e.g., ``sim._res.t`` is a list of the timesteps for the simulation. See the functions in ``plot.py`` for examples of accessing and manipulating time histories.
+NASA's Condor is a framework for mathematical modeling of engineering
+systems in Python. For engineers with a deadline.
 
 Installation
 ------------

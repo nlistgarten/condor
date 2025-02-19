@@ -5,16 +5,20 @@ Condor Design
 Overall goals and API
 ======================
 
-Condor is a new mathematical modeling framework for Python, developed at NASA's Ames Research Center.
-Initial development began in April 2023 to address modeling challenges for aircraft synthesis and robust 
-orbital trajectory design.  Condor emphasizes modern approaches from the scientific python community, and
-leverages many open-source software packages to expedite development and ensure robust and efficient 
-run-time.
+Condor is a new mathematical modeling framework for Python, developed at
+NASA's Ames Research Center. Initial development began in April 2023 to
+address model implementation challenges for aircraft synthesis and
+robust orbital trajectory design.  Condor emphasizes modern approaches
+from the scientific python community, and leverages many open-source
+software packages to expedite development and ensure robust and
+efficient run-time.
 
-The goal is for Condor to help evaluate numerical models and then get out of the way. One key aspect to
-achieve this goal was to create an API that looked as much like the mathematical description as
-possible with as little distraction from programming cruft as possible.  For example, Sellar 
-introduces an arbitrary system of algebraic equations to represent coupling in multi-disciplinary analysis,
+The goal is for Condor to help evaluate numerical models and then get
+out of the way. One key aspect to achieve this goal was to create an API
+that looked as much like the mathematical description as possible with
+as little distraction from programming cruft as possible.  For example,
+Sellar [sellar]_ introduces an arbitrary system of algebraic equations to
+represent coupling in multi-disciplinary analysis,
 
 .. math::
    \begin{align}
@@ -311,6 +315,8 @@ this capability. A design process might include:
   3. Implement a :meth:`process_placeholder` for processing the models data so the implementation
      can call the solver.
 
+.. rubric:: References
+.. [sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based, Concurrent Subspace Optimization for Multidisciplinary System Design," 1996. https://doi.org/10.2514/6.1996-714
 
 ..
     OLD
