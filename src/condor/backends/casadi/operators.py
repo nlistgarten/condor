@@ -2,6 +2,10 @@
 import numpy as np
 import casadi
 import condor.backends.casadi as backend
+# useful but not sure if all backends would have:
+# symvar -- list all symbols present in expression
+# depends_on
+#
 
 pi = casadi.pi
 inf = casadi.inf
@@ -12,6 +16,7 @@ mod = casadi.fmod
 
 atan = casadi.atan
 atan2 = casadi.atan2
+tan = casadi.tan
 sin = casadi.sin
 cos = casadi.cos
 asin = casadi.asin
@@ -76,11 +81,17 @@ def jac_prod(of, wrt, rev=True):
 
 def substitute(expr, subs):
     original_expr = expr
+    for key, val in subs.items():
+        try:
+            expr = casadi.substitute(expr, key, val)
+        except Exception as e:
+            print(e)
+            breakpoint()
+            raise e
+    return expr
+
     if isinstance(expr, backend.symbol_class):
         expr = casadi.substitute([expr], list(subs.keys()), list(subs.values()))[0]
-    return expr
-    for key, val in subs.items():
-        expr = casadi.substitute(expr, key, val)
     return expr
 
 def recurse_if_else(conditions_actions):

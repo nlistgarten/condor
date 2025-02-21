@@ -1217,6 +1217,7 @@ class Model(metaclass=ModelType):
         missing_args = []
         extra_args = []
 
+
         for input_name, input_val in kwargs.items():
             if input_name not in input_names:
                 # TODO: skip this one with a flag?
@@ -1226,8 +1227,11 @@ class Model(metaclass=ModelType):
 
 
         for input_name, field in input_names.items():
-            if input_name not in fields_kwargs[field]:
+            field_kwargs = fields_kwargs[field]
+            if (input_value := field_kwargs.get(input_name, None)) is None:
                 missing_args.append(input_name)
+            elif isinstance(input_value, BaseElement):
+                field_kwargs[input_name] = input_value.backend_repr
 
         if missing_args or extra_args:
             error_message = f"While calling {field._model.__class__.__name__}, "
@@ -1410,7 +1414,7 @@ ModelTemplateType.user_model_metaclass = ModelType
 ModelTemplateType.user_model_baseclass = Model
 
 """
-Do we need class inheritance?
+Do we need class inheritance? "as_template" flag should suffice
 
 Case 1: defining a new model template -- very fiew fields, just copy and paste;
 manipulate and re-use implementaitons etc

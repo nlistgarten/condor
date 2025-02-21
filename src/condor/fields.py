@@ -394,12 +394,16 @@ class BaseElement(
         element.size = np.prod(new_shape)
         return element
 
-    def _generic_op(f):
-        def _(self, other):
+    def _generic_op(f, is_r=False):
+        def _(self, other=None):
+            if other is None:
+                return f(self.backend_repr)
             if isinstance(other, self.__class__):
                 other_value = other.backend_repr
             else:
                 other_value = other
+            if is_r:
+                return f(other_value, self.backend_repr)
             return f(self.backend_repr, other_value)
 
         return _
@@ -415,25 +419,29 @@ class BaseElement(
     __matmul__ = _generic_op(operator.matmul)
     __truediv__ = _generic_op(operator.truediv)
     __floordiv__ = _generic_op(operator.floordiv)
+    __pow__ = _generic_op(operator.pow)
     # mod?
     # divmod?
-    __pow__ = _generic_op(operator.pow)
     # lshift
     # rshift
     # and
     # xor
     # or
+    # is and is_not?
 
+    # are pos/neg the only unary? abs, inv,
     __neg__ = _generic_op(operator.neg)
     __pos__ = _generic_op(operator.pos)
 
-    __radd__ = _generic_op(operator.add)
-    __rmul__ = _generic_op(operator.mul)
-    __rmul__ = _generic_op(operator.mul)
-    __rmatmul__ = _generic_op(operator.matmul)
-    __rtruediv__ = _generic_op(operator.truediv)
-    __rfloordiv__ = _generic_op(operator.floordiv)
-    __rpow__ = _generic_op(operator.pow)
+    __radd__ = _generic_op(operator.add, is_r=True)
+    __rsub__ = _generic_op(operator.sub, is_r=True)
+    __rmul__ = _generic_op(operator.mul, is_r=True)
+    __rmul__ = _generic_op(operator.mul, is_r=True)
+    __rmatmul__ = _generic_op(operator.matmul, is_r=True)
+    __rtruediv__ = _generic_op(operator.truediv, is_r=True)
+    __rfloordiv__ = _generic_op(operator.floordiv, is_r=True)
+    __rpow__ = _generic_op(operator.pow, is_r=True)
+
 
     del _generic_op
 
