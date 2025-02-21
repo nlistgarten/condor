@@ -441,7 +441,7 @@ class ODESystem(ModelTemplate):
     #: elements with deferred behavior, for implementing things such as control inputs
     modal = WithDefaultField(Direction.internal)
     #: additional time-varying outputs :math:`y`
-    dynamic_output = AssignedField(Direction.internal)
+    dynamic_output = AssignedField(Direction.output)
 
 
 @dataclass
