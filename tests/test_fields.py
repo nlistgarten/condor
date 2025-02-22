@@ -38,3 +38,18 @@ def test_create_from_different_field_types():
 
     out = Sys2(b=3, c_target=10)
     assert out.a == 7
+
+
+def test_dict_unpack():
+    class Sys(condor.ExplicitSystem):
+        a = input()
+        b = input()
+
+        output.c = a + b
+
+    assert dict(**Sys.input) == {"a": Sys.a.backend_repr, "b": Sys.b.backend_repr}
+    assert dict(**Sys.output) == {"c": Sys.c.backend_repr}
+
+    sys = Sys(a=1, b=-2)
+    assert dict(**sys.input) == {"a": 1, "b": -2}
+    assert dict(**sys.output) == {"c": -1}

@@ -112,6 +112,12 @@ class FieldValues:
             new_values[elem.name] = elem.wrap_value(values[start_idx:end_idx])
         return cls(**new_values)
 
+    def keys(self):
+        yield from self.field.list_of("name")
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
 
 class Field:
     """Base field
@@ -336,6 +342,12 @@ class Field:
 
     def wrap(self, values):
         return self._dataclass.wrap(values)
+
+    def keys(self):
+        yield from self.list_of("name")
+
+    def __getitem__(self, item):
+        return getattr(self, item)
 
 
 def make_class_name(components):
