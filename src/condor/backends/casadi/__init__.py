@@ -180,7 +180,7 @@ class BackendSymbolData(BackendSymbolDataMixin):
         if (
             (isinstance(value, symbol_class) and value.is_constant())
             #or isinstance(value, casadi.DM)
-            or not isinstance(value, np.ndarray)
+            or not isinstance(value, (np.ndarray, symbol_class))
         ):
             value = np.array(value)
 

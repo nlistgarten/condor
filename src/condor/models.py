@@ -1124,8 +1124,13 @@ class ModelType(BaseModelType):
                     else:
                         placeholder_assignment_dict[elem.backend_repr] = use_val
             elif np.array(use_val).dtype.kind in "if":
-                use_val = np.array(use_val)
-                if elem.size >= use_val.size:
+                #use_val = np.array(use_val)
+                use_val = np.atleast_1d(use_val)
+                if elem.size == use_val.size:
+                    placeholder_assignment_dict[elem.backend_repr] = use_val.reshape(
+                        elem.shape
+                    )
+                elif elem.size > use_val.size:
                     try:
                         np.broadcast_shapes(elem.shape, use_val.shape)
                     except:
