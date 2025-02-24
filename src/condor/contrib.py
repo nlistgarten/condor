@@ -122,6 +122,7 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
     # TODO: output is unmatched, but maybe a subclass or imp might check lengths of
     # residuals and implicit_outputs to ensure enough DOF?
 
+    @classmethod
     def set_initial(cls, **kwargs):
         """Set initial values for the ``variable``\\s of the model"""
         for k, v in kwargs.items():
@@ -213,6 +214,7 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
 
     # TODO: need validation for objective size == 1
 
+    @classmethod
     def set_initial(cls, **kwargs):
         r"""Set initial values for the ``variable``\s of the model
 
@@ -227,6 +229,7 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
                 )
             var.initializer = v
 
+    @classmethod
     def from_values(cls, **kwargs):
         """Construct an instance of a solved model from variable and parameter values"""
         self = cls.__new__(cls)

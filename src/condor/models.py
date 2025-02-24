@@ -1073,7 +1073,7 @@ class ModelType(BaseModelType):
     @classmethod
     def inherit_template_methods(cls, new_cls):
         for key, val in new_cls._meta.template._meta.user_set.items():
-            if not isinstance(val, Field) and callable(val):
+            if isinstance(val, classmethod):
                 log.debug(
                     "inheriting classmethod %s=%s from %s to %s",
                     key,
@@ -1081,7 +1081,17 @@ class ModelType(BaseModelType):
                     new_cls._meta.template,
                     new_cls,
                 )
-                setattr(new_cls, key, val.__get__(new_cls))
+                setattr(new_cls, key, val.__get__(None, new_cls))
+
+            if not isinstance(val, Field) and callable(val):
+                log.debug(
+                    "inheriting instance method %s=%s from %s to %s",
+                    key,
+                    val,
+                    new_cls._meta.template,
+                    new_cls,
+                )
+                setattr(new_cls, key, val)
 
     @classmethod
     def process_placeholders(cls, new_cls, attrs):
