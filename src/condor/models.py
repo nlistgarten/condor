@@ -142,6 +142,8 @@ class BaseCondorClassDict(dict):
                 super().__setitem__(attr_val.name, attr_val)
             else:
                 self.meta.embedded_models[attr_name] = attr_val
+        if isinstance(attr_val, BaseElement):
+            attr_val.name = attr_name
         if isinstance(attr_val, backend.symbol_class):
             # from a FreeField
             if attr_val in self.meta.backend_repr_elements:
@@ -608,6 +610,7 @@ class BaseModelType(type):
         for k, v in condor_attrs.items():
             # TODO: is this actually a new_cls classmethod? should that be the same as a
             # cls.method?
+            log.debug(f"processing {k}={v} on {new_cls}")
             cls.process_condor_attr(k, v, new_cls)
 
         if cls.creating_base_class_for_inheritance(name):
@@ -672,6 +675,8 @@ class BaseModelType(type):
         is_condor_attribute check"""
         meta = new_cls._meta
         pass_attr = True
+        if isinstance(attr_val, BaseElement):
+            pass
         if isinstance(attr_val, backend.symbol_class):
             element = new_cls._meta.backend_repr_elements.get(attr_val, None)
             if element is not None:
@@ -685,7 +690,6 @@ class BaseModelType(type):
                 )
                 # breakpoint()
                 pass_attr = False
-
         if isinstance(attr_val, BaseModelType):
             # not sure if this should really be Base or just Model? Or maybe
             # submodel by now...
@@ -1012,7 +1016,7 @@ class ModelType(BaseModelType):
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
         pass_super = True
-        if isinstance(attr_val, backend.symbol_class):
+        if isinstance(attr_val, (backend.symbol_class, BaseElement)):
             log.debug(
                 "ModelType is checking a backend_repr... %s, %s, %s, %s",
                 attr_name,

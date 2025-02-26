@@ -335,12 +335,19 @@ class Field:
         dataclass"""
         return self.get(name=with_name).backend_repr
 
-    def flatten(self, attr="backend_repr"):
+    def dataclass_of(self, attr="backend_repr"):
+        """construct a dataclass of the field where values are the attr of each element
+        """
         return self._dataclass(
             **{elem.name: getattr(elem, attr) for elem in self}
-        ).flatten()
+        )
+
+    def flatten(self, attr="backend_repr"):
+        """flatten the values into a single 1D array"""
+        return self.dataclass_of(attr).flatten()
 
     def wrap(self, values):
+        """wrap a flattened array into the elements of appropriate shape"""
         return self._dataclass.wrap(values)
 
     def keys(self):
@@ -406,6 +413,10 @@ class BaseElement(
         element.size = np.prod(new_shape)
         return element
 
+    @property
+    def T(self):
+        return self.backend_repr.T
+
     def _generic_op(f, is_r=False):
         def _(self, other=None):
             if other is None:
@@ -454,6 +465,10 @@ class BaseElement(
     __rfloordiv__ = _generic_op(operator.floordiv, is_r=True)
     __rpow__ = _generic_op(operator.pow, is_r=True)
 
+    __array_priority__ = 100.0
+
+    def __getitem__(self, *keys):
+        return self.backend_repr.__getitem__(*keys)
 
     del _generic_op
 
@@ -788,7 +803,7 @@ class MatchedField(Field):
             raise KeyError
         return item.backend_repr
 
-    def to_dataclass(self, on_field=None):
+    def dataclass_of(self, on_field=None):
         if on_field is None:
             on_field = self._matched_to
         dc_kwargs = {}
@@ -802,8 +817,10 @@ class MatchedField(Field):
 
 
     def flatten(self, on_field=None):
-        #if attr != "backend_repr":
-        #    raise ValueError(
-        #        "flatten for matched field only makes sense for backend_repr"
-        #    )
-        return self.to_dataclass(on_field).flatten()
+        """ flatten matches to the on_field, defaults tot he match.
+
+        on_field is used to override which field instance's dataclass gets filled in;
+        this is currently used during TrajectoryAnalysis construction which creates its
+        own copies of the matching fields
+        """
+        return self.dataclass_of(on_field).flatten()

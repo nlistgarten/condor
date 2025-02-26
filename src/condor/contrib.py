@@ -594,6 +594,7 @@ class TrajectoryAnalysis(
     # adding an accumulator state and adding the updates to each event? Maybe that
     # doesn't make sense...
 
+    @classmethod
     def initial_condition(cls, *args, **kwargs):
         self = cls._meta.primary.__new__(cls._meta.primary)
         pp = cls.function_call_to_fields(
@@ -606,6 +607,7 @@ class TrajectoryAnalysis(
         self.bind_field(cls.state.wrap(x0))
         return self
 
+    @classmethod
     def point_analysis(cls, t, *args, **kwargs):
         """Compute the state rates for the ODESystems that were bound (at the time of
         construction).
@@ -629,7 +631,7 @@ class TrajectoryAnalysis(
         self.bind_field(cls.dot.wrap(dot))
         self.bind_field(cls.dynamic_output.wrap(yy))
         self.bind_field(cls.modal.wrap(modals))
-        self.bind_embedded_models()
+        #self.bind_embedded_models()
         return self
 
         # bind paramaeters, state, call implementation functions (dot, dynamic output)
