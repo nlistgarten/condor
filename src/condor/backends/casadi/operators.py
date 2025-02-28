@@ -26,6 +26,16 @@ log = casadi.log
 log10 = casadi.log10
 sqrt = casadi.sqrt
 
+eye = casadi.MX.eye
+
+def vector_norm(x, ord=2):
+    if ord==2:
+        return casadi.norm_2(x)
+    if ord==1:
+        return casadi.norm_1(x)
+    if ord==inf:
+        return casadi.norm_inf(x)
+
 
 def concat(arrs, axis=0):
     """ implement concat from array API for casadi """

@@ -28,6 +28,7 @@ substitute = backend_mod.operators.substitute
 
 # creation functions
 zeros = backend_mod.operators.zeros
+eye = backend_mod.operators.eye
 
 # "manipulation functions"
 concat = backend_mod.operators.concat
@@ -57,4 +58,6 @@ exp = wrap(backend_mod.operators.exp)
 log = wrap(backend_mod.operators.log)
 log10 = wrap(backend_mod.operators.log10)
 sqrt = wrap(backend_mod.operators.sqrt)
+
+vector_norm = wrap(backend_mod.operators.vector_norm)
 
