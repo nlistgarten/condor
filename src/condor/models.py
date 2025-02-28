@@ -385,11 +385,7 @@ class BaseModelType(type):
                 # inherit fields from base -- bound in __new__
                 if isinstance(v, Field):
                     if k in cls_dict:
-                        if (
-                            (cls_dict[k].__class__ is v.__class__) and
-                            (tuple(cls_dict[k]._init_kwargs.values()) ==
-                             tuple(v._init_kwargs.values()))
-                        ):
+                        if cls_dict[k].__class__ is v.__class__:
                             pass # compatible field inheritance
                         else:
                             raise ValueError(
@@ -874,11 +870,13 @@ class ModelTemplateType(BaseModelType):
             log.debug("prcessing for model metaclass asssigned, new")
 
         if as_template:
-            setattr(
-                implementations,
-                new_cls.__name__,
-                getattr(implementations, new_cls.__mro__[1].__name__)
-            )
+            impl = getattr(implementations, new_cls.__mro__[1].__name__, None)
+            if impl is not None:
+                setattr(
+                    implementations,
+                    new_cls.__name__,
+                    impl,
+                )
 
         return new_cls
 
