@@ -27,6 +27,7 @@ log10 = casadi.log10
 sqrt = casadi.sqrt
 
 eye = casadi.MX.eye
+ones = casadi.MX.ones
 
 def vector_norm(x, ord=2):
     if ord==2:
@@ -51,7 +52,6 @@ def concat(arrs, axis=0):
     else:
         return np.concat([np.atleast_2d(arr) for arr in arrs], axis=axis)
 
-
 def unstack(arr, axis=0):
     if axis == 0:
         return casadi.vertsplit(arr)
@@ -61,8 +61,8 @@ def unstack(arr, axis=0):
 def zeros(shape=(1,1)):
     return backend.symbol_class(*shape)
 
-def jacobian(of, wrt=None):
-    """ create a callable that computes dense jacobian """
+def jacobian(of, wrt):
+    """ jacobian of expression `of` with respect to symbols `wrt` """
     """
     we can apply jacobian to ExternalSolverWrapper but it's a bit clunky because need
     symbol_class expressions for IO, and to evalaute need to create a Function. Not sure

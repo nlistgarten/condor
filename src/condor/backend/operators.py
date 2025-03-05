@@ -29,6 +29,7 @@ substitute = backend_mod.operators.substitute
 # creation functions
 zeros = backend_mod.operators.zeros
 eye = backend_mod.operators.eye
+ones = backend_mod.operators.ones
 
 # "manipulation functions"
 concat = backend_mod.operators.concat
