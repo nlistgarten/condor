@@ -10,8 +10,6 @@ except:
     pass
 else:
 
-    os.chdir("/Users/bmargoli/projects/condor-flight/checkcases/lunar/")
-    spice.furnsh("mrotat.tm")
 
     def left_quaternion_product_matrix(q):
         return np.array([
@@ -142,14 +140,17 @@ class MyOpt3(co.OptimizationProblem):
         print_level = 0
 
 opt3 = MyOpt3()
-print(opt3.implementation.stats['iter_count'])
+print('first call')
+print(opt3.implementation.callback._stats['iter_count'])
 
 MyOpt3.Options.exact_hessian = False
 
 opt3 = MyOpt3()
-print(opt3.implementation.stats['iter_count'])
+print('call w/o hessian')
+print(opt3.implementation.callback._stats['iter_count'])
 
 MyOpt3.Options.exact_hessian = True
 
 opt3 = MyOpt3()
-print(opt3.implementation.stats['iter_count'])
+print('with hessian again')
+print(opt3.implementation.callback._stats['iter_count'])
