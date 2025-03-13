@@ -390,12 +390,6 @@ class BaseElement(
 
     def copy_to_field(element, new_field, new_name=""):
         element_dict = asdict(element)
-        if isinstance(element, FreeElement):
-            old_backend_repr = element_dict.pop("backend_repr")
-            element_dict["backend_repr"] = backend.symbol_generator(
-                name=f"{new_field._resolve_name}_{len(new_field._elements)}",
-                **asdict(backend.get_symbol_data(old_backend_repr)),
-            )
         if new_name:
             element_dict["name"] = new_name
         else:
