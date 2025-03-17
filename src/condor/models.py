@@ -138,7 +138,7 @@ class BaseCondorClassDict(dict):
             attr_val.prepare(self)
 
         if isinstance(attr_val.__class__, BaseModelType):
-            if attr_val.name:
+            if getattr(attr_val, 'name', ''):
                 self.meta.embedded_models[attr_val.name] = attr_val
                 super().__setitem__(attr_val.name, attr_val)
             else:
