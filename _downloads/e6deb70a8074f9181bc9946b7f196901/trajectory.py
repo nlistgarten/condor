@@ -322,7 +322,7 @@ ax.text(
 
 # %%
 # We can store the iteration history using :attr:`iter_callback` option on
-# :class:`TrajectoryAnalysis`, pointing it to the method of a class to store the
+# :class:`OptimizationProblem`, pointing it to the method of a class to store the
 # simulation data on each call. Since it only gets information relevant to the
 # optimization problem itself, we use
 # :meth:`~condor.contrib.OptimizationProblem.from_values` to reconstruct the internals of

@@ -305,7 +305,7 @@ event).
  .. code-block:: none
 
 
-    <matplotlib.legend.Legend object at 0x7fec9d356de0>
+    <matplotlib.legend.Legend object at 0x7f65b59051f0>
 
 
 
@@ -399,7 +399,7 @@ The glider now travels a little further with this control behavior.
  .. code-block:: none
 
 
-    <matplotlib.legend.Legend object at 0x7fec9c772450>
+    <matplotlib.legend.Legend object at 0x7f65b5997a40>
 
 
 
@@ -538,7 +538,7 @@ Then we can compare areas with different hold angles of attack:
  .. code-block:: none
 
 
-    <matplotlib.legend.Legend object at 0x7fec9c770200>
+    <matplotlib.legend.Legend object at 0x7f65b4758710>
 
 
 
@@ -606,7 +606,7 @@ and flown range.
 .. GENERATED FROM PYTHON SOURCE LINES 324-330
 
 We can store the iteration history using :attr:`iter_callback` option on
-:class:`TrajectoryAnalysis`, pointing it to the method of a class to store the
+:class:`OptimizationProblem`, pointing it to the method of a class to store the
 simulation data on each call. Since it only gets information relevant to the
 optimization problem itself, we use
 :meth:`~condor.contrib.OptimizationProblem.from_values` to reconstruct the internals of
@@ -665,7 +665,7 @@ the analysis with the simulation outputs bound to the ``sim`` attribute.
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 27.753 seconds)
+   **Total running time of the script:** (0 minutes 28.553 seconds)
 
 
 .. _sphx_glr_download_tutorial_trajectory.py:
