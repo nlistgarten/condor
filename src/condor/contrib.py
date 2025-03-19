@@ -122,6 +122,7 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
     # TODO: output is unmatched, but maybe a subclass or imp might check lengths of
     # residuals and implicit_outputs to ensure enough DOF?
 
+    @classmethod
     def set_initial(cls, **kwargs):
         """Set initial values for the ``variable``\\s of the model"""
         for k, v in kwargs.items():
@@ -213,6 +214,7 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
 
     # TODO: need validation for objective size == 1
 
+    @classmethod
     def set_initial(cls, **kwargs):
         r"""Set initial values for the ``variable``\s of the model
 
@@ -227,6 +229,7 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
                 )
             var.initializer = v
 
+    @classmethod
     def from_values(cls, **kwargs):
         """Construct an instance of a solved model from variable and parameter values"""
         self = cls.__new__(cls)
@@ -441,7 +444,7 @@ class ODESystem(ModelTemplate):
     #: elements with deferred behavior, for implementing things such as control inputs
     modal = WithDefaultField(Direction.internal)
     #: additional time-varying outputs :math:`y`
-    dynamic_output = AssignedField(Direction.internal)
+    dynamic_output = AssignedField(Direction.output)
 
 
 @dataclass
@@ -539,6 +542,12 @@ class TrajectoryAnalysisType(SubmodelType):
                 recurse_if_else(v), control_sub_expression
             )
 
+        new_cls._meta.initial_condition_function = expression_to_operator(
+            [p],
+            substitute(new_cls.initial.flatten(), control_sub_expression),
+            f"{new_cls.__name__}_initial_condition"
+        )
+
         new_cls._meta.state_equation_function = expression_to_operator(
             [new_cls.t, x, p],
             substitute(new_cls.dot.flatten(), control_sub_expression),
@@ -585,6 +594,20 @@ class TrajectoryAnalysis(
     # adding an accumulator state and adding the updates to each event? Maybe that
     # doesn't make sense...
 
+    @classmethod
+    def initial_condition(cls, *args, **kwargs):
+        self = cls._meta.primary.__new__(cls._meta.primary)
+        pp = cls.function_call_to_fields(
+            [cls.parameter],
+            *args, **kwargs
+        )[0]
+        p = pp.flatten()
+        self.input_kwargs = pp.asdict()
+        x0 = cls._meta.initial_condition_function(p)
+        self.bind_field(cls.state.wrap(x0))
+        return self
+
+    @classmethod
     def point_analysis(cls, t, *args, **kwargs):
         """Compute the state rates for the ODESystems that were bound (at the time of
         construction).
@@ -608,7 +631,7 @@ class TrajectoryAnalysis(
         self.bind_field(cls.dot.wrap(dot))
         self.bind_field(cls.dynamic_output.wrap(yy))
         self.bind_field(cls.modal.wrap(modals))
-        self.bind_embedded_models
+        #self.bind_embedded_models()
         return self
 
         # bind paramaeters, state, call implementation functions (dot, dynamic output)

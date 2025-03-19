@@ -3,6 +3,11 @@ Condor
 
 .. image:: https://github.com/nasa/simupy-flight/actions/workflows/docs.yml/badge.svg
    :target: https://nasa.github.io/condor
+.. image:: https://img.shields.io/badge/License-NOSA-green.svg
+   :target: https://github.com/nasa/condor/blob/master/license.pdf
+.. image:: https://img.shields.io/github/release/nasa/condor.svg
+   :target: https://github.com/nasa/condor/releases
+
 
 Condor is a new mathematical modeling framework for Python, developed at
 NASA's Ames Research Center. Initial development began in April 2023 to
@@ -13,8 +18,9 @@ evaluate numerical models and then get out of the way.
 One key aspect to achieve this goal was to create an API that looked as
 much like the mathematical description as possible with as little
 distraction from programming cruft as possible. To best understand
-this approach, we can consider a simple benchmark problem which consists of a set of coupled algebraic expressions. This can be represented as a
-system of algebraic equations,
+this approach, we can consider a simple benchmark problem which consists
+of a set of coupled algebraic expressions. This can be represented as a
+system of algebraic equations:
 
 .. code-block:: python
 
@@ -37,8 +43,9 @@ bound, so the solved values for ``y1`` and ``y2`` can be accessed easily:
    print(coupling.variable) # fields are bound as a dataclass
 
 Models can also be seamlessly built-up, with parent models accessing any
-input or output of the child models. For example, we can optimize this
-coupled algebraic system, with an ``OptimizationProblem`` model,
+input or output of models embedded within them. For example, we can
+optimize this system of algebraic equations by embedding it within an
+optimization problem:
 
 .. code-block:: python
 
@@ -51,8 +58,7 @@ coupled algebraic system, with an ``OptimizationProblem`` model,
       constraint(y1 >= 3.16)
       constraint(24. >= y2)
 
-This optimizaiton problem can be solved and the sub-model can be
-accessed directly:
+After the model is solved, the embedded model can be accessed directly:
 
 .. code-block:: python
 
@@ -63,7 +69,7 @@ accessed directly:
    print(sellar.coupling.y1) # sub-model element
 
 NASA's Condor is a framework for mathematical modeling of engineering
-systems in Python. For engineers with a deadline.
+systems in Python, written for engineers with a deadline.
 
 Installation
 ------------

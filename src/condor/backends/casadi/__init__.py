@@ -180,7 +180,7 @@ class BackendSymbolData(BackendSymbolDataMixin):
         if (
             (isinstance(value, symbol_class) and value.is_constant())
             #or isinstance(value, casadi.DM)
-            or not isinstance(value, np.ndarray)
+            or not isinstance(value, (np.ndarray, symbol_class))
         ):
             value = np.array(value)
 
@@ -401,18 +401,17 @@ class CasadiFunctionCallback(casadi.Callback):
         if self.jacobian_of:
             if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
                 return (out,)
-            if self.jacobian_of is None: # first derivative
-                jac_out = (
-                    #np.concatenate(flatten(out))
-                    out
-                    .reshape(self.get_sparsity_out(0).shape[::-1])
-                    .T
-                )
-            else:
-                if isinstance(out, tuple) and len(out) == 2:
-                    return out
-                # for hessian, need to provide dependence of jacobian on the original
-                # function's output. is it fair to assume always 0?
+            if isinstance(out, tuple) and len(out) == 2:
+                return out
+            jac_out = (
+                #np.concatenate(flatten(out))
+                out
+                .reshape(self.get_sparsity_out(0).shape[::-1])
+                .T
+            )
+            # for hessian, need to provide dependence of jacobian on the original
+            # function's output. is it fair to assume always 0?
+            if self.n_out() == 2:
                 return (jac_out, np.zeros(self.get_sparsity_out(1).shape))
 
             return (jac_out,)
