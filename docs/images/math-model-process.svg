@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="299.77466mm"
+   height="48.198608mm"
+   viewBox="0 0 299.77466 48.198608"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4 (e7c3feb1, 2024-10-09)"
+   sodipodi:docname="math-model-process.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.63431456"
+     inkscape:cx="379.93767"
+     inkscape:cy="102.47282"
+     inkscape:window-width="1728"
+     inkscape:window-height="1051"
+     inkscape:window-x="0"
+     inkscape:window-y="38"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1">
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath67">
+      <path
+         d="M 7.629e-6,540 H 960 V 0 H 7.629e-6"
+         clip-rule="evenodd"
+         id="path67" />
+    </clipPath>
+    <rect
+       x="295.59296"
+       y="474.99374"
+       width="210.0755"
+       height="137.57156"
+       id="rect73" />
+    <rect
+       x="295.59296"
+       y="474.99374"
+       width="210.0755"
+       height="137.57156"
+       id="rect73-6" />
+    <rect
+       x="295.59296"
+       y="474.99374"
+       width="210.0755"
+       height="137.57156"
+       id="rect73-6-5" />
+    <rect
+       x="295.59296"
+       y="474.99374"
+       width="210.0755"
+       height="137.57156"
+       id="rect73-6-5-8" />
+    <rect
+       x="295.59296"
+       y="474.99374"
+       width="210.0755"
+       height="137.57156"
+       id="rect73-3" />
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-10.054167,-147.6375)">
+    <g
+       id="g37"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <path
+         id="path37"
+         d="m 50.625,84.375 h 150.75 v 96 H 50.625 Z"
+         style="fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke:#7f7f7f;stroke-width:2.25;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+         transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+    </g>
+    <g
+       id="g41"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <path
+         id="path41"
+         d="m 223.88,84.375 h 151.5 v 96 h -151.5 z"
+         style="fill:#4472c4;fill-opacity:1;fill-rule:evenodd;stroke:#ed7d31;stroke-width:5.25;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+         transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+    </g>
+    <g
+       id="g45"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <path
+         id="path45"
+         d="m 397.88,84.375 h 151.5 v 96 h -151.5 z"
+         style="fill:#4472c4;fill-opacity:1;fill-rule:evenodd;stroke:#ed7d31;stroke-width:5.25;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+         transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+    </g>
+    <g
+       id="g50"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <path
+         id="path50"
+         d="m 571.88,84.375 h 150.75 v 96 H 571.88 Z"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#7f7f7f;stroke-width:2.25;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+         transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+    </g>
+    <g
+       id="g53"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <path
+         id="path53"
+         d="m 745.88,84.375 h 150.75 v 96 H 745.88 Z"
+         style="fill:#4472c4;fill-opacity:1;fill-rule:evenodd;stroke:#ed7d31;stroke-width:5.25;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+         transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+    </g>
+    <g
+       id="g56"
+       transform="matrix(0.26458333,0,0,0.26458333,-12.700001,21.69583)">
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:24px;font-family:'.Keyboard';-inkscape-font-specification:'.Keyboard';text-align:center;letter-spacing:0px;text-anchor:middle;fill:#ed7d31;fill-opacity:1"
+         x="1052.2367"
+         y="640.45148"
+         id="text71"><tspan
+           sodipodi:role="line"
+           id="tspan71"
+           x="1052.2367"
+           y="640.45148"
+           style="font-size:24px">Steps automated by Condor</tspan></text>
+    </g>
+    <g
+       id="g57"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <g
+         id="g58">
+        <path
+           id="path58"
+           d="m 201,134.25 h 15.21 v -3 H 201 Z m 13.71,3 9,-4.5 -9,-4.5 z"
+           style="fill:#ed7d31;fill-opacity:1;fill-rule:nonzero;stroke:none"
+           transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+      </g>
+    </g>
+    <g
+       id="g59"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <g
+         id="g60">
+        <path
+           id="path60"
+           d="m 375,134.25 h 15.21 v -3 H 375 Z m 13.71,3 9,-4.5 -9,-4.5 z"
+           style="fill:#ed7d31;fill-opacity:1;fill-rule:nonzero;stroke:none"
+           transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+      </g>
+    </g>
+    <g
+       id="g61"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <g
+         id="g62">
+        <path
+           id="path62"
+           d="m 549.75,134.25 h 15.65 v -3 h -15.65 z m 14.15,3 9,-4.5 -9,-4.5 z"
+           style="fill:#4472c4;fill-opacity:1;fill-rule:nonzero;stroke:none"
+           transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+      </g>
+    </g>
+    <g
+       id="g63"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <g
+         id="g64">
+        <path
+           id="path64"
+           d="m 722.25,134.25 h 15.21 v -3 h -15.21 z m 13.71,3 9,-4.5 -9,-4.5 z"
+           style="fill:#ed7d31;fill-opacity:1;fill-rule:nonzero;stroke:none"
+           transform="matrix(1.3333333,0,0,-1.3333333,0,720)" />
+      </g>
+    </g>
+    <g
+       id="g65"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.4083323,21.69583)">
+      <g
+         id="g66">
+        <path
+           id="path66"
+           d="m 123,84.75 v -18 l -1.5,1.5 h 521.43 l -1.5,-1.5 v 10.5 h 3 v -12 H 120 v 19.5 z m 515.43,-9 4.5,9 4.5,-9 z"
+           style="fill:#4472c4;fill-opacity:1;fill-rule:nonzero;stroke:none"
+           transform="matrix(1.3333333,0,0,-1.3333333,0,720)"
+           clip-path="url(#clipPath67)" />
+      </g>
+    </g>
+    <text
+       xml:space="preserve"
+       id="text72"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:'.Keyboard';-inkscape-font-specification:'.Keyboard';text-align:center;letter-spacing:0px;white-space:pre;shape-inside:url(#rect73);shape-padding:8.36584;display:inline;fill:#ffffff;fill-opacity:1"
+       transform="matrix(0.26458333,0,0,0.26458333,-7.6804552,31.827931)"><tspan
+         x="323.03827"
+         y="500.4932"
+         id="tspan1">Transform model </tspan><tspan
+         x="313.06234"
+         y="523.82657"
+         id="tspan2">into canonical form</tspan></text>
+    <text
+       xml:space="preserve"
+       id="text72-0"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:'.Keyboard';-inkscape-font-specification:'.Keyboard';text-align:center;letter-spacing:0px;white-space:pre;shape-inside:url(#rect73-6);shape-padding:8.36584;display:inline;fill:#ffffff;fill-opacity:1"
+       transform="matrix(0.26458333,0,0,0.26458333,53.449659,25.190394)"><tspan
+         x="313.4725"
+         y="500.4932"
+         id="tspan3">Determine auxiliary </tspan><tspan
+         x="325.33059"
+         y="523.82657"
+         id="tspan4">model equations </tspan><tspan
+         x="343.88336"
+         y="547.26359"
+         id="tspan5">(e.g., partial </tspan><tspan
+         x="347.23753"
+         y="570.7006"
+         id="tspan6">derivatives)</tspan></text>
+    <text
+       xml:space="preserve"
+       id="text72-0-8"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:'.Keyboard';-inkscape-font-specification:'.Keyboard';text-align:center;letter-spacing:0px;white-space:pre;shape-inside:url(#rect73-6-5);shape-padding:8.36584;display:inline;fill:#ffffff;fill-opacity:1"
+       transform="matrix(0.26458333,0,0,0.26458333,114.81766,31.865311)"><tspan
+         x="317.688"
+         y="500.4932"
+         id="tspan7">Write equations in </tspan><tspan
+         x="378.27275"
+         y="523.82657"
+         id="tspan8">code</tspan></text>
+    <text
+       xml:space="preserve"
+       id="text72-0-8-0"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:'.Keyboard';-inkscape-font-specification:'.Keyboard';text-align:center;letter-spacing:0px;white-space:pre;shape-inside:url(#rect73-6-5-8);shape-padding:8.36584;display:inline;fill:#ffffff;fill-opacity:1"
+       transform="matrix(0.26458333,0,0,0.26458333,176.078,31.443286)"><tspan
+         x="311.64046"
+         y="500.4932"
+         id="tspan9">Use solver API with </tspan><tspan
+         x="324.8384"
+         y="523.82657"
+         id="tspan10">coded equations</tspan></text>
+    <text
+       xml:space="preserve"
+       id="text72-3"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:'.Keyboard';-inkscape-font-specification:'.Keyboard';text-align:center;letter-spacing:0px;white-space:pre;shape-inside:url(#rect73-3);shape-padding:8.36584;display:inline;fill:#000000;fill-opacity:1"
+       transform="matrix(0.26458333,0,0,0.26458333,-69.186473,31.865311)"><tspan
+         x="307.30191"
+         y="500.4932"
+         id="tspan11">Define mathematical </tspan><tspan
+         x="372.88602"
+         y="523.82657"
+         id="tspan12">model</tspan></text>
+    <g
+       id="g56-6"
+       transform="matrix(0.26458333,0,0,0.26458333,-145.47303,25.139984)">
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:24px;font-family:'.Keyboard';-inkscape-font-specification:'.Keyboard';text-align:center;letter-spacing:0px;text-anchor:middle;fill:#4472c4;fill-opacity:1"
+         x="1052.2367"
+         y="640.45148"
+         id="text71-7"><tspan
+           sodipodi:role="line"
+           id="tspan71-0"
+           x="1052.2367"
+           y="640.45148"
+           style="font-size:24px;fill:#4472c4;fill-opacity:1">Steps facilitated by Condor</tspan></text>
+    </g>
+  </g>
+</svg>
