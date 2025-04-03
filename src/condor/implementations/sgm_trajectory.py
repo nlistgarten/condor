@@ -138,7 +138,7 @@ class TrajectoryAnalysis:
         terminating = []
 
         events = [e for e in model._meta.events]
-        if model.tf is not np.inf:
+        if bool(model.tf != np.inf):
 
             class Terminate(ode_model.Event):
                 at_time = (model.tf,)
