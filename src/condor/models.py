@@ -144,7 +144,8 @@ class BaseCondorClassDict(dict):
             else:
                 self.meta.embedded_models[attr_name] = attr_val
         if isinstance(attr_val, BaseElement):
-            attr_val.name = attr_name
+            if not attr_val.name:
+                attr_val.name = attr_name
         if isinstance(attr_val, backend.symbol_class):
             # from a FreeField
             if attr_val in self.meta.backend_repr_elements:
