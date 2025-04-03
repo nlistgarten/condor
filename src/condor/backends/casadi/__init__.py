@@ -7,9 +7,10 @@ from condor.backends.element_mixin import BackendSymbolDataMixin
 
 from condor.backends.casadi import operators
 
-vertcat = casadi.vertcat
 symbol_class = casadi.MX
 
+evalf = casadi.evalf
+symbols_in = casadi.symvar
 
 def is_constant(symbol):
     return not isinstance(symbol, symbol_class) or symbol.is_constant()

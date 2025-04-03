@@ -1402,8 +1402,13 @@ class Model(metaclass=ModelType):
                                 break
                         embedded_model_kwargs[k] = vv
                         if not value_found:
-                            embedded_model_kwargs[k] = backend.utils.evalf(
-                                v, model_assignments
+                            symbols_in_v = backend.symbols_in(v)
+                            v_kwargs = {
+                                symbol: model_assignments[symbol]
+                                for symbol in symbols_in_v
+                            }
+                            embedded_model_kwargs[k] = backend.evalf(
+                                v, v_kwargs
                             )
 
                     # not working because python is checking equality of stuff??
