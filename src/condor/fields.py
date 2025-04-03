@@ -779,7 +779,16 @@ class MatchedField(Field):
                 backend_repr = value.backend_repr
             else:
                 symbol_data = backend.get_symbol_data(value)
-                backend_repr = value
+
+                if isinstance(value, backend.symbol_class):
+                    backend_repr = value
+                else:
+                    original_value = value
+                    value = np.atleast_1d(value)
+                    if match.size == value.size:
+                        backend_repr = value.reshape(match.shape)
+                    else:
+                        backend_repr = np.broadcast_to(value, match.shape)
             self.create_element(
                 name=None, match=match, backend_repr=backend_repr, **asdict(symbol_data)
             )
