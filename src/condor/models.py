@@ -1175,9 +1175,10 @@ class ModelType(BaseModelType):
 
         for field in new_cls._meta.noninput_fields:
             for elem in field:
-                elem.backend_repr = backend.operators.substitute(
-                    elem.backend_repr, placeholder_assignment_dict
-                )
+                if isinstance(elem.backend_repr, backend.symbol_class):
+                    elem.backend_repr = backend.operators.substitute(
+                        elem.backend_repr, placeholder_assignment_dict
+                    )
 
     @classmethod
     def get_implementation_class(cls, new_cls):
