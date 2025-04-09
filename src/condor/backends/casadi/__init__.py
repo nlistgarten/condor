@@ -10,7 +10,12 @@ from condor.backends.casadi import operators
 symbol_class = casadi.MX
 
 evalf = casadi.evalf
-symbols_in = casadi.symvar
+
+def symbols_in(expression):
+    if not isinstance(expression, symbol_class):
+        return []
+    else:
+        return casadi.symvar(expression)
 
 def is_constant(symbol):
     return not isinstance(symbol, symbol_class) or symbol.is_constant()
