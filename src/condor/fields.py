@@ -683,6 +683,16 @@ class AssignedElement(BaseElement):
 
 
 class AssignedField(Field, default_direction=Direction.output):
+    def __init__(self, direction=None, add_to_namespace_override=None, **kwargs):
+        super().__init__(direction=direction, **kwargs)
+        self._add_to_namespace_override = add_to_namespace_override
+        self._init_kwargs.update(add_to_namespace_override=add_to_namespace_override)
+
+        if add_to_namespace_override is None:
+            self._add_to_namespace = self._direction in (Direction.input, Direction.output)
+        else:
+            self._add_to_namespace = add_to_namespace_override
+
     def __setattr__(self, name, value):
         if name.startswith("_") and not isinstance(value, backend.symbol_class):
             # TODO: iirc the reason we need to prefix field attributes that are directly
@@ -706,7 +716,7 @@ class AssignedField(Field, default_direction=Direction.output):
                 # these reasons, ditch intermediate stuff.
                 **asdict(symbol_data),
             )
-            if self._direction == Direction.output and self._cls_dict:
+            if self._add_to_namespace and self._cls_dict:
                 # self._cls_dict.__set_item__(name, value)
                 self._cls_dict[name] = value
             # super().__setattr__(name, self._symbols[-1])
