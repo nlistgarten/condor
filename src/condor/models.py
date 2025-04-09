@@ -1429,9 +1429,6 @@ class Model(metaclass=ModelType):
                 bound_embedded_model
             )
 
-
-
-
             setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
 
             for field in embedded_model._meta.output_fields:
@@ -1450,7 +1447,7 @@ class Model(metaclass=ModelType):
                     }
                 )
 
-                # for symbolic_key, value in zip(field, bound_field_dict.values()):
+            bound_embedded_model.bind_embedded_models()
 
 
 ModelTemplateType.user_model_metaclass = ModelType
