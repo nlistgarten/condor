@@ -644,16 +644,8 @@ class BaseModelType(type):
         # constructed class, like binding fields and submodels
         # before calling super new, process fields
 
-        for field in new_cls._meta.independent_fields:
-            for element_idx, element in enumerate(field):
-                # add names to elements -- must be an unnamed element without a reference
-                # assignment in the class
-                if not element.name:
-                    element.name = f"{field._model_name}_{field._name}_{element_idx}"
-
-        for matched_field in new_cls._meta.matched_fields:
-            for matched_element in matched_field:
-                matched_element.update_name()
+        for field in new_cls._meta.all_fields:
+            field.process_field()
 
         # elements from input and input fields are added directly to model
         # previously, all fields were  "finalized" by creating dataclass

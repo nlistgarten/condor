@@ -250,6 +250,9 @@ class Field:
         if self._resolve_name:
             return f"<{self.__class__.__name__}: {self._resolve_name}>"
 
+    def process_field(self):
+        pass
+
     def get(self, *args, **kwargs):
         """Get a list of field elements where every field matches kwargs
 
@@ -497,6 +500,14 @@ class FreeField(Field, default_direction=Direction.input):
         new_kwargs = make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_element(**new_kwargs)
         return self._elements[-1].backend_repr
+
+    def process_field(field):
+        for element_idx, element in enumerate(field):
+            # add names to elements -- must be an unnamed element without a reference
+            # assignment in the class
+            if not element.name:
+                element.name = f"{field._model_name}_{field._name}_{element_idx}"
+
 
     def create_from(self, other, **aliases):
         """Get or create elements based on another field
@@ -758,6 +769,10 @@ class MatchedField(Field):
         self._matched_to = matched_to
         self._default_factory = default_factory
         self._init_kwargs.update(matched_to=matched_to, default_factory=default_factory)
+
+    def process_field(self):
+        for element in self:
+            element.update_name()
 
     def key_to_matched_element(self, key):
         if isinstance(key, backend.symbol_class):
