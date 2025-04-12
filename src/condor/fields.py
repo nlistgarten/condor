@@ -383,6 +383,18 @@ class BaseElement(
     FrontendElementData,
     backend.BackendSymbolData,
 ):
+    def __hash__(self):
+        if self.field_type._model is None:
+            raise ValueError("Elements are not hashable until their field has been bound to a model")
+        return hash((
+            self.name,
+            self.shape,
+            self.field_type._name,
+            self.field_type._model_name,
+            self.field_type._model.__module__
+        ))
+
+
     def __post_init__(self, *args, **kwargs):
         super().__post_init__(self, *args, **kwargs)
         # TODO: validate broadcasting, etc. shape info?
