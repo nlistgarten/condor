@@ -143,6 +143,7 @@ class BaseCondorClassDict(dict):
                 super().__setitem__(attr_val.name, attr_val)
             else:
                 self.meta.embedded_models[attr_name] = attr_val
+                attr_val.name = attr_name
         if isinstance(attr_val, BaseElement):
             if not attr_val.name:
                 attr_val.name = attr_name
@@ -1311,11 +1312,11 @@ class Model(metaclass=ModelType):
 
     def bind_input_fields(self, *args, **kwargs):
         cls = self.__class__
+        self.input_kwargs = {}
         bound_input_fields = cls.function_call_to_fields(
             cls._meta.input_fields,
             *args, **kwargs
         )
-        self.input_kwargs = {}
 
         for field_dc in bound_input_fields:
             self.bind_field(field_dc, symbols_to_instance=True)
