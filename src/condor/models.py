@@ -1109,7 +1109,7 @@ class ModelType(BaseModelType):
                 setattr(new_cls, key, val)
 
     @classmethod
-    def process_placeholders(cls, new_cls, attrs):
+    def process_placeholders(cls, new_cls, attrs, placeholder_field=None):
         """perform placeholder substitution
 
         how to do an embedded model placeholder? use a deferred system to define? would
@@ -1119,12 +1119,17 @@ class ModelType(BaseModelType):
         # TODO -- if default = None, keep it as a dummy variable
         placeholder_assignment_dict = {}
         # TODO: no back reference is preserved which frankly seems harsh...
-        placeholder_field = new_cls._meta.template.placeholder
+        if placeholder_field is None:
+            placeholder_field = new_cls._meta.template.placeholder
         for elem in placeholder_field:
             log.debug("checking placeholder %s on %s", elem, new_cls)
             # currently, the placeholder element is getting passed on so we know it
             # exists and should never be None
-            val = getattr(new_cls, elem.name)
+            if not hasattr(new_cls, elem.name):
+                val = elem.default
+            else:
+                val = getattr(new_cls, elem.name)
+
             use_val = None
             if val is None:
                 pass
@@ -1764,12 +1769,6 @@ class SubmodelType(ModelType):
             ):
                 return
         super().process_condor_attr(attr_name, attr_val, new_cls)
-
-    @classmethod
-    def process_placeholders(cls, new_cls, attrs):
-        if new_cls.__name__ == "Accel":
-            log.debug("processing Accel placeholders")
-        super().process_placeholders(new_cls, attrs)
 
     @classmethod
     def is_user_model(cls, bases):
