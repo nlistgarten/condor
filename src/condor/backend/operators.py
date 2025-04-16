@@ -20,6 +20,7 @@ backend_mod = get_backend()
 # constants
 pi = backend_mod.operators.pi
 inf = backend_mod.operators.inf
+nan = backend_mod.operators.nan
 
 # calculus & symbolic
 jacobian = backend_mod.operators.jacobian

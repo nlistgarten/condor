@@ -9,6 +9,7 @@ import condor.backends.casadi as backend
 
 pi = casadi.pi
 inf = casadi.inf
+nan = np.nan
 
 min = casadi.mmin
 max = casadi.mmax
