@@ -373,14 +373,14 @@ class BaseModelType(type):
             else:
                 cls.inherit_field(v, cls_dict)
             field_from_inherited[v] = cls_dict[v._name]
+
             if v._elements:
-                if issubclass(cls, ModelType):
-                    for element in v:
-                        new_elem = element.copy_to_field(
-                            field_from_inherited[element.field_type]
-                        )
-                        if element.name in base.__dict__:
-                            cls_dict[new_elem.name] = new_elem.backend_repr
+                for element in v:
+                    new_elem = element.copy_to_field(
+                        field_from_inherited[element.field_type]
+                    )
+                    if element.name in base.__dict__:
+                        cls_dict[new_elem.name] = new_elem.backend_repr
 
                 log.debug(f"inheriting a non-empty field {k}={v} from {base} to {name}")
         # TODO: other possibilities to handle:
@@ -748,8 +748,9 @@ def check_attr_name(attr_name, attr_val, new_cls):
             compare_attr = existing_attr.backend_repr
         else:
             compare_attr = existing_attr
-        if attr_val.backend_repr is compare_attr:
-            return
+        if isinstance(attr_val, BaseElement) and attr_val.backend_repr is compare_attr:
+                return
+
         raise NameError(
             f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is already set to {getattr(new_cls, attr_name)}"
         )
