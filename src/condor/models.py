@@ -1346,6 +1346,7 @@ class Model(metaclass=ModelType):
             embedded_model = embedded_model_instance.__class__
             embedded_model_kwargs = {}
 
+
             for field in embedded_model._meta.input_fields:
                 bound_field = getattr(embedded_model_instance, field._name)
                 bound_field_dict = asdict(bound_field)
@@ -1377,9 +1378,8 @@ class Model(metaclass=ModelType):
             # pretty small.
             bound_embedded_model = embedded_model.__new__(embedded_model)
             bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
-            bound_embedded_model.implementation = embedded_model_instance.implementation(
-                bound_embedded_model
-            )
+            bound_embedded_model.implementation = embedded_model_instance.implementation
+            bound_embedded_model.implementation(bound_embedded_model)
 
             setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
 
