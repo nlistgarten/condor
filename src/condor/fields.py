@@ -384,10 +384,11 @@ class BaseElement(
     backend.BackendSymbolData,
 ):
     def __hash__(self):
-        if self.field_type._model is None:
-            raise ValueError("Elements are not hashable until their field has been bound to a model")
+        #if self.field_type._model is None:
+        #    raise ValueError("Elements are not hashable until their field has been bound to a model")
         return hash((
-            self.name,
+            #self.name,
+            self.backend_repr,
             self.shape,
             self.field_type._name,
             self.field_type._model_name,
@@ -511,6 +512,8 @@ class FreeField(Field, default_direction=Direction.input):
         backend_name = "%s_%d" % (self._resolve_name, len(self._elements))
         new_kwargs = make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_element(**new_kwargs)
+        if "name" in kwargs and self._cls_dict is not None:
+            self._cls_dict[kwargs["name"]] = self._elements[-1].backend_repr
         return self._elements[-1].backend_repr
 
     def process_field(field):
@@ -570,7 +573,63 @@ class WithDefaultElement(FreeElement):
 
 
 class WithDefaultField(FreeField):
-    pass
+    def create_substitution_dict(self, subclass, set_attr=False):
+        """ 
+
+        """
+        substitution_dict = {}
+        # TODO: no back reference is preserved which frankly seems harsh...
+        for elem in self:
+            log.debug("checking placeholder %s on %s", elem, subclass)
+            # currently, the placeholder element is getting passed on so we know it
+            # exists and should never be None
+            if not hasattr(subclass, elem.name):
+                val = elem.default
+            else:
+                val = getattr(subclass, elem.name)
+
+            use_val = None
+            if val is None:
+                pass
+            elif val is elem or val is elem.backend_repr:
+                use_val = elem.default
+                if use_val is None:
+                    use_val = elem.backend_repr
+
+            elif isinstance(val, BaseElement):
+                use_val = val.backend_repr
+            else:
+                use_val = val
+
+            if set_attr:
+                setattr(subclass, elem.name, use_val)
+            log.debug("creating substitution %s = %s", elem.backend_repr, use_val)
+            if isinstance(use_val, backend.symbol_class):
+                if elem.size >= np.prod(use_val.size()):
+                    try:
+                        np.broadcast_shapes(elem.shape, use_val.shape)
+                    except:
+                        pass
+                    else:
+                        substitution_dict[elem.backend_repr] = use_val
+            elif np.array(use_val).dtype.kind in "if":
+                #use_val = np.array(use_val)
+                use_val = np.atleast_1d(use_val)
+                if elem.size == use_val.size:
+                    substitution_dict[elem.backend_repr] = use_val.reshape(
+                        elem.shape
+                    )
+                elif elem.size > use_val.size:
+                    try:
+                        np.broadcast_shapes(elem.shape, use_val.shape)
+                    except:
+                        pass
+                    else:
+                        substitution_dict[elem.backend_repr] = use_val
+                    substitution_dict[elem.backend_repr] = np.broadcast_to(
+                        use_val, elem.shape
+                    )
+        return substitution_dict
 
 
 @dataclass(repr=False)

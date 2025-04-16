@@ -1118,59 +1118,12 @@ class ModelType(BaseModelType):
         """
         # process placeholders
         # TODO -- if default = None, keep it as a dummy variable
-        placeholder_assignment_dict = {}
-        # TODO: no back reference is preserved which frankly seems harsh...
+
         if placeholder_field is None:
             placeholder_field = new_cls._meta.template.placeholder
-        for elem in placeholder_field:
-            log.debug("checking placeholder %s on %s", elem, new_cls)
-            # currently, the placeholder element is getting passed on so we know it
-            # exists and should never be None
-            if not hasattr(new_cls, elem.name):
-                val = elem.default
-            else:
-                val = getattr(new_cls, elem.name)
-
-            use_val = None
-            if val is None:
-                pass
-            elif val is elem or val is elem.backend_repr:
-                use_val = elem.default
-                if use_val is None:
-                    use_val = elem.backend_repr
-
-            elif isinstance(val, BaseElement):
-                use_val = val.backend_repr
-            else:
-                use_val = val
-
-            setattr(new_cls, elem.name, use_val)
-            log.debug("creating substitution %s = %s", elem.backend_repr, use_val)
-            if isinstance(use_val, backend.symbol_class):
-                if elem.size >= np.prod(use_val.size()):
-                    try:
-                        np.broadcast_shapes(elem.shape, use_val.shape)
-                    except:
-                        pass
-                    else:
-                        placeholder_assignment_dict[elem.backend_repr] = use_val
-            elif np.array(use_val).dtype.kind in "if":
-                #use_val = np.array(use_val)
-                use_val = np.atleast_1d(use_val)
-                if elem.size == use_val.size:
-                    placeholder_assignment_dict[elem.backend_repr] = use_val.reshape(
-                        elem.shape
-                    )
-                elif elem.size > use_val.size:
-                    try:
-                        np.broadcast_shapes(elem.shape, use_val.shape)
-                    except:
-                        pass
-                    else:
-                        placeholder_assignment_dict[elem.backend_repr] = use_val
-                    placeholder_assignment_dict[elem.backend_repr] = np.broadcast_to(
-                        use_val, elem.shape
-                    )
+        placeholder_assignment_dict = placeholder_field.create_substitution_dict(
+            new_cls, set_attr=True
+        )
 
         for field in new_cls._meta.noninput_fields:
             for elem in field:
