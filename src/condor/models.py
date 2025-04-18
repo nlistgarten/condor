@@ -388,9 +388,18 @@ class BaseModelType(type):
         # Submodels will get assigned like this, but Model should declare that
         # what about a Model(Template) that is being declared in the class boy?
         else:
-            if (existing_attr := cls_dict.get(k, None)) is not None:
+            existing_attr = cls_dict.get(k, None)
+            if isinstance(v, backend.symbol_class):
+                elem_matching_backend_repr = meta.backend_repr_elements.get(v, None)
+            else:
+                elem_matching_backend_repr = None
+
+            if (existing_attr is not None or elem_matching_backend_repr is not None):
                 if isinstance(existing_attr, BaseElement):
                     existing_attr = existing_attr.backend_repr
+                elif isinstance(elem_matching_backend_repr, BaseElement):
+                    existing_attr = elem_matching_backend_repr.backend_repr
+                    # assume cls dict assignment??
                 if existing_attr is v:# or cls_dict[k].backend_repr is v:
                     # only ensure that this is marked as inherited, don't need
                     # to re-copy
