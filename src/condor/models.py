@@ -379,7 +379,7 @@ class BaseModelType(type):
                     new_elem = element.copy_to_field(
                         field_from_inherited[element.field_type]
                     )
-                    if element.name in base.__dict__:
+                    if base.__dict__.get(element.name, None) is element:
                         cls_dict[new_elem.name] = new_elem.backend_repr
 
                 log.debug(f"inheriting a non-empty field {k}={v} from {base} to {name}")
