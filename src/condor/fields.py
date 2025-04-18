@@ -821,6 +821,7 @@ class MatchedElement(BaseElement, MatchedElementMixin):
 zero_like = lambda match: backend.operators.zeros(match.shape)
 pass_through = lambda match: match.backend_repr
 
+
 class MatchedField(Field):
     def __init__(self, matched_to=None, default_factory=pass_through, **kwargs):
         """
@@ -903,17 +904,20 @@ class MatchedField(Field):
         return item.backend_repr
 
     def dataclass_of(self, on_field=None):
-        if on_field is None:
-            on_field = self._matched_to
         dc_kwargs = {}
-        for match_elem in on_field:
-            elem = self.get(match=match_elem)
-            if elem:
-                dc_kwargs[match_elem.name] = elem.backend_repr
-            else:
-                dc_kwargs[match_elem.name] = self._default_factory(match_elem)
+        if on_field is self:
+            for elem in self:
+                dc_kwargs[elem.name] = elem.backend_repr
+        else:
+            if on_field is None:
+                on_field = self._matched_to
+            for match_elem in on_field:
+                elem = self.get(match=match_elem)
+                if elem:
+                    dc_kwargs[match_elem.name] = elem.backend_repr
+                else:
+                    dc_kwargs[match_elem.name] = self._default_factory(match_elem)
         return on_field._dataclass(**dc_kwargs)
-
 
     def flatten(self, on_field=None):
         """ flatten matches to the on_field, defaults tot he match.
@@ -923,3 +927,4 @@ class MatchedField(Field):
         own copies of the matching fields
         """
         return self.dataclass_of(on_field).flatten()
+
