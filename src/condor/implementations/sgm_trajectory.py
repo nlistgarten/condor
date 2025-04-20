@@ -100,7 +100,8 @@ class TrajectoryAnalysis:
         }
         for mode in model._meta.modes:
             for act in mode.action:
-                control_subs_pairs[act.match.backend_repr].append(
+                control_subs_pairs[act.match.backend_repr].insert(
+                    -1,
                     (mode.condition, act.backend_repr)
                 )
         control_sub_expression = {}

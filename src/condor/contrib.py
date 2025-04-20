@@ -533,7 +533,8 @@ class TrajectoryAnalysisType(SubmodelType):
         }
         for mode in model._meta.modes:
             for act in mode.action:
-                control_subs_pairs[act.match.backend_repr].append(
+                control_subs_pairs[act.match.backend_repr].insert(
+                    -1,
                     (mode.condition, act.backend_repr)
                 )
         control_sub_expression = {}
@@ -596,6 +597,10 @@ class TrajectoryAnalysis(
 
     @classmethod
     def initial_condition(cls, *args, **kwargs):
+        """ should initial condition be x0(t, p) not just p?
+        bind dynamic output, time, modal? or do point analysis there?
+        but maybe still time?
+        """
         self = cls._meta.primary.__new__(cls._meta.primary)
         pp = cls.function_call_to_fields(
             [cls.parameter],

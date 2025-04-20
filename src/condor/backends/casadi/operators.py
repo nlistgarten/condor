@@ -106,8 +106,28 @@ def substitute(expr, subs):
     return expr
 
 def recurse_if_else(conditions_actions):
+    """conditions_actions is a list of
+        (condition, action) pairs, which should get constructed in order
+
+        to be equivalent to
+
+        if condition0:
+            action0
+        elif condition1:
+            action1
+        ...
+
+        the last element in the list may be a single else action
+
+        else:
+            else_action
+
+    """
     if len(conditions_actions) == 1:
-        return conditions_actions[0][0]
-    condition, action = conditions_actions[-1]
-    remainder = recurse_if_else(conditions_actions[:-1])
+        if not hasattr(conditions_actions[0], "__len__"):
+            return conditions_actions[0]
+        else:
+            return conditions_actions[0][0]
+    condition, action = conditions_actions[0]
+    remainder = recurse_if_else(conditions_actions[1:])
     return casadi.if_else(condition, action, remainder)
