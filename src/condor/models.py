@@ -1235,7 +1235,7 @@ class Model(metaclass=ModelType):
                 field_kwargs[input_name] = input_value.backend_repr
 
         if missing_args or extra_args:
-            error_message = f"While calling {field._model.__class__.__name__}, "
+            error_message = f"While calling {field._model}, "
             if extra_args:
                 error_message += f"recieved extra arguments: {extra_args}"
             if extra_args and missing_args:
