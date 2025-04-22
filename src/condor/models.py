@@ -1097,26 +1097,27 @@ class ModelType(BaseModelType):
 
     @classmethod
     def inherit_template_methods(cls, new_cls):
-        for key, val in new_cls._meta.template._meta.user_set.items():
-            if isinstance(val, classmethod):
-                log.debug(
-                    "inheriting classmethod %s=%s from %s to %s",
-                    key,
-                    val,
-                    new_cls._meta.template,
-                    new_cls,
-                )
-                setattr(new_cls, key, val.__get__(None, new_cls))
+        for base in new_cls._meta.template.__mro__[:-2]:
+            for key, val in base._meta.user_set.items():
+                if isinstance(val, classmethod):
+                    log.debug(
+                        "inheriting classmethod %s=%s from %s to %s",
+                        key,
+                        val,
+                        new_cls._meta.template,
+                        new_cls,
+                    )
+                    setattr(new_cls, key, val.__get__(None, new_cls))
 
-            if not isinstance(val, Field) and callable(val):
-                log.debug(
-                    "inheriting instance method %s=%s from %s to %s",
-                    key,
-                    val,
-                    new_cls._meta.template,
-                    new_cls,
-                )
-                setattr(new_cls, key, val)
+                if not isinstance(val, Field) and callable(val):
+                    log.debug(
+                        "inheriting instance method %s=%s from %s to %s",
+                        key,
+                        val,
+                        new_cls._meta.template,
+                        new_cls,
+                    )
+                    setattr(new_cls, key, val)
 
     @classmethod
     def process_placeholders(cls, new_cls, attrs, placeholder_field=None):
@@ -1355,31 +1356,55 @@ class Model(metaclass=ModelType):
             embedded_model_instance,
         ) in model._meta.embedded_models.items():
             embedded_model = embedded_model_instance.__class__
-            embedded_model_kwargs = {}
 
 
-            for field in embedded_model._meta.input_fields:
-                bound_field = getattr(embedded_model_instance, field._name)
-                bound_field_dict = asdict(bound_field)
-                for k, v in bound_field_dict.items():
-                    if not isinstance(v, backend.symbol_class):
-                        embedded_model_kwargs[k] = v
-                    else:
-                        value_found = False
-                        for kk, vv in model_assignments.items():
-                            if backend.symbol_is(v, kk):
-                                value_found = True
-                                break
-                        embedded_model_kwargs[k] = vv
-                        if not value_found:
-                            symbols_in_v = backend.symbols_in(v)
-                            v_kwargs = {
-                                symbol: model_assignments[symbol]
-                                for symbol in symbols_in_v
-                            }
-                            embedded_model_kwargs[k] = backend.evalf(
-                                v, v_kwargs
-                            )
+            bound_embedded_model = embedded_model.__new__(embedded_model)
+
+            bound_embedded_model.implementation = embedded_model_instance.implementation
+            embedded_model_instance.bind_input_as_embedded(
+                model_instance, bound_embedded_model, model_assignments,
+            )
+
+            bound_embedded_model.implementation(bound_embedded_model)
+
+            setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
+
+            model_assignments.update(
+                embedded_model_instance.bind_output_as_embedded(
+                    model_instance, bound_embedded_model,
+                )
+            )
+
+            bound_embedded_model.bind_embedded_models()
+
+    def bind_input_as_embedded(
+        embedded_model_instance, parent_instance, bound_embedded_model,
+        model_assignments,
+    ):
+        embedded_model = embedded_model_instance.__class__
+        embedded_model_kwargs = {}
+        for field in embedded_model._meta.input_fields:
+            bound_field = getattr(embedded_model_instance, field._name)
+            bound_field_dict = asdict(bound_field)
+            for k, v in bound_field_dict.items():
+                if not isinstance(v, backend.symbol_class):
+                    embedded_model_kwargs[k] = v
+                else:
+                    value_found = False
+                    for kk, vv in model_assignments.items():
+                        if backend.symbol_is(v, kk):
+                            value_found = True
+                            break
+                    embedded_model_kwargs[k] = vv
+                    if not value_found:
+                        symbols_in_v = backend.symbols_in(v)
+                        v_kwargs = {
+                            symbol: model_assignments[symbol]
+                            for symbol in symbols_in_v
+                        }
+                        embedded_model_kwargs[k] = backend.evalf(
+                            v, v_kwargs
+                        )
 
                     # not working because python is checking equality of stuff??
                     # model_assignments[v] = embedded_model_kwargs[k]
@@ -1387,30 +1412,29 @@ class Model(metaclass=ModelType):
             # call alternate method, it's pretty small -- just do it here.
             # pattern is similar to from_values, etc. so maybe dry it up but this is
             # pretty small.
-            bound_embedded_model = embedded_model.__new__(embedded_model)
-            bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
-            bound_embedded_model.implementation = embedded_model_instance.implementation
-            bound_embedded_model.implementation(bound_embedded_model)
+            #bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
+        bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
 
-            setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
+    def bind_output_as_embedded(
+        embedded_model_instance, parent_instance, bound_embedded_model
+    ):
+        assignment_updates = {}
+        for field in embedded_model_instance._meta.output_fields:
+            sym_bound_field = getattr(embedded_model_instance, field._name)
+            sym_bound_field_dict = asdict(sym_bound_field)
 
-            for field in embedded_model._meta.output_fields:
-                sym_bound_field = getattr(embedded_model_instance, field._name)
-                sym_bound_field_dict = asdict(sym_bound_field)
+            ran_bound_field = getattr(bound_embedded_model, field._name)
+            ran_bound_field_dict = asdict(ran_bound_field)
 
-                ran_bound_field = getattr(bound_embedded_model, field._name)
-                ran_bound_field_dict = asdict(ran_bound_field)
-
-                model_assignments.update(
-                    {
-                        sym_val: ran_val
-                        for sym_val, ran_val in zip(
-                            sym_bound_field_dict.values(), ran_bound_field_dict.values()
-                        ) if isinstance(sym_val, backend.symbol_class)
-                    }
-                )
-
-            bound_embedded_model.bind_embedded_models()
+            assignment_updates.update(
+                {
+                    sym_val: ran_val
+                    for sym_val, ran_val in zip(
+                        sym_bound_field_dict.values(), ran_bound_field_dict.values()
+                    ) if isinstance(sym_val, backend.symbol_class)
+                }
+            )
+        return assignment_updates
 
 
 ModelTemplateType.user_model_metaclass = ModelType
