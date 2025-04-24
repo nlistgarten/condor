@@ -97,16 +97,23 @@ def process_relational_element(elem):
             raise ValueError("Too many inequalities deep")
 
         if mhs.shape == (0,0):
-            if rhs.is_constant() == lhs.is_constant():
+            if rhs.is_constant() and lhs.is_constant():
                 raise ValueError("Unexpected inequality of constants")
-            elif rhs.is_constant():
-                mhs = lhs
-                lhs = elem.lower_bound
-                rhs = rhs.to_DM().toarray()
+            elif not rhs.is_constant() and not lhs.is_constant():
+                mhs = (rhs - lhs)
+                lhs = np.full(lhs.shape,0.)
+                rhs = np.full(rhs.shape,np.inf)
             elif lhs.is_constant():
                 mhs = rhs
                 rhs = elem.upper_bound
                 lhs = lhs.to_DM().toarray()
+
+            elif rhs.is_constant():
+                mhs = lhs
+                lhs = elem.lower_bound
+                rhs = rhs.to_DM().toarray()
+            else:
+                raise ValueError
 
         elem.lower_bound = lhs
         elem.backend_repr = mhs
