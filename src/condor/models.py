@@ -372,7 +372,7 @@ class BaseModelType(type):
                     )
             else:
                 cls.inherit_field(v, cls_dict)
-            field_from_inherited[v] = cls_dict[v._name]
+            meta.inherited_items[k] = field_from_inherited[v] = cls_dict[v._name]
 
             if v._elements:
                 for element in v:
@@ -653,7 +653,6 @@ class BaseModelType(type):
         # by building up super_attrs from attrs; some operations need to operate on the
         # constructed class, like binding fields and submodels
         # before calling super new, process fields
-
         for field in new_cls._meta.all_fields:
             field.process_field()
 
@@ -1727,28 +1726,37 @@ class SubmodelType(ModelType):
         return super_names + new_names
 
     @classmethod
+    def prepare_item_from_primary(cls, cls_dict, attr_name, attr_val):
+        if cls_dict.meta.model_name in ("V1Trigger", "Switch1"):
+            print(attr_name, "=", attr_val)
+            #breakpoint()
+            pass
+        if isinstance(attr_val, Field):
+            if cls_dict.meta.copy_fields:
+                if attr_val._direction == Direction.output:
+                    new_direction = Direction.internal
+                else:
+                    new_direction = None
+                cls.inherit_field(attr_val, cls_dict, new_direction)
+                copied_field = cls_dict[attr_val._name]
+                if isinstance(copied_field, FreeField):
+                    copied_field._elements = [sym for sym in attr_val]
+                else:
+                    for elem in attr_val:
+                        elem.copy_to_field(copied_field)
+                # cls_dict[attr_name] = copied_field
+                return
+        cls_dict[attr_name] = attr_val
+
+    @classmethod
     def prepare_populate(cls, cls_dict):
         if cls.baseclass_for_inheritance is not None:
             primary_dict = {**cls_dict.meta.primary._meta.inherited_items}
             primary_dict.update(cls_dict.meta.primary._meta.user_set)
             for attr_name, attr_val in primary_dict.items():
-                if isinstance(attr_val, Field):
-                    if cls_dict.meta.copy_fields:
-                        if attr_val._direction == Direction.output:
-                            new_direction = Direction.internal
-                        else:
-                            new_direction = None
-                        cls.inherit_field(attr_val, cls_dict, new_direction)
-                        copied_field = cls_dict[attr_val._name]
-                        if isinstance(copied_field, FreeField):
-                            copied_field._elements = [sym for sym in attr_val]
-                        else:
-                            for elem in attr_val:
-                                elem.copy_to_field(copied_field)
-                        # cls_dict[attr_name] = copied_field
-                        continue
-                cls_dict[attr_name] = attr_val
+                cls.prepare_item_from_primary(cls_dict, attr_name, attr_val)
         super().prepare_populate(cls_dict)
+        pass
 
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
