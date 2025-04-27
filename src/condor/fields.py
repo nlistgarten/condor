@@ -818,7 +818,7 @@ class MatchedElement(BaseElement, MatchedElementMixin):
     """Element matched with another element of another field"""
     pass
 
-zero_like = lambda match: backend.operators.zeros(match.shape)
+zero_like = lambda match: np.zeros(match.shape)  # backend.operators.zeros(match.shape)
 pass_through = lambda match: match.backend_repr
 
 
