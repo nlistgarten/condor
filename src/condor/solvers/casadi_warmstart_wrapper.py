@@ -272,6 +272,7 @@ class CasadiNlpsolWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallback):
             out = self.out
         else:
             #print("new call running with", run_p)
+            self.run_kwargs = run_kwargs
             out = self.out = self.optimizer(**run_kwargs)
             self._stats = self.optimizer.stats()
 

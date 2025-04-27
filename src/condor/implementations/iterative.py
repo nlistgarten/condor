@@ -207,11 +207,13 @@ class CasadiNlpsolImplementation(OptimizationProblem):
         ipopt = auto()
         snopt = auto()
         qrsqp = auto()
+        fatrop = auto()
 
     method_strings = {
         Method.ipopt: "ipopt",
         Method.snopt: "snopt",
         Method.qrsqp: "sqpmethod",
+        Method.fatrop: "fatrop",
     }
 
 
@@ -276,9 +278,9 @@ class CasadiNlpsolImplementation(OptimizationProblem):
                     hessian_approximation="limited-memory",
                 )
 
-        elif self.method is OptimizationProblem.Method.snopt:
+        elif self.method is CasadiNlpsolImplementation.Method.snopt:
             pass
-        elif self.method is OptimizationProblem.Method.qrsqp:
+        elif self.method is CasadiNlpsolImplementation.Method.qrsqp:
             self.nlp_opts.update(
                 qpsol="qrqp",
                 qpsol_options=dict(
@@ -294,6 +296,14 @@ class CasadiNlpsolImplementation(OptimizationProblem):
                 # hessian_approximation= "limited-memory",
                 print_status=False,
             )
+            if self.options["print_level"] == 0:
+               self.nlp_opts["qpsol_options"] = dict(
+                   print_iter=False,
+                   print_header=False,
+                   print_info=False,
+               )
+
+
 
         self.callback = CasadiNlpsolWarmstart(
             primary_function = self.objective_func,
