@@ -1079,13 +1079,14 @@ class ModelType(BaseModelType):
         new_cls.__doc__ = "\n".join([orig_doc, f"    {lhs_doc} = {name}({arg_doc})"])
 
         # extend submodel templates
-        for submodel in new_cls._meta.template._meta.submodels:
-            extended_submodel = submodel.extend_template(
-                new_meta_kwargs=dict(primary=new_cls)
-            )
-            new_cls._meta.submodels.append(extended_submodel)
-            setattr(new_cls, submodel.__name__, extended_submodel)
-            pass
+        for base in new_cls._meta.template.__mro__[:-2]:
+            for submodel in base._meta.submodels:
+                extended_submodel = submodel.extend_template(
+                    new_meta_kwargs=dict(primary=new_cls)
+                )
+                new_cls._meta.submodels.append(extended_submodel)
+                setattr(new_cls, submodel.__name__, extended_submodel)
+                pass
 
         cls.inherit_template_methods(new_cls)
 
