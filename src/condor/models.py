@@ -1727,10 +1727,6 @@ class SubmodelType(ModelType):
 
     @classmethod
     def prepare_item_from_primary(cls, cls_dict, attr_name, attr_val):
-        if cls_dict.meta.model_name in ("V1Trigger", "Switch1"):
-            print(attr_name, "=", attr_val)
-            #breakpoint()
-            pass
         if isinstance(attr_val, Field):
             if cls_dict.meta.copy_fields:
                 if attr_val._direction == Direction.output:

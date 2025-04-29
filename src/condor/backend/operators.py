@@ -63,3 +63,68 @@ sqrt = wrap(backend_mod.operators.sqrt)
 
 vector_norm = wrap(backend_mod.operators.vector_norm)
 
+
+"""
+    case 0:
+       recurse_if_else(
+           condition0, action0, action_else
+       )
+
+       or
+
+       recurse_if_else([
+           condition0, action0, action_else
+       ])
+
+       slightlyd ifferent than case1 vs case2; wrapping triple elements indicates its
+       one thing??
+
+       so maybe with case2 version,
+
+    case 1:
+       recurse_if_else([
+           (condition0, action0),
+           (condition1, action1),
+           ...
+           action_else
+       ])
+
+    case 2:
+       recurse_if_else(
+           (condition0, action0),
+           (condition1, action1),
+           ...
+           action_else
+       )
+
+    case 3:
+       recurse_if_else(
+           condition0, action0,
+           condition1, action1,
+           ...
+           action_else
+       )
+
+    jax:
+        cond(pred, true_fun, false_fun)
+        https://docs.jax.dev/en/latest/_autosummary/jax.lax.cond.html
+        https://openxla.org/xla/operation_semantics#conditional
+
+        select_n(which, *cases) [and select, between true/false, which I guess is
+        opposite order?]
+        https://docs.jax.dev/en/latest/_autosummary/jax.lax.select_n.html
+        https://openxla.org/xla/operation_semantics#select
+
+        switch compiles to either cond or select
+        https://docs.jax.dev/en/latest/_autosummary/jax.lax.switch.html#jax.lax.switch
+
+    aesara: https://aesara.readthedocs.io/en/latest/reference/conditionals.html
+        ifelse(...) -- assume like cond
+
+        switch appears to be select
+
+    casadi:
+       conditional appears to be select
+       if_else(pred, if_true, if_false0
+
+"""

@@ -529,7 +529,7 @@ class TrajectoryAnalysisType(SubmodelType):
         ode_model = new_cls._meta.primary
         model = new_cls
         control_subs_pairs = {
-            control.backend_repr: [(control.default,)] for control in ode_model.modal
+            control.backend_repr: [control.default] for control in ode_model.modal
         }
         for mode in model._meta.modes:
             for act in mode.action:
@@ -540,7 +540,7 @@ class TrajectoryAnalysisType(SubmodelType):
         control_sub_expression = {}
         for k, v in control_subs_pairs.items():
             control_sub_expression[k] = substitute(
-                recurse_if_else(v), control_sub_expression
+                recurse_if_else(*v), control_sub_expression
             )
 
         new_cls._meta.initial_condition_function = expression_to_operator(

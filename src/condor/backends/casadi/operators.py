@@ -31,8 +31,7 @@ ones = casadi.MX.ones
 def vector_norm(x, ord=2):
     if ord==2:
         return casadi.norm_2(x)
-    if ord==1:
-        return casadi.norm_1(x)
+    if ord==1: return casadi.norm_1(x)
     if ord==inf:
         return casadi.norm_inf(x)
 
@@ -116,8 +115,18 @@ def substitute(expr, subs):
         expr = casadi.substitute([expr], list(subs.keys()), list(subs.values()))[0]
     return expr
 
-def recurse_if_else(conditions_actions):
-    """conditions_actions is a list of
+def recurse_if_else(*conditions_actions):
+    """
+
+    recurse_if_else(
+        (condition0, action0),
+        (codnition1, action1),
+        ...
+        else_action
+    )
+
+
+    conditions_actions is a list of
         (condition, action) pairs, which should get constructed in order
 
         to be equivalent to
@@ -140,5 +149,8 @@ def recurse_if_else(conditions_actions):
         else:
             return conditions_actions[0][0]
     condition, action = conditions_actions[0]
-    remainder = recurse_if_else(conditions_actions[1:])
+    remainder = recurse_if_else(*conditions_actions[1:])
     return casadi.if_else(condition, action, remainder)
+
+
+

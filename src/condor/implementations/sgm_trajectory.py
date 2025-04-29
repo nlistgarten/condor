@@ -96,7 +96,7 @@ class TrajectoryAnalysis:
         self.state0 = get_state_setter(model.initial, [self.p])
 
         control_subs_pairs = {
-            control.backend_repr: [(control.default,)] for control in ode_model.modal
+            control.backend_repr: [control.default] for control in ode_model.modal
         }
         for mode in model._meta.modes:
             for act in mode.action:
@@ -107,7 +107,7 @@ class TrajectoryAnalysis:
         control_sub_expression = {}
         for k, v in control_subs_pairs.items():
             control_sub_expression[k] = substitute(
-                recurse_if_else(v), control_sub_expression
+                recurse_if_else(*v), control_sub_expression
             )
 
         state_equation_func = get_state_setter(
