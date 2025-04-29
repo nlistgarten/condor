@@ -61,21 +61,16 @@ def zeros(shape=(1,1)):
     return backend.symbol_class(*shape)
 
 
-def args_to_symbol(*args):
-    try:
-        return concat(*args)
-    except:
-        return concat(args)
 
-    out = concat(args)
-    breakpoint()
-    return out
+def min(x, axis=None):
+    if axis is not None:
+        raise ValueError("Only axis=None supported")
+    return casadi.mmin(concat(x))
 
-def min(*args):
-    return casadi.mmin(args_to_symbol(*args))
-
-def max(*args):
-    return casadi.mmax(args_to_symbol(*args))
+def max(x, axis=None):
+    if axis is not None:
+        raise ValueError("Only axis=None supported")
+    return casadi.mmax(concat(x))
 
 
 def jacobian(of, wrt):
