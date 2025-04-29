@@ -11,8 +11,6 @@ pi = casadi.pi
 inf = casadi.inf
 nan = np.nan
 
-min = casadi.mmin
-max = casadi.mmax
 mod = casadi.fmod
 
 atan = casadi.atan
@@ -61,6 +59,24 @@ def unstack(arr, axis=0):
 
 def zeros(shape=(1,1)):
     return backend.symbol_class(*shape)
+
+
+def args_to_symbol(*args):
+    try:
+        return concat(*args)
+    except:
+        return concat(args)
+
+    out = concat(args)
+    breakpoint()
+    return out
+
+def min(*args):
+    return casadi.mmin(args_to_symbol(*args))
+
+def max(*args):
+    return casadi.mmax(args_to_symbol(*args))
+
 
 def jacobian(of, wrt):
     """ jacobian of expression `of` with respect to symbols `wrt` """
