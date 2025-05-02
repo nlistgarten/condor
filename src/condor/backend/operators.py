@@ -62,6 +62,7 @@ log10 = wrap(backend_mod.operators.log10)
 sqrt = wrap(backend_mod.operators.sqrt)
 
 vector_norm = wrap(backend_mod.operators.vector_norm)
+solve = wrap(backend_mod.operators.solve)
 
 
 """

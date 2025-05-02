@@ -35,6 +35,7 @@ def vector_norm(x, ord=2):
     if ord==inf:
         return casadi.norm_inf(x)
 
+solve = casadi.solve
 
 def concat(arrs, axis=0):
     """ implement concat from array API for casadi """
