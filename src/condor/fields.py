@@ -317,7 +317,7 @@ class Field:
         """Create the dataclass for this model and field with the current elements"""
         # TODO: do processing to handle different field types
         fields = [(element.name, float) for element in self._elements]
-        name = make_class_name([self._model_name, self._name])
+        name = self._model_name + make_class_name([self._name])
         self._dataclass = make_dataclass(
             name,
             fields,
