@@ -31,6 +31,7 @@ substitute = backend_mod.operators.substitute
 zeros = backend_mod.operators.zeros
 eye = backend_mod.operators.eye
 ones = backend_mod.operators.ones
+diag = backend_mod.operators.diag # possibly not part of array API?
 
 # "manipulation functions"
 concat = backend_mod.operators.concat

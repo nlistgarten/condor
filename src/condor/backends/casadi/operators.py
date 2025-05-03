@@ -28,6 +28,14 @@ sqrt = casadi.sqrt
 eye = casadi.MX.eye
 ones = casadi.MX.ones
 
+def diag(v, k=0):
+    if k != 0:
+        raise ValueError("Not supported for this backend")
+    if not hasattr(v, "shape"):
+        # try to concat list/tuple of elements
+        v = concat(v)
+    return casadi.diag(v)
+
 def vector_norm(x, ord=2):
     if ord==2:
         return casadi.norm_2(x)
