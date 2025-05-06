@@ -1759,7 +1759,7 @@ class SubmodelType(ModelType):
         if isinstance(attr_val, Field):
             if (
                 not new_cls._meta.copy_fields
-                and attr_val._inherits_from._model is not new_cls._meta.primary
+                and attr_val._inherits_from._model in (new_cls._meta.primary, new_cls._meta.primary._meta.template)
             ):
                 return
         super().process_condor_attr(attr_name, attr_val, new_cls)
