@@ -189,11 +189,11 @@ class BackendSymbolData(BackendSymbolDataMixin):
         if self.symmetric:
             value = unique_to_symmetric(value, symbolic=isinstance(value, symbol_class))
 
+        if isinstance(value, symbol_class) and value.is_constant():
+            value = value.to_DM().toarray()
 
         if (
-            (isinstance(value, symbol_class) and value.is_constant())
-            #or isinstance(value, casadi.DM)
-            or not isinstance(value, (np.ndarray, symbol_class))
+            not isinstance(value, (np.ndarray, symbol_class))
         ):
             value = np.array(value)
 
