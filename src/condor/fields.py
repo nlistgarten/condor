@@ -761,7 +761,9 @@ class DependentElement(BaseElement):
 
 @dataclass(repr=False)
 class AssignedElement(BaseElement):
-    pass
+    def __hash__(self):
+        return super().__hash__()
+
 
 
 class AssignedField(Field, default_direction=Direction.output):
