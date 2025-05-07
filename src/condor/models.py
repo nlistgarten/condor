@@ -43,7 +43,7 @@ class BaseModelMetaData:
     template: object = None
 
     user_set: dict = field(default_factory=dict)
-    backend_repr_elements: dict = field(default_factory=dict)
+    backend_repr_elements: dict = field(default_factory=backend.SymbolCompatibleDict)
     options: object = None
 
     # assembly/component can also get children/parent
@@ -149,8 +149,8 @@ class BaseCondorClassDict(dict):
                 attr_val.name = attr_name
         if isinstance(attr_val, backend.symbol_class):
             # from a FreeField
-            if attr_val in self.meta.backend_repr_elements:
-                element = self.meta.backend_repr_elements[attr_val]
+            element = self.meta.backend_repr_elements.get(attr_val, None)
+            if element is not None:
                 if element.name:
                     pass
                 elif attr_name:
@@ -177,7 +177,11 @@ class BaseCondorClassDict(dict):
         if self.user_setting:
             self.meta.user_set[attr_name] = attr_val
 
-        return super().__setitem__(attr_name, attr_val)
+        out = super().__setitem__(attr_name, attr_val)
+
+        if hasattr(attr_val, "update_name"):
+            attr_val.update_name(attr_name)
+        return out
 
 
 class DynamicLink:
@@ -753,10 +757,20 @@ def check_attr_name(attr_name, attr_val, new_cls):
     existing_attr = new_cls.__dict__.get(attr_name, None)
     if existing_attr is not None and attr_val is not existing_attr:
         if isinstance(existing_attr, BaseElement):
-            compare_attr = existing_attr.backend_repr
+            compare_attr_existing = existing_attr.backend_repr
         else:
-            compare_attr = existing_attr
-        if isinstance(attr_val, BaseElement) and attr_val.backend_repr is compare_attr:
+            compare_attr_existing = existing_attr
+
+        if isinstance(attr_val, BaseElement):
+            compare_attr_new = attr_val.backend_repr
+        else:
+            compare_attr_new = attr_val
+
+        if isinstance(compare_attr_existing, backend.symbol_class):
+            if backend.symbol_is(compare_attr_new, compare_attr_existing):
+                return
+        else:
+            if compare_attr_new is compare_attr_existing:
                 return
 
         raise NameError(
@@ -1204,6 +1218,7 @@ class Model(metaclass=ModelType):
             "implementation"
         ]}
         return d
+
 
     @staticmethod
     def function_call_to_fields(fields, *args, **kwargs):

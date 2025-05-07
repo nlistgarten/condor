@@ -13,7 +13,7 @@ expression_to_operator = backend_mod.expression_to_operator
 process_relational_element = backend_mod.process_relational_element
 is_constant = backend_mod.is_constant
 evalf = backend_mod.evalf
-
-symbols_in = backend_mod.symbols_in 
+SymbolCompatibleDict = backend_mod.SymbolCompatibleDict
+symbols_in = backend_mod.symbols_in
 # list of symbols in an expression, casadi.symvar, aesara.graph_inputs, possibly in
 # jax.jax_expr stuff?

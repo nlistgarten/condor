@@ -299,6 +299,57 @@ def symbol_is(a, b):
         casadi.is_equal(a, b, int(1E10))
     )
 
+class WrappedSymbol:
+    def __init__(self, symbol):
+        #assert not isinstance(arg, WrappedSymbol)
+        if isinstance(symbol, WrappedSymbol):
+            symbol = arg.symbol
+        self.symbol = symbol
+
+    def __hash__(self):
+        return hash(self.symbol)
+
+    def __eq__(self, other):
+        if not isinstance(other, WrappedSymbol):
+            if isinstance(other, symbol_class):
+                other = WrappedSymbol(other)
+            else:
+                return False
+        return symbol_is(self.symbol, other.symbol)
+
+    def __str__(self):
+        return self.symbol.__str__()
+
+    def __repr__(self):
+        return self.symbol.__repr__()
+
+class SymbolCompatibleDict(dict):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __getitem__(self, k):
+        return dict.__getitem__(self, WrappedSymbol(k))
+
+    def __setitem__(self, k, v):
+        return dict.__setitem__(self, WrappedSymbol(k), v)
+
+    def keys(self):
+        for k in dict.keys(self):
+            yield k.symbol
+
+    def items(self):
+        for k,v in dict.items(self):
+            yield k.symbol, v
+
+    __iter__ = keys
+
+    def __copy__(self):
+        copy = HashDict()
+        for k,v in self.items():
+            copy[k] = v
+        return copy
+
+
 
 def evalf(expr, backend_repr2value):
     if not isinstance(expr, list):
