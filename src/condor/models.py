@@ -179,8 +179,8 @@ class BaseCondorClassDict(dict):
 
         out = super().__setitem__(attr_name, attr_val)
 
-        if hasattr(attr_val, "update_name"):
-            attr_val.update_name(attr_name)
+        if hasattr(attr_val, "update_name") and self.user_setting:
+            attr_val.update_name(attr_name, self)
         return out
 
 
