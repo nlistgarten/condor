@@ -561,7 +561,7 @@ class TrajectoryAnalysisType(SubmodelType):
         )
         new_cls._meta.modal_eval = expression_to_operator(
             [new_cls.t, x, p],
-            concat(control_sub_expression.values()),
+            substitute(new_cls.modal.flatten(), control_sub_expression),
             f"{new_cls.__name__}_modal_evaluation"
         )
 
