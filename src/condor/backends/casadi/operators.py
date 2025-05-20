@@ -103,7 +103,10 @@ def jacobian(of, wrt):
        #jac = casadi.Function("my_jac", [flat_inp], [jac_expr])
        jac(0.)
     """
-    return casadi.jacobian(of, wrt)
+    if of.size:
+        return casadi.jacobian(of, wrt)
+    else:
+        return casadi.MX()
 
 def jac_prod(of, wrt, rev=True):
     """ create directional derivative """

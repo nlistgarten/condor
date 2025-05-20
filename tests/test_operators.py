@@ -37,3 +37,14 @@ def test_recurse_if_else():
     assert Check(1).emlf == 4.4
     assert Check(2).emlf == 6.0
     assert Check(12).emlf == 12
+
+
+def test_jacobian_empty():
+    class TestJacobian(co.ExplicitSystem):
+        x = input()
+
+    ops.jacobian(TestJacobian.output.flatten(), TestJacobian.input.flatten())
+
+
+
+

@@ -324,8 +324,10 @@ class WrappedSymbol:
         return self.symbol.__repr__()
 
 class SymbolCompatibleDict(dict):
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self,*args, **kwargs):
+        args_dict = dict(*args, **kwargs)
+        for k, v in args_dict.items():
+            self[k] = v
 
     def __getitem__(self, k):
         return dict.__getitem__(self, WrappedSymbol(k))
@@ -344,7 +346,7 @@ class SymbolCompatibleDict(dict):
     __iter__ = keys
 
     def __copy__(self):
-        copy = HashDict()
+        copy = SymbolCompatibleDict()
         for k,v in self.items():
             copy[k] = v
         return copy
