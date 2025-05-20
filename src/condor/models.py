@@ -839,8 +839,14 @@ class ModelTemplateType(BaseModelType):
                 model_name, bases + (cls.user_model_baseclass,), **kwargs
             )
         else:
+            if (meta := kwargs.pop("meta", None)) is None and bases and (
+                user_model_metclass := getattr(bases[0], "user_model_metaclass", None)
+            ) is not None:
+                meta = user_model_metclass.metadata_class(
+                    model_name=model_name
+                )
             # actually creating a model template
-            return super().__prepare__(model_name, bases, **kwargs)
+            return super().__prepare__(model_name, bases, meta=meta, **kwargs)
 
     @classmethod
     def prepare_populate(cls, cls_dict):
