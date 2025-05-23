@@ -71,14 +71,18 @@ def zeros(shape=(1,1)):
 
 
 def min(x, axis=None):
+    if not isinstance(x, backend.symbol_class):
+        x = concat(x)
     if axis is not None:
         raise ValueError("Only axis=None supported")
-    return casadi.mmin(concat(x))
+    return casadi.mmin(x)
 
 def max(x, axis=None):
+    if not isinstance(x, backend.symbol_class):
+        x = concat(x)
     if axis is not None:
         raise ValueError("Only axis=None supported")
-    return casadi.mmax(concat(x))
+    return casadi.mmax(x)
 
 
 def jacobian(of, wrt):

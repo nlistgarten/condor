@@ -10,6 +10,8 @@ def test_min_max():
         x = input()
         output.y = ops.max([0.3, x])
         output.z = ops.min([0.3, x])
+        output.yy = ops.min(ops.concat([0.3, x]))
+        output.zz = ops.max(ops.concat([0.3, x]))
 
     chk1 = TestMax(0.5)
     chk2 = TestMax(0.1)
