@@ -359,6 +359,18 @@ class Field:
     def __getitem__(self, item):
         return getattr(self, item)
 
+    def __add__(self, other):
+        """ add concatenates list of elements """
+        if isinstance(other, Field):
+            return self._elements + other._elements
+        raise NotImplemented
+
+    def __radd__(self, other):
+        """ add concatenates list of elements """
+        if isinstance(other, Field):
+            return other._elements + self._elements
+        raise NotImplemented
+
 
 def make_class_name(components):
     separate_words = " ".join([comp.replace("_", " ") for comp in components])
