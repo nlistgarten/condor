@@ -845,7 +845,16 @@ class ModelTemplateType(BaseModelType):
                 meta = user_model_metclass.metadata_class(
                     model_name=model_name
                 )
-            # actually creating a model template
+            # actually creating a model template, TODO at some point tap into
+            # inheritance tree for now nothing fails this check
+            if as_template:
+                bases_mro = tuple()
+                for base in bases:
+                    bases_mro +=  base.__mro__
+                if Model in bases_mro or ModelTemplate in bases_mro:
+                    pass
+                else:
+                    breakpoint()
             return super().__prepare__(model_name, bases, meta=meta, **kwargs)
 
     @classmethod
@@ -905,7 +914,16 @@ class ModelTemplateType(BaseModelType):
             attrs.meta.user_set = attrs.meta.inherited_items
             attrs.meta.inherited_items = {}
 
-        new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
+        if False and as_template and bases[0].user_model_metaclass is not ModelType and model_metaclass is None:
+            # use model metaclass from first base if possible
+            use_metaclass = bases[0].user_model_metaclass
+            new_cls = use_metaclass.__new__(
+                use_metaclass, model_name, bases, attrs, **kwargs
+            )
+            new_cls.user_model_metaclass = use_metaclass
+        else:
+            new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
+
 
         if immediate_return:
             return new_cls
@@ -916,13 +934,14 @@ class ModelTemplateType(BaseModelType):
             log.debug("prcessing for model metaclass asssigned, new")
 
         if as_template:
-            impl = getattr(implementations, new_cls.__mro__[1].__name__, None)
+            impl = ModelType.get_implementation_class(new_cls)
             if impl is not None:
                 setattr(
                     implementations,
                     new_cls.__name__,
                     impl,
                 )
+
 
         return new_cls
 
@@ -1084,10 +1103,28 @@ class ModelType(BaseModelType):
         if not name:
             name = model_name
 
+
         if cls.creating_base_class_for_inheritance(name):
             super_bases = bases
         else:
-            super_bases = bases[1:]
+            bases_mro = tuple()
+            for base in bases:
+                bases_mro +=  base.__mro__
+            if Model in bases_mro or ModelTemplate in bases_mro:
+                use_bases = bases
+            else:
+                # some type of model inheritance, TODO I think at some point need to
+                # figure out how to thook into the inheritance tree. For now, just
+                # use Model
+                for base in bases:
+                    template = base.__class__
+                    if hasattr(template, "baseclass_for_inheritance"):
+                        first_base = template.baseclass_for_inheritance
+                        break
+                use_bases = (None, Model)
+
+            super_bases = use_bases[1:]
+
         new_cls = super().__new__(cls, name, super_bases, attrs, **kwargs)
 
         if not cls.is_user_model(bases):
