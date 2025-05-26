@@ -67,5 +67,12 @@ General Object-Oriented and Metaprogramming Terms
       A class that provides specific behavior, an inheritor may also inherit from other mixins and even a "base" to maximize 
       code reuse
 
+   type
+      The class of a class (i.e., a class is an object of type, type); used as a suffix for a metaclass
+
+   metaclass
+      The class of a particular class, does name space preparation before user's class declaration and processing at closure
+
+
 
 
