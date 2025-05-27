@@ -131,10 +131,14 @@ def substitute(expr, subs):
         expr = casadi.substitute([expr], list(subs.keys()), list(subs.values()))[0]
     return expr
 
-def recurse_if_else(*conditions_actions):
+from collections import namedtuple
+cond_action = namedtuple("ConditionAction", ["condition", "action"])
+else_action = namedtuple("ElseAction", ["action"])
+
+def if_else(*conditions_actions):
     """
 
-    recurse_if_else(
+    if_else(
         (condition0, action0),
         (codnition1, action1),
         ...
@@ -160,13 +164,11 @@ def recurse_if_else(*conditions_actions):
 
     """
     if len(conditions_actions) == 1:
-        if not hasattr(conditions_actions[0], "__len__"):
-            return conditions_actions[0]
-        else:
-            return conditions_actions[0][0]
+        else_action = conditions_actions[0]
+        if isinstance(else_action, (list, tuple)):
+            raise ValueError("if_else requires an else_action to be provided")
+        return else_action
     condition, action = conditions_actions[0]
-    remainder = recurse_if_else(*conditions_actions[1:])
+    remainder = if_else(*conditions_actions[1:])
     return casadi.if_else(condition, action, remainder)
-
-
 

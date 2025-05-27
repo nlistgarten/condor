@@ -9,7 +9,7 @@ from condor.backend import (
     symbol_class, callables_to_operator, expression_to_operator,
 )
 from condor.backend.operators import (
-    recurse_if_else, substitute, jacobian, concat, inf, sin, pi, mod
+    if_else, substitute, jacobian, concat, inf, sin, pi, mod
 )
 
 def get_state_setter(field, signature, on_field=None, subs=None):
@@ -107,7 +107,7 @@ class TrajectoryAnalysis:
         control_sub_expression = {}
         for k, v in control_subs_pairs.items():
             control_sub_expression[k] = substitute(
-                recurse_if_else(*v), control_sub_expression
+                if_else(*v), control_sub_expression
             )
 
         state_equation_func = get_state_setter(

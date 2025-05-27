@@ -23,10 +23,10 @@ def test_min_max():
     assert chk2.z == 0.1
 
 
-def test_recurse_if_else():
+def test_if_():
     class Check(co.ExplicitSystem):
         catd = input()
-        output.emlf = ops.recurse_if_else(
+        output.emlf = ops.if_else(
             (catd == 0, 3.8), # normal design FAR Part 23
             (catd == 1, 4.4), # utility design FAR 23
             (catd == 2, 6.0), # aerobatic design FAR 23
@@ -39,6 +39,18 @@ def test_recurse_if_else():
     assert Check(1).emlf == 4.4
     assert Check(2).emlf == 6.0
     assert Check(12).emlf == 12
+
+    with pytest.raises(ValueError):
+
+        class Check(co.ExplicitSystem):
+            catd = input()
+            output.emlf = ops.if_else(
+                (catd == 0, 3.8), # normal design FAR Part 23
+                (catd == 1, 4.4), # utility design FAR 23
+                (catd == 2, 6.0), # aerobatic design FAR 23
+                (catd == 3, 2.5), # transports FAR 25
+                (catd > 3, catd), # input design limit load factor
+            )
 
 
 def test_jacobian_empty():

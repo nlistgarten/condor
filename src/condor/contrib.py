@@ -12,7 +12,7 @@ from condor.backend import (
     is_constant
 )
 
-from condor.backend.operators import (recurse_if_else, substitute, concat)
+from condor.backend.operators import (if_else, substitute, concat)
 from condor.fields import (
     AssignedField,
     BoundedAssignmentField,
@@ -540,7 +540,7 @@ class TrajectoryAnalysisType(SubmodelType):
         control_sub_expression = {}
         for k, v in control_subs_pairs.items():
             control_sub_expression[k] = substitute(
-                recurse_if_else(*v), control_sub_expression
+                if_else(*v), control_sub_expression
             )
 
         new_cls._meta.initial_condition_function = expression_to_operator(
