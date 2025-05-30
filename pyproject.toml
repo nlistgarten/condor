@@ -24,9 +24,15 @@ dependencies = [
     "ndsplines>=0.2.0post0",
 ]
 
-[project.optional-dependencies]
-test = ["pytest"]
-docs = ["sphinx", "sphinx-gallery", "matplotlib", "furo"]
+[dependency-groups]
+lint = ["ruff"]
+test = ["pytest", "pytest-cov"]
+docs = [
+    "sphinx",
+    "sphinx-gallery",
+    "matplotlib",
+    "furo",
+]
 
 [project.urls]
 Documentation = "https://nasa.github.io/condor"
@@ -34,9 +40,22 @@ Documentation = "https://nasa.github.io/condor"
 [tool.setuptools_scm]
 write_to = "src/condor/_version.py"
 
+[tool.ruff]
+exclude = ["design/*"]
+
 [tool.ruff.lint]
+select = ["E"]
 ignore = [
     "F821", # Undefined name ..."
+]
+
+[tool.ruff.lint.per-file-ignores]
+"docs/*" = [
+    "E402", # Module level import not at top of file, ok in tutorials
+    "E305", # Expected 2 blank lines afer class or function definition
+]
+"tests/*" = [
+    "F841", # Local variable assigned but never used, ok in smoke tests
 ]
 
 [tool.isort]

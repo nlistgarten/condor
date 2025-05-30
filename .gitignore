@@ -6,7 +6,7 @@ reports/
 _version.py
 _build/
 build/
-tutorials/
+dist/
+
+tutorial/
 howto/
-docs/tutorials/
-docs/howto/
