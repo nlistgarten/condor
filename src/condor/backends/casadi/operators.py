@@ -131,10 +131,6 @@ def substitute(expr, subs):
         expr = casadi.substitute([expr], list(subs.keys()), list(subs.values()))[0]
     return expr
 
-from collections import namedtuple
-cond_action = namedtuple("ConditionAction", ["condition", "action"])
-else_action = namedtuple("ElseAction", ["action"])
-
 def if_else(*conditions_actions):
     """
 

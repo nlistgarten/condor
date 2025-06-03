@@ -38,7 +38,10 @@ Condor Specific Terms
        a model being evaluated as part of another model definition
 
     model instance
-       an evaluation of the model with the specified input values; may be symbolic when embedded into another model
+       an evaluation of the model with the specified input values bound; may be symbolic when embedded into another model
+
+    bind
+       attach specific values to the inputs and outputs of a model to create a model instance
 
     model template
       a class that defines what fields and placeholder values a particular model type can use; a model subclasses a template
@@ -53,11 +56,19 @@ Condor Specific Terms
       a field provided to model templates to define singleton reserved word values, like ``t0`` and ``tf`` for a trajectory
       or the ``objective`` for an optimization problem
 
+    submodel
+      a model (template) for defining models that is instrinsically tied to its super model, e.g., events, modes, and trajectory
+      analysis models are submodels to the super ODE system
+
+    embedded model
+      a (standlone) model that is being used inside another model
+
+
 
 General Object-Oriented and Metaprogramming Terms
 =====================================================
 
-.. glossasry::
+.. glossary::
 
    base
       A relatively complete class to inherit from; inheritors will generally make behavior more specific by overwriting methods.
@@ -72,6 +83,9 @@ General Object-Oriented and Metaprogramming Terms
 
    metaclass
       The class of a particular class, does name space preparation before user's class declaration and processing at closure
+
+   contrib
+      Included implementations of a library's capability, the batteries in "batteries included"
 
 
 
