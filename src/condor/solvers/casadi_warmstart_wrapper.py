@@ -99,7 +99,7 @@ class CasadiWarmstartWrapperBase:
             #    [x,p],
             #    [casadi.jacobian(self.sym_solved_inp_x0["x"], p)],
             #)
-        except RuntimeError as e:
+        except RuntimeError:
             self.placeholder_jacobian = None
 
         # stuff attributes expected by CasadiFunctionCallback, including jacobian
@@ -111,7 +111,7 @@ class CasadiWarmstartWrapperBase:
         if self.placeholder_jacobian is not None:
             try:
                 self.placeholder_hessian = self.placeholder_jacobian.jacobian()
-            except RuntimeError as e:
+            except RuntimeError:
                 self.placeholder_hessian = None
 
             wrap_funcs = [self.eval_jacobian]

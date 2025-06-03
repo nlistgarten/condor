@@ -7,12 +7,12 @@ import ndsplines
 import numpy as np
 
 from condor.backend import (
-    symbol_class, expression_to_operator,
+    expression_to_operator,
     process_relational_element,
     is_constant
 )
 
-from condor.backend.operators import (if_else, substitute, concat)
+from condor.backend.operators import (if_else, substitute)
 from condor.fields import (
     AssignedField,
     BoundedAssignmentField,

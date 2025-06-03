@@ -26,7 +26,6 @@ class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
         state_max_step_size=0.5/8
         adjoint_max_step_size=0.5/8
 
-from condor.backends.casadi.implementations import OptimizationProblem
 class SampledOptLQR(co.OptimizationProblem):
     K = variable(shape=DblIntSampledLQR.K.shape)
     objective = DblIntSampledLQR(K).cost

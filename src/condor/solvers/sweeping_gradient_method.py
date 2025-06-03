@@ -1,9 +1,8 @@
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 
 import numpy as np
 # from condor import backend
 from scipy.interpolate import make_interp_spline
-from scipy.linalg import expm
 
 try:
     from scikits.odes.sundials.cvode import CVODE, StatusEnum
@@ -15,7 +14,7 @@ else:
 from typing import NamedTuple, Optional
 
 from scipy.integrate import ode as scipy_ode
-from scipy.optimize import brentq, newton
+from scipy.optimize import brentq
 
 
 class SolverMixin:
@@ -1226,7 +1225,7 @@ class TrajectoryAnalysisSGM:
         p_terminal_terms_p_state = None,
     ):
         if cache_size >1:
-            raise NotImplemented
+            raise NotImplementedError
         self.cache_size = cache_size
 
         self.cached_p = None

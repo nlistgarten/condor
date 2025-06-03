@@ -1,7 +1,4 @@
 from .utils import options_to_kwargs
-import condor as co
-import numpy as np
-from condor import backend
 
 from condor.backend import callables_to_operator, expression_to_operator
 class DeferredSystem:

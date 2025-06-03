@@ -2,7 +2,6 @@ import numpy as np
 import condor as co
 import matplotlib.pyplot as plt
 from sgm_test_util import LTI_plot
-from scipy import linalg
 
 with_time_state = False
 # either include time as state or increase tolerances to ensure sufficient ODE solver
@@ -82,7 +81,6 @@ sim = Transfer(t1=1., t2= 4.,)
 print(sim.pos_at_switch)
 #jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 
-from condor.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
     t1 = variable(lower_bound=0)
     t2 = variable(lower_bound=0)

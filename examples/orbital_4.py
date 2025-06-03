@@ -1,10 +1,9 @@
 import numpy as np
 import condor as co
 import casadi as ca
-import matplotlib.pyplot as plt
 
 from condor.backends.casadi.implementations import OptimizationProblem
-from LinCovCW import LinCovCW, make_burn, I3, Z3, I6, Z6, deriv_check_plots, make_sim
+from LinCovCW import LinCovCW, make_burn, I3, Z3, I6, Z6, make_sim
 
 
 class Terminate(LinCovCW.Event):

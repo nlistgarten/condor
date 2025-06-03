@@ -10,7 +10,7 @@ import numpy as np
 
 
 from condor.backend import (
-    symbol_class, callables_to_operator, expression_to_operator,
+    symbol_class, expression_to_operator,
 )
 from condor.backend.operators import (
     concat, jacobian, unstack,

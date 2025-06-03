@@ -363,13 +363,13 @@ class Field:
         """ add concatenates list of elements """
         if isinstance(other, Field):
             return self._elements + other._elements
-        raise NotImplemented
+        raise NotImplementedError
 
     def __radd__(self, other):
         """ add concatenates list of elements """
         if isinstance(other, Field):
             return other._elements + self._elements
-        raise NotImplemented
+        raise NotImplementedError
 
 
 def make_class_name(components):

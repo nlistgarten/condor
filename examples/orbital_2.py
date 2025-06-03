@@ -1,4 +1,3 @@
-import numpy as np
 import condor as co
 import casadi as ca
 

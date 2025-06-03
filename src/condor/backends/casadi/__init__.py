@@ -272,7 +272,7 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
     if diagonal:
         #assert m == 1
         sym = casadi.diag(sym)
-        raise NotImplemented
+        raise NotImplementedError
     elif symmetric:
         assert n == m
         unique_shape = (int(n*(n+1)/2), 1)
@@ -491,7 +491,7 @@ class CasadiFunctionCallback(casadi.Callback):
         )
         try:
             pass
-        except Exception as e:
+        except Exception:
             breakpoint()
             pass
         if self.jacobian_of:

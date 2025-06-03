@@ -1,5 +1,4 @@
 import condor as co
-import numpy as np
 import pytest
 backend = co.backend
 ops = backend.operators

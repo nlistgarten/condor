@@ -1,4 +1,3 @@
-import pytest
 import casadi
 from condor import CasadiFunctionCallback
 

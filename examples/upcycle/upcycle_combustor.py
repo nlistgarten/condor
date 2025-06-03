@@ -1,16 +1,11 @@
 import condor.upcycle as upcycle # isort: skip
 
 import os
-import pprint
-import re
-import warnings
 
 import numpy as np
-import openmdao.api as om
 import pandas as pd
 from openmdao.api import IndepVarComp, Problem
 from pycycle.api import AIR_JETA_TAB_SPEC
-from pycycle.elements.ambient import Ambient
 from pycycle.elements.combustor import Combustor
 from pycycle.elements.flow_start import FlowStart
 from pycycle.mp_cycle import Cycle
@@ -120,7 +115,6 @@ def make_problem():
 
 
 upsolver, prob = upcycle.upcycle_problem(make_problem, warm_start=True)
-import condor as co
 #[exec(solver.model_string) for solver in ]
 for solver in list(upsolver.iter_solvers())[::-1]:
     print(solver.model_string)
