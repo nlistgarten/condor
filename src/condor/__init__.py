@@ -7,38 +7,56 @@ if False:
 
 from condor._version import __version__
 from condor.conf import settings
-from condor.models import ModelType, ModelTemplate
 from condor.contrib import (
+    LTI,
+    AlgebraicSystem,
     DeferredSystem,
     ExplicitSystem,
     ExternalSolverModel,
-    AlgebraicSystem,
+    ODESystem,
     OptimizationProblem,
     TableLookup,
-    ODESystem, LTI
 )
-from condor.fields import (AssignedField, BaseElement, BoundedAssignmentField,
-                           Direction, Field, FreeElement, FreeField,
-                           InitializedField, MatchedField,
-                           TrajectoryOutputField, WithDefaultField)
-from condor.models import Options
+from condor.fields import (
+    AssignedField,
+    BaseElement,
+    BoundedAssignmentField,
+    Direction,
+    Field,
+    FreeElement,
+    FreeField,
+    InitializedField,
+    MatchedField,
+    TrajectoryOutputField,
+    WithDefaultField,
+)
+from condor.models import ModelTemplate, ModelType, Options
 
 __all__ = [
     __version__,
-    ModelType, ModelTemplate,
+    ModelType,
+    ModelTemplate,
     settings,
     Options,
     DeferredSystem,
     ExplicitSystem,
     ExternalSolverModel,
     AlgebraicSystem,
-    ODESystem, LTI,
+    ODESystem,
+    LTI,
     TableLookup,
     OptimizationProblem,
-AssignedField, BaseElement, BoundedAssignmentField,
-   Direction, Field, FreeElement, FreeField,
-   InitializedField, MatchedField,
-   TrajectoryOutputField, WithDefaultField,
+    AssignedField,
+    BaseElement,
+    BoundedAssignmentField,
+    Direction,
+    Field,
+    FreeElement,
+    FreeField,
+    InitializedField,
+    MatchedField,
+    TrajectoryOutputField,
+    WithDefaultField,
 ]
 
 ##################

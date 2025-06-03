@@ -16,7 +16,7 @@ import condor
 
 class Model(condor.ExplicitSystem):
     x = input()
-    output.y = -x**2 + 2*x + 1
+    output.y = -(x**2) + 2 * x + 1
 
 
 with Pool(5) as p:

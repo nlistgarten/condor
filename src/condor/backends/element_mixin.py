@@ -116,4 +116,3 @@ class BackendSymbolDataMixin:
             assert len(self.shape) == 2
             assert self.shape[0] == self.shape[1]
         self.size = size
-

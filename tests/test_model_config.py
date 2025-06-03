@@ -1,6 +1,7 @@
-import condor as co
 import numpy as np
 import pytest
+
+import condor as co
 
 
 def test_model_config():
@@ -19,10 +20,5 @@ def test_model_config():
 
     assert dbl_int is not sp_dbl_int
 
-
     with pytest.raises(ValueError):
-        co.settings.get_module(
-            "modules.configured_model", A=A, B=B, extra="something"
-        )
-
-
+        co.settings.get_module("modules.configured_model", A=A, B=B, extra="something")

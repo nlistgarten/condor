@@ -8,11 +8,10 @@ import numpy as np
 
 from condor.backend import (
     expression_to_operator,
+    is_constant,
     process_relational_element,
-    is_constant
 )
-
-from condor.backend.operators import (if_else, substitute)
+from condor.backend.operators import if_else, substitute
 from condor.fields import (
     AssignedField,
     BoundedAssignmentField,
@@ -156,7 +155,6 @@ class OptimizationProblemType(ModelType):
 
             if re_append_elem:
                 new_cls.constraint._elements.append(elem)
-
 
     @classmethod
     def bind_model_fields(cls, new_cls, attrs):
@@ -516,13 +514,11 @@ class TrajectoryAnalysisType(SubmodelType):
         new_cls = super().__new__(cls, *args, **kwargs)
         return new_cls
 
-
     @classmethod
     def bind_model_fields(cls, new_cls, attrs):
         super().bind_model_fields(new_cls, attrs)
         p = new_cls.parameter.flatten()
         x = new_cls.state.flatten()
-
 
         ode_model = new_cls._meta.primary
         model = new_cls
@@ -532,37 +528,33 @@ class TrajectoryAnalysisType(SubmodelType):
         for mode in model._meta.modes:
             for act in mode.action:
                 control_subs_pairs[act.match.backend_repr].insert(
-                    -1,
-                    (mode.condition, act.backend_repr)
+                    -1, (mode.condition, act.backend_repr)
                 )
         control_sub_expression = {}
         for k, v in control_subs_pairs.items():
-            control_sub_expression[k] = substitute(
-                if_else(*v), control_sub_expression
-            )
+            control_sub_expression[k] = substitute(if_else(*v), control_sub_expression)
 
         new_cls._meta.initial_condition_function = expression_to_operator(
             [p],
             substitute(new_cls.initial.flatten(), control_sub_expression),
-            f"{new_cls.__name__}_initial_condition"
+            f"{new_cls.__name__}_initial_condition",
         )
 
         new_cls._meta.state_equation_function = expression_to_operator(
             [new_cls.t, x, p],
             substitute(new_cls.dot.flatten(), control_sub_expression),
-            f"{new_cls.__name__}_state_equation"
+            f"{new_cls.__name__}_state_equation",
         )
         new_cls._meta.output_equation_function = expression_to_operator(
             [new_cls.t, x, p],
             substitute(new_cls.dynamic_output.flatten(), control_sub_expression),
-            f"{new_cls.__name__}_output_equation"
+            f"{new_cls.__name__}_output_equation",
         )
         new_cls._meta.modal_eval = expression_to_operator(
             [new_cls.t, x, p],
             substitute(new_cls.modal.flatten(), control_sub_expression),
-            f"{new_cls.__name__}_modal_evaluation"
+            f"{new_cls.__name__}_modal_evaluation",
         )
-
 
 
 class TrajectoryAnalysis(
@@ -595,15 +587,12 @@ class TrajectoryAnalysis(
 
     @classmethod
     def initial_condition(cls, *args, **kwargs):
-        """ should initial condition be x0(t, p) not just p?
+        """should initial condition be x0(t, p) not just p?
         bind dynamic output, time, modal? or do point analysis there?
         but maybe still time?
         """
         self = cls._meta.primary.__new__(cls._meta.primary)
-        pp = cls.function_call_to_fields(
-            [cls.parameter],
-            *args, **kwargs
-        )[0]
+        pp = cls.function_call_to_fields([cls.parameter], *args, **kwargs)[0]
         p = pp.flatten()
         self.input_kwargs = pp.asdict()
         x0 = cls._meta.initial_condition_function(p)
@@ -617,8 +606,7 @@ class TrajectoryAnalysis(
         """
         self = cls._meta.primary.__new__(cls._meta.primary)
         xx, pp = cls.function_call_to_fields(
-            [cls.state, cls.parameter],
-            *args, **kwargs
+            [cls.state, cls.parameter], *args, **kwargs
         )
         x = xx.flatten()
         p = pp.flatten()
@@ -634,7 +622,7 @@ class TrajectoryAnalysis(
         self.bind_field(cls.dot.wrap(dot))
         self.bind_field(cls.dynamic_output.wrap(yy))
         self.bind_field(cls.modal.wrap(modals))
-        #self.bind_embedded_models()
+        # self.bind_embedded_models()
         return self
 
         # bind paramaeters, state, call implementation functions (dot, dynamic output)
@@ -651,6 +639,7 @@ class TrajectoryAnalysis(
 # new state) etc.
 # maybe allow creation of new parameters (into ODESystem parameter field), access to
 # state, etc.
+
 
 class EventType(SubmodelType):
     @classmethod
@@ -673,8 +662,6 @@ class EventType(SubmodelType):
                 super().process_condor_attr(attr_name, attr_val, new_cls)
         else:
             super().process_condor_attr(attr_name, attr_val, new_cls)
-
-
 
 
 class Event(

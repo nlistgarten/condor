@@ -1,5 +1,6 @@
-import condor as co
 import pytest
+
+import condor as co
 
 # TODO test as_template
 
@@ -21,7 +22,6 @@ class ComponentImplementation(co.implementations.ExplicitSystem):
 co.implementations.ComponentRaw = ComponentImplementation
 
 
-
 class ComponentAsTemplate(co.ExplicitSystem, as_template=True):
     x = placeholder(default=2.0)
     y = placeholder(default=1.0)
@@ -29,14 +29,13 @@ class ComponentAsTemplate(co.ExplicitSystem, as_template=True):
     output.z = x**2 + y
 
 
-@pytest.mark.parametrize('Component', [ComponentRaw, ComponentAsTemplate])
+@pytest.mark.parametrize("Component", [ComponentRaw, ComponentAsTemplate])
 class TestPlaceholders:
     def test_default_impl(self, Component):
         class MyComp0(Component):
             pass
 
         assert MyComp0().z == 5
-
 
     def test_new_io(self, Component):
         class MyComp5(Component):
@@ -47,7 +46,6 @@ class TestPlaceholders:
         assert out.z == 5
         assert out.v == 16
 
-
     def test_use_placeholders(self, Component):
         class MyComp1(Component):
             x = input()
@@ -55,7 +53,6 @@ class TestPlaceholders:
 
         out = MyComp1(x=2.0, y=3.0)
         assert out.z == 7
-
 
     def test_partial_placeholder(self, Component):
         class MyComp2(Component):
@@ -68,14 +65,12 @@ class TestPlaceholders:
         # keyword args x=..., y=... does fail
         assert MyComp2(3.0, 4.0).z == 3**2 + 3
 
-
     def test_override_placeholders(self, Component):
         class MyComp3(Component):
             x = 3.0
             y = 4.0
 
         assert MyComp3().z == 3**2 + 4
-
 
     def test_computed_placeholder(self, Component):
         class MyComp4(Component):
@@ -87,4 +82,4 @@ class TestPlaceholders:
 
         out = MyComp4(4.0)
         assert out.v == 4**0.5 + 5
-        assert out.z == (4**0.5)**2 + 0
+        assert out.z == (4**0.5) ** 2 + 0

@@ -29,19 +29,21 @@ Introduction to Condor
 
 import condor
 
+
 class Coupling(condor.AlgebraicSystem):
     x = parameter(shape=3)
-    y1 = variable(initializer=1.)
-    y2 = variable(initializer=1.)
+    y1 = variable(initializer=1.0)
+    y2 = variable(initializer=1.0)
 
     residual(y1 == x[0] ** 2 + x[1] + x[2] - 0.2 * y2)
     residual(y2 == y1**0.5 + x[0] + x[1])
+
 
 # %%
 # which can be evaluated by instantiating the model with numerical values for the
 # parameters:
 
-coupling = Coupling([5., 2., 1])
+coupling = Coupling([5.0, 2.0, 1])
 
 # %%
 # Once the model is finished running, the model *binds* the numerical results from the
@@ -75,29 +77,31 @@ print(coupling.variable)
 
 from condor.backend import operators as ops
 
+
 class Sellar(condor.OptimizationProblem):
     x = variable(shape=3, lower_bound=0, upper_bound=10)
     coupling = Coupling(x)
     y1, y2 = coupling
 
-    objective = x[2]**2 + x[1] + y1 + ops.exp(-y2)
+    objective = x[2] ** 2 + x[1] + y1 + ops.exp(-y2)
     constraint(y1 >= 3.16)
-    constraint(24. >= y2)
+    constraint(24.0 >= y2)
+
 
 # %%
 # As with the system of algebraic equations, we can numerically solve this optimization
 # problem by providing an initial value for the variables and instantiating the model.
 
-Sellar.set_initial(x=[5,2,1])
+Sellar.set_initial(x=[5, 2, 1])
 sellar = Sellar()
 
 # %%
 # The resulting object will have a dot-able data structure with the bound results,
 # including the embedded ``Coupling`` model:
 
-print("objective value:", sellar.objective) # scalar value
-print(sellar.constraint) # field
-print(sellar.coupling.y1) # embedded-model element
+print("objective value:", sellar.objective)  # scalar value
+print(sellar.constraint)  # field
+print(sellar.coupling.y1)  # embedded-model element
 
 # %%
 # .. rubric:: References

@@ -1,6 +1,7 @@
-import condor as co
 import numpy as np
 import pytest
+
+import condor as co
 
 
 def test_output_ref():
@@ -21,12 +22,14 @@ def test_placeholder_on_explicitsystem():
             output.y = x**2
             z = placeholder()
 
+
 def test_reserved_word_input():
     with pytest.raises(ValueError):
 
         class ShouldFail(co.ExplicitSystem):
             _meta = input()
             output.y = _meta**2
+
 
 def test_reserved_word_output():
     with pytest.raises(ValueError):

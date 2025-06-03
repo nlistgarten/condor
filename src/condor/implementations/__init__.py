@@ -1,6 +1,6 @@
 """
 This module uses the backend to process a Model with values for input fields to call
-solvers. 
+solvers.
 """
 # TODO: make SGM and SolverWithWarmStart (really, back-tracking solver and possibly only
 # needed if broyden doesn't resolve it?) generic and figure out how to separate the
@@ -30,12 +30,21 @@ solvers.
 # TODO for custom solvers like SGM, table, does the get_jacobian arguments allow you to
 # avoid computing wrt particular inputs/outputs if possible?
 
-from condor.implementations.simple import DeferredSystem, ExplicitSystem, ExternalSolverModel
 from condor.implementations.iterative import (
-    AlgebraicSystem, CasadiNlpsolImplementation as OptimizationProblem, ScipyCG,
-    ScipySLSQP, ScipyTrustConstr
+    AlgebraicSystem,
+    ScipyCG,
+    ScipySLSQP,
+    ScipyTrustConstr,
+)
+from condor.implementations.iterative import (
+    CasadiNlpsolImplementation as OptimizationProblem,
 )
 from condor.implementations.sgm_trajectory import TrajectoryAnalysis
+from condor.implementations.simple import (
+    DeferredSystem,
+    ExplicitSystem,
+    ExternalSolverModel,
+)
 
 __all__ = [
     DeferredSystem,
@@ -48,6 +57,3 @@ __all__ = [
     ScipyTrustConstr,
     TrajectoryAnalysis,
 ]
-
-
-

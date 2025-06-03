@@ -1,27 +1,28 @@
-import condor as co
 import casadi as ca
+from LinCovCW import I3, I6, Z3, Z6, LinCovCW, make_burn, sim_kwargs
 
+import condor as co
 from condor.backends.casadi.implementations import OptimizationProblem
-from LinCovCW import LinCovCW, make_burn, sim_kwargs, I3, Z3, I6, Z6
 
 W = ca.vertcat(I6, Z6)
-V = ca.vertcat(Z3, I3, ca.MX(6,3))
+V = ca.vertcat(Z3, I3, ca.MX(6, 3))
 Wonb = ca.MX.eye(6)
 Vonb = ca.vertcat(Z3, I3)
 
+
 class LinCovCW(co.ODESystem):
     omega = parameter()
-    scal_w = parameter(shape=6) # covariance elements for propagation
-    scal_v = parameter(shape=3) # covariance elements for control update
+    scal_w = parameter(shape=6)  # covariance elements for propagation
+    scal_v = parameter(shape=3)  # covariance elements for control update
     # estimated covariance elements for navigation covariance propagation and control
     scalhat_w = parameter(shape=6)
     scalhat_v = parameter(shape=3)
 
     initial_x = parameter(shape=6)
-    initial_C = parameter(shape=(12,12))
-    initial_P = parameter(shape=(6,6))
+    initial_C = parameter(shape=(12, 12))
+    initial_P = parameter(shape=(6, 6))
 
-    Acw = ca.MX(6,6)
+    Acw = ca.MX(6, 6)
 
     """[
 
@@ -35,24 +36,22 @@ class LinCovCW(co.ODESystem):
 
     ] """
 
-    Acw[0,3] = 1
-    Acw[1,4] = 1
-    Acw[2,5] = 1
+    Acw[0, 3] = 1
+    Acw[1, 4] = 1
+    Acw[2, 5] = 1
 
-    Acw[3,5] = 2*omega
-    Acw[4,1] = -omega**2
-    Acw[5,2] = 3*omega**2
-    Acw[5,3] = -2*omega
+    Acw[3, 5] = 2 * omega
+    Acw[4, 1] = -(omega**2)
+    Acw[5, 2] = 3 * omega**2
+    Acw[5, 3] = -2 * omega
 
-    x = state(shape=6) # true state position and velocity
-    C = state(shape=(12,12)) # augmented covariance
-    P =  state(shape=(6,6)) # onboard covariance for navigation system (Kalman filter)
+    x = state(shape=6)  # true state position and velocity
+    C = state(shape=(12, 12))  # augmented covariance
+    P = state(shape=(6, 6))  # onboard covariance for navigation system (Kalman filter)
     Delta_v_mag = state()
     Delta_v_disp = state()
 
     tt = state()
-
-
 
     Scal_w = ca.diag(scal_w)
     Cov_prop_offset = W @ Scal_w @ W.T
@@ -66,7 +65,7 @@ class LinCovCW(co.ODESystem):
     Scalhat_v = ca.diag(scalhat_v)
     P_ctrl_offset = Vonb @ Scalhat_v @ Vonb.T
 
-    Fcal = ca.MX(12,12)
+    Fcal = ca.MX(12, 12)
     Fcal[:6, :6] = Acw
     Fcal[6:, 6:] = Acw
 
@@ -76,7 +75,7 @@ class LinCovCW(co.ODESystem):
 
     dot[x] = Acw @ x
     dot[C] = Fcal @ C + C @ Fcal.T + Cov_prop_offset
-    dot[tt] = 1.
+    dot[tt] = 1.0
 
     # TODO: in generla case, this should be a dfhat/dx(hat) instead of exact Acw
     # and should be reflected in bottom right corner of Fcal as well
@@ -86,10 +85,17 @@ class LinCovCW(co.ODESystem):
 sin = ca.sin
 cos = ca.cos
 
+
 def make_burn(rd, tig, tem):
-    burn_name = "Burn%d" % (1 + sum([
-        event.__name__.startswith("Burn") for event in LinCovCW.Event._meta.subclasses
-    ]))
+    burn_name = "Burn%d" % (
+        1
+        + sum(
+            [
+                event.__name__.startswith("Burn")
+                for event in LinCovCW.Event._meta.subclasses
+            ]
+        )
+    )
     attrs = co.InnerModelType.__prepare__(burn_name, (LinCovCW.Event,))
     update = attrs["update"]
     x = attrs["x"]
@@ -101,54 +107,78 @@ def make_burn(rd, tig, tem):
     Delta_v_disp = attrs["Delta_v_disp"]
 
     if not LinCovCW.parameter.get(backend_repr=rd).name:
-        attrs["rd_%d" % (1 + sum(
-            [name.startswith("rd_") for name in LinCovCW.parameter.list_of('name')]
-        ))] = rd
+        attrs[
+            "rd_%d"
+            % (
+                1
+                + sum(
+                    [
+                        name.startswith("rd_")
+                        for name in LinCovCW.parameter.list_of("name")
+                    ]
+                )
+            )
+        ] = rd
 
     if not LinCovCW.parameter.get(backend_repr=tig).name:
-        attrs["tig_%d" % (1 + sum(
-            [name.startswith("tig_") for name in LinCovCW.parameter.list_of('name')]
-        ))] = tig
+        attrs[
+            "tig_%d"
+            % (
+                1
+                + sum(
+                    [
+                        name.startswith("tig_")
+                        for name in LinCovCW.parameter.list_of("name")
+                    ]
+                )
+            )
+        ] = tig
 
     if not LinCovCW.parameter.get(backend_repr=tem).name:
-        attrs["tem_%d" % (1 + sum(
-            [name.startswith("tem_") for name in LinCovCW.parameter.list_of('name')]
-        ))] = tem
+        attrs[
+            "tem_%d"
+            % (
+                1
+                + sum(
+                    [
+                        name.startswith("tem_")
+                        for name in LinCovCW.parameter.list_of("name")
+                    ]
+                )
+            )
+        ] = tem
 
-    #attrs["function"] = t - tig
+    # attrs["function"] = t - tig
     attrs["at_time"] = [tig]
 
     t_d = tem - tig
-    stm = ca.MX(6,6)
-    stm[0,0] = 1
-    stm[0,2] = 6*omega*t_d - 6*sin(omega*t_d)
-    stm[0,3] = -3*t_d + 4*sin(omega*t_d)/omega
-    stm[0,5] = 2*(1 - cos(omega*t_d))/omega
-    stm[1,1] = cos(omega*t_d)
-    stm[1,4] = sin(omega*t_d)/omega
-    stm[2,2] = 4 - 3*cos(omega*t_d)
-    stm[2,3] = 2*(cos(omega*t_d) - 1)/omega
-    stm[2,5] = sin(omega*t_d)/omega
-    stm[3,2] = 6*omega*(1 - cos(omega*t_d))
-    stm[3,3] = 4*cos(omega*t_d) - 3
-    stm[3,5] = 2*sin(omega*t_d)
-    stm[4,1] = -omega*sin(omega*t_d)
-    stm[4,4] = cos(omega*t_d)
-    stm[5,2] = 3*omega*sin(omega*t_d)
-    stm[5,3] = -2*sin(omega*t_d)
-    stm[5,5] = cos(omega*t_d)
+    stm = ca.MX(6, 6)
+    stm[0, 0] = 1
+    stm[0, 2] = 6 * omega * t_d - 6 * sin(omega * t_d)
+    stm[0, 3] = -3 * t_d + 4 * sin(omega * t_d) / omega
+    stm[0, 5] = 2 * (1 - cos(omega * t_d)) / omega
+    stm[1, 1] = cos(omega * t_d)
+    stm[1, 4] = sin(omega * t_d) / omega
+    stm[2, 2] = 4 - 3 * cos(omega * t_d)
+    stm[2, 3] = 2 * (cos(omega * t_d) - 1) / omega
+    stm[2, 5] = sin(omega * t_d) / omega
+    stm[3, 2] = 6 * omega * (1 - cos(omega * t_d))
+    stm[3, 3] = 4 * cos(omega * t_d) - 3
+    stm[3, 5] = 2 * sin(omega * t_d)
+    stm[4, 1] = -omega * sin(omega * t_d)
+    stm[4, 4] = cos(omega * t_d)
+    stm[5, 2] = 3 * omega * sin(omega * t_d)
+    stm[5, 3] = -2 * sin(omega * t_d)
+    stm[5, 5] = cos(omega * t_d)
     T_pp = stm[:3, :3]
     T_pv = stm[:3, 3:]
     T_pv_inv = ca.solve(T_pv, ca.MX.eye(3))
 
-    Delta_v = (T_pv_inv @ rd - T_pv_inv@T_pp @ x[:3, 0]) - x[3:, 0]
+    Delta_v = (T_pv_inv @ rd - T_pv_inv @ T_pp @ x[:3, 0]) - x[3:, 0]
     update[Delta_v_mag] = Delta_v_mag + ca.norm_2(Delta_v)
-    update[x]  = x + ca.vertcat(Z3, I3) @ (Delta_v)
+    update[x] = x + ca.vertcat(Z3, I3) @ (Delta_v)
 
-    DG = ca.vertcat(
-        ca.MX(3,6),
-        ca.horzcat(-(T_pv_inv@T_pp), -I3)
-    )
+    DG = ca.vertcat(ca.MX(3, 6), ca.horzcat(-(T_pv_inv @ T_pp), -I3))
     Dcal = ca.vertcat(
         ca.horzcat(I6, DG),
         ca.horzcat(Z6, I6 + DG),
@@ -157,7 +187,7 @@ def make_burn(rd, tig, tem):
     update[C] = Dcal @ C @ Dcal.T + Cov_ctrl_offset
 
     Mc = DG @ ca.horzcat(Z6, I6)
-    sigma_Dv__2 = ca.trace( Mc @ C @ Mc.T)
+    sigma_Dv__2 = ca.trace(Mc @ C @ Mc.T)
 
     update[Delta_v_disp] = Delta_v_disp + ca.sqrt(sigma_Dv__2)
     Burn = co.InnerModelType(burn_name, (LinCovCW.Event,), attrs=attrs)
@@ -174,9 +204,9 @@ def make_burn(rd, tig, tem):
 
 
 MajorBurn = make_burn(
-    rd = LinCovCW.parameter(shape=3), # desired position
-    tig = LinCovCW.parameter(), # time ignition
-    tem = LinCovCW.parameter(), # time end maneuver
+    rd=LinCovCW.parameter(shape=3),  # desired position
+    tig=LinCovCW.parameter(),  # time ignition
+    tem=LinCovCW.parameter(),  # time end maneuver
 )
 
 
@@ -184,8 +214,9 @@ class Terminate(LinCovCW.Event):
     terminate = True
     # TODO: how to make a symbol like this just provide the backend repr? or is this
     # correct?
-    #function = t - MajorBurn.tem
+    # function = t - MajorBurn.tem
     at_time = [MajorBurn.tem]
+
 
 class Measurements(LinCovCW.Event):
     rcal = parameter(shape=3)
@@ -202,20 +233,21 @@ class Measurements(LinCovCW.Event):
     update[P] = Acalhat @ P @ Acalhat.T + Khat @ Rcalhat @ Khat.T
 
     M01 = Khat @ Hcal
-    M = ca.vertcat( ca.horzcat(I6, Z6), ca.horzcat(M01, Acalhat) )
+    M = ca.vertcat(ca.horzcat(I6, Z6), ca.horzcat(M01, Acalhat))
     N = ca.vertcat(Z3, Z3, Khat)
     update[C] = M @ C @ M.T + N @ Rcal @ N.T
 
-    #update[Delta_v_disp] = Delta_v_disp# + ca.sqrt(sigma_Dv__2)
-    #update[Delta_v_mag] = Delta_v_mag# + ca.sqrt(sigma_Dv__2)
-    #update[x] = x
+    # update[Delta_v_disp] = Delta_v_disp# + ca.sqrt(sigma_Dv__2)
+    # update[Delta_v_mag] = Delta_v_mag# + ca.sqrt(sigma_Dv__2)
+    # update[x] = x
 
     meas_dt = parameter()
     meas_t_offset = parameter()
 
-    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
-    #function = t - meas_t_offset
+    # function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
+    # function = t - meas_t_offset
     at_time = [meas_t_offset]
+
 
 # 1-burn sim
 class Sim(LinCovCW.TrajectoryAnalysis):
@@ -224,95 +256,83 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     tot_Delta_v_mag = trajectory_output(Delta_v_mag)
     tot_Delta_v_disp = trajectory_output(Delta_v_disp)
 
-
-    Mr = ca.horzcat(I3, ca.MX(3,9))
+    Mr = ca.horzcat(I3, ca.MX(3, 9))
     sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
     final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
     class Casadi(co.Options):
-        #state_rtol = 1E-9
-        #state_atol = 1E-15
-        #adjoint_rtol = 1E-9
-        #adjoint_atol = 1E-15
-        #state_max_step_size = 30.
+        # state_rtol = 1E-9
+        # state_atol = 1E-15
+        # adjoint_rtol = 1E-9
+        # adjoint_atol = 1E-15
+        # state_max_step_size = 30.
 
-        state_adaptive_max_step_size = 4#16
+        state_adaptive_max_step_size = 4  # 16
         adjoint_adaptive_max_step_size = 4
 
-sim_kwargs.update(dict(
-    tem_1 = 2300.,
-    meas_dt = 2300.,
-))
+
+sim_kwargs.update(
+    dict(
+        tem_1=2300.0,
+        meas_dt=2300.0,
+    )
+)
 
 
 class Burn1(co.OptimizationProblem):
-    t1 = variable(initializer=1900.)
+    t1 = variable(initializer=1900.0)
     sigma_r_weight = parameter()
     sigma_Dv_weight = parameter()
     mag_Dv_weight = parameter()
-    sim = Sim(
-        meas_t_offset = 851.,
-        tig_1=t1,
-        **sim_kwargs
+    sim = Sim(meas_t_offset=851.0, tig_1=t1, **sim_kwargs)
 
-    )
-
-    constraint(t1, lower_bound=30., upper_bound=sim_kwargs['tem_1']-30.)
-    constraint(sim.final_pos_disp, upper_bound=10.)
+    constraint(t1, lower_bound=30.0, upper_bound=sim_kwargs["tem_1"] - 30.0)
+    constraint(sim.final_pos_disp, upper_bound=10.0)
     objective = (
-        sigma_Dv_weight*sim.tot_Delta_v_disp
-        + sigma_r_weight*sim.final_pos_disp
-        + mag_Dv_weight*sim.tot_Delta_v_mag
+        sigma_Dv_weight * sim.tot_Delta_v_disp
+        + sigma_r_weight * sim.final_pos_disp
+        + mag_Dv_weight * sim.tot_Delta_v_mag
     )
+
     class Casadi(co.Options):
-        exact_hessian=False
+        exact_hessian = False
         method = OptimizationProblem.Method.scipy_trust_constr
-        gtol = 1E-3
-        xtol = 1E-3
+        gtol = 1e-3
+        xtol = 1e-3
+
 
 class Meas1(co.OptimizationProblem):
-    t1 = variable(initializer=0.)
+    t1 = variable(initializer=0.0)
     sigma_r_weight = parameter()
     sigma_Dv_weight = parameter()
     mag_Dv_weight = parameter()
-    sim = Sim(
-        meas_t_offset = t1,
-        tig_1=851.,
-        **sim_kwargs
+    sim = Sim(meas_t_offset=t1, tig_1=851.0, **sim_kwargs)
 
-    )
-
-    constraint(t1, lower_bound=00., upper_bound=sim_kwargs['tem_1']-30.)
-    constraint(sim.final_pos_disp, upper_bound=10.)
+    constraint(t1, lower_bound=00.0, upper_bound=sim_kwargs["tem_1"] - 30.0)
+    constraint(sim.final_pos_disp, upper_bound=10.0)
     objective = (
-        sigma_Dv_weight*sim.tot_Delta_v_disp
-        + sigma_r_weight*sim.final_pos_disp
-        + mag_Dv_weight*sim.tot_Delta_v_mag
+        sigma_Dv_weight * sim.tot_Delta_v_disp
+        + sigma_r_weight * sim.final_pos_disp
+        + mag_Dv_weight * sim.tot_Delta_v_mag
     )
+
     class Casadi(co.Options):
-        exact_hessian=False
+        exact_hessian = False
         method = OptimizationProblem.Method.scipy_trust_constr
-        gtol = 1E-3
-        xtol = 1E-3
+        gtol = 1e-3
+        xtol = 1e-3
+
 
 opt = Meas1(sigma_Dv_weight=0, mag_Dv_weight=0, sigma_r_weight=1)
-opt_sim = Sim(
-        tig_1=851.,
-        meas_t_offset = opt.t1,
-        **sim_kwargs
-)
+opt_sim = Sim(tig_1=851.0, meas_t_offset=opt.t1, **sim_kwargs)
 
-print("\n"*3,"measurement time minimization")
+print("\n" * 3, "measurement time minimization")
 print(opt._stats)
 
 opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
-opt_sim = Sim(
-        tig_1=opt.t1,
-        meas_t_offset = 851.,
-        **sim_kwargs
-)
+opt_sim = Sim(tig_1=opt.t1, meas_t_offset=851.0, **sim_kwargs)
 
-print("\n"*3,"burn time minimization")
+print("\n" * 3, "burn time minimization")
 print(opt._stats)
 
 """

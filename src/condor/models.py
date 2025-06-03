@@ -1,14 +1,19 @@
-import logging
 import dataclasses as dc
+import logging
 
+from condor import backend, implementations
 
-from condor import backend
-from condor import implementations
 # TODO: figure out how to make this an option/setting like django?
 # from condor.backends import default as backend
-from condor.fields import (AssignedField, BaseElement, Direction, Field, FreeField,
-                           MatchedField,
-                           WithDefaultField)
+from condor.fields import (
+    AssignedField,
+    BaseElement,
+    Direction,
+    Field,
+    FreeField,
+    MatchedField,
+    WithDefaultField,
+)
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +137,7 @@ class BaseCondorClassDict(dict):
             attr_val.prepare(self)
 
         if isinstance(attr_val.__class__, BaseModelType):
-            if getattr(attr_val, 'name', ''):
+            if getattr(attr_val, "name", ""):
                 self.meta.embedded_models[attr_val.name] = attr_val
                 super().__setitem__(attr_val.name, attr_val)
             else:
@@ -174,9 +179,9 @@ class BaseCondorClassDict(dict):
         out = super().__setitem__(attr_name, attr_val)
 
         if (
-            self.user_setting and
-            hasattr(attr_val, "update_name") and # implies element?
-            attr_val.field_type._cls_dict is self
+            self.user_setting
+            and hasattr(attr_val, "update_name")  # implies element?
+            and attr_val.field_type._cls_dict is self
         ):
             attr_val.update_name(attr_name)
         return out
@@ -256,7 +261,8 @@ class BaseModelType(type):
     # BaseModelType
     baseclass_for_inheritance = None
     reserved_words = [
-        "_meta", "reserved_words",
+        "_meta",
+        "reserved_words",
     ]
 
     def __init_subclass__(cls, **kwargs):
@@ -359,7 +365,7 @@ class BaseModelType(type):
 
     @classmethod
     def inherit_item(cls, cls_dict, field_from_inherited, meta, name, base, k, v):
-        """ inerit :attr:`k` = :attr:`v` as present in `base`'s locals dictionary
+        """inerit :attr:`k` = :attr:`v` as present in `base`'s locals dictionary
         field_from_inherited is a dictionary mapping base's fields to field on new class
         """
         if k in base._meta.inherited_items:
@@ -369,7 +375,7 @@ class BaseModelType(type):
         if isinstance(v, Field):
             if k in cls_dict:
                 if cls_dict[k].__class__ is v.__class__:
-                    pass # compatible field inheritance
+                    pass  # compatible field inheritance
                 else:
                     raise ValueError(
                         f"inheriting incompatibility {base}.{k} = {v} to {name}"
@@ -398,13 +404,13 @@ class BaseModelType(type):
             else:
                 elem_matching_backend_repr = None
 
-            if (existing_attr is not None or elem_matching_backend_repr is not None):
+            if existing_attr is not None or elem_matching_backend_repr is not None:
                 if isinstance(existing_attr, BaseElement):
                     existing_attr = existing_attr.backend_repr
                 elif isinstance(elem_matching_backend_repr, BaseElement):
                     existing_attr = elem_matching_backend_repr.backend_repr
                     # assume cls dict assignment??
-                if existing_attr is v:# or cls_dict[k].backend_repr is v:
+                if existing_attr is v:  # or cls_dict[k].backend_repr is v:
                     # only ensure that this is marked as inherited, don't need
                     # to re-copy
                     if (inherited_attr := meta.inherited_items.get(k, None)) is None:
@@ -418,7 +424,7 @@ class BaseModelType(type):
                             )
 
                     return
-                elif cls.is_condor_attr(k,v):
+                elif cls.is_condor_attr(k, v):
                     raise ValueError(
                         f"an inheritance incompatibility "
                         f"{base}.{k} = {v} does not match "
@@ -431,7 +437,7 @@ class BaseModelType(type):
 
             if isinstance(v, backend.symbol_class):
                 original_v = v
-                v = base._meta.backend_repr_elements.get(v,v)
+                v = base._meta.backend_repr_elements.get(v, v)
                 if isinstance(v, BaseElement) and v.field_type._name == "placeholder":
                     v = original_v
 
@@ -735,9 +741,11 @@ class BaseModelType(type):
 
         if attr_name in cls.reserved_words:
             log.debug(
-            #raise ValueError(
-                "NOT passing on %s because it is a reserved word for %s", attr_name, cls
-            #)
+                # raise ValueError(
+                "NOT passing on %s because it is a reserved word for %s",
+                attr_name,
+                cls,
+                # )
             )
             pass_attr = False
 
@@ -835,18 +843,23 @@ class ModelTemplateType(BaseModelType):
                 model_name, bases + (cls.user_model_baseclass,), **kwargs
             )
         else:
-            if (meta := kwargs.pop("meta", None)) is None and bases and (
-                user_model_metclass := getattr(bases[0], "user_model_metaclass", None)
-            ) is not None:
-                meta = user_model_metclass.metadata_class(
-                    model_name=model_name
+            if (
+                (meta := kwargs.pop("meta", None)) is None
+                and bases
+                and (
+                    user_model_metclass := getattr(
+                        bases[0], "user_model_metaclass", None
+                    )
                 )
+                is not None
+            ):
+                meta = user_model_metclass.metadata_class(model_name=model_name)
             # actually creating a model template, TODO at some point tap into
             # inheritance tree for now nothing fails this check
             if as_template:
                 bases_mro = tuple()
                 for base in bases:
-                    bases_mro +=  base.__mro__
+                    bases_mro += base.__mro__
                 if Model in bases_mro or ModelTemplate in bases_mro:
                     pass
                 else:
@@ -884,7 +897,6 @@ class ModelTemplateType(BaseModelType):
     def __new__(
         cls, model_name, bases, attrs, as_template=False, model_metaclass=None, **kwargs
     ):
-
         if cls.is_user_model(bases) and not as_template:
             log.debug(
                 "dispatch __new__ for user model %s, %s, %s",
@@ -899,18 +911,22 @@ class ModelTemplateType(BaseModelType):
             )
             return user_model
 
-
         if cls.creating_base_class_for_inheritance(model_name):
             immediate_return = True
         else:
             immediate_return = False
 
-        if as_template:# and False:
+        if as_template:  # and False:
             attrs.meta.inherited_items.update(attrs.meta.user_set)
             attrs.meta.user_set = attrs.meta.inherited_items
             attrs.meta.inherited_items = {}
 
-        if False and as_template and bases[0].user_model_metaclass is not ModelType and model_metaclass is None:
+        if (
+            False
+            and as_template
+            and bases[0].user_model_metaclass is not ModelType
+            and model_metaclass is None
+        ):
             # use model metaclass from first base if possible
             use_metaclass = bases[0].user_model_metaclass
             new_cls = use_metaclass.__new__(
@@ -919,7 +935,6 @@ class ModelTemplateType(BaseModelType):
             new_cls.user_model_metaclass = use_metaclass
         else:
             new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
-
 
         if immediate_return:
             return new_cls
@@ -937,7 +952,6 @@ class ModelTemplateType(BaseModelType):
                     new_cls.__name__,
                     impl,
                 )
-
 
         return new_cls
 
@@ -1015,11 +1029,12 @@ class ModelType(BaseModelType):
     """Type class for user models"""
 
     reserved_words = BaseModelType.reserved_words + [
-        "Options", # should pass on, used to mark condor_attr
-        "options_dict", # bound values of Options
-        "Casadi", # deprecated Options name
-        "dynamic_link", # raise error on user assignment
-        "name", "model_name",
+        "Options",  # should pass on, used to mark condor_attr
+        "options_dict",  # bound values of Options
+        "Casadi",  # deprecated Options name
+        "dynamic_link",  # raise error on user assignment
+        "name",
+        "model_name",
     ]
 
     def __repr__(cls):
@@ -1099,13 +1114,12 @@ class ModelType(BaseModelType):
         if not name:
             name = model_name
 
-
         if cls.creating_base_class_for_inheritance(name):
             super_bases = bases
         else:
             bases_mro = tuple()
             for base in bases:
-                bases_mro +=  base.__mro__
+                bases_mro += base.__mro__
             if Model in bases_mro or ModelTemplate in bases_mro:
                 use_bases = bases
             else:
@@ -1211,7 +1225,7 @@ class ModelType(BaseModelType):
             if implementation is not None:
                 # inject so subclasses get this implementation
                 # TODO: a better way? registration? etc?
-                #implementation.__dict__[name] = implementation
+                # implementation.__dict__[name] = implementation
                 pass
 
             # TODO: other validation?
@@ -1258,11 +1272,8 @@ class Model(metaclass=ModelType):
     """handles binding etc. for user models"""
 
     def __getstate__(self):
-        d = {k: v for k, v in self.__dict__.items() if k not in [
-            "implementation"
-        ]}
+        d = {k: v for k, v in self.__dict__.items() if k not in ["implementation"]}
         return d
-
 
     @staticmethod
     def function_call_to_fields(fields, *args, **kwargs):
@@ -1278,14 +1289,12 @@ class Model(metaclass=ModelType):
         missing_args = []
         extra_args = []
 
-
         for input_name, input_val in kwargs.items():
             if input_name not in input_names:
                 # TODO: skip this one with a flag?
                 extra_args.append(input_name)
                 continue
             fields_kwargs[input_names[input_name]][input_name] = input_val
-
 
         for input_name, field in input_names.items():
             field_kwargs = fields_kwargs[field]
@@ -1310,7 +1319,6 @@ class Model(metaclass=ModelType):
         out_fields = [field._dataclass(**fields_kwargs[field]) for field in fields]
         return out_fields
 
-
     def __init__(self, *args, name="", **kwargs):
         cls = self.__class__
         self.name = name
@@ -1326,8 +1334,8 @@ class Model(metaclass=ModelType):
 
         implementation_class = cls.get_implementation_class(cls)
         self.implementation = implementation_class(self)
-            #self, list(self.input_kwargs.values())
-        #)
+        # self, list(self.input_kwargs.values())
+        # )
 
         # generally implementations are responsible for binding computed values.
         # implementations know about models, models don't know about implementations
@@ -1344,8 +1352,7 @@ class Model(metaclass=ModelType):
         cls = self.__class__
         self.input_kwargs = {}
         bound_input_fields = cls.function_call_to_fields(
-            cls._meta.input_fields,
-            *args, **kwargs
+            cls._meta.input_fields, *args, **kwargs
         )
 
         for field_dc in bound_input_fields:
@@ -1416,12 +1423,13 @@ class Model(metaclass=ModelType):
         ) in model._meta.embedded_models.items():
             embedded_model = embedded_model_instance.__class__
 
-
             bound_embedded_model = embedded_model.__new__(embedded_model)
 
             bound_embedded_model.implementation = embedded_model_instance.implementation
             embedded_model_instance.bind_input_as_embedded(
-                model_instance, bound_embedded_model, model_assignments,
+                model_instance,
+                bound_embedded_model,
+                model_assignments,
             )
 
             bound_embedded_model.implementation(bound_embedded_model)
@@ -1430,14 +1438,17 @@ class Model(metaclass=ModelType):
 
             model_assignments.update(
                 embedded_model_instance.bind_output_as_embedded(
-                    model_instance, bound_embedded_model,
+                    model_instance,
+                    bound_embedded_model,
                 )
             )
 
             bound_embedded_model.bind_embedded_models()
 
     def bind_input_as_embedded(
-        embedded_model_instance, parent_instance, bound_embedded_model,
+        embedded_model_instance,
+        parent_instance,
+        bound_embedded_model,
         model_assignments,
     ):
         embedded_model = embedded_model_instance.__class__
@@ -1458,12 +1469,9 @@ class Model(metaclass=ModelType):
                     if not value_found:
                         symbols_in_v = backend.symbols_in(v)
                         v_kwargs = {
-                            symbol: model_assignments[symbol]
-                            for symbol in symbols_in_v
+                            symbol: model_assignments[symbol] for symbol in symbols_in_v
                         }
-                        embedded_model_kwargs[k] = backend.evalf(
-                            v, v_kwargs
-                        )
+                        embedded_model_kwargs[k] = backend.evalf(v, v_kwargs)
 
                     # not working because python is checking equality of stuff??
                     # model_assignments[v] = embedded_model_kwargs[k]
@@ -1471,7 +1479,7 @@ class Model(metaclass=ModelType):
             # call alternate method, it's pretty small -- just do it here.
             # pattern is similar to from_values, etc. so maybe dry it up but this is
             # pretty small.
-            #bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
+            # bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
         bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
 
     def bind_output_as_embedded(
@@ -1490,7 +1498,8 @@ class Model(metaclass=ModelType):
                     sym_val: ran_val
                     for sym_val, ran_val in zip(
                         sym_bound_field_dict.values(), ran_bound_field_dict.values()
-                    ) if isinstance(sym_val, backend.symbol_class)
+                    )
+                    if isinstance(sym_val, backend.symbol_class)
                 }
             )
         return assignment_updates
@@ -1815,9 +1824,9 @@ class SubmodelType(ModelType):
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
         if isinstance(attr_val, Field):
-            if (
-                not new_cls._meta.copy_fields
-                and attr_val._inherits_from._model in (new_cls._meta.primary, new_cls._meta.primary._meta.template)
+            if not new_cls._meta.copy_fields and attr_val._inherits_from._model in (
+                new_cls._meta.primary,
+                new_cls._meta.primary._meta.template,
             ):
                 return
         super().process_condor_attr(attr_name, attr_val, new_cls)

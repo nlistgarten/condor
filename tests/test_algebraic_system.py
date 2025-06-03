@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 
 import condor as co
 
@@ -18,6 +18,7 @@ def sellar_system():
         residual(y2 == y1**0.5 + z[0] + z[1])
 
     return Coupling
+
 
 def test_sellar_solvers(sellar_system):
     out = sellar_system(x=1, z=[5, 2])

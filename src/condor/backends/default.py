@@ -1,7 +1,7 @@
 """
 vcat/vertcat -- combine multiple backend_symbol
 flatten -- always used in cnojuction with vertcat? to make differently shaped
-           backend_reprs 
+           backend_reprs
 
 vertsplit -- opposite of vertcat
 wrap -- opposite of flatten?
@@ -87,4 +87,3 @@ but probably should just figure out hooks to do that? Could create local dict of
 that gets updated with backend.implementations at the top of this file, then libary/user
 code could update it (add/overwrite)
 """
-

@@ -1,6 +1,7 @@
-import condor as co
 import numpy as np
 from scipy.signal import cont2discrete
+
+import condor as co
 
 settings = co.settings.get_settings(
     A=None,

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 import numpy as np
+
 # from condor import backend
 from scipy.interpolate import make_interp_spline
 
@@ -115,8 +116,10 @@ class SolverSciPyBase(SolverMixin):
 
         for g_idx, g_sign in enumerate(gs_sign):
             if g_sign:
+
                 def find_function(t):
                     return g_spl(t)[g_idx]
+
                 set_t = brentq(
                     find_function,
                     spline_ts[-2],
@@ -1186,43 +1189,38 @@ class SweepingGradientMethod:
 
         return np.stack(jac_rows, axis=0)
 
+
 class TrajectoryAnalysisSGM:
     def __init__(
-        self, 
+        self,
         state_system,
-
-
         # to construct a trajectoryanlysis
         # need at least one of integrand and terminal terms
         integrand_terms=None,
         terminal_terms=None,
-
         # args for adjoint system
         dte_dxs=None,
         dh_dxs=None,
         state_jac=None,
         # for adjoint system, can provide here if state_system doesn't have
-
         # adjoint system solver options
         adjoint_solver_class=SolverSciPyDopri5,
         adjoint_atol=1e-12,
         adjoint_rtol=1e-6,
         adjoint_adaptive_max_step_size=False,
         adjoint_max_step_size=0.0,
-
         cache_size=1,
-
         # to construct SweepingGradientMethod
-        p_x0_p_params = None,
-        p_dots_p_params = None,
-        dh_dps = None,
-        dte_dps = None,
-        p_integrand_terms_p_params = None,
-        p_terminal_terms_p_params = None,
-        p_integrand_terms_p_state = None,
-        p_terminal_terms_p_state = None,
+        p_x0_p_params=None,
+        p_dots_p_params=None,
+        dh_dps=None,
+        dte_dps=None,
+        p_integrand_terms_p_params=None,
+        p_terminal_terms_p_params=None,
+        p_integrand_terms_p_state=None,
+        p_terminal_terms_p_state=None,
     ):
-        if cache_size >1:
+        if cache_size > 1:
             raise NotImplementedError
         self.cache_size = cache_size
 
@@ -1230,9 +1228,7 @@ class TrajectoryAnalysisSGM:
         self.cached_output = None
 
         self.state_system = state_system
-        self.trajectory_analysis = TrajectoryAnalysis(
-            integrand_terms, terminal_terms
-        )
+        self.trajectory_analysis = TrajectoryAnalysis(integrand_terms, terminal_terms)
 
         if state_jac is None:
             if state_system._jac is None:
@@ -1264,7 +1260,6 @@ class TrajectoryAnalysisSGM:
             p_integrand_terms_p_state=p_integrand_terms_p_state,
         )
 
-
     def function(self, p):
         if self.cached_p is None or not np.all(self.cached_p == p):
             self.cached_p = p
@@ -1276,5 +1271,3 @@ class TrajectoryAnalysisSGM:
         if self.cached_p is None or not np.all(self.cached_p == p):
             _ = self.function(p)
         return self.sweeping_gradient_method(self.res)
-
-

@@ -4,15 +4,15 @@
 
 import importlib
 import logging
+import operator
 import sys
 from dataclasses import asdict as dataclass_asdict
 from dataclasses import dataclass, fields, make_dataclass
 from enum import Enum
-import operator
 
 import numpy as np
 
-#from condor.backends.element_mixin import BackendSymbolData
+# from condor.backends.element_mixin import BackendSymbolData
 from condor import backend
 
 log = logging.getLogger(__name__)
@@ -72,6 +72,7 @@ def asdict(obj):
 
 class Direction(Enum):
     """:class:`Enum` used to indicate the direction of an element relative to a model"""
+
     """
     MatchedField may need to become MatchedElement and also use direction -- might
     be useful for DAE models, etc.
@@ -86,27 +87,32 @@ class FieldValues:
     """Base class for Field dataclasses"""
 
     def asdict(self):
-        """ call the :mod:`dataclasses` module :func:`asdict` function on this field
-        datacalss """
+        """call the :mod:`dataclasses` module :func:`asdict` function on this field
+        datacalss"""
         return dataclass_asdict(self)
 
     def flatten(self):
-        """ turn the bound values of this field instance into a single symbol -- may be
+        """turn the bound values of this field instance into a single symbol -- may be
         numeric or in the backend representation (symbol class)"""
-        flat_val =  backend.operators.concat([
-            elem.flatten_value(v) for elem, v in zip(self.field, self.asdict().values())
-        ])
+        flat_val = backend.operators.concat(
+            [
+                elem.flatten_value(v)
+                for elem, v in zip(self.field, self.asdict().values())
+            ]
+        )
         if not isinstance(flat_val, backend.symbol_class):
             flat_val = np.array(flat_val).reshape(-1)
         return flat_val
 
     @classmethod
     def wrap(cls, values):
-        """ turn a single symbol into a bound field dataclasss """
+        """turn a single symbol into a bound field dataclasss"""
         size_cum_sum = np.cumsum([0] + cls.field.list_of("size"))
         new_values = {}
         for start_idx, end_idx, elem in zip(
-            size_cum_sum, size_cum_sum[1:], cls.field,
+            size_cum_sum,
+            size_cum_sum[1:],
+            cls.field,
         ):
             new_values[elem.name] = elem.wrap_value(values[start_idx:end_idx])
         return cls(**new_values)
@@ -275,9 +281,7 @@ class Field:
                     if not isinstance(field_value, backend.symbol_class):
                         this_item = False
                         break
-                    this_item = this_item and backend.symbol_is(
-                        item_value, field_value
-                    )
+                    this_item = this_item and backend.symbol_is(item_value, field_value)
                 elif isinstance(item_value, BaseElement):
                     if item_value.__class__ is not field_value.__class__:
                         this_item = False
@@ -338,11 +342,8 @@ class Field:
         return self.get(name=with_name).backend_repr
 
     def dataclass_of(self, attr="backend_repr"):
-        """construct a dataclass of the field where values are the attr of each element
-        """
-        return self._dataclass(
-            **{elem.name: getattr(elem, attr) for elem in self}
-        )
+        """construct a dataclass of the field where values are the attr of each element"""
+        return self._dataclass(**{elem.name: getattr(elem, attr) for elem in self})
 
     def flatten(self, attr="backend_repr"):
         """flatten the values into a single 1D array"""
@@ -359,13 +360,13 @@ class Field:
         return getattr(self, item)
 
     def __add__(self, other):
-        """ add concatenates list of elements """
+        """add concatenates list of elements"""
         if isinstance(other, Field):
             return self._elements + other._elements
         raise NotImplementedError
 
     def __radd__(self, other):
-        """ add concatenates list of elements """
+        """add concatenates list of elements"""
         if isinstance(other, Field):
             return other._elements + self._elements
         raise NotImplementedError
@@ -395,17 +396,18 @@ class BaseElement(
     backend.BackendSymbolData,
 ):
     def __hash__(self):
-        #if self.field_type._model is None:
+        # if self.field_type._model is None:
         #    raise ValueError("Elements are not hashable until their field has been bound to a model")
-        return hash((
-            #self.name,
-            self.backend_repr,
-            self.shape,
-            self.field_type._name,
-            self.field_type._model_name,
-            self.field_type._model.__module__
-        ))
-
+        return hash(
+            (
+                # self.name,
+                self.backend_repr,
+                self.shape,
+                self.field_type._name,
+                self.field_type._model_name,
+                self.field_type._model.__module__,
+            )
+        )
 
     def __post_init__(self, *args, **kwargs):
         super().__post_init__(self, *args, **kwargs)
@@ -534,7 +536,6 @@ class FreeField(Field, default_direction=Direction.input):
             if not element.name:
                 element.name = f"{field._model_name}_{field._name}_{element_idx}"
 
-
     def create_from(self, other, **aliases):
         """Get or create elements based on another field
 
@@ -585,9 +586,7 @@ class WithDefaultElement(FreeElement):
 
 class WithDefaultField(FreeField):
     def create_substitution_dict(self, subclass, set_attr=False):
-        """ 
-
-        """
+        """ """
         substitution_dict = {}
         # TODO: no back reference is preserved which frankly seems harsh...
         for elem in self:
@@ -624,12 +623,10 @@ class WithDefaultField(FreeField):
                     else:
                         substitution_dict[elem.backend_repr] = use_val
             elif np.array(use_val).dtype.kind in "if":
-                #use_val = np.array(use_val)
+                # use_val = np.array(use_val)
                 use_val = np.atleast_1d(use_val)
                 if elem.size == use_val.size:
-                    substitution_dict[elem.backend_repr] = use_val.reshape(
-                        elem.shape
-                    )
+                    substitution_dict[elem.backend_repr] = use_val.reshape(elem.shape)
                 elif elem.size > use_val.size:
                     try:
                         np.broadcast_shapes(elem.shape, use_val.shape)
@@ -676,12 +673,11 @@ class InitializedElement(BoundedElement):
         # initializer may be an expression and cause an error here.
         # TODO: test this behavior? lol
         if isinstance(self.initializer, BaseElement):
-            self.initializer = np.ones( self.shape) * self.initializer.backend_repr
+            self.initializer = np.ones(self.shape) * self.initializer.backend_repr
         elif isinstance(self.initializer, backend.symbol_class):
-            self.initializer = np.ones( self.shape) * self.initializer
+            self.initializer = np.ones(self.shape) * self.initializer
         else:
             self.initializer = np.broadcast_to(self.initializer, self.shape)
-
 
 
 class InitializedField(FreeField):
@@ -776,7 +772,6 @@ class AssignedElement(BaseElement):
         return super().__hash__()
 
 
-
 class AssignedField(Field, default_direction=Direction.output):
     def __init__(self, direction=None, add_to_namespace_override=None, **kwargs):
         super().__init__(direction=direction, **kwargs)
@@ -784,7 +779,10 @@ class AssignedField(Field, default_direction=Direction.output):
         self._init_kwargs.update(add_to_namespace_override=add_to_namespace_override)
 
         if add_to_namespace_override is None:
-            self._add_to_namespace = self._direction in (Direction.input, Direction.output)
+            self._add_to_namespace = self._direction in (
+                Direction.input,
+                Direction.output,
+            )
         else:
             self._add_to_namespace = add_to_namespace_override
 
@@ -796,7 +794,6 @@ class AssignedField(Field, default_direction=Direction.output):
             # symbol_class??
             super().__setattr__(name, value)
         else:
-
             # TODO: resolve circular imports so we can use dataclass
             if isinstance(value, BaseElement):
                 value = value.backend_repr
@@ -829,10 +826,13 @@ class MatchedElementMixin:
 @dataclass(repr=False)
 class MatchedElement(BaseElement, MatchedElementMixin):
     """Element matched with another element of another field"""
+
     pass
+
 
 def zero_like(match):
     return np.zeros(match.shape)
+
 
 def pass_through(match):
     return match.backend_repr
@@ -887,7 +887,7 @@ class MatchedField(Field):
                 symbol_data = backend.BackendSymbolData(
                     shape=value.shape,
                     symmetric=value.symmetric,
-                    diagonal=value.diagonal
+                    diagonal=value.diagonal,
                 )
                 backend_repr = value.backend_repr
             else:
@@ -935,11 +935,10 @@ class MatchedField(Field):
         return on_field._dataclass(**dc_kwargs)
 
     def flatten(self, on_field=None):
-        """ flatten matches to the on_field, defaults tot he match.
+        """flatten matches to the on_field, defaults tot he match.
 
         on_field is used to override which field instance's dataclass gets filled in;
         this is currently used during TrajectoryAnalysis construction which creates its
         own copies of the matching fields
         """
         return self.dataclass_of(on_field).flatten()
-

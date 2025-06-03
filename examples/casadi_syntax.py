@@ -1,4 +1,5 @@
 import casadi
+
 from condor import CasadiFunctionCallback
 
 
@@ -17,7 +18,7 @@ def test_callbackfunc_2to1():
 def test_callbackfunc_2to2():
     x = casadi.SX.sym("x", 2)
     y = casadi.SX.sym("y")
-    f = casadi.Function("f", [x, y], [x**2, 2*y])
+    f = casadi.Function("f", [x, y], [x**2, 2 * y])
     cf = CasadiFunctionCallback(f)
 
     out = cf([0, 2], 1)

@@ -1,23 +1,26 @@
-import casadi
-import numpy as np
 from dataclasses import dataclass
 
-from condor.backends.element_mixin import BackendSymbolDataMixin
+import numpy as np
 
+import casadi
 from condor.backends.casadi import operators as operators
+from condor.backends.element_mixin import BackendSymbolDataMixin
 
 symbol_class = casadi.MX
 
+
 def symbols_in(expression):
-    """ return the leaf symbols in the :attr:`expression` """
+    """return the leaf symbols in the :attr:`expression`"""
     if not isinstance(expression, symbol_class):
         return []
     else:
         return casadi.symvar(expression)
 
+
 def is_constant(symbol):
-    """ evaluate whether the :attr:`symbol` is a constant (e.g., numeric) """
+    """evaluate whether the :attr:`symbol` is a constant (e.g., numeric)"""
     return not isinstance(symbol, symbol_class) or symbol.is_constant()
+
 
 def process_relational_element(elem):
     """
@@ -38,19 +41,17 @@ def process_relational_element(elem):
         lhs = elem.backend_repr.dep(0)
         rhs = elem.backend_repr.dep(1)
 
-    if (
-        hasattr(elem, "lower_bound") and
-        (not isinstance(elem.lower_bound, np.ndarray) or
-        np.any(np.isfinite(elem.lower_bound)))
+    if hasattr(elem, "lower_bound") and (
+        not isinstance(elem.lower_bound, np.ndarray)
+        or np.any(np.isfinite(elem.lower_bound))
     ):
         real_lower_bound = True
     else:
         real_lower_bound = False
 
-    if (
-        hasattr(elem, "upper_bound") and
-        (not isinstance(elem.upper_bound, np.ndarray)
-        or np.any(np.isfinite(elem.upper_bound)))
+    if hasattr(elem, "upper_bound") and (
+        not isinstance(elem.upper_bound, np.ndarray)
+        or np.any(np.isfinite(elem.upper_bound))
     ):
         real_upper_bound = True
     else:
@@ -88,19 +89,19 @@ def process_relational_element(elem):
             rhs = rhs.dep(1)
 
         if (
-            (lhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT)) or
-            (rhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT)) or
-            (mhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT))
+            (lhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT))
+            or (rhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT))
+            or (mhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT))
         ):
             raise ValueError("Too many inequalities deep")
 
-        if mhs.shape == (0,0):
+        if mhs.shape == (0, 0):
             if rhs.is_constant() and lhs.is_constant():
                 raise ValueError("Unexpected inequality of constants")
             elif not rhs.is_constant() and not lhs.is_constant():
-                mhs = (rhs - lhs)
-                lhs = np.full(lhs.shape,0.)
-                rhs = np.full(rhs.shape,np.inf)
+                mhs = rhs - lhs
+                lhs = np.full(lhs.shape, 0.0)
+                rhs = np.full(rhs.shape, np.inf)
             elif lhs.is_constant():
                 mhs = rhs
                 rhs = elem.upper_bound
@@ -130,15 +131,12 @@ def process_relational_element(elem):
             elem.lower_bound = 0.0
 
     if relational_op and (real_lower_bound or real_upper_bound):
-        raise ValueError(
-            f"Do not use relational constraints with bounds for {elem}"
-        )
-
+        raise ValueError(f"Do not use relational constraints with bounds for {elem}")
 
 
 def shape_to_nm(shape):
     if isinstance(shape, (int, np.int64)):
-        shape = (shape,1)
+        shape = (shape, 1)
     if len(shape) > 2:
         raise ValueError
     n = shape[0]
@@ -148,22 +146,20 @@ def shape_to_nm(shape):
         m = 1
     return n, m
 
+
 @dataclass
 class BackendSymbolData(BackendSymbolDataMixin):
-    """ Dataclass for handling backend expressions
-    """
+    """Dataclass for handling backend expressions"""
+
     def __post_init__(self, *args, **kwargs):
         # might potentially want to overwrite for casadi-specific validation, etc.
         super().__post_init__(self, *args, **kwargs)
 
-
     def flatten_value(self, value):
-        """ flatten a value to the appropriate representation for the backend
-        """
+        """flatten a value to the appropriate representation for the backend"""
         if self.symmetric:
             unique_values = symmetric_to_unique(
-                value,
-                symbolic=isinstance(value, symbol_class)
+                value, symbolic=isinstance(value, symbol_class)
             )
             if isinstance(value, symbol_class):
                 syms = casadi.symvar(value)
@@ -175,12 +171,10 @@ class BackendSymbolData(BackendSymbolDataMixin):
         else:
             if not isinstance(value, (np.ndarray, symbol_class)):
                 value = np.array(value)
-            return value.reshape((-1,1))
-
+            return value.reshape((-1, 1))
 
     def wrap_value(self, value):
-        """ wrap a flattened value to the appropriate shape
-        """
+        """wrap a flattened value to the appropriate shape"""
         if self.size == 1:
             if isinstance(value, (float, int, symbol_class)):
                 return value
@@ -196,9 +190,7 @@ class BackendSymbolData(BackendSymbolDataMixin):
         if isinstance(value, symbol_class) and value.is_constant():
             value = value.to_DM().toarray()
 
-        if (
-            not isinstance(value, (np.ndarray, symbol_class))
-        ):
+        if not isinstance(value, (np.ndarray, symbol_class)):
             value = np.array(value)
 
         try:
@@ -209,48 +201,48 @@ class BackendSymbolData(BackendSymbolDataMixin):
         return value
         return symbol_class(value).reshape(self.shape)
 
+
 def symmetric_to_unique(value, symbolic=True):
-    """ helper function for flattening a symmetric symbol """
+    """helper function for flattening a symmetric symbol"""
     n = value.shape[0]
-    unique_shape = (int(n*(n+1)/2), 1)
+    unique_shape = (int(n * (n + 1) / 2), 1)
     indices = np.tril_indices(n)
     if symbolic:
         unique_values = symbol_class(*unique_shape)
     else:
         unique_values = np.empty(unique_shape)
-    for kk, (i,j) in enumerate(zip(*indices)):
-        unique_values[kk] = value[i,j]
+    for kk, (i, j) in enumerate(zip(*indices)):
+        unique_values[kk] = value[i, j]
     return unique_values
 
+
 def unique_to_symmetric(unique, symbolic=True):
-    """ helper function for wrapping a symmetric symbol """
+    """helper function for wrapping a symmetric symbol"""
     count = unique.shape[0]
-    n = m = int((np.sqrt(1+8*count)-1)/2)
+    n = m = int((np.sqrt(1 + 8 * count) - 1) / 2)
     if symbolic:
         # using an empty MX is unverifiable by casadi.is_equal, but concatenating the
         # iniddividual elements from a list works
         matrix_symbols = np.empty((n, m), dtype=np.object_)
     else:
         if unique.shape[1] > 1:
-            use_shape = (n,m,unique.shape[1])
+            use_shape = (n, m, unique.shape[1])
         else:
-            use_shape = (n,m)
+            use_shape = (n, m)
         matrix_symbols = np.empty(use_shape)
     indices = np.tril_indices(n)
-    for kk, (i,j) in enumerate(zip(*indices)):
-        matrix_symbols[i,j] = unique[kk]
+    for kk, (i, j) in enumerate(zip(*indices)):
+        matrix_symbols[i, j] = unique[kk]
         if i != j:
-            matrix_symbols[j,i] = unique[kk]
+            matrix_symbols[j, i] = unique[kk]
     if symbolic:
         symbol_list = matrix_symbols.tolist()
-        matrix_symbols = casadi.vcat([
-            casadi.hcat(row) for row in symbol_list
-        ])
+        matrix_symbols = casadi.vcat([casadi.hcat(row) for row in symbol_list])
     return matrix_symbols
 
 
 def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
-    """ create a symbol
+    """create a symbol
 
     Parameters
     ----------
@@ -266,12 +258,12 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
     """
     n, m = shape_to_nm(shape)
     if diagonal:
-        #assert m == 1
+        # assert m == 1
         sym = casadi.diag(sym)
         raise NotImplementedError
     elif symmetric:
         assert n == m
-        unique_shape = (int(n*(n+1)/2), 1)
+        unique_shape = (int(n * (n + 1) / 2), 1)
         unique_symbols = symbol_class.sym(name, unique_shape)
         matrix_symbols = unique_to_symmetric(unique_symbols)
         return matrix_symbols
@@ -281,8 +273,7 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
 
 
 def get_symbol_data(symbol, symmetric=None):
-    """ extract shape metadata from an expression
-    """
+    """extract shape metadata from an expression"""
     if hasattr(symbol, "backend_repr"):
         symbol = symbol.backend_repr
 
@@ -303,10 +294,12 @@ def get_symbol_data(symbol, symmetric=None):
     diagonal = False
     if symmetric is None:
         # if unprovided, try to determine if symmetric
-        if isinstance( symbol, (symbol_class, casadi.DM)):
+        if isinstance(symbol, (symbol_class, casadi.DM)):
             symmetric = symbol.sparsity().is_symmetric() and size > 1
         else:
-            symmetric = np.isclose(0, symbol - symbol.T).all() and len(shape) == 2 and size > 1
+            symmetric = (
+                np.isclose(0, symbol - symbol.T).all() and len(shape) == 2 and size > 1
+            )
 
     return BackendSymbolData(
         shape=shape,
@@ -316,16 +309,15 @@ def get_symbol_data(symbol, symmetric=None):
 
 
 def symbol_is(a, b):
-    """ evaluate whether two symbols are the same with idiosyncrasies for symbol class
-    """
+    """evaluate whether two symbols are the same with idiosyncrasies for symbol class"""
     return (a.shape == b.shape) and (
-        (a == b).is_one() or
-        casadi.is_equal(a, b, int(1E10))
+        (a == b).is_one() or casadi.is_equal(a, b, int(1e10))
     )
+
 
 class WrappedSymbol:
     def __init__(self, symbol):
-        #assert not isinstance(arg, WrappedSymbol)
+        # assert not isinstance(arg, WrappedSymbol)
         if isinstance(symbol, WrappedSymbol):
             symbol = arg.symbol
         self.symbol = symbol
@@ -347,10 +339,11 @@ class WrappedSymbol:
     def __repr__(self):
         return self.symbol.__repr__()
 
+
 class SymbolCompatibleDict(dict):
-    """ A dict subclass that works with the backend symbol class
-    """
-    def __init__(self,*args, **kwargs):
+    """A dict subclass that works with the backend symbol class"""
+
+    def __init__(self, *args, **kwargs):
         args_dict = dict(*args, **kwargs)
         for k, v in args_dict.items():
             self[k] = v
@@ -366,21 +359,20 @@ class SymbolCompatibleDict(dict):
             yield k.symbol
 
     def items(self):
-        for k,v in dict.items(self):
+        for k, v in dict.items(self):
             yield k.symbol, v
 
     __iter__ = keys
 
     def __copy__(self):
         copy = SymbolCompatibleDict()
-        for k,v in self.items():
+        for k, v in self.items():
             copy[k] = v
         return copy
 
 
 def evalf(expr, backend_repr2value):
-    """ evaluate :attr:`expr` with dictionary of {symbol: value}
-    """
+    """evaluate :attr:`expr` with dictionary of {symbol: value}"""
     if not isinstance(expr, list):
         expr = [expr]
     func = casadi.Function(
@@ -395,8 +387,14 @@ class CasadiFunctionCallback(casadi.Callback):
     """Base class for wrapping a Function with a Callback"""
 
     def __init__(
-        self, wrapper_funcs, implementation=None, model_name="", jacobian_of=None, input_symbol=None,
-        output_symbol=None, opts={}
+        self,
+        wrapper_funcs,
+        implementation=None,
+        model_name="",
+        jacobian_of=None,
+        input_symbol=None,
+        output_symbol=None,
+        opts={},
     ):
         """
         wrapper_funcs -- list of callables to wrap, in order of ascending derivatives
@@ -422,8 +420,11 @@ class CasadiFunctionCallback(casadi.Callback):
         if not model_name:
             model_name = implementation.model.__name__
 
-
-        if jacobian_of is None and input_symbol is not None and output_symbol is not None:
+        if (
+            jacobian_of is None
+            and input_symbol is not None
+            and output_symbol is not None
+        ):
             self.placeholder_func = casadi.Function(
                 f"{model_name}_placeholder",
                 [self.input_symbol],
@@ -444,10 +445,10 @@ class CasadiFunctionCallback(casadi.Callback):
             # using callables_to_operator SHOULD mean that casadi backend for one-layer
             # callable can re-enter native casadi -- infinite differentiable, etc.
             self.jacobian = callables_to_operator(
-                wrapper_funcs = wrapper_funcs[1:],
-                implementation = None,
-                model_name = model_name,
-                jacobian_of = self,
+                wrapper_funcs=wrapper_funcs[1:],
+                implementation=None,
+                model_name=model_name,
+                jacobian_of=self,
                 opts=opts,
             )
 
@@ -459,7 +460,6 @@ class CasadiFunctionCallback(casadi.Callback):
         if self.jacobian is not None:
             self.jacobian.construct()
         super().construct(self.placeholder_func.name(), self.opts)
-
 
     def init(self):
         pass
@@ -474,13 +474,13 @@ class CasadiFunctionCallback(casadi.Callback):
         return self.placeholder_func.n_out()
 
     def eval(self, args):
-        #if self.jacobian_of:
+        # if self.jacobian_of:
         #    pass_args = args[:-1]
-        #else:
+        # else:
         #    pass_args = args
-        #out = self.wrapper_func(
+        # out = self.wrapper_func(
         #    *pass_args,
-        #)
+        # )
         out = self.wrapper_func(
             args[0],
         )
@@ -495,10 +495,8 @@ class CasadiFunctionCallback(casadi.Callback):
             if isinstance(out, tuple) and len(out) == 2:
                 return out
             jac_out = (
-                #np.concatenate(flatten(out))
-                out
-                .reshape(self.get_sparsity_out(0).shape[::-1])
-                .T
+                # np.concatenate(flatten(out))
+                out.reshape(self.get_sparsity_out(0).shape[::-1]).T
             )
             # for hessian, need to provide dependence of jacobian on the original
             # function's output. is it fair to assume always 0?
@@ -506,8 +504,8 @@ class CasadiFunctionCallback(casadi.Callback):
                 return (jac_out, np.zeros(self.get_sparsity_out(1).shape))
 
             return (jac_out,)
-        return out,
-        #breakpoint()
+        return (out,)
+        # breakpoint()
         return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else (out,)
         return [out] if self.get_n_out() == 1 else out
         # return out,
@@ -528,10 +526,10 @@ class CasadiFunctionCallback(casadi.Callback):
             raise ValueError
 
     def get_sparsity_out(self, i):
-        #if self.jacobian_of is None or i < self.jacobian_of.get_n_out():
+        # if self.jacobian_of is None or i < self.jacobian_of.get_n_out():
         if i < 1:
             return casadi.Sparsity.dense(*self.placeholder_func.sparsity_out(i).shape)
-        #elif i < self.jacobian_of.get_n_in() + self.jacobian_of.get_n_out():
+        # elif i < self.jacobian_of.get_n_in() + self.jacobian_of.get_n_out():
         else:
             return self.placeholder_func.sparsity_out(i)
             return casadi.Sparsity(
@@ -562,8 +560,9 @@ class CasadiFunctionCallback(casadi.Callback):
         # breakpoint()
         return self.jacobian
 
+
 def callables_to_operator(wrapper_funcs, *args, **kwargs):
-    """ check if this is actually something that needs to get wrapped or if it's a
+    """check if this is actually something that needs to get wrapped or if it's a
     native op... if latter, return directly; if former, create callback.
 
     this function ultimately contains the generic API, CasadiFunctionCallback can be
@@ -606,9 +605,10 @@ def callables_to_operator(wrapper_funcs, *args, **kwargs):
         return wrapper_funcs[0]
     return CasadiFunctionCallback(wrapper_funcs, *args, **kwargs)
 
+
 def expression_to_operator(input_symbols, output_expressions, name="", **kwargs):
-    """ take a symbolic expression and create an operator -- callable that can be used
-    with jacobian, etc. operators 
+    """take a symbolic expression and create an operator -- callable that can be used
+    with jacobian, etc. operators
 
     assume "MISO" -- but slightly misleading since output can be arbitrary size
     """

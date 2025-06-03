@@ -1,6 +1,5 @@
 """Exercise wrapping different systems overriding some inputs with constants"""
 
-
 import condor
 
 
