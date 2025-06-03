@@ -14,6 +14,7 @@ from condor.contrib import (
     ExternalSolverModel,
     AlgebraicSystem,
     OptimizationProblem,
+    TableLookup,
     ODESystem, LTI
 )
 from condor.fields import (AssignedField, BaseElement, BoundedAssignmentField,
@@ -32,6 +33,7 @@ __all__ = [
     ExternalSolverModel,
     AlgebraicSystem,
     ODESystem, LTI,
+    TableLookup,
     OptimizationProblem,
 AssignedField, BaseElement, BoundedAssignmentField,
    Direction, Field, FreeElement, FreeField,

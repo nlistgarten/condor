@@ -133,30 +133,34 @@ def substitute(expr, subs):
 
 def if_else(*conditions_actions):
     """
+    symbolic representation of a if/else control flow
 
-    if_else(
-        (condition0, action0),
-        (codnition1, action1),
-        ...
-        else_action
-    )
+    Parameters
+    ---------
+    *conditions_actions : list of (condition, value) pairs, ending with else_value
+
+    Example
+    --------
+
+    The expression::
+
+        value = if_else(
+            (condition0, value0),
+            (codnition1, value1),
+            ...
+            else_value
+        )
 
 
-    conditions_actions is a list of
-        (condition, action) pairs, which should get constructed in order
-
-        to be equivalent to
+    is equivalent to the numerical code::
 
         if condition0:
-            action0
+            value = value0
         elif condition1:
-            action1
+            value = value1
         ...
-
-        the last element in the list may be a single else action
-
         else:
-            else_action
+            value = else_value
 
     """
     if len(conditions_actions) == 1:
