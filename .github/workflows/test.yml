@@ -40,4 +40,4 @@ jobs:
         python -m pip install --group test .
 
     - name: Run tests
-      run: pytest --cov
+      run: pytest --cov=src

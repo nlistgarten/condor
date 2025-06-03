@@ -44,7 +44,7 @@ write_to = "src/condor/_version.py"
 exclude = ["design/*"]
 
 [tool.ruff.lint]
-select = ["E"]
+select = ["E", "I"]
 ignore = [
     "F821", # Undefined name ..."
 ]
