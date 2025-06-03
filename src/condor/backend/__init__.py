@@ -1,8 +1,13 @@
+"""
+Shim module for non-operators. This is moer utility-like functionality, outside the
+scope of the array API standard.
+"""
 from ._get_backend import get_backend
 backend_mod = get_backend()
 
+
 # non-operators -- more utility-like, ~outside scope of array API
-symbol_class = backend_mod.symbol_class
+symbol_class = backend_mod.symbol_class #: class for expressions
 symbol_generator = backend_mod.symbol_generator
 get_symbol_data = backend_mod.get_symbol_data
 symbol_is = backend_mod.symbol_is

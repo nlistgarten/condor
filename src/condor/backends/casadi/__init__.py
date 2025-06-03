@@ -12,12 +12,14 @@ symbol_class = casadi.MX
 evalf = casadi.evalf
 
 def symbols_in(expression):
+    """ return the leaf symbols in the :attr:`expression` """
     if not isinstance(expression, symbol_class):
         return []
     else:
         return casadi.symvar(expression)
 
 def is_constant(symbol):
+    """ evaluate whether the :attr:`symbol` is a constant (e.g., numeric) """
     return not isinstance(symbol, symbol_class) or symbol.is_constant()
 
 def process_relational_element(elem):
@@ -152,12 +154,16 @@ def shape_to_nm(shape):
 
 @dataclass
 class BackendSymbolData(BackendSymbolDataMixin):
+    """ Dataclass for handling backend expressions
+    """
     def __post_init__(self, *args, **kwargs):
         # might potentially want to overwrite for casadi-specific validation, etc.
         super().__post_init__(self, *args, **kwargs)
 
 
     def flatten_value(self, value):
+        """ flatten a value to the appropriate representation for the backend
+        """
         if self.symmetric:
             unique_values = symmetric_to_unique(
                 value,
@@ -177,6 +183,8 @@ class BackendSymbolData(BackendSymbolDataMixin):
 
 
     def wrap_value(self, value):
+        """ wrap a flattened value to the appropriate shape
+        """
         if self.size == 1:
             if isinstance(value, (float, int, symbol_class)):
                 return value
@@ -206,6 +214,7 @@ class BackendSymbolData(BackendSymbolDataMixin):
         return symbol_class(value).reshape(self.shape)
 
 def symmetric_to_unique(value, symbolic=True):
+    """ helper function for flattening a symmetric symbol """
     n = value.shape[0]
     unique_shape = (int(n*(n+1)/2), 1)
     indices = np.tril_indices(n)
@@ -218,6 +227,7 @@ def symmetric_to_unique(value, symbolic=True):
     return unique_values
 
 def unique_to_symmetric(unique, symbolic=True):
+    """ helper function for wrapping a symmetric symbol """
     count = unique.shape[0]
     n = m = int((np.sqrt(1+8*count)-1)/2)
     if symbolic:
@@ -244,6 +254,20 @@ def unique_to_symmetric(unique, symbolic=True):
 
 
 def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
+    """ create a symbol
+
+    Parameters
+    ----------
+    name : str
+    shape : tuple of ints
+    symmetric : bool
+        flag to indicate this should be a symmetric (2-D) matrix; only store the unique
+        elements
+    diagonal : bool
+        flag to indicate this should be a (2-D) matrix with only elements on the
+        diagonal
+
+    """
     n, m = shape_to_nm(shape)
     if diagonal:
         #assert m == 1
@@ -261,6 +285,8 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
 
 
 def get_symbol_data(symbol, symmetric=None):
+    """ extract shape metadata from an expression
+    """
     if hasattr(symbol, "backend_repr"):
         symbol = symbol.backend_repr
 
@@ -294,6 +320,8 @@ def get_symbol_data(symbol, symmetric=None):
 
 
 def symbol_is(a, b):
+    """ evaluate whether two symbols are the same with idiosyncrasies for symbol class
+    """
     return (a.shape == b.shape) and (
         (a == b).is_one() or
         casadi.is_equal(a, b, int(1E10))
@@ -324,6 +352,8 @@ class WrappedSymbol:
         return self.symbol.__repr__()
 
 class SymbolCompatibleDict(dict):
+    """ A dict subclass that works with the backend symbol class
+    """
     def __init__(self,*args, **kwargs):
         args_dict = dict(*args, **kwargs)
         for k, v in args_dict.items():
@@ -354,6 +384,8 @@ class SymbolCompatibleDict(dict):
 
 
 def evalf(expr, backend_repr2value):
+    """ evaluate :attr:`expr` with dictionary of {symbol: value}
+    """
     if not isinstance(expr, list):
         expr = [expr]
     func = casadi.Function(
@@ -366,8 +398,6 @@ def evalf(expr, backend_repr2value):
 
 class CasadiFunctionCallback(casadi.Callback):
     """Base class for wrapping a Function with a Callback"""
-
-
 
     def __init__(
         self, wrapper_funcs, implementation=None, model_name="", jacobian_of=None, input_symbol=None,

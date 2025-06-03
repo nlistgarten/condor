@@ -14,6 +14,7 @@ Implementations
    :member-order: bysource
    :undoc-members:
    :members:
+   :exclude-members: get_state_setter
 
 
 Iterative Solvers
