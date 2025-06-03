@@ -43,7 +43,31 @@ class InitializerMixin:
                 model_var.initializer = v
 
 class AlgebraicSystem(InitializerMixin):
+    """ Implementation for :class:`AlgebraicSystem` model.
 
+    Options
+    --------
+    atol : float
+       absolute tolerance (default 1e-12)
+    rtol : float
+       relative tolerance (default 1e-12)
+    warm_start : bool
+       flag indicating whether subsequent calls should initialize the variable values to
+       the last-run solution (default True)
+    max_iter : int
+       maximum number of iterations before terminating solver (default 100)
+    error_on_fail : bool
+       flag indicating whether to raise an error if the solver fails to converge within
+       specified tolerance before reaching max_iter (default False)
+    """
+    """
+    exact_hessian : bool
+       flag indicating whether to use second-order gradient information or broyden
+    re_initialize : ???
+       ???
+    default_initializer : ???
+       ???
+    """
     def construct(
         self,
         model,
@@ -124,6 +148,18 @@ class AlgebraicSystem(InitializerMixin):
 
 
 class OptimizationProblem(InitializerMixin):
+    """Implementation base class for :class:`OptimizationProblem` model.
+
+    Options
+    --------
+    init_callback : callable
+       callback with signature , called when an optimization problem is evalauted. Once
+       when embedded or every time as a standalone.
+    iter_callback : callable
+       callback with signature , called at each iteration of the
+       :class:`CasadiNlpsolImplementation` (only IPOPT) and :class:`SciPyBase`
+       subclass optimization implementaitons.
+    """
     # take an OptimizationProblem model with or without iteration spec and other Options
     # process options, create appropriate callback hooks
     # create appropriate operator --
@@ -203,9 +239,29 @@ class OptimizationProblem(InitializerMixin):
 
 
 class CasadiNlpsolImplementation(OptimizationProblem):
+    """Implementation layer for casadi nlpsol for :class:`OptimizationProblem` models.
+
+    Options
+    --------
+    method : CasadiNlpsolImplementation.Method
+        value from method enum to specify supported methods
+    exact_hessian : bool
+        flag to use second order gradient information; use limited Broyden update
+        otherwise
+    calc_lam_x : bool
+        flag to calculate the lagrange multipliers solution, used for IPOPT to perform a
+        true warm start
+
+    **options
+        remaining keyword arguments are passed to casadi's nlpsol's constructor's
+        solver-specific options argument. See :attr:`method_default_options` for the
+        defaults
+
+
+    """
     class Method(Enum):
         ipopt = auto()
-        snopt = auto()
+        snopt = auto() #: currently unsupported
         qrsqp = auto()
         fatrop = auto()
 
@@ -230,6 +286,8 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
     @property
     def default_options(self):
+        """ derived property to get a copy of :attr:`method_default_options` or an empty
+        dict """
         return self.method_default_options.get(self.method, dict())
 
     def construct(
@@ -362,6 +420,14 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
 
 class ScipyMinimizeBase(OptimizationProblem):
+    """Base implementation class for SciPy minimize for :class:`OptimizationProblem`
+    models.
+
+    Options
+    --------
+    **options
+        keyword options are passed directly to scipy.minimize's options keyword argument
+    """
     def construct(
         self,
         model,
@@ -638,6 +704,8 @@ class ScipyTrustConstr(ScipyMinimizeBase):
 
 import inspect
 class SciPyIterCallbackWrapper:
+    """ Wrapper for iter_callback function to use with SciPy minimize, used internally
+    """
     @classmethod
     def create_or_none(cls, model, parameters, callback=None):
         if callback is None:

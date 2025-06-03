@@ -47,6 +47,8 @@ class ExplicitSystem:
         )
 
 class ExternalSolverModel:
+    """ Implementation for External Solver models. No :class:`Options` expected.
+    """
     def __init__(self, model_instance):
         model = model_instance.__class__
         model_instance.options_dict=options_to_kwargs(model)

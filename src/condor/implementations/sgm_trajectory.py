@@ -26,8 +26,31 @@ def get_state_setter(field, signature, on_field=None, subs=None):
 
 
 class TrajectoryAnalysis:
+    """ Implementation for :class:`TrajectoryAnalysis` model.
+
+    Options
+    --------
+    state_atol : float
+        absolute tolerance for forward evalaution
+    state_rtol : float
+        relative tolerance for forward evalaution
+    state_adaptive_max_step_size : float
+        actually a minimum number of steps per time-defined segment for the forward
+        evaluation
+    state_max_step_size : float
+        maximum step size for the forward evaluation
+    state_solver : TrajectoryAnalysis.Solver
+        enum member for solver type
+
+    adjoint_*
+        same as above, for the adjoint solution
+
+
+
+    """
+
     class Solver(Enum):
-        CVODE = auto()
+        CVODE = auto() #: currently unsupported
         dopri5 = auto()
         dop853 = auto()
 

@@ -60,9 +60,6 @@ Condor Specific Terms
       a model (template) for defining models that is instrinsically tied to its super model, e.g., events, modes, and trajectory
       analysis models are submodels to the super ODE system
 
-    embedded model
-      a (standlone) model that is being used inside another model
-
 
 
 General Object-Oriented and Metaprogramming Terms
