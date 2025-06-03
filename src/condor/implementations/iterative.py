@@ -1,6 +1,7 @@
 from .utils import options_to_kwargs
 from enum import Enum, auto
 import condor as co
+import inspect
 
 from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
 from condor.solvers.casadi_warmstart_wrapper import (
@@ -196,30 +197,30 @@ class OptimizationProblem(InitializerMixin):
         self.iter_callback = iter_callback
         self.init_callback = init_callback
 
-        self.f = f = getattr(model, "objective", 0)
+        self.f = getattr(model, "objective", 0)
         self.has_p = bool(len(model.parameter))
-        self.p = p = model.parameter.flatten()
-        self.x = x = model.variable.flatten()
-        self.g = g = model.constraint.flatten()
+        self.p = model.parameter.flatten()
+        self.x = model.variable.flatten()
+        self.g = model.constraint.flatten()
 
         InitializerMixin.construct(self, model)
 
         self.objective_func = expression_to_operator(
             [self.x, self.p],
-            f,
+            self.f,
             f"{model.__name__}_objective",
         )
         self.constraint_func = expression_to_operator(
             [self.x, self.p],
-            g,
+            self.g,
             f"{model.__name__}_constraint",
         )
 
 
-        self.lbx = lbx = model.variable.flatten("lower_bound")
-        self.ubx = ubx = model.variable.flatten("upper_bound")
-        self.lbg = lbg = model.constraint.flatten("lower_bound")
-        self.ubg = ubg = model.constraint.flatten("upper_bound")
+        self.lbx = model.variable.flatten("lower_bound")
+        self.ubx = model.variable.flatten("upper_bound")
+        self.lbg = model.constraint.flatten("lower_bound")
+        self.ubg = model.constraint.flatten("upper_bound")
 
 
     def load_initializer(self, model_instance):
@@ -588,8 +589,6 @@ class ScipyTrustConstr(ScipyMinimizeBase):
         g_split=self.g_split
         g_jacs = [jacobian(g, self.x) for g in self.g_split]
 
-        scipy_constraints = []
-
         nonlinear_flags = [
             not jacobian(g_jac, self.x).nnz()
             or not jacobian(g_expr, self.p).nnz()
@@ -702,7 +701,6 @@ class ScipyTrustConstr(ScipyMinimizeBase):
         return scipy_constraints
 
 
-import inspect
 class SciPyIterCallbackWrapper:
     """ Wrapper for iter_callback function to use with SciPy minimize, used internally
     """

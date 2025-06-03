@@ -103,7 +103,6 @@ class FieldValues:
     @classmethod
     def wrap(cls, values):
         """ turn a single symbol into a bound field dataclasss """
-        count_accumulator = 0
         size_cum_sum = np.cumsum([0] + cls.field.list_of("size"))
         new_values = {}
         for start_idx, end_idx, elem in zip(
@@ -620,7 +619,7 @@ class WithDefaultField(FreeField):
                 if elem.size >= np.prod(use_val.size()):
                     try:
                         np.broadcast_shapes(elem.shape, use_val.shape)
-                    except:
+                    except Exception:
                         pass
                     else:
                         substitution_dict[elem.backend_repr] = use_val
@@ -634,7 +633,7 @@ class WithDefaultField(FreeField):
                 elif elem.size > use_val.size:
                     try:
                         np.broadcast_shapes(elem.shape, use_val.shape)
-                    except:
+                    except Exception:
                         pass
                     else:
                         substitution_dict[elem.backend_repr] = use_val
@@ -832,8 +831,11 @@ class MatchedElement(BaseElement, MatchedElementMixin):
     """Element matched with another element of another field"""
     pass
 
-zero_like = lambda match: np.zeros(match.shape)  # backend.operators.zeros(match.shape)
-pass_through = lambda match: match.backend_repr
+def zero_like(match):
+    return np.zeros(match.shape)
+
+def pass_through(match):
+    return match.backend_repr
 
 
 class MatchedField(Field):
@@ -894,7 +896,6 @@ class MatchedField(Field):
                 if isinstance(value, backend.symbol_class):
                     backend_repr = value
                 else:
-                    original_value = value
                     value = np.atleast_1d(value)
                     if match.size == value.size:
                         backend_repr = value.reshape(match.shape)

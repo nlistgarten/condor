@@ -1,15 +1,12 @@
 import casadi
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from condor.backends.element_mixin import BackendSymbolDataMixin
 
-
-from condor.backends.casadi import operators
+from condor.backends.casadi import operators as operators
 
 symbol_class = casadi.MX
-
-evalf = casadi.evalf
 
 def symbols_in(expression):
     """ return the leaf symbols in the :attr:`expression` """
@@ -36,7 +33,6 @@ def process_relational_element(elem):
     """
     # check if the backend_repr is a comparison op
     # check if the bounds are constant
-    re_append_elem = True
     relational_op = False
     if elem.backend_repr.is_binary():
         lhs = elem.backend_repr.dep(0)
@@ -380,7 +376,6 @@ class SymbolCompatibleDict(dict):
         for k,v in self.items():
             copy[k] = v
         return copy
-
 
 
 def evalf(expr, backend_repr2value):

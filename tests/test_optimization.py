@@ -41,7 +41,7 @@ def test_sellar(method):
     Sellar.x.initializer = 1.0
     Sellar.z.initializer = [5.0, 2.0]
     Sellar.Options.__implementation__ = method
-    sellar_opt = Sellar()
+    Sellar()
 
     # TODO meaningful asserts?
 

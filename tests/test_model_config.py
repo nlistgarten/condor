@@ -21,7 +21,8 @@ def test_model_config():
 
 
     with pytest.raises(ValueError):
-        failing_mod = co.settings.get_module(
+        co.settings.get_module(
             "modules.configured_model", A=A, B=B, extra="something"
         )
+
 

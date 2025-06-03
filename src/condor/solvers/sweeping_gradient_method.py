@@ -113,18 +113,15 @@ class SolverSciPyBase(SolverMixin):
         # spline_gs = np.array([system.events(tt, x_spl(tt)) for tt in ts_for_g])
         # g_spl = make_interp_spline(ts_for_g[time_sort], spline_gs[time_sort], k=k)
 
-        g_der = g_spl.derivative()
-
         for g_idx, g_sign in enumerate(gs_sign):
             if g_sign:
-                find_function = lambda t: g_spl(t)[g_idx]
-                find_prime = lambda t: g_der(t)[g_idx]
+                def find_function(t):
+                    return g_spl(t)[g_idx]
                 set_t = brentq(
                     find_function,
                     spline_ts[-2],
                     spline_ts[-1],
                 )
-                # set_t = newton(find_function, spline_ts[-2], find_prime, tol=1E-12)
             else:
                 set_t = spline_ts[-1]
             t_events[g_idx] = set_t
@@ -394,7 +391,10 @@ class SolverCVODE(SolverMixin):
                     )
                     try:
                         terminate = np.any(rootsfound[system.terminating] != 0)
-                    except:
+                    except Exception as e:
+                        print("Hit exemption:")
+                        print(e)
+                        print("You may try to continue through or exit")
                         breakpoint()
                     self.store_result(np.copy(solver_res.values.t), next_x)
 
@@ -865,7 +865,7 @@ class AdjointSystem(System):
         # might be able to some magic to skip if nothing is done? but might only be for
         # terminal event anyway? maybe initial?
         active_update_idxs = np.where(event.rootsfound != 0)[0]
-        lamda_tep = last_lamda = lamda  # self.result.x[-1]
+        last_lamda = lamda
         p = state_res.p
         state_idxp = event.index  # positive side of event
         te = state_res.t[state_idxp]
@@ -900,8 +900,6 @@ class AdjointSystem(System):
                     lamda_tem = (dh_dx.T - dte_dxT @ (dh_dx @ ftem).T) @ last_lamda
                     last_lamda = lamda_tem
             else:
-                lamda_dot = self.dots(te, last_lamda)
-
                 for event_channel in active_update_idxs[::-1]:
                     dh_dx = self.dh_dxs[event_channel](
                         p,

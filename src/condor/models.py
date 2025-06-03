@@ -1,7 +1,5 @@
 import logging
-from dataclasses import asdict, dataclass, field
-from dataclasses import fields as dc_fields
-from dataclasses import replace
+import dataclasses as dc
 
 
 from condor import backend
@@ -15,31 +13,31 @@ from condor.fields import (AssignedField, BaseElement, Direction, Field, FreeFie
 log = logging.getLogger(__name__)
 
 
-@dataclass
+@dc.dataclass
 class BaseModelMetaData:
     """Holds metadata for models"""
 
     model_name: str = ""
-    independent_fields: list = field(default_factory=list)
-    matched_fields: list = field(default_factory=list)
-    assigned_fields: list = field(default_factory=list)
+    independent_fields: list = dc.field(default_factory=list)
+    matched_fields: list = dc.field(default_factory=list)
+    assigned_fields: list = dc.field(default_factory=list)
 
-    input_fields: list = field(default_factory=list)
-    output_fields: list = field(default_factory=list)
-    internal_fields: list = field(default_factory=list)
+    input_fields: list = dc.field(default_factory=list)
+    output_fields: list = dc.field(default_factory=list)
+    internal_fields: list = dc.field(default_factory=list)
 
-    input_names: list = field(default_factory=list)
-    output_names: list = field(default_factory=list)
+    input_names: list = dc.field(default_factory=list)
+    output_names: list = dc.field(default_factory=list)
 
-    submodels: list = field(default_factory=list)
-    embedded_models: dict = field(default_factory=dict)
+    submodels: list = dc.field(default_factory=list)
+    embedded_models: dict = dc.field(default_factory=dict)
     bind_embedded_models: bool = True
 
-    inherited_items: dict = field(default_factory=dict)
+    inherited_items: dict = dc.field(default_factory=dict)
     template: object = None
 
-    user_set: dict = field(default_factory=dict)
-    backend_repr_elements: dict = field(default_factory=backend.SymbolCompatibleDict)
+    user_set: dict = dc.field(default_factory=dict)
+    backend_repr_elements: dict = dc.field(default_factory=backend.SymbolCompatibleDict)
     options: object = None
 
     # assembly/component can also get children/parent
@@ -64,7 +62,7 @@ class BaseModelMetaData:
 
     def copy_update(self, **new_meta_kwargs):
         meta_kwargs = {}
-        for field in dc_fields(self):
+        for field in dc.fields(self):
             field_val = getattr(self, field.name)
             if isinstance(field_val, list):
                 # shallow copy
@@ -330,7 +328,6 @@ class BaseModelType(type):
         available during class declaration)
         """
         v = field
-        v_class = v.__class__
         v_init_kwargs = v._init_kwargs.copy()
         for init_k, init_v_iterable in v._init_kwargs.items():
             did_update = False
@@ -362,6 +359,9 @@ class BaseModelType(type):
 
     @classmethod
     def inherit_item(cls, cls_dict, field_from_inherited, meta, name, base, k, v):
+        """ inerit :attr:`k` = :attr:`v` as present in `base`'s locals dictionary
+        field_from_inherited is a dictionary mapping base's fields to field on new class
+        """
         if k in base._meta.inherited_items:
             log.debug("should this be injected? %s=%s", k, v)
             breakpoint()
@@ -634,7 +634,7 @@ class BaseModelType(type):
             new_attrs,
             **kwargs,
         )
-        new_cls._meta = replace(attrs.meta)
+        new_cls._meta = dc.replace(attrs.meta)
         # TODO why did process_fields happen before?
         cls.process_fields(new_cls)
 
@@ -1115,7 +1115,8 @@ class ModelType(BaseModelType):
                 for base in bases:
                     template = base.__class__
                     if hasattr(template, "baseclass_for_inheritance"):
-                        first_base = template.baseclass_for_inheritance
+                        # first_base = template.baseclass_for_inheritance
+                        # might be useful to get this?
                         break
                 use_bases = (None, Model)
 
@@ -1331,7 +1332,7 @@ class Model(metaclass=ModelType):
         # generally implementations are responsible for binding computed values.
         # implementations know about models, models don't know about implementations
         if False:
-            self.output_kwargs = output_kwargs = {
+            self.output_kwargs = {
                 out_name: getattr(self, out_name)
                 for field in cls._meta.output_fields
                 for out_name in field.list_of("name")
@@ -1401,7 +1402,7 @@ class Model(metaclass=ModelType):
         ]
         for field in fields:
             model_instance_field = getattr(model_instance, field._name)
-            model_instance_field_dict = asdict(model_instance_field)
+            model_instance_field_dict = dc.asdict(model_instance_field)
             model_assignments.update(
                 {
                     elem.backend_repr: val
@@ -1443,7 +1444,7 @@ class Model(metaclass=ModelType):
         embedded_model_kwargs = {}
         for field in embedded_model._meta.input_fields:
             bound_field = getattr(embedded_model_instance, field._name)
-            bound_field_dict = asdict(bound_field)
+            bound_field_dict = dc.asdict(bound_field)
             for k, v in bound_field_dict.items():
                 if not isinstance(v, backend.symbol_class):
                     embedded_model_kwargs[k] = v
@@ -1479,10 +1480,10 @@ class Model(metaclass=ModelType):
         assignment_updates = {}
         for field in embedded_model_instance._meta.output_fields:
             sym_bound_field = getattr(embedded_model_instance, field._name)
-            sym_bound_field_dict = asdict(sym_bound_field)
+            sym_bound_field_dict = dc.asdict(sym_bound_field)
 
             ran_bound_field = getattr(bound_embedded_model, field._name)
-            ran_bound_field_dict = asdict(ran_bound_field)
+            ran_bound_field_dict = dc.asdict(ran_bound_field)
 
             assignment_updates.update(
                 {
@@ -1623,12 +1624,12 @@ TrajectoryAnalysis should get extra flags for keep/skip events and modes
 """
 
 
-@dataclass
+@dc.dataclass
 class SubmodelMetaData(BaseModelMetaData):
     # primary only needed for submodels, maybe also subclasses?
     primary: object = None
-    copy_fields: list = field(default_factory=list)
-    subclasses: list = field(default_factory=list)
+    copy_fields: list = dc.field(default_factory=list)
+    subclasses: list = dc.field(default_factory=list)
 
 
 class SubmodelTemplateType(ModelTemplateType):
@@ -1640,7 +1641,6 @@ class SubmodelTemplateType(ModelTemplateType):
     @classmethod
     def inherit_field(cls, field, cls_dict):
         v = field
-        v_class = v.__class__
         v_init_kwargs = v._init_kwargs.copy()
         for init_k, init_v_iterable in v._init_kwargs.items():
             did_update = False

@@ -144,14 +144,12 @@ class OptimizationProblemType(ModelType):
             re_append_elem = True
             process_relational_element(elem)
             if not is_constant(elem.lower_bound):
-                # new_elem = elem.copy_to_field(new_cls.constraint)
-                new_elem = new_cls.constraint(
+                new_cls.constraint(
                     elem.backend_repr - elem.lower_bound, lower_bound=0.0
                 )
                 re_append_elem = False
             if not is_constant(elem.upper_bound):
-                # new_elem = elem.copy_to_field(new_cls.constraint)
-                new_elem = new_cls.constraint(
+                new_cls.constraint(
                     elem.backend_repr - elem.upper_bound, upper_bound=0.0
                 )
                 re_append_elem = False
@@ -823,7 +821,7 @@ def LTI(
         elif B is not None:
             dt_attrs["update"][dt_attrs["u"]] = -K @ x
             # dt_attrs["update"][dt_attrs["x"]] = x
-        DTclass = SubmodelType(
+        SubmodelType(
             "DT",
             (plant.Event,),
             attrs=dt_attrs,

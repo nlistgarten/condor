@@ -82,7 +82,6 @@ class TrajectoryAnalysis:
         self.ode_model = ode_model = model._meta.primary
 
         self.x = model.state.flatten()
-        dot = model.dot.flatten()
         self.lamda = backend.symbol_generator("lambda", model.state._count)
 
         self.p = model.parameter.flatten()

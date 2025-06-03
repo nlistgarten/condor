@@ -39,7 +39,8 @@ def diag(v, k=0):
 def vector_norm(x, ord=2):
     if ord==2:
         return casadi.norm_2(x)
-    if ord==1: return casadi.norm_1(x)
+    if ord==1:
+        return casadi.norm_1(x)
     if ord==inf:
         return casadi.norm_inf(x)
 
@@ -117,7 +118,6 @@ def jac_prod(of, wrt, rev=True):
     return casadi.jtimes(of, wrt, not rev)
 
 def substitute(expr, subs):
-    original_expr = expr
     for key, val in subs.items():
         try:
             expr = casadi.substitute(expr, key, val)
