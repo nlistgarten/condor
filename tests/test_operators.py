@@ -41,7 +41,7 @@ def test_if_():
     assert Check(2).emlf == 6.0
     assert Check(12).emlf == 12
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="if_else requires an else_action"):
 
         class Check(co.ExplicitSystem):
             catd = input()

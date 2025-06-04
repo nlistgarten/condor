@@ -20,5 +20,5 @@ def test_model_config():
 
     assert dbl_int is not sp_dbl_int
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Extra keyword arguments"):
         co.settings.get_module("modules.configured_model", A=A, B=B, extra="something")
