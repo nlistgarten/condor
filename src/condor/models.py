@@ -1382,7 +1382,7 @@ class Model(metaclass=ModelType):
     def create_bound_field_dataclass(field, values, wrap=True):
         if wrap:
             values = backend.wrap(field, values)
-        dataclass_kwarg = {elem_name, val in zip(field.list_of("name"), values)}
+        dataclass_kwarg = {elem_name: val in zip(field.list_of("name"), values)}
         return field._dataclass(**dataclass_kwarg)
 
     def __iter__(self):

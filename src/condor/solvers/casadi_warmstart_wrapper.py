@@ -61,14 +61,14 @@ class CasadiWarmstartWrapperBase:
 
 
     """
-    primary_function: (
-        callable  # callable f(x, p). nlpsol's objective or rootfinder's residual
-    )
+    #: callable f(x, p). nlpsol's objective or rootfinder's residual
+    primary_function: callable
 
     n_variable: int
     n_parameter: int
 
-    init_var: list  # initial guess function of p,  x0(p)
+    #: initial guess function of p,  x0(p)
+    init_var: list
     warm_start: list
     method_string: str
 
@@ -137,10 +137,7 @@ class CasadiWarmstartWrapperBase:
         casadi.Callback.__init__(self)
         self.construct()
 
-    def eval_jacobian(
-        self,
-        run_p,
-    ):
+    def eval_jacobian(self, run_p):
         if np.all(self.last_p == run_p):
             # defensive check that last solution was right, then just use last_x
             jac_x, jac_p = self.placeholder_jacobian(self.last_x, run_p, [])
@@ -151,10 +148,7 @@ class CasadiWarmstartWrapperBase:
             )
         return jac_p
 
-    def eval_hessian(
-        self,
-        run_p,
-    ):
+    def eval_hessian(self, run_p):
         if np.all(self.last_p == run_p):
             # defensive check that last solution was right, then just use last_x
             *_jac_nz, jac_pp, jac_px = self.placeholder_hessian(
