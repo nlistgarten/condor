@@ -233,7 +233,16 @@ class TrajectoryAnalysis:
                         e_expr = e_expr * (model.t <= at_time.stop)
                         # if there is an end-time, hold constant to prevent additional
                         # zero crossings -- hopefully works even if stop is on an event
-                        # post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
+                        # post_term = (
+                        #     (ode_model.t >= at_time.stop)
+                        #     * at_time.step
+                        #     * casadi.sin(
+                        #         casadi.pi
+                        #         * (at_time.stop - at_time_start)
+                        #         / at_time.step
+                        #     )
+                        #     / casasadi.pi
+                        # )
                         post_term = (model.t >= at_time.stop) * mod(
                             at_time.stop - at_time_start, at_time.step
                         )
@@ -426,44 +435,43 @@ class TrajectoryAnalysis:
             dh_dx = jacobian(h_expr.expr, self.x)
             dh_dp = jacobian(h_expr.expr, self.p)
 
-            """
-            te = ode_model.t
+            # te = ode_model.t
 
-            xtem = self.x
-            xtep = h_expr(self.p, te, xtem)
+            # xtem = self.x
+            # xtep = h_expr(self.p, te, xtem)
 
-            ftem = state_equation_func(self.p, te, xtem)
-            ftep = state_equation_func(self.p, te, xtep)
-            delta_fs = ftep - ftem
-            delta_xs = xtep - xtem
+            # ftem = state_equation_func(self.p, te, xtem)
+            # ftep = state_equation_func(self.p, te, xtep)
+            # delta_fs = ftep - ftem
+            # delta_xs = xtep - xtem
 
-            lamda_tep = self.lamda
-            eyen = casadi.MX.eye(lamda_tep.shape[0])
-            lamda_tem = (( eyen + dte_dx.T @ ftem.T) @  dh_dx.T - dte_dx.T @ ftep.T )@ lamda_tep
+            # lamda_tep = self.lamda
+            # eyen = casadi.MX.eye(lamda_tep.shape[0])
+            # lamda_tem = (
+            #     (eyen + dte_dx.T @ ftem.T) @ dh_dx.T - dte_dx.T @ ftep.T
+            # ) @ lamda_tep
 
-            delta_lamdas = (lamda_tem - lamda_tep)
+            # delta_lamdas = lamda_tem - lamda_tep
 
-            # TODO update for forcing function
-            lamda_dot_tem = -state_dot_jac_func(self.p, te, xtem).T @ lamda_tem
-            lamda_dot_tep = -state_dot_jac_func(self.p, te, xtep).T @ lamda_tep
+            # # TODO update for forcing function
+            # lamda_dot_tem = -state_dot_jac_func(self.p, te, xtem).T @ lamda_tem
+            # lamda_dot_tep = -state_dot_jac_func(self.p, te, xtep).T @ lamda_tep
 
-            delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
+            # delta_lamda_dots = lamda_dot_tem - lamda_dot_tep
 
-            jac_update = (
-                lamda_tep.T @ dh_dp
-                - lamda_tep.T @ ( ftep - dh_dx @ ftem ) @ dte_dp 
-            )
+            # jac_update = (
+            #     lamda_tep.T @ dh_dp - lamda_tep.T @ (ftep - dh_dx @ ftem) @ dte_dp
+            # )
 
-            jac_update = substitute(jac_update, control_sub_expression)
+            # jac_update = substitute(jac_update, control_sub_expression)
 
-            self.jac_updates.append(
-                casadi.Function(
-                    f"{event.__name__}_jac_update",
-                    self.adjoint_signature,
-                    [jac_update],
-                )
-            )
-            """
+            # self.jac_updates.append(
+            #     casadi.Function(
+            #         f"{event.__name__}_jac_update",
+            #         self.adjoint_signature,
+            #         [jac_update],
+            #     )
+            # )
 
             dte_dx = substitute(dte_dx, control_sub_expression)
             self.dte_dxs.append(

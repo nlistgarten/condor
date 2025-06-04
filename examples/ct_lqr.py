@@ -1,3 +1,6 @@
+import sys
+from time import perf_counter
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import linalg
@@ -49,8 +52,6 @@ class CtOptLQR(co.OptimizationProblem):
         __implementation__ = co.implementations.ScipyCG
 
 
-from time import perf_counter
-
 t_start = perf_counter()
 lqr_sol = CtOptLQR()
 t_stop = perf_counter()
@@ -67,6 +68,3 @@ print("      ARE sol:", K, "\niterative sol:", lqr_sol.K)
 print("time to run:", t_stop - t_start)
 
 plt.show()
-import sys
-
-sys.exit()

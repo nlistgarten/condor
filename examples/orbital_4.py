@@ -1,3 +1,5 @@
+import sys
+
 import casadi as ca
 import numpy as np
 from LinCovCW import I3, I6, Z3, Z6, LinCovCW, make_burn, make_sim
@@ -299,8 +301,6 @@ print([sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_2a])
 print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_2a])
 
 
-import sys
-
 sys.exit()
 opt = OptimizeBurns(disp_weighting=0.0)
 
@@ -432,7 +432,7 @@ sum Dv mag: 1.581449624190216 sum Dv disp: 1.7926191557385818
 was running 3 opts simultaneously, I think I killed my memory. Seemed to finish pretty
 quick after that.
 
-"""
+"""  # noqa
 
 """
 analysis with "2 burn" -- I think this is actually 3 burns, because I wasn't counting
@@ -592,7 +592,7 @@ no cost on dispersion, objective is 30% worse than with free t1 from paper
  barrier_tolerance: 2.048000000000001e-09
              niter: 195
 
-"""
+"""  # noqa
 
 scenario_kwargs = dict(
     **scenario_1_kwargs,

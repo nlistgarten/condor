@@ -1,6 +1,8 @@
 import casadi as ca
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.interpolate import make_interp_spline
+from scipy.io import loadmat
 
 import condor as co
 
@@ -285,8 +287,6 @@ def make_sim(sim_name="Sim"):
     return Sim
 
 
-from scipy.io import loadmat
-
 Cov_0_matlab = loadmat("P_aug_0.mat")["P_aug_0"][0]
 
 sim_kwargs = dict(
@@ -322,9 +322,6 @@ sim_kwargs.update(
         initial_P=Cov_0_matlab[-6:, -6:] - Cov_0_matlab[:6, :6],
     )
 )
-
-
-from scipy.interpolate import make_interp_spline
 
 
 def deriv_check_plots(indep_var, output_vars, sims, title_prefix="", interp_k=2):

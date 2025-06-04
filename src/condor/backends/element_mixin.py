@@ -53,8 +53,8 @@ Or, should the implementations just live in the main backend?
 Backend Implementations
 [x] must be able to flatten model symbols to backend arrays,
 [x] wrap backend arrays to model symbol, matching shape -- 
-[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics (if
-different, eg casadi DM) and backend symbols
+[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics
+    (if different, eg casadi DM) and backend symbols
 [ ] ideally, handle special case symmetric and dynamic flags for FreeSymbol and
 [ ] MatchedSymbol if matched to symmetric/diagonal FreeSymbol
 setting the values for outputs and intermediates
@@ -99,8 +99,8 @@ class BackendSymbolDataMixin:
     symmetric: bool
     diagonal: bool
     size: int = field(init=False)
-    # TODO: mark size as computed? or replace with @property? can that be trivially cached?
-    # currently computed by actual backend...
+    # TODO: mark size as computed? or replace with @property? can that be trivially
+    # cached? currently computed by actual backend...
 
     def __post_init__(self, *args, **kwargs):
         n = self.shape[0]

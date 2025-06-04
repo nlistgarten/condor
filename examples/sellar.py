@@ -1,4 +1,5 @@
 import condor as co
+from condor.backend import operators as ops
 
 warm_start = False
 
@@ -15,8 +16,6 @@ class Coupling(co.AlgebraicSystem):
 coupling = Coupling([5.0, 2.0, 1])  # evaluate the model numerically
 print(coupling.y1, coupling.y2)  # individual elements are bound numerically
 print(coupling.variable)  # fields are bound as a dataclass
-
-from condor.backend import operators as ops
 
 
 class Sellar(co.OptimizationProblem):

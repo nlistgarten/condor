@@ -1,5 +1,9 @@
 import functools
 
+import numpy as np
+
+import condor as co
+
 
 class instancemethod:
     def __init__(self, func):
@@ -29,11 +33,6 @@ class Class:
 
 cls = Class(2.0)
 print(cls.test(3.0))
-
-
-import numpy as np
-
-import condor as co
 
 
 class ComponentRaw(co.models.ModelTemplate):

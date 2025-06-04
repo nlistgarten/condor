@@ -103,11 +103,11 @@ def jacobian(of, wrt):
     a callable? Maybe the overall process is right (e.g., within an optimization
     problem, will have a variable flat input, and might just want the jac_expr)
 
-    Example to extend from docs/howto_src/table_basicsa.py
+    Example to extend from docs/howto_src/table_basics.py
 
        flat_inp = SinTable.input.flatten()
        wrap_inp = SinTable.input.wrap(flat_inp)
-       instance = SinTable(**wrap_inp.asdict()) # needed so callback object isn't destroyed
+       instance = SinTable(**wrap_inp.asdict()) # needed so callback obj isn't destroyed
        wrap_out = instance.output
        flat_out = wrap_out.flatten()
        jac_expr = ops.jacobian(flat_out, flat_inp)

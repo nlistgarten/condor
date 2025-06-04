@@ -18,7 +18,10 @@ class DeferredSystem:
 
 
 class ExplicitSystem:
-    """Implementation for :class:`ExplicitSystem` model. No :class:`Options` expected."""
+    """Implementation for :class:`ExplicitSystem` model.
+
+    No :class:`Options` expected.
+    """
 
     def __init__(self, model_instance):
         self.construct(model_instance.__class__)
@@ -42,7 +45,10 @@ class ExplicitSystem:
 
 
 class ExternalSolverModel:
-    """Implementation for External Solver models. No :class:`Options` expected."""
+    """Implementation for External Solver models.
+
+    No :class:`Options` expected.
+    """
 
     def __init__(self, model_instance):
         model = model_instance.__class__

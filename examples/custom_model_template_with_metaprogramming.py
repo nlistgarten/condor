@@ -5,7 +5,8 @@ class CustomMetaprogrammedType(co.ModelType):
     @classmethod
     def process_placeholders(cls, new_cls, attrs):
         print(
-            f"CustomMetaprogrammedType.processs_placeholders for {new_cls} is a good place for manipulating substitutions"
+            f"CustomMetaprogrammedType.processs_placeholders for {new_cls} is a good "
+            "place for manipulating substitutions"
         )
 
     @classmethod
@@ -100,7 +101,8 @@ class ModelsCouldAlwaysTakeNonCondorInputs(co.ExplicitSystem):
 
     def __init__(self, *args, my_kwarg=None, **kwargs):
         print(
-            "Use for something like ReferenceFrame, it's also possible to modify the kwargs "
+            "Use for something like ReferenceFrame, it's also possible to modify the "
+            "kwargs"
         )
         # store frame state as condor elements, then can use normal python type logic to
         # compose bigger expressions like finding path from arbitrary frames -- but

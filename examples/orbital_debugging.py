@@ -102,7 +102,9 @@ sim_kwargs.update(
 #            #rtol = 1E-12,
 #            nsteps = 10000,
 #        )
-# Sim.implementation.callback.get_jacobian(f'jac_{Sim.implementation.callback.name}', None, None, {})
+# Sim.implementation.callback.get_jacobian(
+#     f"jac_{Sim.implementation.callback.name}", None, None, {}
+# )
 
 
 Sim = make_sim()
@@ -179,7 +181,9 @@ MinorBurn = make_burn(
 #    sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
 #    final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
 
-# Sim2.implementation.callback.get_jacobian(f'jac_{Sim2.implementation.callback.name}', None, None, {})
+# Sim2.implementation.callback.get_jacobian(
+#     f"jac_{Sim2.implementation.callback.name}", None, None, {}
+# )
 Sim2 = make_sim()
 
 tigs = np.arange(600, 1000.0, 50)
@@ -198,12 +202,13 @@ turning debug_level to 0 for shooting_gradient_method moves from 200s to 190s.
 """
 plt.show()
 
-import sys
+import sys  # noqa
 
 sys.exit()
 
 
-# was attempting to optimize measurement time given fixed burn schedule: converse of orbital_3
+# was attempting to optimize measurement time given fixed burn schedule: converse of
+# orbital_3
 class Meas1(co.OptimizationProblem):
     t1 = variable(initializer=100.0)
     sigma_r_weight = parameter()

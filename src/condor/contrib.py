@@ -58,11 +58,12 @@ class ExplicitSystem(ModelTemplate):
        y_m &=& f_m(x_1, x_2, \dots, x_n)
        \end{align}
 
-    where each :math:`y_i` is a name-assigned expression on the ``output`` field and each
-    :math:`x_i` is an element drawn from the ``input`` field.
+    where each :math:`y_i` is a name-assigned expression on the ``output`` field and
+    each :math:`x_i` is an element drawn from the ``input`` field.
 
     Each :math:`x_i` and :math:`y_j` may have arbitrary shape. Condor can automatically
-    calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers, etc.
+    calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers,
+    etc.
     """
 
     #: the inputs of the model (e.g., :math:`x_i`)
@@ -128,7 +129,8 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
             var = getattr(cls, k)
             if var.field_type is not cls.variable:
                 raise ValueError(
-                    "Use set initial to set the initialier for variables, attempting to set {k}"
+                    "Use set initial to set the initialier for variables, attempting "
+                    f"to set {k}"
                 )
             var.initializer = v
 
@@ -221,7 +223,8 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
             var = getattr(cls, k)
             if var.field_type is not cls.variable:
                 raise ValueError(
-                    "Use set initial to set the initialier for variables, attempting to set {k}"
+                    "Use set initial to set the initialier for variables, attempting "
+                    f"to set {k}"
                 )
             var.initializer = v
 
@@ -337,10 +340,10 @@ class ODESystem(ModelTemplate):
 
     """
 
-    # TODO: indepdent var  needs its own descriptor type? OR do we want user classes to do
-    # t = DynamicsModel.independent_variable ? That would allow leaving it like this and
-    # consumers still know what it is
-    # or just set it to t and always use it? trying this way...
+    # TODO: indepdent var  needs its own descriptor type? OR do we want user classes to
+    # do t = DynamicsModel.independent_variable ? That would allow leaving it like this
+    # and consumers still know what it is or just set it to t and always use it? trying
+    # this way...
 
     # TODO: Are initial conditions an attribute of the dynamicsmodel or the trajectory
     # analysis that consumes it?
@@ -362,8 +365,8 @@ class ODESystem(ModelTemplate):
     # specification so adjoint gradients could get computed??
 
     # TODO: combine all events if functions are the same? maybe that happens
-    # automatically and that's okay. Needs the new events API (mimicking sundials) to happen
-    # --> VERIFY that SGM works correctly? Would require non-conflicting update
+    # automatically and that's okay. Needs the new events API (mimicking sundials) to
+    # happen --> VERIFY that SGM works correctly? Would require non-conflicting update
     # functions
 
     # TODO: inside another model, the callback gets captured into the "expression" and
@@ -456,9 +459,6 @@ class TrajectoryAnalysisType(SubmodelType):
         A common use case will be to bind the parameters then only update the state...
 
 
-    |                           |------------+-----------------------+----------------------|
-
-    |                           |            | constraint            |                      |
     """
 
     metadata_class = TrajectoryAnalysisMetaData
@@ -841,7 +841,8 @@ class ExternalSolverWrapperType(ModelTemplateType):
     @classmethod
     def __prepare__(cls, model_name, bases, name="", **kwds):
         log.debug(
-            f"ExternalSolverWrapperType prepare for cls={cls}, model_name={model_name}, bases={bases}, name={name}, kwds={kwds}"
+            f"ExternalSolverWrapperType prepare for cls={cls}, "
+            f"model_name={model_name}, bases={bases}, name={name}, kwds={kwds}"
         )
         if name:
             model_name = name
@@ -857,7 +858,8 @@ class ExternalSolverWrapperType(ModelTemplateType):
 
     def __call__(cls, *args, **kwargs):
         log.debug(
-            f"ExternalSolverWrapperType __call__ for cls={cls}, *args={args}, **kwargs={kwargs}"
+            f"ExternalSolverWrapperType __call__ for cls={cls}, *args={args}, "
+            f"**kwargs={kwargs}"
         )
         # gets called on instantiation of the user wrapper, so COULD return the
         # condor model instead of the wrapper class -- perhaps this is more condoric,
@@ -883,7 +885,8 @@ class ExternalSolverWrapper(
 
     def __init_subclass__(cls, singleton=True, **kwargs):
         log.debug(
-            f"ExternalSolverWrapper init subclass, cls={cls}, singleton={singleton}, kwargs={kwargs}"
+            f"ExternalSolverWrapper init subclass, cls={cls}, singleton={singleton}, "
+            f"kwargs={kwargs}"
         )
         # at this point, fields  are already bound by ExternalSolverWrapperType.__new__
         # but modifications AFTER construction can be doen here
@@ -893,7 +896,8 @@ class ExternalSolverWrapper(
 
     def __create_model__(self, *args, condor_model_name="", **kwargs):
         log.debug(
-            f"ExternalSolverWrapper create model self={self}, args={args}, condor_model_name={condor_model_name}, kwargs={kwargs}"
+            f"ExternalSolverWrapper create model self={self}, args={args}, "
+            f"condor_model_name={condor_model_name}, kwargs={kwargs}"
         )
         # print("create model of", self, self.__class__)
         # copy field so that any field modification by __original_init__ is onto the

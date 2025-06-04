@@ -1,3 +1,5 @@
+from time import perf_counter
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sgm_test_util import LTI_plot
@@ -68,9 +70,6 @@ class Transfer(DblInt.TrajectoryAnalysis):
 
         class Casadi(co.Options):
             state_adaptive_max_step_size = 4
-            # state_max_step_size = 4
-            # state_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
-            # adjoint_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
 
 
 class AccelerateTransfer(DblInt.TrajectoryAnalysis, exclude_events=[Switch1]):
@@ -82,9 +81,6 @@ class AccelerateTransfer(DblInt.TrajectoryAnalysis, exclude_events=[Switch1]):
 
         class Casadi(co.Options):
             state_adaptive_max_step_size = 4
-            # state_max_step_size = 4
-            # state_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
-            # adjoint_solver = co.backend.implementations.TrajectoryAnalysis.Solver.CVODE
 
 
 sim = Transfer(
@@ -119,8 +115,6 @@ p=[1, 4]
 """
 
 MinimumTime.set_initial(t1=2.163165480675697, t2=4.361971866705403)
-
-from time import perf_counter
 
 t_start = perf_counter()
 opt = MinimumTime()

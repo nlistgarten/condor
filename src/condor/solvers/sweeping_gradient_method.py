@@ -62,8 +62,12 @@ class SolverSciPyBase(SolverMixin):
         results = system.result
         # had to do some debugging and figured out a decent pattern for conditional
         # breakpoints... TODO move to notes or something?
-        # if results.e and results.e[-1].index == 19 and np.abs(results.t[-1] - 56.81341256) < 1.5E-9:
-        #    breakpoint()
+        # if (
+        #     results.e
+        #     and results.e[-1].index == 19
+        #     and np.abs(results.t[-1] - 56.81341256) < 1.5e-9
+        # ):
+        #     breakpoint()
 
         # if any sign change, return -1. maybe could determine rootinfo here?
         new_gs = system.events(t, x)
@@ -197,8 +201,12 @@ class SolverSciPyBase(SolverMixin):
                 # == 1: #equivalent to tstop
                 # == 2: #equivalent to rootfound
 
-                # if len(results.t) > 10 and np.abs(solver.t - next_t) < 1E-13 and solver.t != next_t:
-                #    breakpoint()
+                # if (
+                #     len(results.t) > 10
+                #     and np.abs(solver.t - next_t) < 1e-13
+                #     and solver.t != next_t
+                # ):
+                #     breakpoint()
 
                 if np.any(self.rootinfo):
                     rootsfound = self.rootinfo
@@ -210,11 +218,6 @@ class SolverSciPyBase(SolverMixin):
                     rootsfound = (gs == min_e).astype(int)
 
                 idx = len(results.t)
-                # had to do some debugging and figured out a decent pattern for conditional
-                # breakpoints... TODO move to notes or something?
-                # if idx == 19 and isinstance(system, AdjointSystem) and np.abs(next_t - 56.81341256) < 1.5E-9:#:21 and results.e[-1].index == 19:
-                ##if idx == 21 and results.e[-1].index == 19:
-                #    breakpoint()
                 results.e.append(Root(idx, rootsfound))
                 next_x = system.update(
                     results.t[-1],
@@ -703,11 +706,12 @@ class ResultInterpolant:
 
         if self.interpolants is None:
             # TODO figure out how to combine (and possibly reverse direction) state and
-            # parameter jacobian of state equation to reduce number of calls (and distance
-            # at each call), since this is potentially most expensive call -- I guess only
-            # if the ODE depends on inner-loop solver? then split
+            # parameter jacobian of state equation to reduce number of calls (and
+            # distance at each call), since this is potentially most expensive call -- I
+            # guess only if the ODE depends on inner-loop solver? then split
             # coefficients
-            # --> then also combine e.g., adjoint forcing function and jacobian interpolant
+            # --> then also combine e.g., adjoint forcing function and jacobian
+            # interpolant
 
             # expect integrand-term related functions to be cheap functions of state
             # point-wise along trajectory
@@ -758,7 +762,8 @@ class ResultInterpolant:
                         ts = ts[:idx] + ts[idx + 1 :]
                         coefs = coefs[:idx] + coefs[idx + 1 :]
                         print(
-                            f"stripping non-decreasing {ts[idx]} -- creating result interpolant"
+                            f"stripping non-decreasing {ts[idx]} -- creating result "
+                            "interpolant"
                         )
 
                     try:
@@ -1095,8 +1100,8 @@ class SweepingGradientMethod:
                 p_integrand_p_param_interp.interpolants,
             ):
                 # compute discontinuous portion of gradient associated with each event
-                # integrate continuous portion of gradient corresponding to pre/suc-ceding
-                # segment
+                # integrate continuous portion of gradient corresponding to
+                # pre/suc-ceding segment
                 adjoint_time_data = adjoint_result.t[
                     adjoint_segment.idx0 : adjoint_segment.idx1
                 ][::-1]

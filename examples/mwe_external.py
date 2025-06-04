@@ -5,7 +5,7 @@ import condor as co
 
 try:
     import spiceypy as spice
-except:
+except ImportError:
     pass
 else:
 
@@ -38,8 +38,8 @@ else:
             cls.omega = cls.input(shape=3, name="omega")
 
             OR
-            allow something along the lines of "auto_create" flag, or figure it out based on
-            context? lol
+            allow something along the lines of "auto_create" flag, or figure it out
+            based on context? lol
 
             cls.input(name="dt")
             cls.input(shape=4, name="q")

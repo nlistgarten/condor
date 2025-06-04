@@ -1,3 +1,5 @@
+from time import perf_counter
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sgm_test_util import LTI_plot
@@ -77,7 +79,6 @@ class MinimumTime(co.OptimizationProblem):
 
 MinimumTime.set_initial(p1=p0[0], p2=p0[1])
 
-from time import perf_counter
 
 t_start = perf_counter()
 opt = MinimumTime()

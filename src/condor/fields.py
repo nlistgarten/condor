@@ -342,7 +342,9 @@ class Field:
         return self.get(name=with_name).backend_repr
 
     def dataclass_of(self, attr="backend_repr"):
-        """construct a dataclass of the field where values are the attr of each element"""
+        """construct a dataclass of the field where values are the attr of each
+        element
+        """
         return self._dataclass(**{elem.name: getattr(elem, attr) for elem in self})
 
     def flatten(self, attr="backend_repr"):
@@ -397,7 +399,9 @@ class BaseElement(
 ):
     def __hash__(self):
         # if self.field_type._model is None:
-        #    raise ValueError("Elements are not hashable until their field has been bound to a model")
+        #    raise ValueError(
+        #        "Elements are not hashable until their field has been bound to a model"
+        #    )
         return hash(
             (
                 # self.name,

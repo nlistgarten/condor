@@ -1,3 +1,5 @@
+from time import perf_counter
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import linalg, signal
@@ -5,12 +7,7 @@ from sgm_test_util import LTI_plot
 
 import condor as co
 
-dblintA = np.array(
-    [
-        [0, 1],
-        [0, 0],
-    ]
-)
+dblintA = np.array([[0, 1], [0, 0]])
 dblintB = np.array([[0, 1]]).T
 dt = 0.5
 
@@ -48,8 +45,6 @@ sim = DblIntSampledLQR([1.00842737, 0.05634044])
 sim = DblIntSampledLQR([0.0, 0.0])
 sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 
-
-from time import perf_counter
 
 t_start = perf_counter()
 lqr_sol_samp = SampledOptLQR()

@@ -1,3 +1,5 @@
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -40,8 +42,6 @@ ct_sim = DblIntLQR(
 LTI_plot(ct_sim)
 # plt.show()
 
-
-import sys
 
 sys.exit()
 

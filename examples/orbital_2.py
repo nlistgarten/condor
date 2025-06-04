@@ -1,4 +1,5 @@
 import casadi as ca
+from scipy.io import loadmat
 
 import condor as co
 from condor.backends.casadi.implementations import OptimizationProblem
@@ -232,8 +233,6 @@ class Sim(LinCovCW.TrajectoryAnalysis):
 
     # class Casadi(co.Options):
 
-
-from scipy.io import loadmat
 
 Cov_0_matlab = loadmat("P_aug_0.mat")["P_aug_0"][0]
 

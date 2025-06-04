@@ -1,5 +1,8 @@
+from time import perf_counter
+
 import casadi as ca
 import numpy as np
+from scipy.io import loadmat
 
 import condor as co
 from condor.backends.casadi.implementations import OptimizationProblem
@@ -166,8 +169,6 @@ class Sim(LinCovCW.TrajectoryAnalysis):
         adjoint_adaptive_max_step_size = 4
 
 
-from scipy.io import loadmat
-
 Cov_0_matlab = loadmat("P_aug_0.mat")["P_aug_0"][0]
 
 sim_kwargs = dict(
@@ -225,7 +226,6 @@ class TotalDeltaV(co.OptimizationProblem):
 
 
 ##############
-from time import perf_counter
 
 DV_idx = Sim.trajectory_output.flat_index(Sim.tot_Delta_v_mag)
 tig_idx = Sim.parameter.flat_index(Sim.tig)

@@ -115,7 +115,8 @@ class BaseCondorClassDict(dict):
             and self.user_setting
         ):
             raise ValueError(
-                f"Attempting to set {attr_name}={attr_val}, but {attr_name} is a reserved word"
+                f"Attempting to set {attr_name}={attr_val}, but {attr_name} is a "
+                "reserved word"
             )
 
         log.debug("setting %s to %s on %s", attr_name, attr_val, self.meta.model_name)
@@ -155,7 +156,10 @@ class BaseCondorClassDict(dict):
                 elif attr_name:
                     element.name = attr_name
                 else:
-                    element.name = f"{field._model_name}_{field._name}_{field._elements.index(element)}"
+                    element.name = (
+                        f"{field._model_name}_{field._name}"
+                        f"_{field._elements.index(element)}"
+                    )
 
             # TODO: MatchedField in "free" mode
             # TODO: from the output of a subsystem? Does this case matter?
@@ -267,7 +271,8 @@ class BaseModelType(type):
 
     def __init_subclass__(cls, **kwargs):
         cls.baseclass_for_inheritance = None
-        # backreference for baseclass (e.g., ModelTemplate, Model, etc) not created until
+        # backreference for baseclass (e.g., ModelTemplate, Model, etc) not created
+        # until
 
         # potential additional metadata:
         # these are only for templates? Or should templates get a custom metadata?
@@ -346,7 +351,8 @@ class BaseModelType(type):
             use_kwarg = []
             for init_v in init_v_iterable:
                 if isinstance(init_v, Field):
-                    # TODO: is it OK to always assume cls_dict has the proper reference injected
+                    # TODO: is it OK to always assume cls_dict has the proper reference
+                    # injected
                     if init_v._name in cls_dict:
                         use_kwarg.append(cls_dict[init_v._name])
                         did_update = True
@@ -432,7 +438,8 @@ class BaseModelType(type):
                     )
             else:
                 log.debug(
-                    f"Independent element/symbol being inherited from {base}.{k} = {v} to {name}"
+                    f"Independent element/symbol being inherited from {base}.{k} = {v} "
+                    f"to {name}"
                 )
 
             if isinstance(v, backend.symbol_class):
@@ -489,7 +496,8 @@ class BaseModelType(type):
         template = meta.template
 
         # probably sufficient to do noninput_fields
-        field_from_inherited = {}  # field._inherits_from: field for field in meta.all_fields}
+        field_from_inherited = {}
+        # field._inherits_from: field for field in meta.all_fields}
 
         # also need to iterate over bases/template, I guess?
         # cls.__mro__ might work. need to make sure the things in cls are fully copied,
@@ -575,8 +583,8 @@ class BaseModelType(type):
         attrs.user_setting = False
         # case 1: class Model -- provides machinery to make subsequent cases easier to
         # implement. "base model for inheritance"
-        # case 2: template - library code that defines fields, etc that user code inherits
-        # maybe call this model template?
+        # case 2: template - library code that defines fields, etc that user code
+        # inherits maybe call this model template?
         # from (case 3+). Implementations are tied to 2? "Library Models"?
         # case 3: User Model - inherits from template, defines the actual model that is
         # being analyzed, need to manipulate bases to swap for Model
@@ -673,8 +681,8 @@ class BaseModelType(type):
         # and should be not be finalized until a trajectory analysis, which has its own
         # copy. state must be fully defined by ODEsystem and can/should be finalized.
         # What about output? Should fields have an optional skip_finalize or something
-        # that for when an submodel class may modify it so don't finalize? And is that the
-        # only time it would come up?
+        # that for when an submodel class may modify it so don't finalize? And is that
+        # the only time it would come up?
         # TODO: review this
 
         for input_field in new_cls._meta.input_fields:
@@ -760,7 +768,8 @@ class BaseModelType(type):
 def check_attr_name(attr_name, attr_val, new_cls):
     if attr_name in new_cls.__class__.reserved_words:
         raise NameError(
-            f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is a reserved word"
+            f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is a "
+            "reserved word"
         )
     existing_attr = new_cls.__dict__.get(attr_name, None)
     if existing_attr is not None and attr_val is not existing_attr:
@@ -782,7 +791,8 @@ def check_attr_name(attr_name, attr_val, new_cls):
                 return
 
         raise NameError(
-            f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is already set to {getattr(new_cls, attr_name)}"
+            f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is "
+            f"already set to {getattr(new_cls, attr_name)}"
         )
     return
 
@@ -794,8 +804,9 @@ def check_attr_name(attr_name, attr_val, new_cls):
 
 
 class ModelTemplateType(BaseModelType):
-    """Define a Model Template  by subclassing Model, creating field types, and writing an
-    implementation."""
+    """Define a Model Template by subclassing Model, creating field types, and writing 
+    an implementation.
+    """
 
     # metadata_class = SubmodelMetaData
     user_model_metaclass = None
@@ -1282,7 +1293,8 @@ class Model(metaclass=ModelType):
         for (input_name, field), input_val in zip(input_names.items(), args):
             if input_name in kwargs:
                 raise ValueError(
-                    f"Argument {input_name} has value {input_val} from args and {kwargs[input_name]} from kwargs"
+                    f"Argument {input_name} has value {input_val} from args and "
+                    f"{kwargs[input_name]} from kwargs"
                 )
             fields_kwargs[field][input_name] = input_val
 
@@ -1600,9 +1612,9 @@ submodels from atmosphere etc models from Condor-Flight?
 placeholders: elements defined by library creators to allow user inputs; condor provides
 substitution mechanisms, etc. ~ expected uer input
 
-submodels are mdoels that don't make sense w/o their parent, maybe add configuration (like
-singleton). inner_to arg becomes modifying? because submodels only exist to modify their
-parent?  maybe submodel modifies its superior? 
+submodels are mdoels that don't make sense w/o their parent, maybe add configuration
+(like singleton). inner_to arg becomes modifying? because submodels only exist to modify
+their parent?  maybe submodel modifies its superior? 
 
 
 A user Model with a parent, a ModelTemplate with a parent is a submodel
@@ -1662,7 +1674,8 @@ class SubmodelTemplateType(ModelTemplateType):
             use_kwarg = []
             for init_v in init_v_iterable:
                 if isinstance(init_v, Field):
-                    # TODO: is it OK to always assume cls_dict has the proper reference injected
+                    # TODO: is it OK to always assume cls_dict has the proper reference
+                    # injected
                     if init_v._name in cls_dict:
                         use_kwarg.append(cls_dict[init_v._name])
                         did_update = True
@@ -1670,7 +1683,9 @@ class SubmodelTemplateType(ModelTemplateType):
                     elif init_v._name in cls_dict.meta.primary.__dict__:
                         use_kwarg.append(cls_dict.meta.primary.__dict__[init_v._name])
                         did_update = True
-                        # v_init_kwargs[init_k] = cls_dict.meta.primary.__dict__[init_v._name]
+                        # v_init_kwargs[init_k] = (
+                        #     cls_dict.meta.primary.__dict__[init_v._name]
+                        # )
             if not originaly_iterable and use_kwarg:
                 use_kwarg = use_kwarg[0]
             if did_update:
@@ -1711,9 +1726,9 @@ class SubmodelTemplateType(ModelTemplateType):
                 raise TypeError("User's submodels should not provide primary")
             if base_meta.primary is None:
                 raise TypeError(
-                    "This shouldn't happen -- defining user submodel with submodel template that is missing primary attribute"
+                    "This shouldn't happen -- defining user submodel with submodel "
+                    "template that is missing primary attribute"
                 )
-                # raise TypeError(" SubmodelTemplateType.__prepare__ missing required positional argument 'primary'")
             primary = base_meta.primary
 
             if copy_fields is None:

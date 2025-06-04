@@ -67,9 +67,9 @@ print(coupling.variable)
 #
 # .. math::
 #    \begin{aligned}
-#    \operatorname*{minimize}_{x \in \mathbb{R}^3} &  &  & x_{2}^{2}+x_{1}+y_{1}+e^{-y_{2}} \\
-#    \text{subject to} &  &  & 3.16\le y_{1}\\
-#     &  &  & y_{2}\le24.0
+#    \operatorname*{minimize}_{x \in \mathbb{R}^3} & \quad x_2^2+x_1+y_1+e^{-y_{2}} \\
+#    \text{subject to} & \quad 3.16 \le y_1 \\
+#    & \quad y_2 \le 24.0
 #    \end{aligned}
 #
 # where :math:`y_1` and :math:`y_2` are the solution to the system of algebraic
@@ -105,4 +105,6 @@ print(sellar.coupling.y1)  # embedded-model element
 
 # %%
 # .. rubric:: References
-# .. [sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based, Concurrent Subspace Optimization for Multidisciplinary System Design," 1996. https://doi.org/10.2514/6.1996-714
+# .. [sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based,
+#    Concurrent Subspace Optimization for Multidisciplinary System Design," 1996.
+#    https://doi.org/10.2514/6.1996-714

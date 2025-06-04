@@ -4,7 +4,8 @@ Polar Transformation
 =========================
 """
 # %%
-# As another example, if we were interested in transforming Cartesian coordinates to polar form:
+# As another example, if we were interested in transforming Cartesian coordinates to
+# polar form:
 #
 # .. math::
 #    \begin{align}
