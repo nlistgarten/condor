@@ -131,7 +131,7 @@ They can also be retrieved collectively:
 
  .. code-block:: none
 
-    PolartransformOutput(r=array([5.]), theta=array([0.92729522]))
+    PolarTransformOutput(r=array([5.]), theta=array([0.92729522]))
 
 
 
@@ -242,7 +242,7 @@ values is directly accessible if the ``bind_embedded_models`` option is ``True``
 
  .. code-block:: none
 
-    PolartransformOutput(r=array([1.]), theta=array([0.78539816]))
+    PolarTransformOutput(r=array([1.]), theta=array([0.78539816]))
 
 
 
@@ -273,7 +273,7 @@ position. For example,
 
  .. code-block:: none
 
-    CartesiantransformVariable(x=array([-0.70710678]), y=array([-0.70710678]))
+    CartesianTransformVariable(x=array([-0.70710678]), y=array([-0.70710678]))
 
 
 

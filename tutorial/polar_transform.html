@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Working with trajectories" href="trajectory.html" /><link rel="prev" title="Introduction to Condor" href="sellar.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
-        <title>Polar Transformation - Condor 0.1.dev1+g6fce032 documentation</title>
+        <title>Polar Transformation - Condor 0.1.dev1+g243c968 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.1.dev1+g6fce032 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.1.dev1+g243c968 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -195,7 +195,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
   
-  <span class="sidebar-brand-text">Condor 0.1.dev1+g6fce032 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.1.dev1+g243c968 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -224,6 +224,7 @@
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../topics/design.html">Condor Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../topics/glossary.html">Glossary of Terms</a></li>
 </ul>
 </li>
 </ul>
@@ -317,7 +318,7 @@ accustomed to Condor features.</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">output</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>PolartransformOutput(r=array([5.]), theta=array([0.92729522]))
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>PolarTransformOutput(r=array([5.]), theta=array([0.92729522]))
 </pre></div>
 </div>
 <p>You can of course call it again with different arguments</p>
@@ -375,7 +376,7 @@ values is directly accessible if the <code class="docutils literal notranslate">
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">p</span><span class="o">.</span><span class="n">output</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>PolartransformOutput(r=array([1.]), theta=array([0.78539816]))
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>PolarTransformOutput(r=array([1.]), theta=array([0.78539816]))
 </pre></div>
 </div>
 <p>Note that this has multiple solutions due to the form of the algebraic relationship of
@@ -388,7 +389,7 @@ position. For example,</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">variable</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>CartesiantransformVariable(x=array([-0.70710678]), y=array([-0.70710678]))
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>CartesianTransformVariable(x=array([-0.70710678]), y=array([-0.70710678]))
 </pre></div>
 </div>
 <p>An additional <code class="xref py py-attr docutils literal notranslate"><span class="pre">warm_start</span></code> attribute determines whether the initializer is
@@ -467,7 +468,7 @@ over-wrriten. Since the default is true, we can inspect the initializer values,<
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=07a83505"></script>
+</div><script src="../_static/documentation_options.js?v=b6a1ed3c"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=5fa4622c"></script>

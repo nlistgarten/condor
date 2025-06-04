@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Implementations" href="implementations.html" /><link rel="prev" title="Contrib Models" href="contrib.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
-        <title>Fields and Elements - Condor 0.1.dev1+g6fce032 documentation</title>
+        <title>Fields and Elements - Condor 0.1.dev1+g243c968 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.1.dev1+g6fce032 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.1.dev1+g243c968 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -195,7 +195,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
   
-  <span class="sidebar-brand-text">Condor 0.1.dev1+g6fce032 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.1.dev1+g243c968 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -224,6 +224,7 @@
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../topics/design.html">Condor Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../topics/glossary.html">Glossary of Terms</a></li>
 </ul>
 </li>
 </ul>
@@ -473,7 +474,12 @@ supplied in <cite>aliases</cite>.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="condor.fields.WithDefaultField">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.fields.</span></span><span class="sig-name descname"><span class="pre">WithDefaultField</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inherit_from</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.fields.WithDefaultField" title="Link to this definition">¶</a></dt>
-<dd><dl class="py attribute">
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="condor.fields.WithDefaultField.create_substitution_dict">
+<span class="sig-name descname"><span class="pre">create_substitution_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subclass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">set_attr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.fields.WithDefaultField.create_substitution_dict" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="condor.fields.WithDefaultField.element_class">
 <span class="sig-name descname"><span class="pre">element_class</span></span><a class="headerlink" href="#condor.fields.WithDefaultField.element_class" title="Link to this definition">¶</a></dt>
 <dd><p>alias of <a class="reference internal" href="#condor.fields.WithDefaultElement" title="condor.fields.WithDefaultElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">WithDefaultElement</span></code></a></p>
@@ -580,7 +586,7 @@ supplied in <cite>aliases</cite>.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="condor.fields.AssignedField">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.fields.</span></span><span class="sig-name descname"><span class="pre">AssignedField</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inherit_from</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.fields.AssignedField" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.fields.</span></span><span class="sig-name descname"><span class="pre">AssignedField</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_to_namespace_override</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.fields.AssignedField" title="Link to this definition">¶</a></dt>
 <dd><dl class="py attribute">
 <dt class="sig sig-object py" id="condor.fields.AssignedField.element_class">
 <span class="sig-name descname"><span class="pre">element_class</span></span><a class="headerlink" href="#condor.fields.AssignedField.element_class" title="Link to this definition">¶</a></dt>
@@ -602,7 +608,7 @@ supplied in <cite>aliases</cite>.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="condor.fields.MatchedField">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.fields.</span></span><span class="sig-name descname"><span class="pre">MatchedField</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">matched_to=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_factory=&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.fields.MatchedField" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.fields.</span></span><span class="sig-name descname"><span class="pre">MatchedField</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">matched_to=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_factory=&lt;function</span> <span class="pre">pass_through&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.fields.MatchedField" title="Link to this definition">¶</a></dt>
 <dd><dl class="py attribute">
 <dt class="sig sig-object py" id="condor.fields.MatchedField.element_class">
 <span class="sig-name descname"><span class="pre">element_class</span></span><a class="headerlink" href="#condor.fields.MatchedField.element_class" title="Link to this definition">¶</a></dt>
@@ -723,6 +729,7 @@ own copies of the matching fields</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#condor.fields.WithDefaultField"><code class="docutils literal notranslate"><span class="pre">WithDefaultField</span></code></a><ul>
+<li><a class="reference internal" href="#condor.fields.WithDefaultField.create_substitution_dict"><code class="docutils literal notranslate"><span class="pre">WithDefaultField.create_substitution_dict()</span></code></a></li>
 <li><a class="reference internal" href="#condor.fields.WithDefaultField.element_class"><code class="docutils literal notranslate"><span class="pre">WithDefaultField.element_class</span></code></a></li>
 </ul>
 </li>
@@ -778,7 +785,7 @@ own copies of the matching fields</p>
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=07a83505"></script>
+</div><script src="../_static/documentation_options.js?v=b6a1ed3c"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=5fa4622c"></script>
