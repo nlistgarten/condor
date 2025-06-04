@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 
 import casadi
-from condor.backends.casadi import operators as operators
+from condor.backends.casadi import operators as operators  # noqa: PLC0414
 from condor.backends.element_mixin import BackendSymbolDataMixin
 
 symbol_class = casadi.MX

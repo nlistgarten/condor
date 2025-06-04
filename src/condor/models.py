@@ -338,29 +338,29 @@ class BaseModelType(type):
         """Used to inherit a field from parent to new class dictionary (so it is
         available during class declaration)
         """
-        v = field
-        v_init_kwargs = v._init_kwargs.copy()
-        for init_k, init_v_iterable in v._init_kwargs.items():
+        v_init_kwargs = field._init_kwargs.copy()
+        for init_k, init_v in field._init_kwargs.items():
             did_update = False
-            if isinstance(init_v_iterable, (list, tuple)):
+            if isinstance(init_v, (list, tuple)):
+                init_v_iterable = init_v
                 originaly_iterable = True
             else:
-                init_v_iterable = [init_v_iterable]
+                init_v_iterable = [init_v]
                 originaly_iterable = False
 
             use_kwarg = []
-            for init_v in init_v_iterable:
+            for v in init_v_iterable:
                 # TODO: is it OK to always assume cls_dict has the proper reference
                 # injected
-                if isinstance(init_v, Field) and init_v._name in cls_dict:
-                    use_kwarg.append(cls_dict[init_v._name])
+                if isinstance(v, Field) and v._name in cls_dict:
+                    use_kwarg.append(cls_dict[v._name])
                     did_update = True
-                    # v_init_kwargs[init_k] = cls_dict[init_v._name]
+                    # v_init_kwargs[init_k] = cls_dict[v._name]
             if not originaly_iterable and use_kwarg:
                 use_kwarg = use_kwarg[0]
             if did_update:
                 v_init_kwargs[init_k] = use_kwarg
-        inherited_field = v.inherit(
+        inherited_field = field.inherit(
             cls_dict.meta.model_name, field_type_name=field._name, **v_init_kwargs
         )
         if new_direction is not None:
@@ -784,9 +784,8 @@ def check_attr_name(attr_name, attr_val, new_cls):
         if isinstance(compare_attr_existing, backend.symbol_class):
             if backend.symbol_is(compare_attr_new, compare_attr_existing):
                 return
-        else:
-            if compare_attr_new is compare_attr_existing:
-                return
+        elif compare_attr_new is compare_attr_existing:
+            return
 
         msg = (
             f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is "
@@ -1065,14 +1064,13 @@ class ModelType(BaseModelType):
             meta = cls.metadata_class(
                 model_name=model_name, bind_embedded_models=bind_embedded_models
             )
-        else:
-            if meta.model_name != model_name:
-                log.debug(
-                    "updated meta's model_name from %s to %s",
-                    meta.model_name,
-                    model_name,
-                )
-                meta.model_name = model_name
+        elif meta.model_name != model_name:
+            log.debug(
+                "updated meta's model_name from %s to %s",
+                meta.model_name,
+                model_name,
+            )
+            meta.model_name = model_name
         log.debug(
             "ModelType.__prepare__(model_name=%s, bases=%s, **%s), meta=%s",
             model_name,
@@ -1661,37 +1659,37 @@ class SubmodelTemplateType(ModelTemplateType):
 
     @classmethod
     def inherit_field(cls, field, cls_dict):
-        v = field
-        v_init_kwargs = v._init_kwargs.copy()
-        for init_k, init_v_iterable in v._init_kwargs.items():
+        v_init_kwargs = field._init_kwargs.copy()
+        for init_k, init_v in field._init_kwargs.items():
             did_update = False
-            if isinstance(init_v_iterable, (list, tuple)):
+            if isinstance(init_v, (list, tuple)):
+                init_v_iterable = init_v
                 originaly_iterable = True
             else:
-                init_v_iterable = [init_v_iterable]
+                init_v_iterable = [init_v]
                 originaly_iterable = False
 
             use_kwarg = []
-            for init_v in init_v_iterable:
-                if isinstance(init_v, Field):
+            for v in init_v_iterable:
+                if isinstance(v, Field):
                     # TODO: is it OK to always assume cls_dict has the proper reference
                     # injected
-                    if init_v._name in cls_dict:
-                        use_kwarg.append(cls_dict[init_v._name])
+                    if v._name in cls_dict:
+                        use_kwarg.append(cls_dict[v._name])
                         did_update = True
-                        # v_init_kwargs[init_k] = cls_dict[init_v._name]
-                    elif init_v._name in cls_dict.meta.primary.__dict__:
-                        use_kwarg.append(cls_dict.meta.primary.__dict__[init_v._name])
+                        # v_init_kwargs[init_k] = cls_dict[v._name]
+                    elif v._name in cls_dict.meta.primary.__dict__:
+                        use_kwarg.append(cls_dict.meta.primary.__dict__[v._name])
                         did_update = True
                         # v_init_kwargs[init_k] = (
-                        #     cls_dict.meta.primary.__dict__[init_v._name]
+                        #     cls_dict.meta.primary.__dict__[v._name]
                         # )
             if not originaly_iterable and use_kwarg:
                 use_kwarg = use_kwarg[0]
             if did_update:
                 v_init_kwargs[init_k] = use_kwarg
 
-        inherited_field = v.inherit(
+        inherited_field = field.inherit(
             cls_dict.meta.model_name, field_type_name=field._name, **v_init_kwargs
         )
         cls_dict[field._name] = inherited_field

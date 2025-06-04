@@ -47,13 +47,13 @@ from condor.implementations.simple import (
 )
 
 __all__ = [
-    DeferredSystem,
-    ExplicitSystem,
-    ExternalSolverModel,
-    AlgebraicSystem,
-    OptimizationProblem,
-    ScipyCG,
-    ScipySLSQP,
-    ScipyTrustConstr,
-    TrajectoryAnalysis,
+    "DeferredSystem",
+    "ExplicitSystem",
+    "ExternalSolverModel",
+    "AlgebraicSystem",
+    "OptimizationProblem",
+    "ScipyCG",
+    "ScipySLSQP",
+    "ScipyTrustConstr",
+    "TrajectoryAnalysis",
 ]

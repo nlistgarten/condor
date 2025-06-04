@@ -656,14 +656,13 @@ class EventType(SubmodelType):
                 check_attr_name(state_elem.name, attr_val, new_cls._meta.primary)
                 setattr(new_cls._meta.primary, state_elem.name, state_elem)
                 new_cls._meta.primary._meta.user_set[state_elem.name] = attr_val
-            else:
-                if primary_attr is not state_elem:
-                    msg = (
-                        f"{new_cls} attempting to assign state {attr_name} = {attr_val}"
-                        f" but {new_cls._meta.primary} already has {attr_name} ="
-                        f"{primary_attr}"
-                    )
-                    raise NameError(msg)
+            elif primary_attr is not state_elem:
+                msg = (
+                    f"{new_cls} attempting to assign state {attr_name} = {attr_val}"
+                    f" but {new_cls._meta.primary} already has {attr_name} ="
+                    f"{primary_attr}"
+                )
+                raise NameError(msg)
             if state_elem.name != attr_name:
                 super().process_condor_attr(attr_name, attr_val, new_cls)
         else:

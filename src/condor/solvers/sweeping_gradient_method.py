@@ -300,7 +300,7 @@ class SolverCVODE(SolverMixin):
     ):  # userdata=None,):
         xdot[:] = self.system.dots(t, x)
 
-    def jac(self, t, x, xdot, jac):  #
+    def jac(self, t, x, xdot, jac):
         jac[...] = self.system.jac(t, x)
 
     def events(self, t, x, g):
