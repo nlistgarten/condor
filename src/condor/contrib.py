@@ -847,13 +847,12 @@ class ExternalSolverWrapperType(ModelTemplateType):
         if name:
             model_name = name
         sup_dict = super().__prepare__(model_name, bases, **kwds)
-        if cls.baseclass_for_inheritance is not None:
-            if ExternalSolverWrapper in bases:  # should check MRO, I guess?
-                # print("copying IO fields to", model_name)
-                for field_name in ["input", "output"]:
-                    sup_dict[field_name] = copy_field(
-                        model_name, getattr(ExternalSolverWrapper, field_name)
-                    )
+        # TODO should check MRO, I guess?
+        if cls.baseclass_for_inheritance is not None and ExternalSolverWrapper in bases:
+            for field_name in ["input", "output"]:
+                sup_dict[field_name] = copy_field(
+                    model_name, getattr(ExternalSolverWrapper, field_name)
+                )
         return sup_dict
 
     def __call__(cls, *args, **kwargs):

@@ -49,7 +49,7 @@ select = [
     "B", # flake8-bugbear
     # "EM", # flake8-errmsg
     "PT", # flake8-pytest-style
-    # "SIM", # flake8-simplify
+    "SIM", # flake8-simplify
     # "PTH", # flake8-use-pathlib
     # "I", # isort
     # "NPY", # numpy-specific-rules

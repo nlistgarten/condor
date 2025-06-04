@@ -140,10 +140,7 @@ def shape_to_nm(shape):
     if len(shape) > 2:
         raise ValueError
     n = shape[0]
-    if len(shape) == 2:
-        m = shape[1]
-    else:
-        m = 1
+    m = 1 if len(shape) == 1 else shape[1]
     return n, m
 
 
@@ -207,10 +204,7 @@ def symmetric_to_unique(value, symbolic=True):
     n = value.shape[0]
     unique_shape = (int(n * (n + 1) / 2), 1)
     indices = np.tril_indices(n)
-    if symbolic:
-        unique_values = symbol_class(*unique_shape)
-    else:
-        unique_values = np.empty(unique_shape)
+    unique_values = symbol_class(*unique_shape) if symbolic else np.empty(unique_shape)
     for kk, (i, j) in enumerate(zip(*indices)):
         unique_values[kk] = value[i, j]
     return unique_values
@@ -225,10 +219,7 @@ def unique_to_symmetric(unique, symbolic=True):
         # iniddividual elements from a list works
         matrix_symbols = np.empty((n, m), dtype=np.object_)
     else:
-        if unique.shape[1] > 1:
-            use_shape = (n, m, unique.shape[1])
-        else:
-            use_shape = (n, m)
+        use_shape = (n, m) if unique_shape[1] == 1 else (n, m, unique_shape[1])
         matrix_symbols = np.empty(use_shape)
     indices = np.tril_indices(n)
     for kk, (i, j) in enumerate(zip(*indices)):

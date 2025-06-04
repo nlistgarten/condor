@@ -144,9 +144,8 @@ class BaseCondorClassDict(dict):
             else:
                 self.meta.embedded_models[attr_name] = attr_val
                 attr_val.name = attr_name
-        if isinstance(attr_val, BaseElement):
-            if not attr_val.name:
-                attr_val.name = attr_name
+        if isinstance(attr_val, BaseElement) and not attr_val.name:
+            attr_val.name = attr_name
         if isinstance(attr_val, backend.symbol_class):
             # from a FreeField
             element = self.meta.backend_repr_elements.get(attr_val, None)
@@ -350,13 +349,12 @@ class BaseModelType(type):
 
             use_kwarg = []
             for init_v in init_v_iterable:
-                if isinstance(init_v, Field):
-                    # TODO: is it OK to always assume cls_dict has the proper reference
-                    # injected
-                    if init_v._name in cls_dict:
-                        use_kwarg.append(cls_dict[init_v._name])
-                        did_update = True
-                        # v_init_kwargs[init_k] = cls_dict[init_v._name]
+                # TODO: is it OK to always assume cls_dict has the proper reference
+                # injected
+                if isinstance(init_v, Field) and init_v._name in cls_dict:
+                    use_kwarg.append(cls_dict[init_v._name])
+                    did_update = True
+                    # v_init_kwargs[init_k] = cls_dict[init_v._name]
             if not originaly_iterable and use_kwarg:
                 use_kwarg = use_kwarg[0]
             if did_update:
@@ -725,16 +723,16 @@ class BaseModelType(type):
                     "symbol %s=%s was NOT found, NOT passing", attr_name, attr_val
                 )
                 pass_attr = False
-        if isinstance(attr_val, BaseModelType):
-            # not sure if this should really be Base or just Model? Or maybe
-            # submodel by now...
-            # TODO check isinstance type
-            if (
-                attr_val.primary in bases
-                and attr_val in attr_val.primary._meta.submodels
-            ):
-                # handle submodel classes below, don't add to super
-                return
+        # not sure if this should really be Base or just Model? Or maybe submodel by
+        # now...
+        # TODO check isinstance type
+        if (
+            isinstance(attr_val, BaseModelType)
+            and attr_val.primary in bases
+            and attr_val in attr_val.primary._meta.submodels
+        ):
+            # handle submodel classes below, don't add to super
+            return
         if isinstance(attr_val, Field):
             attr_val.bind(attr_name, new_cls)
 
@@ -932,20 +930,20 @@ class ModelTemplateType(BaseModelType):
             attrs.meta.user_set = attrs.meta.inherited_items
             attrs.meta.inherited_items = {}
 
-        if (
-            False
-            and as_template
-            and bases[0].user_model_metaclass is not ModelType
-            and model_metaclass is None
-        ):
-            # use model metaclass from first base if possible
-            use_metaclass = bases[0].user_model_metaclass
-            new_cls = use_metaclass.__new__(
-                use_metaclass, model_name, bases, attrs, **kwargs
-            )
-            new_cls.user_model_metaclass = use_metaclass
-        else:
-            new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
+        # if (
+        #     as_template
+        #     and bases[0].user_model_metaclass is not ModelType
+        #     and model_metaclass is None
+        # ):
+        #     # use model metaclass from first base if possible
+        #     use_metaclass = bases[0].user_model_metaclass
+        #     new_cls = use_metaclass.__new__(
+        #         use_metaclass, model_name, bases, attrs, **kwargs
+        #     )
+        #     new_cls.user_model_metaclass = use_metaclass
+        # else:
+        #     new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
+        new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
 
         if immediate_return:
             return new_cls
@@ -1011,11 +1009,13 @@ class ModelTemplate(metaclass=ModelTemplateType):
             pass
         for k, v in cls._meta.user_set.items():
             processed_v = getattr(cls, k, None)
-            if isinstance(processed_v, BaseElement):
-                if processed_v.field_type is cls.placeholder:
-                    new_processed_v = processed_v.copy_to_field(new_placeholder_field)
-                    new_dict[k] = new_processed_v.backend_repr
-                    continue
+            if (
+                isinstance(processed_v, BaseElement)
+                and processed_v.field_type is cls.placeholder
+            ):
+                new_processed_v = processed_v.copy_to_field(new_placeholder_field)
+                new_dict[k] = new_processed_v.backend_repr
+                continue
             if isinstance(v, Field):
                 cls.inherit_field(v, new_dict)
             else:
@@ -1806,21 +1806,20 @@ class SubmodelType(ModelType):
 
     @classmethod
     def prepare_item_from_primary(cls, cls_dict, attr_name, attr_val):
-        if isinstance(attr_val, Field):
-            if cls_dict.meta.copy_fields:
-                if attr_val._direction == Direction.output:
-                    new_direction = Direction.internal
-                else:
-                    new_direction = None
-                cls.inherit_field(attr_val, cls_dict, new_direction)
-                copied_field = cls_dict[attr_val._name]
-                if isinstance(copied_field, FreeField):
-                    copied_field._elements = [sym for sym in attr_val]
-                else:
-                    for elem in attr_val:
-                        elem.copy_to_field(copied_field)
-                # cls_dict[attr_name] = copied_field
-                return
+        if isinstance(attr_val, Field) and cls_dict.meta.copy_fields:
+            if attr_val._direction == Direction.output:
+                new_direction = Direction.internal
+            else:
+                new_direction = None
+            cls.inherit_field(attr_val, cls_dict, new_direction)
+            copied_field = cls_dict[attr_val._name]
+            if isinstance(copied_field, FreeField):
+                copied_field._elements = [sym for sym in attr_val]
+            else:
+                for elem in attr_val:
+                    elem.copy_to_field(copied_field)
+            # cls_dict[attr_name] = copied_field
+            return
         cls_dict[attr_name] = attr_val
 
     @classmethod
@@ -1835,12 +1834,13 @@ class SubmodelType(ModelType):
 
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
-        if isinstance(attr_val, Field):
-            if not new_cls._meta.copy_fields and attr_val._inherits_from._model in (
-                new_cls._meta.primary,
-                new_cls._meta.primary._meta.template,
-            ):
-                return
+        if (
+            isinstance(attr_val, Field)
+            and not new_cls._meta.copy_fields
+            and attr_val._inherits_from._model
+            in (new_cls._meta.primary, new_cls._meta.primary._meta.template)
+        ):
+            return
         super().process_condor_attr(attr_name, attr_val, new_cls)
 
     @classmethod

@@ -9,10 +9,7 @@ def LTI_plot(sim, t_slice=None):
     field = sim.state
     # for field in [sim.state, sim.output]:
     for sym_name, symbol in asdict(field).items():
-        if symbol.ndim > 1:
-            n = symbol.shape[0]
-        else:
-            n = 1
+        n = symbol.shape if symbol.ndim > 1 else 1
         fig, axes = plt.subplots(n, 1, constrained_layout=True, sharex=True)
         plt.suptitle(f"{sim.__class__.__name__} {field.__class__.__name__}.{sym_name}")
         if n > 1:

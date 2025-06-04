@@ -25,7 +25,7 @@ class Sellar(co.OptimizationProblem):
 
     objective = x[2] ** 2 + x[1] + y1 + ops.exp(-y2)
     constraint(y1 >= 3.16)
-    constraint(24.0 >= y2)
+    constraint(y2 <= 24.0)
 
     class Options:
         __implementation__ = co.implementations.OptimizationProblem

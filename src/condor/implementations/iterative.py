@@ -149,11 +149,12 @@ class AlgebraicSystem(InitializerMixin):
 
         for k, v in model_instance.variable.asdict().items():
             model_var = getattr(self.model, k)
-            if model_var.warm_start and not isinstance(
-                model_var.initializer, symbol_class
+            if (
+                model_var.warm_start
+                and not isinstance(model_var.initializer, symbol_class)
+                and not isinstance(v, symbol_class)
             ):
-                if not isinstance(v, symbol_class):
-                    model_var.initializer = v
+                model_var.initializer = v
 
 
 class OptimizationProblem(InitializerMixin):
@@ -468,10 +469,7 @@ class ScipyMinimizeBase(OptimizationProblem):
 
     def run_optimizer(self, model_instance):
         print(self.has_p)
-        if self.has_p:
-            extra_args = (self.eval_p,)
-        else:
-            extra_args = ([],)
+        extra_args = (self.eval_p,) if self.has_p else ([],)
 
         scipy_constraints = self.prepare_constraints(extra_args)
 

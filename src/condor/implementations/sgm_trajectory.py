@@ -205,10 +205,7 @@ class TrajectoryAnalysis:
                     if at_time.step is None:
                         raise ValueError
 
-                    if at_time.start is not None:
-                        at_time_start = at_time.start
-                    else:
-                        at_time_start = 0
+                    at_time_start = 0 if at_time.start is None else at_time.start
 
                     e_expr = (
                         at_time.step

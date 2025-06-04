@@ -469,10 +469,7 @@ class TimeGeneratorFromSlices:
             time_slice.set_p(p)
 
         t = -self.direction * np.inf
-        if self.direction > 0:
-            get_time = min
-        else:
-            get_time = max
+        get_time = min if self.direction > 0 else max
         while True:
             next_times = [time_slice(t) for time_slice in self.time_slices]
             t = get_time(next_times)
