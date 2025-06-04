@@ -46,7 +46,7 @@ exclude = ["design/*"]
 [tool.ruff.lint]
 select = [
     "S", # flake8-bandit
-    # "B", # flake8-bugbear
+    "B", # flake8-bugbear
     # "C4", # flake8-comprehensions
     # "EM", # flake8-errmsg
     # "PT", # flake8-pytest-style

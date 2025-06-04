@@ -194,12 +194,15 @@ def sympy2casadi(
     sympy_vars,  # really, arguments/signature
     # cse_generator=assignment_cse,
     # cse_generator_args=dict(
-    extra_assignments={},
+    extra_assignments=None,
     return_assignments=True,
     # )
 ):
     breakpoint()
     import casadi
+
+    if extra_assignments is None:
+        extra_assignments = {}
 
     ca_vars = casadi.vertcat(*[casadi.MX.sym(s.name) for s in sympy_vars])
 

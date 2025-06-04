@@ -43,7 +43,7 @@ class Sellar(co.OptimizationProblem):
 
 
 Sellar.set_initial(x=[5, 2, 1])
-for idx in range(2):
+for _ in range(2):
     sellar = Sellar()
     print()
     print("objective value:", sellar.objective)  # scalar value

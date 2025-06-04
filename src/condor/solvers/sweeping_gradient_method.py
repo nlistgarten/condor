@@ -1,3 +1,4 @@
+import functools
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -121,11 +122,11 @@ class SolverSciPyBase(SolverMixin):
         for g_idx, g_sign in enumerate(gs_sign):
             if g_sign:
 
-                def find_function(t):
-                    return g_spl(t)[g_idx]
+                def find_function(t, idx):
+                    return g_spl(t)[idx]
 
                 set_t = brentq(
-                    find_function,
+                    functools.partial(find_function, idx=g_idx),
                     spline_ts[-2],
                     spline_ts[-1],
                 )

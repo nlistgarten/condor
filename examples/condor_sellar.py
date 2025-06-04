@@ -36,7 +36,6 @@ class Sellar(co.OptimizationProblem):
     x = variable(lower_bound=0, upper_bound=10)
     z = variable(shape=2, lower_bound=0, upper_bound=10)
 
-    obj
     objective = Obj(x, z).obj
     constrs = Constr(x, z)
     constraint(constrs.con1, upper_bound=0.0)

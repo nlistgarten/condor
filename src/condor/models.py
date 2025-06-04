@@ -692,7 +692,7 @@ class BaseModelType(type):
                 setattr(new_cls, in_name, in_element)
                 new_cls._meta.input_names.append(in_name)
 
-        for internal_field in new_cls._meta.internal_fields:
+        for _ in new_cls._meta.internal_fields:
             pass
 
         for output_field in new_cls._meta.output_fields:
@@ -1264,7 +1264,7 @@ class ModelType(BaseModelType):
                 field.bind_dataclass()
 
         for field in new_cls._meta.independent_fields:
-            for element_idx, element in enumerate(field):
+            for element in field:
                 setattr(new_cls, element.name, element)
 
     def finalize_input_fields(cls):
@@ -1473,7 +1473,7 @@ class Model(metaclass=ModelType):
                     embedded_model_kwargs[k] = v
                 else:
                     value_found = False
-                    for kk, vv in model_assignments.items():
+                    for kk, vv in model_assignments.items():  # noqa: B007
                         if backend.symbol_is(v, kk):
                             value_found = True
                             break
@@ -1759,9 +1759,6 @@ class SubmodelTemplateType(ModelTemplateType):
         cls_dict = super().__prepare__(model_name, bases, meta=meta, **kwds)
 
         return cls_dict
-        _dict = meta.template.__dict__
-        for k, v in _dict.items():
-            pass
 
     def __new__(
         cls, model_name, bases, attrs, primary=None, copy_fields=None, **kwargs

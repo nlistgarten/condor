@@ -3,7 +3,9 @@ from dataclasses import asdict
 import matplotlib.pyplot as plt
 
 
-def LTI_plot(sim, t_slice=slice(None, None)):
+def LTI_plot(sim, t_slice=None):
+    if t_slice is None:
+        t_slice = slice(None, None)
     field = sim.state
     # for field in [sim.state, sim.output]:
     for sym_name, symbol in asdict(field).items():

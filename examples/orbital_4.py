@@ -219,7 +219,7 @@ cost_system_kwargs = nominal_kwargs
 # base_kwargs['meas_t_offset'] = scenario_b_tf*2
 
 # generate additional burns
-for idx in range(1):
+for _ in range(1):
     MajorBurn = make_burn(
         rd=LinCovCW.parameter(shape=3),  # desired position
         tig=LinCovCW.parameter(),  # time ignition

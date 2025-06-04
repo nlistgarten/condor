@@ -396,7 +396,7 @@ class CasadiFunctionCallback(casadi.Callback):
         jacobian_of=None,
         input_symbol=None,
         output_symbol=None,
-        opts={},
+        opts=None,
     ):
         """
         wrapper_funcs -- list of callables to wrap, in order of ascending derivatives
@@ -416,6 +416,8 @@ class CasadiFunctionCallback(casadi.Callback):
 
         self.input_symbol = input_symbol
         self.output_symbol = output_symbol
+        if opts is None:
+            opts = {}
 
         if (not model_name) == (implementation is None):
             raise ValueError

@@ -375,12 +375,14 @@ class CasadiRootfinderWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallba
 
 
 class CasadiIterationCallback(casadi.Callback):
-    def __init__(self, name, nlpdict, model, iteration_callback, opts={}):
+    def __init__(self, name, nlpdict, model, iteration_callback, opts=None):
         casadi.Callback.__init__(self)
         self.iteration_callback = iteration_callback
         self.nlpdict = nlpdict
         self.model = model
         self.iter = 0
+        if opts is None:
+            opts = {}
         self.construct(name, opts)
 
     def get_n_in(self):

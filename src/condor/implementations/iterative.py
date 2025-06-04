@@ -89,12 +89,14 @@ class AlgebraicSystem(InitializerMixin):
         exact_hessian=True,
         max_iter=100,
         # new options
-        re_initialize=slice(
-            None
-        ),  # slice for re-initializing at every call. will support indexing
+        # slice for re-initializing at every call. will support indexing
+        re_initialize=None,
         default_initializer=0.0,
         error_on_fail=False,
     ):
+        if re_initialize is None:
+            re_initialize = slice(None)
+
         rootfinder_options = dict(
             error_on_fail=error_on_fail, abstol=atol, abstolStep=rtol, max_iter=max_iter
         )
