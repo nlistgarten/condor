@@ -4,6 +4,8 @@ import numpy as np
 
 import condor as co
 
+rng = np.random.default_rng(123)
+
 
 class instancemethod:
     def __init__(self, func):
@@ -114,7 +116,7 @@ class MatSys(co.ExplicitSystem):
     output.C = A @ B
 
 
-ms = MatSys(np.random.rand(3, 4), np.random.rand(4, 2))
+ms = MatSys(rng.random(size=(3, 4)), rng.random(size=(4, 2)))
 
 
 class SymMatSys(co.ExplicitSystem):
@@ -123,8 +125,8 @@ class SymMatSys(co.ExplicitSystem):
     output.C = A @ B + B.T @ A
 
 
-a = np.random.rand(3, 3)
-sms = SymMatSys(a + a.T, np.random.rand(3, 3))
+a = rng.random(size=(3, 3))
+sms = SymMatSys(a + a.T, rng.random(size=(3, 3)))
 
 
 class Sys(co.ExplicitSystem):
