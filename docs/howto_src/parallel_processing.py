@@ -19,8 +19,9 @@ class Model(condor.ExplicitSystem):
     output.y = -(x**2) + 2 * x + 1
 
 
-with Pool(5) as p:
-    models = p.map(Model, [1, 2, 3])
+if __name__ == "__main__":
+    with Pool(5) as p:
+        models = p.map(Model, [1, 2, 3])
 
-for model in models:
-    print(model.input, model.output)
+    for model in models:
+        print(model.input, model.output)
