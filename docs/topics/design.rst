@@ -49,9 +49,10 @@ equations," which suggests the API for an algebraic system of equations as
         residual(y1 == x[0] ** 2 + x[1] + x[2] - 0.2 * y2)
         residual(y2 == y1**0.5 + x[0] + x[1])
 
-which can be evaluated by instantiating the model with numerical values for hte
-parameter, which *binds* the result from the iterative solver to the named *element* and
-*field* attributes on the instance,
+which can be evaluated by instantiating the model with numerical values for the
+parameter, which :term:`binds<bind>` the result from the iterative solver to the named
+:term:`element` and :term:`field` attributes on :term:`model instance`, by calling
+the :term:`model`,
 
 .. code-block:: python
 
@@ -174,31 +175,26 @@ address repeat and sophisticated modeling tasks.
 Fields and Elements
 -------------------
 
-Fields contain the elements. Can be 
+A model template defines what fields are available to organize expressions to represent a particular mathematical model.
+Different field types are used for different purposes:
+
+:class:`FreeField`
+    used to represent independent leaf expressions, typically used as function inputs to solver callbacks
+
+:class:`MatchedField`
+    used to define expressions that correspond to elements from another field, for example initial conditions and time derivatives in :class:`ODESystem` are matched to state, a :class:`FreeField`
+
+:class:`AssignedField`
+    used to represent assigned expressions, often outputs of models
+
+User models then draw elements from (free) fields and define expressions for the matched and assigned fields.
 
 Metaprogramming class declaration
 ---------------------------------
 
-..
-    as clarified by Ionel: https://blog.ionelmc.ro/2015/02/09/understanding-python-metaclasses/#putting-it-all-together
-    call order is:
-      Meta.__prepare__ creates class dict
-      process attributes of Class (class definition fills in class dict)
-      Meta.__new__ creates class (via type.__call__) and returns Class
-      (and Meta.__init__, but not as powerful, can do post-ops on constructed Class)
-
-    note, similar construction for object, instance of Class:
-      Meta.__call__ (classmethod, but located in Meta)
-      Class.__new__ (classmethod)
-      Class.__init__ (with instantiated class instance)
-
-    note, inheritance is done ~ by checking bases (well, really MRO) if the attribute is not
-    found on the leaf node. Can use this for Model's definition of __init__ etc for binding
-    the IO to the model instance, but cannot rely on it for the magic name space injection
-
-Ionel provides a nice overview of Python3 process for class declaration 
-and object instantiation. Relevant for us is the following call-order. For 
-class declaration,
+Ionel provides `a nice overview <https://blog.ionelmc.ro/2015/02/09/understanding-python-metaclasses/#putting-it-all-together>`_ 
+of the Python3 process for class declaration and object instantiation. Relevant 
+for us is the following call order. For class declaration,
 
 1. :meth:`Metaclass.__prepare__` creates a class dictionary at the entry
    of the ``class`` declaration.
@@ -208,29 +204,92 @@ class declaration,
    creates the class via :meth:`type.__call__`. Note that
    :meth:`Metaclass.__init__` is also called after this but is not as
    useful because the :code:`class` is already fully constructed by this point;
-   the :code:`__init__` can only be used to organize post-processing. 
+   the :code:`__init__` can only be used to organize post-processing.
 
-Is there any shared flow between a Template and Model? Yes, show Template first then Model.
+In Condor, the :class:`BaseModelType` provides a common base metaclass for model template
+and user model classes. An outline of the key method calls:
+
+1. :meth:`__prepare__`
+
+   1. :meth:`prepare_create` to create the custom (over-writable) dictionary, :attr:`cls.dict_class`
+   2. :meth:`prepare_populate` to perform the condor-specific inheritance process (iterating over bases and calling :meth:`inherit_item`)
+
+2. :meth:`__new__`
+
+   1. separate condor related attributes from non-condor attributes
+   2. call :meth:`super().__new__` with non-condor attributes
+   3. :meth:`cls.process_fields` for preparing fields and their elements for processing
+   4. iterate over condor-related attributes, and call :meth:`cls.process_condor_attrs`, which at this point primarily attaches elements and nothing else
+
+In both :meth:`__prepare__` and :meth:`__new__`, steps are taken to determine if a :class:`ModelTemplate` or :class:`Model` is being declared,
+and manipulations to the inheritance tree are made appropriately. There are three cases:
+
+1. Template declaration
+   define the fields, etc that user code will create
+2. class Model declaration
+   create the class from the template that user models will inherit "base model for inheritance"
+3. user model declaration
+   inherits from template (or another use model), but creates a subclass of Model
+
+There are essentially two types of inheritance.
+
+1. Condor inheritance works by traversing the :term:`MRO` and directly copying or creating a reference to the subclass
+2. Python inheritance which looks to the class to find an attribute, and if not found, checks each class in the :term:`MRO` until it is found (or raises an exception)
+
+
+
 
 :class:`ModelTemplate` declaration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Annotated flow of how a :class:`ModelTemplate` is created
+:class:`ModelTemplateType` is responsible for dispatching to the appropriate metaclass, and performs  more pre-processing to handle several additioanl flags:
+
+:attr:`as_template`
+    used to define abstract base models (particularly useful to deploy :attr:`placeholder` field elements)
+
+:attr:`model_metaclass`
+    used to assign a metaclass for user models to add model-specific processing, including the specification of a custom dictionary or metadata class.
+
+:attr:`placeholder`
+    an injected field used to declare singleton keywords
+
+
 
 :class:`Model` declaration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Annotated flow of how a :class:`Model` is created -- 
+:class:`ModelType` makes the follwoing changes to :class:`BaseModelType`\'s process:
+
+1. in :meth:`prepare_populate`, handles custom metadata class creation and injects :attr:`dynamic_link`
+2. in :meth:`__new__`,
+
+   1. dispatch appropriately if this is the creation of the class that user models will be assigned OR this is a user model
+   2. call :meth:`super().__new__` to run :class:`BaseModelType`\'s process
+   3. update docstring
+   4. inherit :term:`submodel` templates
+   5. :meth:`inherit_template_methods` copies class and instance methods as appropriate; unforunately since Condor inheritance must be used, which breaks standard Python inheritance, super() cannot be used directly in user methods.
+   6. :meth:`process_placeholders` collects the placeholder values and substitutes them into existing expressions
+   7. :meth:`bind_model_fields` creates the dataclasses for each field
+
+The last two steps are particularly useful hooks to customize behavior in a custom model metaclass.
 
 
 Calling and binding
--------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-the :code:`__class__` is :meth:`__call__`\ed which calls the :meth:`__new__` which creates
-the :code:`self` object which is then passed to :meth:`__init__`.
+In Python, an instance of a class is creaed when the :code:`__class__` is :meth:`__call__`\ed,
 
-The :meth:`condor.Model.__init__` parses the positional and keyword arguments to bind
-the values for the input field(s). Then the 
+1. calls the :meth:`__new__` with any args and kwargs, which creates the :code:`self` object
+2. calls the  :meth:`__init__` with the :code:`self` object and any args and kwargs
+
+The :meth:`condor.Model.__init__` has the following process:
+
+1. :meth:`bind_input_fields` which uses staticmethod :meth:`function_call_to_fields` to parse the positional and keyword arguments to bind the values for the input field(s)
+2. classmethod :meth:`get_implementation_class` finds the implementation class and create an instance
+3. evalaute the :attr:`implementation` which is responsible for binding the output fields
+4. :meth:`bind_embedded_models` recursive evaluates and binds embedded models, if the metadata flag is true
+
+In some instance-creation routines, like :class:`OptimizaitonProblem`\'s :meth:`from_values`, it is useful to use :meth:`__new__` on the model directly to bypass the standard :meth:`__init__` processing described here.
 
 The implementation layer
 ========================
@@ -239,44 +298,22 @@ The implementation layer is responsible for using the backend to create
 the numerical functions needed to evaluate model and call any solvers as
 needed.
 
-The embedded :class:`Options` class inside a model provides a name-space.
-Attributes without a leading underscore are placed into a ``dict`` for
-the keyword arguments to the implementation's :func:`construct`
-method. Special behavior for ``_implementation`` and ...
+The embedded :class:`Options` class inside a model provides a name-space for specifying solver options.
+Attributes without a leading underscore can be placed into a :attr:`dict` by
+:meth:`condor.implementations.utils.options_to_kwargs` to pass to the solver.
+The :attr:`__implementation__` is used to specify the class to use, otherwise inheriting from the template.
 
-Solver options can be passed from throught he Options attribute. Ultimately it is the
-implementations job to parse the Options, but except where different solvers for the
-same model-type conflict the intention is to make the argument manipulation at the
-implementation layer as thin as possible.
+Due to initial coupling with the casadi computational engine, the ``contrib`` model implementations follow a pattern of calling
 
-the :attr:`Options` can be considered model inputs that make sense to have a default. They
-are also intended to be inputs that don't define the mathematical meaning of the model. 
+2. :meth:`construct` to create the callables from the model fields and setup the solver
+3. :meth:`__call__` to run the solver and bind the output fields
 
-..
-    #
-    # In the case of the TableLookup, Options can be used to specify the boundary conditions
-    # and interpolant degree (in each direction.) Options can be declared during the model
-    # declaration, as in:
+Ultimately it is the implementation's job to parse the Options. The intention is to make
+the argument manipulation at the implementation layer as thin as possible. This is not always possible,
+especially when supporting multiple solvers for the same model template.
 
-
-    class SinTable(condor.TableLookup):
-        x = input()
-        y = output()
-
-        input_data[x] = np.linspace(-1, 1, 5)*np.pi
-        output_data[y] = ops.sin(input_data[x])
-        class Options:
-            degrees = 0
-
-    print(SinTable(np.pi/4))
-
-
-    # %%
-    # or by assigning an attribute directly on the Model's Option attribute, which will be
-    # injected if it is not declared. For example, we can iterate over piecewise constant,
-    # piecewise linear, and piecewise cubic polynomials to 
-
-
+The :attr:`Options` can be considered model inputs that make sense to have a default. They
+are also intended to be inputs that don't define the mathematical meaning of the model.
 
 
 

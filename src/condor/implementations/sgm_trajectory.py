@@ -9,7 +9,7 @@ from condor.backend import (
     symbol_class, callables_to_operator, expression_to_operator,
 )
 from condor.backend.operators import (
-    recurse_if_else, substitute, jacobian, concat, inf, sin, pi, mod
+    if_else, substitute, jacobian, concat, inf, sin, pi, mod
 )
 
 def get_state_setter(field, signature, on_field=None, subs=None):
@@ -26,8 +26,31 @@ def get_state_setter(field, signature, on_field=None, subs=None):
 
 
 class TrajectoryAnalysis:
+    """ Implementation for :class:`TrajectoryAnalysis` model.
+
+    Options
+    --------
+    state_atol : float
+        absolute tolerance for forward evalaution
+    state_rtol : float
+        relative tolerance for forward evalaution
+    state_adaptive_max_step_size : float
+        actually a minimum number of steps per time-defined segment for the forward
+        evaluation
+    state_max_step_size : float
+        maximum step size for the forward evaluation
+    state_solver : TrajectoryAnalysis.Solver
+        enum member for solver type
+
+    adjoint_*
+        same as above, for the adjoint solution
+
+
+
+    """
+
     class Solver(Enum):
-        CVODE = auto()
+        CVODE = auto() #: currently unsupported
         dopri5 = auto()
         dop853 = auto()
 
@@ -59,7 +82,6 @@ class TrajectoryAnalysis:
         self.ode_model = ode_model = model._meta.primary
 
         self.x = model.state.flatten()
-        dot = model.dot.flatten()
         self.lamda = backend.symbol_generator("lambda", model.state._count)
 
         self.p = model.parameter.flatten()
@@ -96,17 +118,18 @@ class TrajectoryAnalysis:
         self.state0 = get_state_setter(model.initial, [self.p])
 
         control_subs_pairs = {
-            control.backend_repr: [(control.default,)] for control in ode_model.modal
+            control.backend_repr: [control.default] for control in ode_model.modal
         }
         for mode in model._meta.modes:
             for act in mode.action:
-                control_subs_pairs[act.match.backend_repr].append(
+                control_subs_pairs[act.match.backend_repr].insert(
+                    -1,
                     (mode.condition, act.backend_repr)
                 )
         control_sub_expression = {}
         for k, v in control_subs_pairs.items():
             control_sub_expression[k] = substitute(
-                recurse_if_else(v), control_sub_expression
+                if_else(*v), control_sub_expression
             )
 
         state_equation_func = get_state_setter(
@@ -138,8 +161,7 @@ class TrajectoryAnalysis:
         terminating = []
 
         events = [e for e in model._meta.events]
-        if model.tf is not np.inf:
-
+        if not isinstance(model.tf, (np.ndarray, float)) or not np.isinf(model.tf).any():
             class Terminate(ode_model.Event):
                 at_time = (model.tf,)
                 terminate = True

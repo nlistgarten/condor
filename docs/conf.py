@@ -49,3 +49,5 @@ sphinx_gallery_conf = {
         "sphinx_gallery": None,
     },
 }
+
+napoleon_custom_sections = [("Options", "params_style")]

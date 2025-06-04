@@ -3,7 +3,6 @@ import condor as co
 import casadi as ca
 import matplotlib.pyplot as plt
 
-from condor.backends.casadi.implementations import OptimizationProblem
 
 I6 = ca.MX.eye(6)
 Z6 = ca.MX(6, 6)

@@ -107,7 +107,7 @@ def test_sp_lqr():
     # sim = DblIntSampledLQR([1.00842737, 0.05634044])
     sim = DblIntSampledLQR(K)
 
-    jac = sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
+    sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
     LTI_plot(sim)
     plt.show()
 
@@ -319,4 +319,4 @@ def test_mode_param_to_mode(odesys):
     class Sim(odesys.TrajectoryAnalysis):
         tf = 10
 
-    out = Sim(wn=10, u_hold=0.8)
+    Sim(wn=10, u_hold=0.8)

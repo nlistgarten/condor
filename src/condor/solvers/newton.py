@@ -90,13 +90,13 @@ class Newton:
             # newton step calculation J @ d = -f
             try:
                 dx = linalg.solve(J, -f)
-            except linalg.LinAlgError as e:
+            except linalg.LinAlgError:
                 print(
                     "solver failed, jacobian is singular. itr:",
                     itr,
                 )
                 break
-            except ValueError as e:
+            except ValueError:
                 print("some other error. itr:", itr)
                 breakpoint()
                 pass

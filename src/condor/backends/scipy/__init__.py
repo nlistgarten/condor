@@ -3,7 +3,6 @@ import sympy as sym
 from sympy.core.expr import Expr
 from sympy.core.function import AppliedUndef as symApplied
 from sympy.core.function import UndefinedFunction as symUndefined
-from sympy.physics.mechanics import dynamicsymbols
 from sympy.printing.pycode import PythonCodePrinter
 from sympy.utilities.lambdify import lambdify
 

@@ -2,7 +2,6 @@ import upcycle
 import numpy as np
 import pandas as pd
 import openmdao.api as om
-import upcycle
 
 deriv_method = "exact"  # or "fd"
 

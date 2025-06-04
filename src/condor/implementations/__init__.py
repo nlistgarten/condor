@@ -2,12 +2,6 @@
 This module uses the backend to process a Model with values for input fields to call
 solvers. 
 """
-from dataclasses import dataclass
-from enum import Enum, auto
-
-import condor as co
-import numpy as np
-
 # TODO: make SGM and SolverWithWarmStart (really, back-tracking solver and possibly only
 # needed if broyden doesn't resolve it?) generic and figure out how to separate the
 # algorithm from the casadi callback. I think SWWS already does this pretty well
@@ -42,6 +36,18 @@ from condor.implementations.iterative import (
     ScipySLSQP, ScipyTrustConstr
 )
 from condor.implementations.sgm_trajectory import TrajectoryAnalysis
+
+__all__ = [
+    DeferredSystem,
+    ExplicitSystem,
+    ExternalSolverModel,
+    AlgebraicSystem,
+    OptimizationProblem,
+    ScipyCG,
+    ScipySLSQP,
+    ScipyTrustConstr,
+    TrajectoryAnalysis,
+]
 
 
 

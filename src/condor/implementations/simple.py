@@ -1,7 +1,4 @@
 from .utils import options_to_kwargs
-import condor as co
-import numpy as np
-from condor import backend
 
 from condor.backend import callables_to_operator, expression_to_operator
 class DeferredSystem:
@@ -47,6 +44,8 @@ class ExplicitSystem:
         )
 
 class ExternalSolverModel:
+    """ Implementation for External Solver models. No :class:`Options` expected.
+    """
     def __init__(self, model_instance):
         model = model_instance.__class__
         model_instance.options_dict=options_to_kwargs(model)

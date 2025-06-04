@@ -43,7 +43,6 @@ class Sellar(co.OptimizationProblem):
 
 
 Sellar.set_initial(x=[5,2,1])
-import numpy as np
 for idx in range(2):
     sellar = Sellar()
     print()

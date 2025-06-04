@@ -2,8 +2,6 @@ import condor.upcycle as upcycle # isort: skip
 
 
 import os
-import pprint
-import re
 
 import numpy as np
 import pandas as pd
@@ -22,8 +20,6 @@ upsolver = updriver.children[0]
 # or backend ufuncs -- generally like using numpy and expect the backend to work. casadi
 # and sympy array with numpy dispatching both do
 
-from numpy import exp, array
-import condor as co
 exec(upsolver.model_string)
 exec(updriver.model_string)
 

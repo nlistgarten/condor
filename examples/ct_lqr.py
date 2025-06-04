@@ -39,7 +39,6 @@ LTI_plot(ct_sim)
 
 
 
-from condor.implementations import OptimizationProblem
 class CtOptLQR(co.OptimizationProblem):
     K = variable(shape=DblIntLQR.K.shape)
     objective = DblIntLQR(K).cost

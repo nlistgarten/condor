@@ -1,6 +1,7 @@
 from .utils import options_to_kwargs
 from enum import Enum, auto
 import condor as co
+import inspect
 
 from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
 from condor.solvers.casadi_warmstart_wrapper import (
@@ -10,7 +11,7 @@ import numpy as np
 
 
 from condor.backend import (
-    symbol_class, callables_to_operator, expression_to_operator,
+    symbol_class, expression_to_operator,
 )
 from condor.backend.operators import (
     concat, jacobian, unstack,
@@ -43,7 +44,31 @@ class InitializerMixin:
                 model_var.initializer = v
 
 class AlgebraicSystem(InitializerMixin):
+    """ Implementation for :class:`AlgebraicSystem` model.
 
+    Options
+    --------
+    atol : float
+       absolute tolerance (default 1e-12)
+    rtol : float
+       relative tolerance (default 1e-12)
+    warm_start : bool
+       flag indicating whether subsequent calls should initialize the variable values to
+       the last-run solution (default True)
+    max_iter : int
+       maximum number of iterations before terminating solver (default 100)
+    error_on_fail : bool
+       flag indicating whether to raise an error if the solver fails to converge within
+       specified tolerance before reaching max_iter (default False)
+    """
+    """
+    exact_hessian : bool
+       flag indicating whether to use second-order gradient information or broyden
+    re_initialize : ???
+       ???
+    default_initializer : ???
+       ???
+    """
     def construct(
         self,
         model,
@@ -124,6 +149,18 @@ class AlgebraicSystem(InitializerMixin):
 
 
 class OptimizationProblem(InitializerMixin):
+    """Implementation base class for :class:`OptimizationProblem` model.
+
+    Options
+    --------
+    init_callback : callable
+       callback with signature , called when an optimization problem is evalauted. Once
+       when embedded or every time as a standalone.
+    iter_callback : callable
+       callback with signature , called at each iteration of the
+       :class:`CasadiNlpsolImplementation` (only IPOPT) and :class:`SciPyBase`
+       subclass optimization implementaitons.
+    """
     # take an OptimizationProblem model with or without iteration spec and other Options
     # process options, create appropriate callback hooks
     # create appropriate operator --
@@ -160,30 +197,30 @@ class OptimizationProblem(InitializerMixin):
         self.iter_callback = iter_callback
         self.init_callback = init_callback
 
-        self.f = f = getattr(model, "objective", 0)
+        self.f = getattr(model, "objective", 0)
         self.has_p = bool(len(model.parameter))
-        self.p = p = model.parameter.flatten()
-        self.x = x = model.variable.flatten()
-        self.g = g = model.constraint.flatten()
+        self.p = model.parameter.flatten()
+        self.x = model.variable.flatten()
+        self.g = model.constraint.flatten()
 
         InitializerMixin.construct(self, model)
 
         self.objective_func = expression_to_operator(
             [self.x, self.p],
-            f,
+            self.f,
             f"{model.__name__}_objective",
         )
         self.constraint_func = expression_to_operator(
             [self.x, self.p],
-            g,
+            self.g,
             f"{model.__name__}_constraint",
         )
 
 
-        self.lbx = lbx = model.variable.flatten("lower_bound")
-        self.ubx = ubx = model.variable.flatten("upper_bound")
-        self.lbg = lbg = model.constraint.flatten("lower_bound")
-        self.ubg = ubg = model.constraint.flatten("upper_bound")
+        self.lbx = model.variable.flatten("lower_bound")
+        self.ubx = model.variable.flatten("upper_bound")
+        self.lbg = model.constraint.flatten("lower_bound")
+        self.ubg = model.constraint.flatten("upper_bound")
 
 
     def load_initializer(self, model_instance):
@@ -203,15 +240,37 @@ class OptimizationProblem(InitializerMixin):
 
 
 class CasadiNlpsolImplementation(OptimizationProblem):
+    """Implementation layer for casadi nlpsol for :class:`OptimizationProblem` models.
+
+    Options
+    --------
+    method : CasadiNlpsolImplementation.Method
+        value from method enum to specify supported methods
+    exact_hessian : bool
+        flag to use second order gradient information; use limited Broyden update
+        otherwise
+    calc_lam_x : bool
+        flag to calculate the lagrange multipliers solution, used for IPOPT to perform a
+        true warm start
+
+    **options
+        remaining keyword arguments are passed to casadi's nlpsol's constructor's
+        solver-specific options argument. See :attr:`method_default_options` for the
+        defaults
+
+
+    """
     class Method(Enum):
         ipopt = auto()
-        snopt = auto()
+        snopt = auto() #: currently unsupported
         qrsqp = auto()
+        fatrop = auto()
 
     method_strings = {
         Method.ipopt: "ipopt",
         Method.snopt: "snopt",
         Method.qrsqp: "sqpmethod",
+        Method.fatrop: "fatrop",
     }
 
 
@@ -228,6 +287,8 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
     @property
     def default_options(self):
+        """ derived property to get a copy of :attr:`method_default_options` or an empty
+        dict """
         return self.method_default_options.get(self.method, dict())
 
     def construct(
@@ -276,9 +337,9 @@ class CasadiNlpsolImplementation(OptimizationProblem):
                     hessian_approximation="limited-memory",
                 )
 
-        elif self.method is OptimizationProblem.Method.snopt:
+        elif self.method is CasadiNlpsolImplementation.Method.snopt:
             pass
-        elif self.method is OptimizationProblem.Method.qrsqp:
+        elif self.method is CasadiNlpsolImplementation.Method.qrsqp:
             self.nlp_opts.update(
                 qpsol="qrqp",
                 qpsol_options=dict(
@@ -294,6 +355,14 @@ class CasadiNlpsolImplementation(OptimizationProblem):
                 # hessian_approximation= "limited-memory",
                 print_status=False,
             )
+            if self.options["print_level"] == 0:
+               self.nlp_opts["qpsol_options"] = dict(
+                   print_iter=False,
+                   print_header=False,
+                   print_info=False,
+               )
+
+
 
         self.callback = CasadiNlpsolWarmstart(
             primary_function = self.objective_func,
@@ -352,6 +421,14 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
 
 class ScipyMinimizeBase(OptimizationProblem):
+    """Base implementation class for SciPy minimize for :class:`OptimizationProblem`
+    models.
+
+    Options
+    --------
+    **options
+        keyword options are passed directly to scipy.minimize's options keyword argument
+    """
     def construct(
         self,
         model,
@@ -512,8 +589,6 @@ class ScipyTrustConstr(ScipyMinimizeBase):
         g_split=self.g_split
         g_jacs = [jacobian(g, self.x) for g in self.g_split]
 
-        scipy_constraints = []
-
         nonlinear_flags = [
             not jacobian(g_jac, self.x).nnz()
             or not jacobian(g_expr, self.p).nnz()
@@ -626,8 +701,9 @@ class ScipyTrustConstr(ScipyMinimizeBase):
         return scipy_constraints
 
 
-import inspect
 class SciPyIterCallbackWrapper:
+    """ Wrapper for iter_callback function to use with SciPy minimize, used internally
+    """
     @classmethod
     def create_or_none(cls, model, parameters, callback=None):
         if callback is None:

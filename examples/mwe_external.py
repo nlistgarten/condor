@@ -1,6 +1,5 @@
 import condor as co
 import casadi
-import os
 import numpy as np
 
 

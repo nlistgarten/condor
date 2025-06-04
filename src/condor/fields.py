@@ -103,7 +103,6 @@ class FieldValues:
     @classmethod
     def wrap(cls, values):
         """ turn a single symbol into a bound field dataclasss """
-        count_accumulator = 0
         size_cum_sum = np.cumsum([0] + cls.field.list_of("size"))
         new_values = {}
         for start_idx, end_idx, elem in zip(
@@ -250,6 +249,9 @@ class Field:
         if self._resolve_name:
             return f"<{self.__class__.__name__}: {self._resolve_name}>"
 
+    def process_field(self):
+        pass
+
     def get(self, *args, **kwargs):
         """Get a list of field elements where every field matches kwargs
 
@@ -314,7 +316,7 @@ class Field:
         """Create the dataclass for this model and field with the current elements"""
         # TODO: do processing to handle different field types
         fields = [(element.name, float) for element in self._elements]
-        name = make_class_name([self._model_name, self._name])
+        name = self._model_name + make_class_name([self._name])
         self._dataclass = make_dataclass(
             name,
             fields,
@@ -356,6 +358,18 @@ class Field:
     def __getitem__(self, item):
         return getattr(self, item)
 
+    def __add__(self, other):
+        """ add concatenates list of elements """
+        if isinstance(other, Field):
+            return self._elements + other._elements
+        raise NotImplementedError
+
+    def __radd__(self, other):
+        """ add concatenates list of elements """
+        if isinstance(other, Field):
+            return other._elements + self._elements
+        raise NotImplementedError
+
 
 def make_class_name(components):
     separate_words = " ".join([comp.replace("_", " ") for comp in components])
@@ -380,6 +394,19 @@ class BaseElement(
     FrontendElementData,
     backend.BackendSymbolData,
 ):
+    def __hash__(self):
+        #if self.field_type._model is None:
+        #    raise ValueError("Elements are not hashable until their field has been bound to a model")
+        return hash((
+            #self.name,
+            self.backend_repr,
+            self.shape,
+            self.field_type._name,
+            self.field_type._model_name,
+            self.field_type._model.__module__
+        ))
+
+
     def __post_init__(self, *args, **kwargs):
         super().__post_init__(self, *args, **kwargs)
         # TODO: validate broadcasting, etc. shape info?
@@ -496,7 +523,17 @@ class FreeField(Field, default_direction=Direction.input):
         backend_name = "%s_%d" % (self._resolve_name, len(self._elements))
         new_kwargs = make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_element(**new_kwargs)
+        if "name" in kwargs and self._cls_dict is not None:
+            self._cls_dict[kwargs["name"]] = self._elements[-1].backend_repr
         return self._elements[-1].backend_repr
+
+    def process_field(field):
+        for element_idx, element in enumerate(field):
+            # add names to elements -- must be an unnamed element without a reference
+            # assignment in the class
+            if not element.name:
+                element.name = f"{field._model_name}_{field._name}_{element_idx}"
+
 
     def create_from(self, other, **aliases):
         """Get or create elements based on another field
@@ -547,7 +584,63 @@ class WithDefaultElement(FreeElement):
 
 
 class WithDefaultField(FreeField):
-    pass
+    def create_substitution_dict(self, subclass, set_attr=False):
+        """ 
+
+        """
+        substitution_dict = {}
+        # TODO: no back reference is preserved which frankly seems harsh...
+        for elem in self:
+            log.debug("checking placeholder %s on %s", elem, subclass)
+            # currently, the placeholder element is getting passed on so we know it
+            # exists and should never be None
+            if not hasattr(subclass, elem.name):
+                val = elem.default
+            else:
+                val = getattr(subclass, elem.name)
+
+            use_val = None
+            if val is None:
+                pass
+            elif val is elem or val is elem.backend_repr:
+                use_val = elem.default
+                if use_val is None:
+                    use_val = elem.backend_repr
+
+            elif isinstance(val, BaseElement):
+                use_val = val.backend_repr
+            else:
+                use_val = val
+
+            if set_attr:
+                setattr(subclass, elem.name, use_val)
+            log.debug("creating substitution %s = %s", elem.backend_repr, use_val)
+            if isinstance(use_val, backend.symbol_class):
+                if elem.size >= np.prod(use_val.size()):
+                    try:
+                        np.broadcast_shapes(elem.shape, use_val.shape)
+                    except Exception:
+                        pass
+                    else:
+                        substitution_dict[elem.backend_repr] = use_val
+            elif np.array(use_val).dtype.kind in "if":
+                #use_val = np.array(use_val)
+                use_val = np.atleast_1d(use_val)
+                if elem.size == use_val.size:
+                    substitution_dict[elem.backend_repr] = use_val.reshape(
+                        elem.shape
+                    )
+                elif elem.size > use_val.size:
+                    try:
+                        np.broadcast_shapes(elem.shape, use_val.shape)
+                    except Exception:
+                        pass
+                    else:
+                        substitution_dict[elem.backend_repr] = use_val
+                    substitution_dict[elem.backend_repr] = np.broadcast_to(
+                        use_val, elem.shape
+                    )
+        return substitution_dict
 
 
 @dataclass(repr=False)
@@ -679,10 +772,22 @@ class DependentElement(BaseElement):
 
 @dataclass(repr=False)
 class AssignedElement(BaseElement):
-    pass
+    def __hash__(self):
+        return super().__hash__()
+
 
 
 class AssignedField(Field, default_direction=Direction.output):
+    def __init__(self, direction=None, add_to_namespace_override=None, **kwargs):
+        super().__init__(direction=direction, **kwargs)
+        self._add_to_namespace_override = add_to_namespace_override
+        self._init_kwargs.update(add_to_namespace_override=add_to_namespace_override)
+
+        if add_to_namespace_override is None:
+            self._add_to_namespace = self._direction in (Direction.input, Direction.output)
+        else:
+            self._add_to_namespace = add_to_namespace_override
+
     def __setattr__(self, name, value):
         if name.startswith("_") and not isinstance(value, backend.symbol_class):
             # TODO: iirc the reason we need to prefix field attributes that are directly
@@ -706,7 +811,7 @@ class AssignedField(Field, default_direction=Direction.output):
                 # these reasons, ditch intermediate stuff.
                 **asdict(symbol_data),
             )
-            if self._direction == Direction.output and self._cls_dict:
+            if self._add_to_namespace and self._cls_dict:
                 # self._cls_dict.__set_item__(name, value)
                 self._cls_dict[name] = value
             # super().__setattr__(name, self._symbols[-1])
@@ -726,8 +831,12 @@ class MatchedElement(BaseElement, MatchedElementMixin):
     """Element matched with another element of another field"""
     pass
 
-zero_like = lambda match: backend.operators.zeros(match.shape)
-pass_through = lambda match: match.backend_repr
+def zero_like(match):
+    return np.zeros(match.shape)
+
+def pass_through(match):
+    return match.backend_repr
+
 
 class MatchedField(Field):
     def __init__(self, matched_to=None, default_factory=pass_through, **kwargs):
@@ -748,6 +857,10 @@ class MatchedField(Field):
         self._matched_to = matched_to
         self._default_factory = default_factory
         self._init_kwargs.update(matched_to=matched_to, default_factory=default_factory)
+
+    def process_field(self):
+        for element in self:
+            element.update_name()
 
     def key_to_matched_element(self, key):
         if isinstance(key, backend.symbol_class):
@@ -779,7 +892,15 @@ class MatchedField(Field):
                 backend_repr = value.backend_repr
             else:
                 symbol_data = backend.get_symbol_data(value)
-                backend_repr = value
+
+                if isinstance(value, backend.symbol_class):
+                    backend_repr = value
+                else:
+                    value = np.atleast_1d(value)
+                    if match.size == value.size:
+                        backend_repr = value.reshape(match.shape)
+                    else:
+                        backend_repr = np.broadcast_to(value, match.shape)
             self.create_element(
                 name=None, match=match, backend_repr=backend_repr, **asdict(symbol_data)
             )
@@ -798,17 +919,20 @@ class MatchedField(Field):
         return item.backend_repr
 
     def dataclass_of(self, on_field=None):
-        if on_field is None:
-            on_field = self._matched_to
         dc_kwargs = {}
-        for match_elem in on_field:
-            elem = self.get(match=match_elem)
-            if elem:
-                dc_kwargs[match_elem.name] = elem.backend_repr
-            else:
-                dc_kwargs[match_elem.name] = self._default_factory(match_elem)
+        if on_field is self:
+            for elem in self:
+                dc_kwargs[elem.name] = elem.backend_repr
+        else:
+            if on_field is None:
+                on_field = self._matched_to
+            for match_elem in on_field:
+                elem = self.get(match=match_elem)
+                if elem:
+                    dc_kwargs[match_elem.name] = elem.backend_repr
+                else:
+                    dc_kwargs[match_elem.name] = self._default_factory(match_elem)
         return on_field._dataclass(**dc_kwargs)
-
 
     def flatten(self, on_field=None):
         """ flatten matches to the on_field, defaults tot he match.
@@ -818,3 +942,4 @@ class MatchedField(Field):
         own copies of the matching fields
         """
         return self.dataclass_of(on_field).flatten()
+

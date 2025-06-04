@@ -1,10 +1,7 @@
 import upcycle  # isort: skip
-import casadi
 
 import sys
 import os
-import pprint
-import re
 
 import numpy as np
 import pandas as pd

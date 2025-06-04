@@ -1,4 +1,3 @@
-import condor.backends.casadi as backend
 """
 vcat/vertcat -- combine multiple backend_symbol
 flatten -- always used in cnojuction with vertcat? to make differently shaped

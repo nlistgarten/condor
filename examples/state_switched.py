@@ -2,8 +2,6 @@ import numpy as np
 import condor as co
 import matplotlib.pyplot as plt
 from sgm_test_util import LTI_plot
-from scipy import linalg
-import casadi as ca
 
 
 class DblInt(co.ODESystem):
@@ -59,7 +57,6 @@ p0 = -4., -1.
 sim = Transfer(*p0)
 #sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
 
-from condor.implementations import OptimizationProblem
 class MinimumTime(co.OptimizationProblem):
     p1 = variable()
     p2 = variable()
