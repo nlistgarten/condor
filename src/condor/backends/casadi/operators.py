@@ -129,12 +129,7 @@ def jac_prod(of, wrt, rev=True):
 
 def substitute(expr, subs):
     for key, val in subs.items():
-        try:
-            expr = casadi.substitute(expr, key, val)
-        except Exception as e:
-            print(e)
-            breakpoint()
-            raise e
+        expr = casadi.substitute(expr, key, val)
     return expr
 
     if isinstance(expr, backend.symbol_class):

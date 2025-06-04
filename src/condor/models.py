@@ -1380,11 +1380,9 @@ class Model(metaclass=ModelType):
 
     @staticmethod
     def create_bound_field_dataclass(field, values, wrap=True):
-        dataclass_kwarg = {}
         if wrap:
             values = backend.wrap(field, values)
-        for element_name, value in zip(field.list_of("name"), values):
-            dataclass_kwarg[element_name] = value
+        dataclass_kwarg = {elem_name, val in zip(field.list_of("name"), values)}
         return field._dataclass(**dataclass_kwarg)
 
     def __iter__(self):

@@ -53,7 +53,7 @@ select = [
     "I", # isort
     "NPY", # numpy-specific-rules
     # "N", # pep8-naming
-    # "PERF", # perflint
+    "PERF", # perflint
     "E","W", # pycodestyle
     # "D", # pydocstyle
     "F", # pyflakes

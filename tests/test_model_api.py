@@ -48,7 +48,7 @@ def test_ode_system_event_api():
     class MySystem(co.ODESystem):
         ts = list()
         for i in range(3):
-            ts.append(parameter(name=f"t_{i}"))
+            ts.append(parameter(name=f"t_{i}"))  # noqa: PERF401
 
         n = 2
         m = 1
