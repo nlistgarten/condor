@@ -109,7 +109,6 @@ def make_burn(
     x = attrs["x"]
     C = attrs["C"]
     P = attrs["P"]
-    t = attrs["t"]
     omega = attrs["omega"]
     Cov_ctrl_offset = attrs["Cov_ctrl_offset"]
     P_ctrl_offset = attrs["P_ctrl_offset"]
@@ -335,12 +334,12 @@ def deriv_check_plots(indep_var, output_vars, sims, title_prefix="", interp_k=2)
 
     ordinate_names = [output_var.name.replace("_", " ") for output_var in output_vars]
     field = output_vars[0].field_type
-    Sim = field._model
     ordinates = [
         [getattr(sim, output_var.name) for sim in sims1] for output_var in output_vars
     ]
     ord_idxs = [field.flat_index(output_var) for output_var in output_vars]
 
+    # Sim = field._model
     # Dv_mag_idx = Sim.trajectory_output.flat_index(Sim.Delta_v_mag_1)
     # Dv_disp_idx = Sim.trajectory_output.flat_index(Sim.Delta_v_disp_1)
     # pos_disp_idx = Sim.trajectory_output.flat_index(Sim.final_pos_disp)

@@ -58,7 +58,6 @@ else:
         def function(cls, dt):
             # need cls ref to access things like inertial_frame_name, etc
             et = cls.et_start + dt
-            name = cls.name
             SS = spice.sxform(cls.inertial_frame_name, cls.name, et)
             RR, omega_other = spice.xf2rav(SS)
             ang_vel = RR @ omega_other

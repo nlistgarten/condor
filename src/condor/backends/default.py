@@ -48,7 +48,7 @@ Or, should the implementations just live in the main backend?
 
 Backend Implementations
 [x] must be able to flatten model symbols to backend arrays,
-[x] wrap backend arrays to model symbol, matching shape -- 
+[x] wrap backend arrays to model symbol, matching shape --
 [ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics
     (if different, eg casadi DM) and backend symbols
 [ ] ideally, handle special case symmetric and dynamic flags for FreeSymbol and
@@ -74,7 +74,7 @@ takes advantage of model attributes just like backend implementation
 
 I assume a user model/library code could inject an implementation to the backend?
 not sure how to assign special numeric stuff, probably an submodel class on the model
-based on NPSS discussion it's not really needed if it's done right 
+based on NPSS discussion it's not really needed if it's done right
 
 For injecting a default implementation (e.g., new backend) this does work:
 

@@ -804,7 +804,7 @@ def check_attr_name(attr_name, attr_val, new_cls):
 
 
 class ModelTemplateType(BaseModelType):
-    """Define a Model Template by subclassing Model, creating field types, and writing 
+    """Define a Model Template by subclassing Model, creating field types, and writing
     an implementation.
     """
 
@@ -1537,7 +1537,7 @@ class inheritance would be a mechanism to translate ODE to DAE -- seems useful.
 
 Case 3: Submodel version of same...
 Not sure if it's a true inner model, but definitely need some capability to re-use both
-Model and ModelTemplate on different "outer" model/template. 
+Model and ModelTemplate on different "outer" model/template.
 
 rename:
 submodel --> embedded_model, generally no back reference
@@ -1560,7 +1560,7 @@ and assembly.
 
 also, simulate "freezes" the assembly, which has been extremely useful for free drift
 stuff, may be a nice mechanism for gasp missions, although maybe the "segment assembly"
-and "operator" approach could be even better?? 
+and "operator" approach could be even better??
 
 I guess we can just expect to provide class methods on assembly models that perform
 symbolic operations on what currently exists? I think at that point, placeholders would
@@ -1573,7 +1573,7 @@ Or an "Airplane" submodel that acts on root component (maybe an OML body, ? mayb
 choice) which freezes thing, then Airplane has to have inputs bound and has the instance
 methods for operating? But actually something like aero and propulsion still need to
 create something like an explicit system (maybe it would be unique for gascon, something
-like "dynamic/performance component" or something). 
+like "dynamic/performance component" or something).
 
 Maybe "Design" off of the root of the node? And that's what gets named by a particular
 airplane? And root is just body. And then can even tree off the design for the
@@ -1614,7 +1614,7 @@ substitution mechanisms, etc. ~ expected uer input
 
 submodels are mdoels that don't make sense w/o their parent, maybe add configuration
 (like singleton). inner_to arg becomes modifying? because submodels only exist to modify
-their parent?  maybe submodel modifies its superior? 
+their parent?  maybe submodel modifies its superior?
 
 
 A user Model with a parent, a ModelTemplate with a parent is a submodel
@@ -1629,7 +1629,7 @@ assembly of (mix and match) explicit systems, algebraic, etc would even be!
 Actually, if computation is always on some end-point submodel, can do all processing
 htere? Yes, assembly components are JUST a datastructure ot define inputs, it solves the
 the sensor model problem from LinCov demo to automatically handle creating parameters, a
-few things about accessing namespace, etc. 
+few things about accessing namespace, etc.
 
 flags/controls to conntrol inheritance:
 "as_template" flag -- dry way to create new but related templates similar to user model

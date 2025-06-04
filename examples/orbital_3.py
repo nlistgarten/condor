@@ -1,5 +1,5 @@
 import casadi as ca
-from LinCovCW import I3, I6, Z3, Z6, LinCovCW, make_burn, sim_kwargs
+from LinCovCW import I3, I6, Z3, Z6, sim_kwargs
 
 import condor as co
 from condor.backends.casadi.implementations import OptimizationProblem
@@ -100,7 +100,6 @@ def make_burn(rd, tig, tem):
     update = attrs["update"]
     x = attrs["x"]
     C = attrs["C"]
-    t = attrs["t"]
     omega = attrs["omega"]
     Cov_ctrl_offset = attrs["Cov_ctrl_offset"]
     Delta_v_mag = attrs["Delta_v_mag"]

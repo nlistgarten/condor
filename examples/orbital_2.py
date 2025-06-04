@@ -94,7 +94,6 @@ def make_burn(rd, tig, tem):
     update = attrs["update"]
     x = attrs["x"]
     C = attrs["C"]
-    t = attrs["t"]
     omega = attrs["omega"]
     Cov_ctrl_offset = attrs["Cov_ctrl_offset"]
     Delta_v_mag = attrs["Delta_v_mag"]

@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 """
 class AnyTopeofModel(co....):
     some specific setup
-    
+
     subsystem_ref_1 = create_subsystem(SomeNormalModel, **aliases)
     # adds attributes for holding all input, and then useful subsets. ref has outputs
 

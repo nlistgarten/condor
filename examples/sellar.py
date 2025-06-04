@@ -35,11 +35,11 @@ class Sellar(co.OptimizationProblem):
         def iter_callback(idx, variable, objective, constraints, instance=None):
             print()
             # print(f"iter {idx}: {variable}")
-            for k, v in constraints.asdict().items():
-                elem = Sellar.constraint.get(name=k)
-                # print(" "*4, f"{k}: {elem.lower_bound} < {v} < {elem.upper_bound}")
-                # if instance is not None:
-                #    print(" ", f"{instance.coupling.variable}")
+            # for k, v in constraints.asdict().items():
+            #     elem = Sellar.constraint.get(name=k)
+            #     # print(" "*4, f"{k}: {elem.lower_bound} < {v} < {elem.upper_bound}")
+            #     # if instance is not None:
+            #     #    print(" ", f"{instance.coupling.variable}")
 
 
 Sellar.set_initial(x=[5, 2, 1])

@@ -307,8 +307,8 @@ class ODESystem(ModelTemplate):
 
     make - set control a value/computation. Or `let`?
 
-    note: no time-varying input to system. Assume dynamicsmodels "pull" what they need 
-    from other models. 
+    note: no time-varying input to system. Assume dynamicsmodels "pull" what they need
+    from other models.
     Need to augment state with "pulled" dynamicsmodels
     But do need a "control" that could be defined based on mode? automatically added to
     output? or is it always just a placeholder for functional space gradient?
@@ -835,7 +835,7 @@ class ExternalSolverWrapperType(ModelTemplateType):
     by model sub-types. Could just as easily create decorator or other
     class-method (on Wrapper) that consumes singleton/collection of functions
 
-    IO fields just a nice way to create simple object with IO metadata. 
+    IO fields just a nice way to create simple object with IO metadata.
     """
 
     @classmethod

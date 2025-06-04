@@ -44,7 +44,25 @@ write_to = "src/condor/_version.py"
 exclude = ["design/*"]
 
 [tool.ruff.lint]
-select = ["E", "I"]
+select = [
+    # "S", # flake8-bandit
+    # "B", # flake8-bugbear
+    # "C4", # flake8-comprehensions
+    # "EM", # flake8-errmsg
+    # "PT", # flake8-pytest-style
+    # "SIM", # flake8-simplify
+    # "PTH", # flake8-use-pathlib
+    # "I", # isort
+    # "NPY", # numpy-specific-rules
+    # "N", # pep8-naming
+    # "PERF", # perflint
+    "E","W", # pycodestyle
+    # "D", # pydocstyle
+    "F", # pyflakes
+    # "PL", # pylint
+    # "UP", # pyupgrade
+    # "RUF", # ruff-specific-rules
+]
 ignore = [
     "F821", # Undefined name ..."
 ]

@@ -94,11 +94,11 @@ submodel template:
 
 assembly/component model template:
     specify rules for acceptable child/parent (but also methods for later modificaiton)
-    template extension classes by default 
+    template extension classes by default
 
 user assembly/component model creation:
     provide methods for operating on tree (maybe python multi-inherit)
-    must take kwarg 
+    must take kwarg
 
 user model creation
     (condor-)inherit template-specific fields
@@ -113,7 +113,7 @@ user model creation
 
 
 so __prepare__ has to handle all the accesible element and field injection
-(accessing/copying/etc), 
+(accessing/copying/etc),
 CondorClassDict has to handle assignment for elements/submodels/etc
 __new__ is cleanup of standard class attributes before passing to type().__new__ and
 finalization after -- I guess it's possible the finalization could happen in __init__ or
@@ -123,19 +123,19 @@ customize meta so only have relevant attriburtes
 too hard to use different metaclasses for base/template/user ? times special types like
 submodel, assemblycomponent.
 if template inherits from base, user inherits from template, what happens? special types
-can multi-inherit? 
+can multi-inherit?
 
 need to be able to make it easy to build library components (extended templates)
 how to "socket" something? e.g., quickly create a new assembly component like an
 impulsive correction and implement __new__ finalize logic to modify ODE... similar to
 condor-flight.
-clear pattern (or even better, simple API to automate) 
-if over-writing __new__, __prepare__, class_dict.__set_item__, is enough, that's OK. 
+clear pattern (or even better, simple API to automate)
+if over-writing __new__, __prepare__, class_dict.__set_item__, is enough, that's OK.
 class_dict can use meta to access anything and then adding some generality to class_dict
-filtering, maybe even adding little callback hooks or something. 
+filtering, maybe even adding little callback hooks or something.
 
 above sketch is still just datastructure. Need to trace through construction of a simple
-model. 
+model.
 
 LinCov is directional SGM, sone number of number to construct covariance matrix or
 something
@@ -149,7 +149,7 @@ provide a bunch of user-model methods
 
 a template: inherit ModelTemplate
 define fields and pre-loaded symbols (placeholders, independent variables, etc) and get
-ready for inheritance to a user model -- 
+ready for inheritance to a user model --
 
 a submodel template: inherit SubmodelTemplate
 primary to a template, define fields and pre-loaded symbols
