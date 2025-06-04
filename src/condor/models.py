@@ -1774,8 +1774,7 @@ class SubmodelTemplateType(ModelTemplateType):
         return new_cls
 
     def __iter__(cls):
-        for subclass in cls._meta.subclasses:
-            yield subclass
+        yield from cls._meta.subclasses
 
 
 class SubmodelTemplate(

@@ -103,7 +103,7 @@ def make_burn(
     #    event.__name__.startswith("Burn") for event in LinCovCW.Event.subclasses
     # ]))
     burn_num = 1 + len(burns)
-    burn_name = "Burn%d" % burn_num
+    burn_name = f"Burn{burn_num:d}"
     attrs = co.InnerModelType.__prepare__(burn_name, (LinCovCW.Event,))
     update = attrs["update"]
     x = attrs["x"]
@@ -113,51 +113,26 @@ def make_burn(
     Cov_ctrl_offset = attrs["Cov_ctrl_offset"]
     P_ctrl_offset = attrs["P_ctrl_offset"]
 
-    Delta_v_disp = attrs["Delta_v_disp_%d" % burn_num] = attrs["state"]()
-    Delta_v_mag = attrs["Delta_v_mag_%d" % burn_num] = attrs["state"]()
+    Delta_v_disp = attrs[f"Delta_v_disp_{burn_num:d}"] = attrs["state"]()
+    Delta_v_mag = attrs[f"Delta_v_mag_{burn_num:d}"] = attrs["state"]()
 
     if not LinCovCW.parameter.get(backend_repr=rd).name:
-        attrs[
-            "rd_%d"
-            % (
-                1
-                + sum(
-                    [
-                        name.startswith("rd_")
-                        for name in LinCovCW.parameter.list_of("name")
-                    ]
-                )
-            )
-        ] = rd
+        rdnum = 1 + sum(
+            [name.startswith("rd_") for name in LinCovCW.parameter.list_of("name")]
+        )
+        attrs[f"rd_{rdnum:d}"] = rd
 
     if not LinCovCW.parameter.get(backend_repr=tig).name:
-        attrs[
-            "tig_%d"
-            % (
-                1
-                + sum(
-                    [
-                        name.startswith("tig_")
-                        for name in LinCovCW.parameter.list_of("name")
-                    ]
-                )
-            )
-        ] = tig
+        tignum = 1 + sum(
+            [name.startswith("tig_") for name in LinCovCW.parameter.list_of("name")]
+        )
+        attrs[f"tig_{tignum:d}"] = tig
 
     if not LinCovCW.parameter.get(backend_repr=tem).name:
-        attrs[
-            "tem_%d"
-            % (
-                1
-                + sum(
-                    [
-                        name.startswith("tem_")
-                        for name in LinCovCW.parameter.list_of("name")
-                    ]
-                )
-            )
-        ] = tem
-
+        temnum = 1 + sum(
+            [name.startswith("tem_") for name in LinCovCW.parameter.list_of("name")]
+        )
+        attrs[f"tem_{temnum:d}"] = tem
     # attrs["function"] = t - tig
     attrs["at_time"] = [tig]
 

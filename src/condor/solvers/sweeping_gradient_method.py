@@ -792,8 +792,7 @@ class ResultInterpolant:
         return self.interpolants[interval_idx](t)
 
     def __iter__(self):
-        for interp_segment in self.interpolants:
-            yield interp_segment
+        yield from self.interpolants
 
 
 @dataclass

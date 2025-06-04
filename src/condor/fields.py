@@ -331,8 +331,7 @@ class Field:
 
     def __iter__(self):
         """Iterate over field elements"""
-        for element in self._elements:
-            yield element
+        yield from self._elements
 
     def __len__(self):
         return len(self._elements)
@@ -527,7 +526,7 @@ class FreeField(Field, default_direction=Direction.input):
     """
 
     def __call__(self, **kwargs):
-        backend_name = "%s_%d" % (self._resolve_name, len(self._elements))
+        backend_name = f"{self._resolve_name}_{len(self._elements)}"
         new_kwargs = make_backend_symbol(backend_name=backend_name, **kwargs)
         self.create_element(**new_kwargs)
         if "name" in kwargs and self._cls_dict is not None:

@@ -58,7 +58,7 @@ select = [
     # "D", # pydocstyle
     "F", # pyflakes
     "PL", # pylint
-    # "UP", # pyupgrade
+    "UP", # pyupgrade
     # "RUF", # ruff-specific-rules
 ]
 ignore = [
