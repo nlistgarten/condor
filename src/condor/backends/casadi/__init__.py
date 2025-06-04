@@ -262,7 +262,9 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
         sym = casadi.diag(sym)
         raise NotImplementedError
     elif symmetric:
-        assert n == m
+        if n != m:
+            msg = f"Symmetric specified but shape non-square {(n, m)}"
+            raise ValueError(msg)
         unique_shape = (int(n * (n + 1) / 2), 1)
         unique_symbols = symbol_class.sym(name, unique_shape)
         matrix_symbols = unique_to_symmetric(unique_symbols)

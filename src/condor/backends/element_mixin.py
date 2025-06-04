@@ -110,9 +110,14 @@ class BackendSymbolDataMixin:
         if self.diagonal:
             size = n
 
-        if self.diagonal:
-            assert size == self.shape[0]
+        if self.diagonal and size != self.shape[0]:
+            msg = f"Diagonal symbol should have size {self.shape[0]}, got {size}"
+            raise ValueError(msg)
         elif self.symmetric:
-            assert len(self.shape) == 2
-            assert self.shape[0] == self.shape[1]
+            if len(self.shape) != 2:
+                msg = f"Symmetric symbol must have dimension 2, got {len(self.shape)}"
+                raise ValueError(msg)
+            if self.shape[0] != self.shape[1]:
+                msg = f"Symmetric symbol must be square, got shape {self.shape}"
+                raise ValueError(msg)
         self.size = size

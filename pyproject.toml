@@ -45,7 +45,7 @@ exclude = ["design/*"]
 
 [tool.ruff.lint]
 select = [
-    # "S", # flake8-bandit
+    "S", # flake8-bandit
     # "B", # flake8-bugbear
     # "C4", # flake8-comprehensions
     # "EM", # flake8-errmsg
@@ -71,9 +71,11 @@ ignore = [
 "docs/*" = [
     "E402", # Module level import not at top of file, ok in tutorials
     "E305", # Expected 2 blank lines afer class or function definition
+    "S101", # asserts ok in doc examples
 ]
 "tests/*" = [
     "F841", # Local variable assigned but never used, ok in smoke tests
+    "S101", # asserts ok in tests
 ]
 
 [tool.isort]

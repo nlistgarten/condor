@@ -127,6 +127,6 @@ print(opt._stats)
 LTI_plot(opt.transfer)
 
 sim_accel = AccelerateTransfer(**opt.transfer.parameter.asdict())
-assert sim_accel._res.e[0].rootsfound.size == opt.transfer._res.e[0].rootsfound.size - 1
+assert sim_accel._res.e[0].rootsfound.size == opt.transfer._res.e[0].rootsfound.size - 1  # noqa
 
 plt.show()

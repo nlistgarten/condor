@@ -86,7 +86,7 @@ class MyComponentA(ComponentAT):
     output.w = z + u
 
 
-assert MyComponentR(u=1.23).z == MyComponentA(u=1.23).z
+assert MyComponentR(u=1.23).z == MyComponentA(u=1.23).z  # noqa
 
 # comp = MyComponentA(u=1., z=5.)
 

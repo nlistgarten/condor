@@ -622,8 +622,8 @@ class WithDefaultField(FreeField):
                 if elem.size >= np.prod(use_val.size()):
                     try:
                         np.broadcast_shapes(elem.shape, use_val.shape)
-                    except Exception:
-                        pass
+                    except ValueError:
+                        pass  # noqa: S110
                     else:
                         substitution_dict[elem.backend_repr] = use_val
             elif np.array(use_val).dtype.kind in "if":
@@ -634,8 +634,8 @@ class WithDefaultField(FreeField):
                 elif elem.size > use_val.size:
                     try:
                         np.broadcast_shapes(elem.shape, use_val.shape)
-                    except Exception:
-                        pass
+                    except ValueError:
+                        pass  # noqa: S110
                     else:
                         substitution_dict[elem.backend_repr] = use_val
                     substitution_dict[elem.backend_repr] = np.broadcast_to(
