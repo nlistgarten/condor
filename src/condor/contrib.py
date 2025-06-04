@@ -128,10 +128,11 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
         for k, v in kwargs.items():
             var = getattr(cls, k)
             if var.field_type is not cls.variable:
-                raise ValueError(
+                msg = (
                     "Use set initial to set the initialier for variables, attempting "
                     f"to set {k}"
                 )
+                raise ValueError(msg)
             var.initializer = v
 
 
@@ -222,10 +223,11 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
         for k, v in kwargs.items():
             var = getattr(cls, k)
             if var.field_type is not cls.variable:
-                raise ValueError(
+                msg = (
                     "Use set initial to set the initialier for variables, attempting "
                     f"to set {k}"
                 )
+                raise ValueError(msg)
             var.initializer = v
 
     @classmethod
@@ -245,7 +247,8 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
             setattr(self, elem.name, val)
 
         if kwargs:
-            raise ValueError(f"Extra arguments provided: {kwargs}")
+            msg = f"Extra arguments provided: {kwargs}"
+            raise ValueError(msg)
 
         self.input_kwargs = parameters
         self.parameter = cls.parameter._dataclass(**parameters)
@@ -454,9 +457,9 @@ class TrajectoryAnalysisMetaData(SubmodelMetaData):
 
 class TrajectoryAnalysisType(SubmodelType):
     """Handle kwargs for including/excluding events (also need to include/exlcude
-        modes?), injecting bound events (event functions, updates) to model, etc.
+    modes?), injecting bound events (event functions, updates) to model, etc.
 
-        A common use case will be to bind the parameters then only update the state...
+    A common use case will be to bind the parameters then only update the state...
 
 
     """
@@ -475,7 +478,8 @@ class TrajectoryAnalysisType(SubmodelType):
     ):
         cls_dict = super().__prepare__(*args, **kwargs)
         if exclude_events is not None and include_events is not None:
-            raise ValueError("Use only one of include or exclude events")
+            msg = "Use only one of include or exclude events"
+            raise ValueError(msg)
 
         if include_events is None:
             cls_dict.meta.events = list(cls_dict.meta.primary.Event)
@@ -488,7 +492,8 @@ class TrajectoryAnalysisType(SubmodelType):
             ]
 
         if exclude_modes is not None and include_modes is not None:
-            raise ValueError("Use only one of include or exclude modes")
+            msg = "Use only one of include or exclude modes"
+            raise ValueError(msg)
 
         if include_modes is None:
             cls_dict.meta.modes = list(cls_dict.meta.primary.Mode)
@@ -653,11 +658,12 @@ class EventType(SubmodelType):
                 new_cls._meta.primary._meta.user_set[state_elem.name] = attr_val
             else:
                 if primary_attr is not state_elem:
-                    raise NameError(
+                    msg = (
                         f"{new_cls} attempting to assign state {attr_name} = {attr_val}"
                         f" but {new_cls._meta.primary} already has {attr_name} ="
                         f"{primary_attr}"
                     )
+                    raise NameError(msg)
             if state_elem.name != attr_name:
                 super().process_condor_attr(attr_name, attr_val, new_cls)
         else:

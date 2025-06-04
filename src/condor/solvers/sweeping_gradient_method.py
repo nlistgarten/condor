@@ -1234,9 +1234,8 @@ class TrajectoryAnalysisSGM:
 
         if state_jac is None:
             if state_system._jac is None:
-                raise ValueError(
-                    "must provide state jacobian through state_system.jac or state_jac"
-                )
+                msg = "must provide state jacobian via state_system.jac or state_jac"
+                raise ValueError(msg)
             state_jac = state_system._jac
 
         self.adjoint_system = AdjointSystem(

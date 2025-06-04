@@ -114,10 +114,11 @@ class BaseCondorClassDict(dict):
             and attr_name in type(self.meta.template).reserved_words
             and self.user_setting
         ):
-            raise ValueError(
+            msg = (
                 f"Attempting to set {attr_name}={attr_val}, but {attr_name} is a "
                 "reserved word"
             )
+            raise ValueError(msg)
 
         log.debug("setting %s to %s on %s", attr_name, attr_val, self.meta.model_name)
 
@@ -381,9 +382,8 @@ class BaseModelType(type):
                 if cls_dict[k].__class__ is v.__class__:
                     pass  # compatible field inheritance
                 else:
-                    raise ValueError(
-                        f"inheriting incompatibility {base}.{k} = {v} to {name}"
-                    )
+                    msg = f"inheriting incompatibility {base}.{k} = {v} to {name}"
+                    raise ValueError(msg)
             else:
                 cls.inherit_field(v, cls_dict)
             meta.inherited_items[k] = field_from_inherited[v] = cls_dict[v._name]
@@ -423,17 +423,16 @@ class BaseModelType(type):
                         if isinstance(inherited_attr, BaseElement):
                             inherited_attr = inherited_attr.backend_repr
                         if inherited_attr is not v:
-                            raise ValueError(
-                                f"an inheritance bug, {base}.{k} = {v} to {name}"
-                            )
+                            msg = f"an inheritance bug, {base}.{k} = {v} to {name}"
+                            raise ValueError(msg)
 
                     return
                 elif cls.is_condor_attr(k, v):
-                    raise ValueError(
-                        f"an inheritance incompatibility "
-                        f"{base}.{k} = {v} does not match "
-                        f"{name}.{k} = {cls_dict[k]}"
+                    msg = (
+                        f"an inheritance incompatibility {base}.{k} = {v} does not "
+                        f"match {name}.{k} = {cls_dict[k]}"
                     )
+                    raise ValueError(msg)
             else:
                 log.debug(
                     f"Independent element/symbol being inherited from {base}.{k} = {v} "
@@ -765,10 +764,11 @@ class BaseModelType(type):
 
 def check_attr_name(attr_name, attr_val, new_cls):
     if attr_name in new_cls.__class__.reserved_words:
-        raise NameError(
+        msg = (
             f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is a "
             "reserved word"
         )
+        raise NameError(msg)
     existing_attr = new_cls.__dict__.get(attr_name, None)
     if existing_attr is not None and attr_val is not existing_attr:
         if isinstance(existing_attr, BaseElement):
@@ -788,10 +788,11 @@ def check_attr_name(attr_name, attr_val, new_cls):
             if compare_attr_new is compare_attr_existing:
                 return
 
-        raise NameError(
+        msg = (
             f"Cannot assign attribute {attr_name}={attr_val} because {attr_name} is "
             f"already set to {getattr(new_cls, attr_name)}"
         )
+        raise NameError(msg)
     return
 
 
@@ -1292,10 +1293,11 @@ class Model(metaclass=ModelType):
         fields_kwargs = {field: dict() for field in fields}
         for (input_name, field), input_val in zip(input_names.items(), args):
             if input_name in kwargs:
-                raise ValueError(
+                msg = (
                     f"Argument {input_name} has value {input_val} from args and "
                     f"{kwargs[input_name]} from kwargs"
                 )
+                raise ValueError(msg)
             fields_kwargs[field][input_name] = input_val
 
         missing_args = []
@@ -1721,12 +1723,14 @@ class SubmodelTemplateType(ModelTemplateType):
 
         if cls.is_user_model(bases):
             if primary is not None:
-                raise TypeError("User's submodels should not provide primary")
+                msg = "User's submodels should not provide primary"
+                raise TypeError(msg)
             if base_meta.primary is None:
-                raise TypeError(
+                msg = (
                     "This shouldn't happen -- defining user submodel with submodel "
                     "template that is missing primary attribute"
                 )
+                raise TypeError(msg)
             primary = base_meta.primary
 
             if copy_fields is None:
@@ -1738,7 +1742,8 @@ class SubmodelTemplateType(ModelTemplateType):
         else:
             # should extended models hit here??
             if primary is None:
-                raise TypeError("SubmodelTemplate requires primary")
+                msg = "SubmodelTemplate requires primary"
+                raise TypeError(msg)
             if copy_fields is None:
                 copy_fields = False
 

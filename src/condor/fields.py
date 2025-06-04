@@ -209,7 +209,8 @@ class Field:
         self._model = model
         if self._model_name:
             if self._model_name != model.__name__:
-                raise ValueError("attempting to bind to a class that wasn't inherited")
+                msg = "Attempting to bind to a class that wasn't inherited"
+                raise ValueError(msg)
         else:
             self._model_name = model.__name__
         self._set_resolve_name()
@@ -737,10 +738,11 @@ class TrajectoryOutputField(FreeField, default_direction=Direction.output):
             if "terminal_term" in kwargs:
                 if backend.get_symbol_data(integrand) != shape_data:
                     # TODO would be nice to include the names here
-                    raise ValueError(
+                    msg = (
                         f"Incompatible terminal term shape {shape_data} for integrand "
                         f"{backend.get_symbol_data(integrand)}"
                     )
+                    raise ValueError(msg)
             else:
                 shape_data = backend.get_symbol_data(integrand)
                 kwargs["terminal_term"] = np.broadcast_to(
@@ -870,13 +872,15 @@ class MatchedField(Field):
         if isinstance(key, backend.symbol_class):
             match = self._matched_to.get(backend_repr=key)
             if isinstance(match, list):
-                raise ValueError(f"Could not find match for {key}")
+                msg = f"Could not find match for {key}"
+                raise ValueError(msg)
         elif isinstance(key, BaseElement):
             match = key
         elif isinstance(key, str):
             match = self._matched_to.get(name=key)
         else:
-            raise ValueError(f"Could not find match for {key}")
+            msg = f"Could not find match for {key}"
+            raise ValueError(msg)
         return match
 
     def __setitem__(self, key, value):

@@ -47,7 +47,7 @@ exclude = ["design/*"]
 select = [
     "S", # flake8-bandit
     "B", # flake8-bugbear
-    # "EM", # flake8-errmsg
+    "EM", # flake8-errmsg
     "PT", # flake8-pytest-style
     "SIM", # flake8-simplify
     "I", # isort

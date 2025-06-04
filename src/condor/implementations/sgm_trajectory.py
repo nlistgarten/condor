@@ -188,9 +188,8 @@ class TrajectoryAnalysis:
 
         for event_idx, event in enumerate(events):
             if (event.function is not np.nan) == (event.at_time is not np.nan):
-                raise ValueError(
-                    f"Event class `{event}` has set both `function` and `at_time`"
-                )
+                msg = f"Event class `{event}` has set both `function` and `at_time`"
+                raise ValueError(msg)
             if getattr(event, "function", np.nan) is not np.nan:
                 e_expr = event.function
             else:

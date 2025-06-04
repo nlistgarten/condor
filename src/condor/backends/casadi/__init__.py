@@ -63,23 +63,23 @@ def process_relational_element(elem):
 
         # validation
         if not hasattr(elem, "lower_bound"):
-            raise ValueError(
-                "Setting inequality for an element without bounds doesn't make snse"
-            )
+            msg = "Setting inequality for an element without bounds doesn't make sense"
+            raise ValueError(msg)
         if casadi.OP_EQ in (lhs.op(), rhs.op()):
-            raise ValueError(
-                "setting inequality and equality relation doesn't make sense"
-            )
+            msg = "Setting inequality and equality relation doesn't make sense"
+            raise ValueError(msg)
         if lhs.op() in (casadi.OP_LT, casadi.OP_LE):
             mhs = lhs.dep(1)
             lhs = lhs.dep(0)
             if rhs.backend_repr.op() in (casadi.OP_LT, casadi.OP_LE):
-                raise ValueError("Too many inequalities deep")
+                msg = "Too many inequalities deep"
+                raise ValueError(msg)
         if rhs.op() in (casadi.OP_LT, casadi.OP_LE):
             mhs = rhs.dep(0)
             rhs = rhs.dep(1)
             if lhs.backend_repr.op() in (casadi.OP_LT, casadi.OP_LE):
-                raise ValueError("Too many inequalities deep")
+                msg = "Too many inequalities deep"
+                raise ValueError(msg)
 
         if lhs.op() in (casadi.OP_LT, casadi.OP_LE):
             mhs = lhs.dep(1)
@@ -93,11 +93,13 @@ def process_relational_element(elem):
             or (rhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT))
             or (mhs.op() in (casadi.OP_EQ, casadi.OP_LE, casadi.OP_LT))
         ):
-            raise ValueError("Too many inequalities deep")
+            msg = "Too many inequalities deep"
+            raise ValueError(msg)
 
         if mhs.shape == (0, 0):
             if rhs.is_constant() and lhs.is_constant():
-                raise ValueError("Unexpected inequality of constants")
+                msg = "Unexpected inequality of constants"
+                raise ValueError(msg)
             elif not rhs.is_constant() and not lhs.is_constant():
                 mhs = rhs - lhs
                 lhs = np.full(lhs.shape, 0.0)
@@ -131,7 +133,8 @@ def process_relational_element(elem):
             elem.lower_bound = 0.0
 
     if relational_op and (real_lower_bound or real_upper_bound):
-        raise ValueError(f"Do not use relational constraints with bounds for {elem}")
+        msg = f"Do not use relational constraints with bounds for {elem}"
+        raise ValueError(msg)
 
 
 def shape_to_nm(shape):

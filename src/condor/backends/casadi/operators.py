@@ -33,7 +33,8 @@ ones = casadi.MX.ones
 
 def diag(v, k=0):
     if k != 0:
-        raise ValueError("Not supported for this backend")
+        msg = "Not supported for this backend"
+        raise ValueError(msg)
     if not hasattr(v, "shape"):
         # try to concat list/tuple of elements
         v = concat(v)
@@ -62,7 +63,8 @@ def concat(arrs, axis=0):
         elif axis in (1, -1):
             return casadi.hcat(arrs)
         else:
-            raise ValueError("casadi only supports matrices")
+            msg = "Casadi only supports matrices"
+            raise ValueError(msg)
     else:
         return np.concat([np.atleast_2d(arr) for arr in arrs], axis=axis)
 
@@ -82,7 +84,8 @@ def min(x, axis=None):
     if not isinstance(x, backend.symbol_class):
         x = concat(x)
     if axis is not None:
-        raise ValueError("Only axis=None supported")
+        msg = "Only axis=None supported"
+        raise ValueError(msg)
     return casadi.mmin(x)
 
 
@@ -90,7 +93,8 @@ def max(x, axis=None):
     if not isinstance(x, backend.symbol_class):
         x = concat(x)
     if axis is not None:
-        raise ValueError("Only axis=None supported")
+        msg = "Only axis=None supported"
+        raise ValueError(msg)
     return casadi.mmax(x)
 
 
@@ -172,7 +176,8 @@ def if_else(*conditions_actions):
     if len(conditions_actions) == 1:
         else_action = conditions_actions[0]
         if isinstance(else_action, (list, tuple)):
-            raise ValueError("if_else requires an else_action to be provided")
+            msg = "if_else requires an else_action to be provided"
+            raise ValueError(msg)
         return else_action
     condition, action = conditions_actions[0]
     remainder = if_else(*conditions_actions[1:])
