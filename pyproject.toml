@@ -59,13 +59,12 @@ select = [
     "F", # pyflakes
     "PL", # pylint
     "UP", # pyupgrade
-    # "RUF", # ruff-specific-rules
 ]
 ignore = [
-    "F821", # Undefined name ..."
+    "F821", # Undefined name ... (too dynamic)
     "D1", # Missing docstring in ... (use doc coverage for now)
-    "PLR09", # Too many statements/arguments/etc
-    "PLR2004", # Magic value used in comparison
+    "PLR09", # Too many statements/arguments/etc (preference)
+    "PLR2004", # Magic value used in comparison (preference)
 ]
 
 [tool.ruff.lint.per-file-ignores]
