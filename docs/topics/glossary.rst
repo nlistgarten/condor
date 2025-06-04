@@ -84,6 +84,9 @@ General Object-Oriented and Metaprogramming Terms
    contrib
       Included implementations of a library's capability, the batteries in "batteries included"
 
+   MRO
+      the "method resolution order" which defines the order of classes to resolve an attribute definition
+
 
 
 
