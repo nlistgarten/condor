@@ -7,6 +7,9 @@ _version.py
 _build/
 build/
 dist/
+.coverage
 
+# sphinx-gallery outputs
 tutorial/
 howto/
+sg_execution_times.rst
