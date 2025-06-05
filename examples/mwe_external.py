@@ -21,30 +21,7 @@ else:
 
     # class SpiceReferenceFrame(type):
     class SpiceReferenceFrame(co.ExternalSolverWrapper, parameterized_IO=False):
-        # dt = input()
-        # q = output(shape=4)
-        # omega = output(shape=3)
-
-        # def __new__(cls, model_name, bases, attrs,  **kwargs):
-        #    new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
-        #    return new_cls
-
-        # def __call__(cls, inertial_frame_name, name, start_time_string):
         def __init__(self, inertial_frame_name, name, start_time_string):
-            """
-            or...
-            cls.dt = cls.input(name="dt")
-            cls.q = cls.input(shape=4, name="q")
-            cls.omega = cls.input(shape=3, name="omega")
-
-            OR
-            allow something along the lines of "auto_create" flag, or figure it out
-            based on context? lol
-
-            cls.input(name="dt")
-            cls.input(shape=4, name="q")
-            cls.input(shape=3, name="omega")
-            """
             self.input(name="dt")
             self.output(name="q", shape=4)
             self.output(name="omega", shape=3)
@@ -55,10 +32,10 @@ else:
             self.et_start = spice.str2et(start_time_string)
             # self.create_model()
 
-        def function(cls, dt):
-            # need cls ref to access things like inertial_frame_name, etc
-            et = cls.et_start + dt
-            SS = spice.sxform(cls.inertial_frame_name, cls.name, et)
+        def function(self, dt):
+            # need self ref to access things like inertial_frame_name, etc
+            et = self.et_start + dt
+            SS = spice.sxform(self.inertial_frame_name, self.name, et)
             RR, omega_other = spice.xf2rav(SS)
             ang_vel = RR @ omega_other
             # quaternion = spice.m2q(RR.T.copy())
@@ -69,8 +46,8 @@ else:
 
         # allow jac_vec_prod, hessian, etc
         # okay, I guess a finite_difference_mixin would be easy to add --
-        def jacobian(cls, t):
-            q, ang_vel = cls.function(t)
+        def jacobian(self, t):
+            q, ang_vel = self.function(t)
             qjac = left_quaternion_product_matrix(q) @ ang_vel / 2
             return qjac, np.zeros(3)
 
