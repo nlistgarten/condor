@@ -392,6 +392,23 @@ class FrontendElementData:
         return self.field_type.flat_index(self)
 
 
+def _generic_op(op, is_r=False):
+    """Generate method from generic operator"""
+
+    def mthd(self, other=None):
+        if other is None:
+            return op(self.backend_repr)
+
+        other_value = other.backend_repr if isinstance(other, self.__class__) else other
+
+        if is_r:
+            return op(other_value, self.backend_repr)
+
+        return op(self.backend_repr, other_value)
+
+    return mthd
+
+
 @dataclass
 class BaseElement(
     FrontendElementData,
@@ -444,23 +461,6 @@ class BaseElement(
     def T(self):  # noqa: N802
         return self.backend_repr.T
 
-    @staticmethod
-    def _generic_op(op, is_r=False):
-        """Generate method from generic operator"""
-
-        def mthd(self, other=None):
-            if other is None:
-                return op(self.backend_repr)
-            if isinstance(other, self.__class__):
-                other_value = other.backend_repr
-            else:
-                other_value = other
-            if is_r:
-                return op(other_value, self.backend_repr)
-            return op(self.backend_repr, other_value)
-
-        return mthd
-
     __le__ = _generic_op(operator.le)
     __lt__ = _generic_op(operator.lt)
     __ge__ = _generic_op(operator.ge)
@@ -499,8 +499,6 @@ class BaseElement(
 
     def __getitem__(self, *keys):
         return self.backend_repr.__getitem__(*keys)
-
-    del _generic_op
 
 
 class FreeElement(BaseElement):
