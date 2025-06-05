@@ -7,15 +7,10 @@ from sgm_test_util import LTI_plot
 
 import condor as co
 
-dblintA = np.array(
-    [
-        [0, 1],
-        [0, 0],
-    ]
-)
+dblintA = np.array([[0, 1], [0, 0]])
 dblintB = np.array([[0, 1]]).T
 
-DblInt = co.LTI(A=dblintA, B=dblintB, name="DblInt")
+DblInt = co.LTI(a=dblintA, b=dblintB, name="DblInt")
 # class Terminate(DblInt.Event):
 #    at_time = 32.,
 #    terminate = True

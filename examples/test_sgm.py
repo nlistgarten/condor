@@ -13,7 +13,7 @@ dblintA = np.array(
 )
 dblintB = np.array([[0, 1]]).T
 
-DblInt = co.LTI(A=dblintA, B=dblintB, name="DblInt")
+DblInt = co.LTI(a=dblintA, b=dblintB, name="DblInt")
 
 
 class DblIntLQR(DblInt.TrajectoryAnalysis):
@@ -53,7 +53,7 @@ lqr_sol_samp = SampledOptLQR()
 
 # -------
 
-DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=5.0)
+DblIntSampled = co.LTI(a=dblintA, b=dblintB, name="DblIntSampled", dt=5.0)
 
 
 class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
@@ -73,7 +73,7 @@ LTI_plot(sampled_sim)
 plt.show()
 
 
-DblIntDt = co.LTI(A=dblintA, B=dblintB, name="DblIntDt", dt=5.0, dt_plant=True)
+DblIntDt = co.LTI(a=dblintA, b=dblintB, name="DblIntDt", dt=5.0, dt_plant=True)
 
 
 class DblIntDtLQR(DblIntDt.TrajectoryAnalysis):

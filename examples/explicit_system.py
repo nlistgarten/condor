@@ -7,7 +7,7 @@ import condor as co
 rng = np.random.default_rng(123)
 
 
-class instancemethod:
+class instancemethod:  # noqa: N801
     def __init__(self, func):
         print("creating wrapper with func", func, "on", self)
         self.func = func

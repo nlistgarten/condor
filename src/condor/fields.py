@@ -421,42 +421,45 @@ class BaseElement(
     def __repr__(self):
         return f"<{self.field_type._resolve_name}: {self.name}>"
 
-    def copy_to_field(element, new_field, new_name=""):
-        element_dict = asdict(element)
+    def copy_to_field(self, new_field, new_name=""):
+        element_dict = asdict(self)
         if new_name:
             element_dict["name"] = new_name
         else:
-            element_dict["name"] = f"{element.name}"
+            element_dict["name"] = f"{self.name}"
         new_field.create_element(**element_dict)
         return new_field._elements[-1]
 
-    def reshape(element, new_shape):
-        element.backend_repr = backend.symbol_generator(
-            name=element.backend_repr.name(), shape=new_shape
+    def reshape(self, new_shape):
+        self.backend_repr = backend.symbol_generator(
+            name=self.backend_repr.name(), shape=new_shape
         )
-        element.shape = new_shape
+        self.shape = new_shape
         # TODO: this is wrong, need to use get symbol data or something? because need to
         # check for symmetry, etc.
-        element.size = np.prod(new_shape)
-        return element
+        self.size = np.prod(new_shape)
+        return self
 
     @property
-    def T(self):
+    def T(self):  # noqa: N802
         return self.backend_repr.T
 
-    def _generic_op(f, is_r=False):
-        def _(self, other=None):
+    @staticmethod
+    def _generic_op(op, is_r=False):
+        """Generate method from generic operator"""
+
+        def mthd(self, other=None):
             if other is None:
-                return f(self.backend_repr)
+                return op(self.backend_repr)
             if isinstance(other, self.__class__):
                 other_value = other.backend_repr
             else:
                 other_value = other
             if is_r:
-                return f(other_value, self.backend_repr)
-            return f(self.backend_repr, other_value)
+                return op(other_value, self.backend_repr)
+            return op(self.backend_repr, other_value)
 
-        return _
+        return mthd
 
     __le__ = _generic_op(operator.le)
     __lt__ = _generic_op(operator.lt)
@@ -533,12 +536,12 @@ class FreeField(Field, default_direction=Direction.input):
             self._cls_dict[kwargs["name"]] = self._elements[-1].backend_repr
         return self._elements[-1].backend_repr
 
-    def process_field(field):
-        for element_idx, element in enumerate(field):
+    def process_field(self):
+        for element_idx, element in enumerate(self):
             # add names to elements -- must be an unnamed element without a reference
             # assignment in the class
             if not element.name:
-                element.name = f"{field._model_name}_{field._name}_{element_idx}"
+                element.name = f"{self._model_name}_{self._name}_{element_idx}"
 
     def create_from(self, other, **aliases):
         """Get or create elements based on another field

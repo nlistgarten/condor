@@ -635,16 +635,16 @@ class ScipyTrustConstr(ScipyMinimizeBase):
             )
 
         # process linear constraints
-        linear_A_exprs = [
+        linear_a_exprs = [
             g_jac
             for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
             if not is_nonlinear
         ]
-        self.num_linear_g = len(linear_A_exprs)
+        self.num_linear_g = len(linear_a_exprs)
         if self.num_linear_g:
             self.linear_jac_func = expression_to_operator(
                 [self.p],
-                concat(linear_A_exprs),
+                concat(linear_a_exprs),
                 f"{model.__name__}_A",
             )
 

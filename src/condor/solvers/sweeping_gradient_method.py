@@ -900,8 +900,8 @@ class AdjointSystem(System):
                         te,
                         xtem,
                     )
-                    dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
-                    lamda_tem = (dh_dx.T - dte_dxT @ (dh_dx @ ftem).T) @ last_lamda
+                    dte_dx_tr = self.dte_dxs[event_channel](p, te, xtem).T
+                    lamda_tem = (dh_dx.T - dte_dx_tr @ (dh_dx @ ftem).T) @ last_lamda
                     last_lamda = lamda_tem
             else:
                 for event_channel in active_update_idxs[::-1]:
@@ -910,9 +910,9 @@ class AdjointSystem(System):
                         te,
                         xtem,
                     )
-                    dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
+                    dte_dx_tr = self.dte_dxs[event_channel](p, te, xtem).T
                     lamda_tem = (
-                        dh_dx.T - dte_dxT @ (ftep - dh_dx @ ftem).T
+                        dh_dx.T - dte_dx_tr @ (ftep - dh_dx @ ftem).T
                     ) @ last_lamda
                     last_lamda = lamda_tem
         else:

@@ -761,38 +761,38 @@ class Mode(
     )
 
 
-def LTI(
-    A,
-    B=None,
+def LTI(  # noqa: N802
+    a,
+    b=None,
     dt=0.0,
     dt_plant=False,
     name="LTISystem",
 ):
     attrs = ModelTemplateType.__prepare__(name, (ODESystem,))
-    attrs["A"] = A
+    attrs["a"] = a
     state = attrs["state"]
-    x = state(shape=A.shape[0])
+    x = state(shape=a.shape[0])
     attrs["x"] = x
-    xdot = A @ x
+    xdot = a @ x
     if dt <= 0.0 and dt_plant:
         raise ValueError
 
-    if B is not None:
-        attrs["B"] = B
-        K = attrs["parameter"](shape=B.T.shape)
-        attrs["K"] = K
+    if b is not None:
+        attrs["b"] = b
+        k = attrs["parameter"](shape=b.T.shape)
+        attrs["k"] = k
 
         if dt and not dt_plant:
             # sampled control
-            u = state(shape=B.shape[1])
+            u = state(shape=b.shape[1])
             attrs["u"] = u
-            # attrs["initial"][u] = -K@x
+            # attrs["initial"][u] = -k@x
         else:
             # feedback control matching system
-            u = -K @ x
+            u = -k @ x
             attrs["dynamic_output"].u = u
 
-        xdot += B @ u
+        xdot += b @ u
 
     if not (dt_plant and dt):
         attrs["dot"][x] = xdot
@@ -806,12 +806,12 @@ def LTI(
         if dt_plant:
             from scipy.signal import cont2discrete
 
-            if B is None:
-                B = np.zeros((A.shape[0], 1))
-            Ad, Bd, *_ = cont2discrete((A, B, None, None), dt=dt)
-            dt_attrs["update"][dt_attrs["x"]] = (Ad - Bd @ K) @ x
-        elif B is not None:
-            dt_attrs["update"][dt_attrs["u"]] = -K @ x
+            if b is None:
+                b = np.zeros((a.shape[0], 1))
+            ad, bd, *_ = cont2discrete((a, b, None, None), dt=dt)
+            dt_attrs["update"][dt_attrs["x"]] = (ad - bd @ k) @ x
+        elif b is not None:
+            dt_attrs["update"][dt_attrs["u"]] = -k @ x
             # dt_attrs["update"][dt_attrs["x"]] = x
         SubmodelType(
             "DT",
@@ -860,9 +860,9 @@ class ExternalSolverWrapperType(ModelTemplateType):
                 )
         return sup_dict
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(self, *args, **kwargs):
         log.debug(
-            f"ExternalSolverWrapperType __call__ for cls={cls}, *args={args}, "
+            f"ExternalSolverWrapperType __call__ for cls={self}, *args={args}, "
             f"**kwargs={kwargs}"
         )
         # gets called on instantiation of the user wrapper, so COULD return the

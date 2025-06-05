@@ -334,12 +334,12 @@ class BaseModelType(type):
 
         return cls_dict
 
-    def inherit_field(field, cls_dict, new_direction=None):
+    def inherit_field(cls, cls_dict, new_direction=None):
         """Used to inherit a field from parent to new class dictionary (so it is
         available during class declaration)
         """
-        v_init_kwargs = field._init_kwargs.copy()
-        for init_k, init_v in field._init_kwargs.items():
+        v_init_kwargs = cls._init_kwargs.copy()
+        for init_k, init_v in cls._init_kwargs.items():
             did_update = False
             if isinstance(init_v, (list, tuple)):
                 init_v_iterable = init_v
@@ -360,13 +360,13 @@ class BaseModelType(type):
                 use_kwarg = use_kwarg[0]
             if did_update:
                 v_init_kwargs[init_k] = use_kwarg
-        inherited_field = field.inherit(
-            cls_dict.meta.model_name, field_type_name=field._name, **v_init_kwargs
+        inherited_field = cls.inherit(
+            cls_dict.meta.model_name, field_type_name=cls._name, **v_init_kwargs
         )
         if new_direction is not None:
             inherited_field._direction = new_direction
-        cls_dict[field._name] = inherited_field
-        cls_dict[field._name].prepare(cls_dict)
+        cls_dict[cls._name] = inherited_field
+        cls_dict[cls._name].prepare(cls_dict)
 
     @classmethod
     def inherit_item(cls, cls_dict, field_from_inherited, meta, name, base, k, v):
@@ -1397,7 +1397,7 @@ class Model(metaclass=ModelType):
             + ">"
         )
 
-    def bind_embedded_models(model_instance):
+    def bind_embedded_models(self):
         # TODO: how to have models cache previous results so this is always free?
         # Can imagine a parent model with multiple instances of the exact same
         # sub-model called with different parameters. Would need to memoize at least
@@ -1407,7 +1407,7 @@ class Model(metaclass=ModelType):
         # name not the assigned name, but assigned name can still be used during model
         # definition
 
-        model = model_instance.__class__
+        model = self.__class__
         if not model._meta.bind_embedded_models:
             return
         model_assignments = {}
@@ -1418,7 +1418,7 @@ class Model(metaclass=ModelType):
             if isinstance(field, FreeField)
         ]
         for field in fields:
-            model_instance_field = getattr(model_instance, field._name)
+            model_instance_field = getattr(self, field._name)
             model_instance_field_dict = dc.asdict(model_instance_field)
             model_assignments.update(
                 {
@@ -1437,18 +1437,18 @@ class Model(metaclass=ModelType):
 
             bound_embedded_model.implementation = embedded_model_instance.implementation
             embedded_model_instance.bind_input_as_embedded(
-                model_instance,
+                self,
                 bound_embedded_model,
                 model_assignments,
             )
 
             bound_embedded_model.implementation(bound_embedded_model)
 
-            setattr(model_instance, embedded_model_ref_name, bound_embedded_model)
+            setattr(self, embedded_model_ref_name, bound_embedded_model)
 
             model_assignments.update(
                 embedded_model_instance.bind_output_as_embedded(
-                    model_instance,
+                    self,
                     bound_embedded_model,
                 )
             )
@@ -1456,15 +1456,15 @@ class Model(metaclass=ModelType):
             bound_embedded_model.bind_embedded_models()
 
     def bind_input_as_embedded(
-        embedded_model_instance,
+        self,
         parent_instance,
         bound_embedded_model,
         model_assignments,
     ):
-        embedded_model = embedded_model_instance.__class__
+        embedded_model = self.__class__
         embedded_model_kwargs = {}
         for field in embedded_model._meta.input_fields:
-            bound_field = getattr(embedded_model_instance, field._name)
+            bound_field = getattr(self, field._name)
             bound_field_dict = dc.asdict(bound_field)
             for k, v in bound_field_dict.items():
                 if not isinstance(v, backend.symbol_class):
@@ -1493,11 +1493,11 @@ class Model(metaclass=ModelType):
         bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
 
     def bind_output_as_embedded(
-        embedded_model_instance, parent_instance, bound_embedded_model
+        self, parent_instance, bound_embedded_model
     ):
         assignment_updates = {}
-        for field in embedded_model_instance._meta.output_fields:
-            sym_bound_field = getattr(embedded_model_instance, field._name)
+        for field in self._meta.output_fields:
+            sym_bound_field = getattr(self, field._name)
             sym_bound_field_dict = dc.asdict(sym_bound_field)
 
             ran_bound_field = getattr(bound_embedded_model, field._name)

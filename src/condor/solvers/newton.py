@@ -85,11 +85,11 @@ class Newton:
                 break
 
             # eval jacobian
-            J = self.fprime(x, p)
+            jac = self.fprime(x, p)
 
-            # newton step calculation J @ d = -f
+            # newton step calculation jac @ d = -f
             try:
-                dx = linalg.solve(J, -f)
+                dx = linalg.solve(jac, -f)
             except linalg.LinAlgError:
                 print(
                     "solver failed, jacobian is singular. itr:",

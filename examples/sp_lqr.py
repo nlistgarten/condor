@@ -12,7 +12,7 @@ dblintB = np.array([[0, 1]]).T
 dt = 0.5
 
 
-DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=dt)
+DblIntSampled = co.LTI(a=dblintA, b=dblintB, name="DblIntSampled", dt=dt)
 
 
 class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):

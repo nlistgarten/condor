@@ -29,16 +29,16 @@ class ComponentAsTemplate(co.ExplicitSystem, as_template=True):
     output.z = x**2 + y
 
 
-@pytest.mark.parametrize("Component", [ComponentRaw, ComponentAsTemplate])
+@pytest.mark.parametrize("component", [ComponentRaw, ComponentAsTemplate])
 class TestPlaceholders:
-    def test_default_impl(self, Component):
-        class MyComp0(Component):
+    def test_default_impl(self, component):
+        class MyComp0(component):
             pass
 
         assert MyComp0().z == 5
 
-    def test_new_io(self, Component):
-        class MyComp5(Component):
+    def test_new_io(self, component):
+        class MyComp5(component):
             u = input()
             output.v = u**2 + 2 * u + 1
 
@@ -46,16 +46,16 @@ class TestPlaceholders:
         assert out.z == 5
         assert out.v == 16
 
-    def test_use_placeholders(self, Component):
-        class MyComp1(Component):
+    def test_use_placeholders(self, component):
+        class MyComp1(component):
             x = input()
             y = input()
 
         out = MyComp1(x=2.0, y=3.0)
         assert out.z == 7
 
-    def test_partial_placeholder(self, Component):
-        class MyComp2(Component):
+    def test_partial_placeholder(self, component):
+        class MyComp2(component):
             x = input()
             y = 3.0
 
@@ -65,15 +65,15 @@ class TestPlaceholders:
         # keyword args x=..., y=... does fail
         assert MyComp2(3.0, 4.0).z == 3**2 + 3
 
-    def test_override_placeholders(self, Component):
-        class MyComp3(Component):
+    def test_override_placeholders(self, component):
+        class MyComp3(component):
             x = 3.0
             y = 4.0
 
         assert MyComp3().z == 3**2 + 4
 
-    def test_computed_placeholder(self, Component):
-        class MyComp4(Component):
+    def test_computed_placeholder(self, component):
+        class MyComp4(component):
             u = input()
             x = u**0.5
             y = 0
