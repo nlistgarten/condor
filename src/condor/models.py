@@ -1492,9 +1492,7 @@ class Model(metaclass=ModelType):
             # bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
         bound_embedded_model.bind_input_fields(**embedded_model_kwargs)
 
-    def bind_output_as_embedded(
-        self, parent_instance, bound_embedded_model
-    ):
+    def bind_output_as_embedded(self, parent_instance, bound_embedded_model):
         assignment_updates = {}
         for field in self._meta.output_fields:
             sym_bound_field = getattr(self, field._name)
