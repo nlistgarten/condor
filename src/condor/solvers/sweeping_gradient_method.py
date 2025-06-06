@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 import numpy as np
+
 # from condor import backend
 from scipy.interpolate import make_interp_spline
 
@@ -61,8 +62,12 @@ class SolverSciPyBase(SolverMixin):
         results = system.result
         # had to do some debugging and figured out a decent pattern for conditional
         # breakpoints... TODO move to notes or something?
-        # if results.e and results.e[-1].index == 19 and np.abs(results.t[-1] - 56.81341256) < 1.5E-9:
-        #    breakpoint()
+        # if (
+        #     results.e
+        #     and results.e[-1].index == 19
+        #     and np.abs(results.t[-1] - 56.81341256) < 1.5e-9
+        # ):
+        #     breakpoint()
 
         # if any sign change, return -1. maybe could determine rootinfo here?
         new_gs = system.events(t, x)
@@ -115,8 +120,10 @@ class SolverSciPyBase(SolverMixin):
 
         for g_idx, g_sign in enumerate(gs_sign):
             if g_sign:
+
                 def find_function(t):
-                    return g_spl(t)[g_idx]
+                    return g_spl(t)[g_idx]  # noqa: B023 false positive
+
                 set_t = brentq(
                     find_function,
                     spline_ts[-2],
@@ -194,8 +201,12 @@ class SolverSciPyBase(SolverMixin):
                 # == 1: #equivalent to tstop
                 # == 2: #equivalent to rootfound
 
-                # if len(results.t) > 10 and np.abs(solver.t - next_t) < 1E-13 and solver.t != next_t:
-                #    breakpoint()
+                # if (
+                #     len(results.t) > 10
+                #     and np.abs(solver.t - next_t) < 1e-13
+                #     and solver.t != next_t
+                # ):
+                #     breakpoint()
 
                 if np.any(self.rootinfo):
                     rootsfound = self.rootinfo
@@ -207,11 +218,6 @@ class SolverSciPyBase(SolverMixin):
                     rootsfound = (gs == min_e).astype(int)
 
                 idx = len(results.t)
-                # had to do some debugging and figured out a decent pattern for conditional
-                # breakpoints... TODO move to notes or something?
-                # if idx == 19 and isinstance(system, AdjointSystem) and np.abs(next_t - 56.81341256) < 1.5E-9:#:21 and results.e[-1].index == 19:
-                ##if idx == 21 and results.e[-1].index == 19:
-                #    breakpoint()
                 results.e.append(Root(idx, rootsfound))
                 next_x = system.update(
                     results.t[-1],
@@ -294,7 +300,7 @@ class SolverCVODE(SolverMixin):
     ):  # userdata=None,):
         xdot[:] = self.system.dots(t, x)
 
-    def jac(self, t, x, xdot, jac):  #
+    def jac(self, t, x, xdot, jac):
         jac[...] = self.system.jac(t, x)
 
     def events(self, t, x, g):
@@ -463,10 +469,7 @@ class TimeGeneratorFromSlices:
             time_slice.set_p(p)
 
         t = -self.direction * np.inf
-        if self.direction > 0:
-            get_time = min
-        else:
-            get_time = max
+        get_time = min if self.direction > 0 else max
         while True:
             next_times = [time_slice(t) for time_slice in self.time_slices]
             t = get_time(next_times)
@@ -700,11 +703,12 @@ class ResultInterpolant:
 
         if self.interpolants is None:
             # TODO figure out how to combine (and possibly reverse direction) state and
-            # parameter jacobian of state equation to reduce number of calls (and distance
-            # at each call), since this is potentially most expensive call -- I guess only
-            # if the ODE depends on inner-loop solver? then split
+            # parameter jacobian of state equation to reduce number of calls (and
+            # distance at each call), since this is potentially most expensive call -- I
+            # guess only if the ODE depends on inner-loop solver? then split
             # coefficients
-            # --> then also combine e.g., adjoint forcing function and jacobian interpolant
+            # --> then also combine e.g., adjoint forcing function and jacobian
+            # interpolant
 
             # expect integrand-term related functions to be cheap functions of state
             # point-wise along trajectory
@@ -755,7 +759,8 @@ class ResultInterpolant:
                         ts = ts[:idx] + ts[idx + 1 :]
                         coefs = coefs[:idx] + coefs[idx + 1 :]
                         print(
-                            f"stripping non-decreasing {ts[idx]} -- creating result interpolant"
+                            f"stripping non-decreasing {ts[idx]} -- creating result "
+                            "interpolant"
                         )
 
                     try:
@@ -787,8 +792,7 @@ class ResultInterpolant:
         return self.interpolants[interval_idx](t)
 
     def __iter__(self):
-        for interp_segment in self.interpolants:
-            yield interp_segment
+        yield from self.interpolants
 
 
 @dataclass
@@ -896,8 +900,8 @@ class AdjointSystem(System):
                         te,
                         xtem,
                     )
-                    dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
-                    lamda_tem = (dh_dx.T - dte_dxT @ (dh_dx @ ftem).T) @ last_lamda
+                    dte_dx_tr = self.dte_dxs[event_channel](p, te, xtem).T
+                    lamda_tem = (dh_dx.T - dte_dx_tr @ (dh_dx @ ftem).T) @ last_lamda
                     last_lamda = lamda_tem
             else:
                 for event_channel in active_update_idxs[::-1]:
@@ -906,9 +910,9 @@ class AdjointSystem(System):
                         te,
                         xtem,
                     )
-                    dte_dxT = self.dte_dxs[event_channel](p, te, xtem).T
+                    dte_dx_tr = self.dte_dxs[event_channel](p, te, xtem).T
                     lamda_tem = (
-                        dh_dx.T - dte_dxT @ (ftep - dh_dx @ ftem).T
+                        dh_dx.T - dte_dx_tr @ (ftep - dh_dx @ ftem).T
                     ) @ last_lamda
                     last_lamda = lamda_tem
         else:
@@ -1092,8 +1096,8 @@ class SweepingGradientMethod:
                 p_integrand_p_param_interp.interpolants,
             ):
                 # compute discontinuous portion of gradient associated with each event
-                # integrate continuous portion of gradient corresponding to pre/suc-ceding
-                # segment
+                # integrate continuous portion of gradient corresponding to
+                # pre/suc-ceding segment
                 adjoint_time_data = adjoint_result.t[
                     adjoint_segment.idx0 : adjoint_segment.idx1
                 ][::-1]
@@ -1186,43 +1190,38 @@ class SweepingGradientMethod:
 
         return np.stack(jac_rows, axis=0)
 
+
 class TrajectoryAnalysisSGM:
     def __init__(
-        self, 
+        self,
         state_system,
-
-
         # to construct a trajectoryanlysis
         # need at least one of integrand and terminal terms
         integrand_terms=None,
         terminal_terms=None,
-
         # args for adjoint system
         dte_dxs=None,
         dh_dxs=None,
         state_jac=None,
         # for adjoint system, can provide here if state_system doesn't have
-
         # adjoint system solver options
         adjoint_solver_class=SolverSciPyDopri5,
         adjoint_atol=1e-12,
         adjoint_rtol=1e-6,
         adjoint_adaptive_max_step_size=False,
         adjoint_max_step_size=0.0,
-
         cache_size=1,
-
         # to construct SweepingGradientMethod
-        p_x0_p_params = None,
-        p_dots_p_params = None,
-        dh_dps = None,
-        dte_dps = None,
-        p_integrand_terms_p_params = None,
-        p_terminal_terms_p_params = None,
-        p_integrand_terms_p_state = None,
-        p_terminal_terms_p_state = None,
+        p_x0_p_params=None,
+        p_dots_p_params=None,
+        dh_dps=None,
+        dte_dps=None,
+        p_integrand_terms_p_params=None,
+        p_terminal_terms_p_params=None,
+        p_integrand_terms_p_state=None,
+        p_terminal_terms_p_state=None,
     ):
-        if cache_size >1:
+        if cache_size > 1:
             raise NotImplementedError
         self.cache_size = cache_size
 
@@ -1230,15 +1229,12 @@ class TrajectoryAnalysisSGM:
         self.cached_output = None
 
         self.state_system = state_system
-        self.trajectory_analysis = TrajectoryAnalysis(
-            integrand_terms, terminal_terms
-        )
+        self.trajectory_analysis = TrajectoryAnalysis(integrand_terms, terminal_terms)
 
         if state_jac is None:
             if state_system._jac is None:
-                raise ValueError(
-                    "must provide state jacobian through state_system.jac or state_jac"
-                )
+                msg = "must provide state jacobian via state_system.jac or state_jac"
+                raise ValueError(msg)
             state_jac = state_system._jac
 
         self.adjoint_system = AdjointSystem(
@@ -1264,7 +1260,6 @@ class TrajectoryAnalysisSGM:
             p_integrand_terms_p_state=p_integrand_terms_p_state,
         )
 
-
     def function(self, p):
         if self.cached_p is None or not np.all(self.cached_p == p):
             self.cached_p = p
@@ -1276,5 +1271,3 @@ class TrajectoryAnalysisSGM:
         if self.cached_p is None or not np.all(self.cached_p == p):
             _ = self.function(p)
         return self.sweeping_gradient_method(self.res)
-
-

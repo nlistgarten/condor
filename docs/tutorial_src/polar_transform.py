@@ -4,7 +4,8 @@ Polar Transformation
 =========================
 """
 # %%
-# As another example, if we were interested in transforming Cartesian coordinates to polar form:
+# As another example, if we were interested in transforming Cartesian coordinates to
+# polar form:
 #
 # .. math::
 #    \begin{align}
@@ -17,13 +18,15 @@ Polar Transformation
 
 import condor as co
 from condor.backend import operators as ops
+
+
 class PolarTransform(co.ExplicitSystem):
     x = input()
     y = input()
 
     output.r = ops.sqrt(x**2 + y**2)
-    #output.theta = ops.atan2(y, x)
-    output.theta = ops.atan(y/x)
+    # output.theta = ops.atan2(y, x)
+    output.theta = ops.atan(y / x)
 
 
 # %%
@@ -61,7 +64,7 @@ print(PolarTransform(x=1, y=0).output.asdict())
 # numerically solve this algebraic system of equations using an ``AlgebraicSystem`` by
 # declaring the input radius and angle as ``parameter``\s and the solving variables for
 # :math:`x` and :math:`y`. Mathematically, we are defining the system of algebraic
-# equations 
+# equations
 #
 # .. math::
 #    r &= p_r (x^*, y^*) \\
@@ -69,6 +72,7 @@ print(PolarTransform(x=1, y=0).output.asdict())
 #
 # and letting an iterative solver find the solution :math:`x^*,y^*` satisfying both
 # residual equations given parameters :math:`r` and :math:`\theta`. In Condor,
+
 
 class CartesianTransform(co.AlgebraicSystem):
     # r and theta are input parameters
@@ -115,12 +119,11 @@ print(out.variable)
 
 # %%
 # An additional :attr:`warm_start` attribute determines whether the initializer is
-# over-wrriten. Since the default is true, we can inspect the initializer values, 
+# over-wrriten. Since the default is true, we can inspect the initializer values,
 
 print(CartesianTransform.x.initializer, CartesianTransform.y.initializer)
 
 # %%
 # and re-solve with attr:`warm_start` False
 
-CartesianTransform.y.warm_start = False 
-
+CartesianTransform.y.warm_start = False

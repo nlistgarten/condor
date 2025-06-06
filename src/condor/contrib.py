@@ -8,11 +8,10 @@ import numpy as np
 
 from condor.backend import (
     expression_to_operator,
+    is_constant,
     process_relational_element,
-    is_constant
 )
-
-from condor.backend.operators import (if_else, substitute)
+from condor.backend.operators import if_else, substitute
 from condor.fields import (
     AssignedField,
     BoundedAssignmentField,
@@ -59,11 +58,12 @@ class ExplicitSystem(ModelTemplate):
        y_m &=& f_m(x_1, x_2, \dots, x_n)
        \end{align}
 
-    where each :math:`y_i` is a name-assigned expression on the ``output`` field and each
-    :math:`x_i` is an element drawn from the ``input`` field.
+    where each :math:`y_i` is a name-assigned expression on the ``output`` field and
+    each :math:`x_i` is an element drawn from the ``input`` field.
 
     Each :math:`x_i` and :math:`y_j` may have arbitrary shape. Condor can automatically
-    calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers, etc.
+    calculate the derivatives :math:`\frac{dy_j}{dx_i}` as needed for parent solvers,
+    etc.
     """
 
     #: the inputs of the model (e.g., :math:`x_i`)
@@ -128,9 +128,11 @@ class AlgebraicSystem(ModelTemplate, model_metaclass=AlgebraicSystemType):
         for k, v in kwargs.items():
             var = getattr(cls, k)
             if var.field_type is not cls.variable:
-                raise ValueError(
-                    "Use set initial to set the initialier for variables, attempting to set {k}"
+                msg = (
+                    "Use set initial to set the initialier for variables, attempting "
+                    f"to set {k}"
                 )
+                raise ValueError(msg)
             var.initializer = v
 
 
@@ -156,7 +158,6 @@ class OptimizationProblemType(ModelType):
 
             if re_append_elem:
                 new_cls.constraint._elements.append(elem)
-
 
     @classmethod
     def bind_model_fields(cls, new_cls, attrs):
@@ -222,9 +223,11 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
         for k, v in kwargs.items():
             var = getattr(cls, k)
             if var.field_type is not cls.variable:
-                raise ValueError(
-                    "Use set initial to set the initialier for variables, attempting to set {k}"
+                msg = (
+                    "Use set initial to set the initialier for variables, attempting "
+                    f"to set {k}"
                 )
+                raise ValueError(msg)
             var.initializer = v
 
     @classmethod
@@ -244,7 +247,8 @@ class OptimizationProblem(ModelTemplate, model_metaclass=OptimizationProblemType
             setattr(self, elem.name, val)
 
         if kwargs:
-            raise ValueError(f"Extra arguments provided: {kwargs}")
+            msg = f"Extra arguments provided: {kwargs}"
+            raise ValueError(msg)
 
         self.input_kwargs = parameters
         self.parameter = cls.parameter._dataclass(**parameters)
@@ -306,8 +310,8 @@ class ODESystem(ModelTemplate):
 
     make - set control a value/computation. Or `let`?
 
-    note: no time-varying input to system. Assume dynamicsmodels "pull" what they need 
-    from other models. 
+    note: no time-varying input to system. Assume dynamicsmodels "pull" what they need
+    from other models.
     Need to augment state with "pulled" dynamicsmodels
     But do need a "control" that could be defined based on mode? automatically added to
     output? or is it always just a placeholder for functional space gradient?
@@ -339,10 +343,10 @@ class ODESystem(ModelTemplate):
 
     """
 
-    # TODO: indepdent var  needs its own descriptor type? OR do we want user classes to do
-    # t = DynamicsModel.independent_variable ? That would allow leaving it like this and
-    # consumers still know what it is
-    # or just set it to t and always use it? trying this way...
+    # TODO: indepdent var  needs its own descriptor type? OR do we want user classes to
+    # do t = DynamicsModel.independent_variable ? That would allow leaving it like this
+    # and consumers still know what it is or just set it to t and always use it? trying
+    # this way...
 
     # TODO: Are initial conditions an attribute of the dynamicsmodel or the trajectory
     # analysis that consumes it?
@@ -364,8 +368,8 @@ class ODESystem(ModelTemplate):
     # specification so adjoint gradients could get computed??
 
     # TODO: combine all events if functions are the same? maybe that happens
-    # automatically and that's okay. Needs the new events API (mimicking sundials) to happen
-    # --> VERIFY that SGM works correctly? Would require non-conflicting update
+    # automatically and that's okay. Needs the new events API (mimicking sundials) to
+    # happen --> VERIFY that SGM works correctly? Would require non-conflicting update
     # functions
 
     # TODO: inside another model, the callback gets captured into the "expression" and
@@ -453,14 +457,11 @@ class TrajectoryAnalysisMetaData(SubmodelMetaData):
 
 class TrajectoryAnalysisType(SubmodelType):
     """Handle kwargs for including/excluding events (also need to include/exlcude
-        modes?), injecting bound events (event functions, updates) to model, etc.
+    modes?), injecting bound events (event functions, updates) to model, etc.
 
-        A common use case will be to bind the parameters then only update the state...
+    A common use case will be to bind the parameters then only update the state...
 
 
-    |                           |------------+-----------------------+----------------------|
-
-    |                           |            | constraint            |                      |
     """
 
     metadata_class = TrajectoryAnalysisMetaData
@@ -477,7 +478,8 @@ class TrajectoryAnalysisType(SubmodelType):
     ):
         cls_dict = super().__prepare__(*args, **kwargs)
         if exclude_events is not None and include_events is not None:
-            raise ValueError("Use only one of include or exclude events")
+            msg = "Use only one of include or exclude events"
+            raise ValueError(msg)
 
         if include_events is None:
             cls_dict.meta.events = list(cls_dict.meta.primary.Event)
@@ -490,7 +492,8 @@ class TrajectoryAnalysisType(SubmodelType):
             ]
 
         if exclude_modes is not None and include_modes is not None:
-            raise ValueError("Use only one of include or exclude modes")
+            msg = "Use only one of include or exclude modes"
+            raise ValueError(msg)
 
         if include_modes is None:
             cls_dict.meta.modes = list(cls_dict.meta.primary.Mode)
@@ -516,13 +519,11 @@ class TrajectoryAnalysisType(SubmodelType):
         new_cls = super().__new__(cls, *args, **kwargs)
         return new_cls
 
-
     @classmethod
     def bind_model_fields(cls, new_cls, attrs):
         super().bind_model_fields(new_cls, attrs)
         p = new_cls.parameter.flatten()
         x = new_cls.state.flatten()
-
 
         ode_model = new_cls._meta.primary
         model = new_cls
@@ -532,37 +533,33 @@ class TrajectoryAnalysisType(SubmodelType):
         for mode in model._meta.modes:
             for act in mode.action:
                 control_subs_pairs[act.match.backend_repr].insert(
-                    -1,
-                    (mode.condition, act.backend_repr)
+                    -1, (mode.condition, act.backend_repr)
                 )
         control_sub_expression = {}
         for k, v in control_subs_pairs.items():
-            control_sub_expression[k] = substitute(
-                if_else(*v), control_sub_expression
-            )
+            control_sub_expression[k] = substitute(if_else(*v), control_sub_expression)
 
         new_cls._meta.initial_condition_function = expression_to_operator(
             [p],
             substitute(new_cls.initial.flatten(), control_sub_expression),
-            f"{new_cls.__name__}_initial_condition"
+            f"{new_cls.__name__}_initial_condition",
         )
 
         new_cls._meta.state_equation_function = expression_to_operator(
             [new_cls.t, x, p],
             substitute(new_cls.dot.flatten(), control_sub_expression),
-            f"{new_cls.__name__}_state_equation"
+            f"{new_cls.__name__}_state_equation",
         )
         new_cls._meta.output_equation_function = expression_to_operator(
             [new_cls.t, x, p],
             substitute(new_cls.dynamic_output.flatten(), control_sub_expression),
-            f"{new_cls.__name__}_output_equation"
+            f"{new_cls.__name__}_output_equation",
         )
         new_cls._meta.modal_eval = expression_to_operator(
             [new_cls.t, x, p],
             substitute(new_cls.modal.flatten(), control_sub_expression),
-            f"{new_cls.__name__}_modal_evaluation"
+            f"{new_cls.__name__}_modal_evaluation",
         )
-
 
 
 class TrajectoryAnalysis(
@@ -595,15 +592,12 @@ class TrajectoryAnalysis(
 
     @classmethod
     def initial_condition(cls, *args, **kwargs):
-        """ should initial condition be x0(t, p) not just p?
+        """should initial condition be x0(t, p) not just p?
         bind dynamic output, time, modal? or do point analysis there?
         but maybe still time?
         """
         self = cls._meta.primary.__new__(cls._meta.primary)
-        pp = cls.function_call_to_fields(
-            [cls.parameter],
-            *args, **kwargs
-        )[0]
+        pp = cls.function_call_to_fields([cls.parameter], *args, **kwargs)[0]
         p = pp.flatten()
         self.input_kwargs = pp.asdict()
         x0 = cls._meta.initial_condition_function(p)
@@ -617,8 +611,7 @@ class TrajectoryAnalysis(
         """
         self = cls._meta.primary.__new__(cls._meta.primary)
         xx, pp = cls.function_call_to_fields(
-            [cls.state, cls.parameter],
-            *args, **kwargs
+            [cls.state, cls.parameter], *args, **kwargs
         )
         x = xx.flatten()
         p = pp.flatten()
@@ -634,7 +627,7 @@ class TrajectoryAnalysis(
         self.bind_field(cls.dot.wrap(dot))
         self.bind_field(cls.dynamic_output.wrap(yy))
         self.bind_field(cls.modal.wrap(modals))
-        #self.bind_embedded_models()
+        # self.bind_embedded_models()
         return self
 
         # bind paramaeters, state, call implementation functions (dot, dynamic output)
@@ -652,6 +645,7 @@ class TrajectoryAnalysis(
 # maybe allow creation of new parameters (into ODESystem parameter field), access to
 # state, etc.
 
+
 class EventType(SubmodelType):
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
@@ -662,19 +656,17 @@ class EventType(SubmodelType):
                 check_attr_name(state_elem.name, attr_val, new_cls._meta.primary)
                 setattr(new_cls._meta.primary, state_elem.name, state_elem)
                 new_cls._meta.primary._meta.user_set[state_elem.name] = attr_val
-            else:
-                if primary_attr is not state_elem:
-                    raise NameError(
-                        f"{new_cls} attempting to assign state {attr_name} = {attr_val}"
-                        f" but {new_cls._meta.primary} already has {attr_name} ="
-                        f"{primary_attr}"
-                    )
+            elif primary_attr is not state_elem:
+                msg = (
+                    f"{new_cls} attempting to assign state {attr_name} = {attr_val}"
+                    f" but {new_cls._meta.primary} already has {attr_name} ="
+                    f"{primary_attr}"
+                )
+                raise NameError(msg)
             if state_elem.name != attr_name:
                 super().process_condor_attr(attr_name, attr_val, new_cls)
         else:
             super().process_condor_attr(attr_name, attr_val, new_cls)
-
-
 
 
 class Event(
@@ -769,38 +761,38 @@ class Mode(
     )
 
 
-def LTI(
-    A,
-    B=None,
+def LTI(  # noqa: N802
+    a,
+    b=None,
     dt=0.0,
     dt_plant=False,
     name="LTISystem",
 ):
     attrs = ModelTemplateType.__prepare__(name, (ODESystem,))
-    attrs["A"] = A
+    attrs["a"] = a
     state = attrs["state"]
-    x = state(shape=A.shape[0])
+    x = state(shape=a.shape[0])
     attrs["x"] = x
-    xdot = A @ x
+    xdot = a @ x
     if dt <= 0.0 and dt_plant:
         raise ValueError
 
-    if B is not None:
-        attrs["B"] = B
-        K = attrs["parameter"](shape=B.T.shape)
-        attrs["K"] = K
+    if b is not None:
+        attrs["b"] = b
+        k = attrs["parameter"](shape=b.T.shape)
+        attrs["k"] = k
 
         if dt and not dt_plant:
             # sampled control
-            u = state(shape=B.shape[1])
+            u = state(shape=b.shape[1])
             attrs["u"] = u
-            # attrs["initial"][u] = -K@x
+            # attrs["initial"][u] = -k@x
         else:
             # feedback control matching system
-            u = -K @ x
+            u = -k @ x
             attrs["dynamic_output"].u = u
 
-        xdot += B @ u
+        xdot += b @ u
 
     if not (dt_plant and dt):
         attrs["dot"][x] = xdot
@@ -814,12 +806,12 @@ def LTI(
         if dt_plant:
             from scipy.signal import cont2discrete
 
-            if B is None:
-                B = np.zeros((A.shape[0], 1))
-            Ad, Bd, *_ = cont2discrete((A, B, None, None), dt=dt)
-            dt_attrs["update"][dt_attrs["x"]] = (Ad - Bd @ K) @ x
-        elif B is not None:
-            dt_attrs["update"][dt_attrs["u"]] = -K @ x
+            if b is None:
+                b = np.zeros((a.shape[0], 1))
+            ad, bd, *_ = cont2discrete((a, b, None, None), dt=dt)
+            dt_attrs["update"][dt_attrs["x"]] = (ad - bd @ k) @ x
+        elif b is not None:
+            dt_attrs["update"][dt_attrs["u"]] = -k @ x
             # dt_attrs["update"][dt_attrs["x"]] = x
         SubmodelType(
             "DT",
@@ -848,29 +840,30 @@ class ExternalSolverWrapperType(ModelTemplateType):
     by model sub-types. Could just as easily create decorator or other
     class-method (on Wrapper) that consumes singleton/collection of functions
 
-    IO fields just a nice way to create simple object with IO metadata. 
+    IO fields just a nice way to create simple object with IO metadata.
     """
 
     @classmethod
     def __prepare__(cls, model_name, bases, name="", **kwds):
         log.debug(
-            f"ExternalSolverWrapperType prepare for cls={cls}, model_name={model_name}, bases={bases}, name={name}, kwds={kwds}"
+            f"ExternalSolverWrapperType prepare for cls={cls}, "
+            f"model_name={model_name}, bases={bases}, name={name}, kwds={kwds}"
         )
         if name:
             model_name = name
         sup_dict = super().__prepare__(model_name, bases, **kwds)
-        if cls.baseclass_for_inheritance is not None:
-            if ExternalSolverWrapper in bases:  # should check MRO, I guess?
-                # print("copying IO fields to", model_name)
-                for field_name in ["input", "output"]:
-                    sup_dict[field_name] = copy_field(
-                        model_name, getattr(ExternalSolverWrapper, field_name)
-                    )
+        # TODO should check MRO, I guess?
+        if cls.baseclass_for_inheritance is not None and ExternalSolverWrapper in bases:
+            for field_name in ["input", "output"]:
+                sup_dict[field_name] = copy_field(
+                    model_name, getattr(ExternalSolverWrapper, field_name)
+                )
         return sup_dict
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(self, *args, **kwargs):
         log.debug(
-            f"ExternalSolverWrapperType __call__ for cls={cls}, *args={args}, **kwargs={kwargs}"
+            f"ExternalSolverWrapperType __call__ for cls={self}, *args={args}, "
+            f"**kwargs={kwargs}"
         )
         # gets called on instantiation of the user wrapper, so COULD return the
         # condor model instead of the wrapper class -- perhaps this is more condoric,
@@ -896,7 +889,8 @@ class ExternalSolverWrapper(
 
     def __init_subclass__(cls, singleton=True, **kwargs):
         log.debug(
-            f"ExternalSolverWrapper init subclass, cls={cls}, singleton={singleton}, kwargs={kwargs}"
+            f"ExternalSolverWrapper init subclass, cls={cls}, singleton={singleton}, "
+            f"kwargs={kwargs}"
         )
         # at this point, fields  are already bound by ExternalSolverWrapperType.__new__
         # but modifications AFTER construction can be doen here
@@ -906,7 +900,8 @@ class ExternalSolverWrapper(
 
     def __create_model__(self, *args, condor_model_name="", **kwargs):
         log.debug(
-            f"ExternalSolverWrapper create model self={self}, args={args}, condor_model_name={condor_model_name}, kwargs={kwargs}"
+            f"ExternalSolverWrapper create model self={self}, args={args}, "
+            f"condor_model_name={condor_model_name}, kwargs={kwargs}"
         )
         # print("create model of", self, self.__class__)
         # copy field so that any field modification by __original_init__ is onto the

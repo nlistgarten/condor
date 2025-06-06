@@ -1,5 +1,7 @@
-import condor as co
 import pytest
+
+import condor as co
+
 backend = co.backend
 ops = backend.operators
 
@@ -26,12 +28,12 @@ def test_if_():
     class Check(co.ExplicitSystem):
         catd = input()
         output.emlf = ops.if_else(
-            (catd == 0, 3.8), # normal design FAR Part 23
-            (catd == 1, 4.4), # utility design FAR 23
-            (catd == 2, 6.0), # aerobatic design FAR 23
-            (catd == 3, 2.5), # transports FAR 25
-            (catd > 3, catd), # input design limit load factor
-            1.234 # else
+            (catd == 0, 3.8),  # normal design FAR Part 23
+            (catd == 1, 4.4),  # utility design FAR 23
+            (catd == 2, 6.0),  # aerobatic design FAR 23
+            (catd == 3, 2.5),  # transports FAR 25
+            (catd > 3, catd),  # input design limit load factor
+            1.234,  # else
         )
 
     assert Check(2.2).emlf == 1.234
@@ -39,16 +41,16 @@ def test_if_():
     assert Check(2).emlf == 6.0
     assert Check(12).emlf == 12
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="if_else requires an else_action"):
 
         class Check(co.ExplicitSystem):
             catd = input()
             output.emlf = ops.if_else(
-                (catd == 0, 3.8), # normal design FAR Part 23
-                (catd == 1, 4.4), # utility design FAR 23
-                (catd == 2, 6.0), # aerobatic design FAR 23
-                (catd == 3, 2.5), # transports FAR 25
-                (catd > 3, catd), # input design limit load factor
+                (catd == 0, 3.8),  # normal design FAR Part 23
+                (catd == 1, 4.4),  # utility design FAR 23
+                (catd == 2, 6.0),  # aerobatic design FAR 23
+                (catd == 3, 2.5),  # transports FAR 25
+                (catd > 3, catd),  # input design limit load factor
             )
 
 
@@ -57,7 +59,3 @@ def test_jacobian_empty():
         x = input()
 
     ops.jacobian(TestJacobian.output.flatten(), TestJacobian.input.flatten())
-
-
-
-

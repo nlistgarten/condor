@@ -6,7 +6,10 @@ reports/
 _version.py
 _build/
 build/
-tutorials/
+dist/
+.coverage
+
+# sphinx-gallery outputs
+tutorial/
 howto/
-docs/tutorials/
-docs/howto/
+sg_execution_times.rst

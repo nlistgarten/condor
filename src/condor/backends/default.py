@@ -1,7 +1,7 @@
 """
 vcat/vertcat -- combine multiple backend_symbol
 flatten -- always used in cnojuction with vertcat? to make differently shaped
-           backend_reprs 
+           backend_reprs
 
 vertsplit -- opposite of vertcat
 wrap -- opposite of flatten?
@@ -48,9 +48,9 @@ Or, should the implementations just live in the main backend?
 
 Backend Implementations
 [x] must be able to flatten model symbols to backend arrays,
-[x] wrap backend arrays to model symbol, matching shape -- 
-[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics (if
-different, eg casadi DM) and backend symbols
+[x] wrap backend arrays to model symbol, matching shape --
+[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics
+    (if different, eg casadi DM) and backend symbols
 [ ] ideally, handle special case symmetric and dynamic flags for FreeSymbol and
 [ ] MatchedSymbol if matched to symmetric/diagonal FreeSymbol
 setting the values for outputs and intermediates
@@ -74,7 +74,7 @@ takes advantage of model attributes just like backend implementation
 
 I assume a user model/library code could inject an implementation to the backend?
 not sure how to assign special numeric stuff, probably an submodel class on the model
-based on NPSS discussion it's not really needed if it's done right 
+based on NPSS discussion it's not really needed if it's done right
 
 For injecting a default implementation (e.g., new backend) this does work:
 
@@ -87,4 +87,3 @@ but probably should just figure out hooks to do that? Could create local dict of
 that gets updated with backend.implementations at the top of this file, then libary/user
 code could update it (add/overwrite)
 """
-

@@ -52,15 +52,11 @@ class Settings:
             Module configuration as set by :meth:`get_module`.
         """
         configured_kwargs = {k: self.settings[-1].get(k, defaults[k]) for k in defaults}
-        extra_kwargs = {}
-        for k, v in self.settings[-1].items():
-            if k not in defaults:
-                extra_kwargs[k] = v
+        extra_kwargs = {k: v for k, v in self.settings[-1].items() if k not in defaults}
         if extra_kwargs:
             # TODO warn instead?
-            raise ValueError(
-                "Extra keyword arguments were provided to configuration", extra_kwargs
-            )
+            msg = f"Extra keyword arguments provided to configuration {extra_kwargs}"
+            raise ValueError(msg)
 
         return configured_kwargs
 

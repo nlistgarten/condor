@@ -69,23 +69,24 @@ print(tab_out.output)
 
 from matplotlib import pyplot as plt
 
-eval_x = np.linspace(-1, 1, 100) * np.pi
+eval_x = np.linspace(-1.1, 1.1, 100) * np.pi
 
 fig, ax = plt.subplots(constrained_layout=True)
 for k in [0, 1, 3]:
-    if k == 3:
-        # for cubic polynomial, use constant slope (constant first derivative, 0 second
-        # derivative) boundary condition instead of default not-a-knot (constant,
-        # non-zero, second derivative)
-        bcs = (2, 0)
-    else:
-        # else, use default
-        bcs = (-1, 0)
+    # for cubic polynomial, use constant slope (constant first derivative, 0 second
+    # derivative) boundary condition instead of default not-a-knot (constant, non-zero,
+    # second derivative)
+    bcs = (2, 0) if k == 3 else (-1, 0)
+
     SinTable = condor.TableLookup(data_x, data_y, degrees=k, bcs=bcs)
     y = np.array([SinTable(x).y for x in eval_x]).squeeze()
+
     plt.plot(eval_x, y, label=f"k={k}")
+
 plt.plot(data_x["x"], data_y["y"], "ko")
 plt.plot(eval_x, np.sin(eval_x), "k--", label="true")
+
 plt.grid(True)
 plt.legend()
+
 plt.show()

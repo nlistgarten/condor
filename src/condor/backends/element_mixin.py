@@ -5,7 +5,7 @@ import numpy as np
 """
 vcat/vertcat -- combine multiple backend_symbol
 flatten -- always used in cnojuction with vertcat? to make differently shaped
-           backend_reprs 
+           backend_reprs
 
 vertsplit -- opposite of vertcat
 wrap -- opposite of flatten?
@@ -52,9 +52,9 @@ Or, should the implementations just live in the main backend?
 
 Backend Implementations
 [x] must be able to flatten model symbols to backend arrays,
-[x] wrap backend arrays to model symbol, matching shape -- 
-[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics (if
-different, eg casadi DM) and backend symbols
+[x] wrap backend arrays to model symbol, matching shape --
+[ ] wrap and flatten must handle model numerics (float/numpy array) and backend numerics
+    (if different, eg casadi DM) and backend symbols
 [ ] ideally, handle special case symmetric and dynamic flags for FreeSymbol and
 [ ] MatchedSymbol if matched to symmetric/diagonal FreeSymbol
 setting the values for outputs and intermediates
@@ -78,7 +78,7 @@ takes advantage of model attributes just like backend implementation
 
 I assume a user model/library code could inject an implementation to the backend?
 not sure how to assign special numeric stuff, probably an submodel class on the model
-based on NPSS discussion it's not really needed if it's done right 
+based on NPSS discussion it's not really needed if it's done right
 
 For injecting a default implementation (e.g., new backend) this does work:
 
@@ -99,8 +99,8 @@ class BackendSymbolDataMixin:
     symmetric: bool
     diagonal: bool
     size: int = field(init=False)
-    # TODO: mark size as computed? or replace with @property? can that be trivially cached?
-    # currently computed by actual backend...
+    # TODO: mark size as computed? or replace with @property? can that be trivially
+    # cached? currently computed by actual backend...
 
     def __post_init__(self, *args, **kwargs):
         n = self.shape[0]
@@ -110,10 +110,14 @@ class BackendSymbolDataMixin:
         if self.diagonal:
             size = n
 
-        if self.diagonal:
-            assert size == self.shape[0]
+        if self.diagonal and size != self.shape[0]:
+            msg = f"Diagonal symbol should have size {self.shape[0]}, got {size}"
+            raise ValueError(msg)
         elif self.symmetric:
-            assert len(self.shape) == 2
-            assert self.shape[0] == self.shape[1]
+            if len(self.shape) != 2:
+                msg = f"Symmetric symbol must have dimension 2, got {len(self.shape)}"
+                raise ValueError(msg)
+            if self.shape[0] != self.shape[1]:
+                msg = f"Symmetric symbol must be square, got shape {self.shape}"
+                raise ValueError(msg)
         self.size = size
-

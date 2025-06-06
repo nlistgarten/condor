@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 
 import condor as co
 
@@ -19,6 +19,7 @@ def sellar_system():
 
     return Coupling
 
+
 def test_sellar_solvers(sellar_system):
     out = sellar_system(x=1, z=[5, 2])
 
@@ -32,7 +33,7 @@ def test_sellar_solvers(sellar_system):
 def test_set_initial(sellar_system):
     sellar_system.set_initial(y1=1.1, y2=1.5)
     out = sellar_system(x=1, z=[5.0, 2.0])
-    for _, resid in out.residual.asdict().items():
+    for resid in out.residual.asdict().values():
         assert np.isclose(resid, 0, atol=1e-6)
 
 

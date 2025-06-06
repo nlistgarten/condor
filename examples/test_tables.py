@@ -1,5 +1,6 @@
-import condor as co
 import numpy as np
+
+import condor as co
 
 sig1 = np.array(
     [
@@ -25,7 +26,7 @@ xbbar = np.linspace(0, 1.0, sig1.shape[0])
 xhbar = np.linspace(0, 0.3, sig1.shape[1])
 
 Interp = co.TableLookup(
-    dict(bbar=xbbar, hbar = xhbar),
+    dict(bbar=xbbar, hbar=xhbar),
     dict(sigma=sig1, sigstr=sig2),
     1,
 )
@@ -36,46 +37,95 @@ class MyOpt3(co.OptimizationProblem):
     xx = variable()
     yy = variable()
     interp = Interp(xx, yy)
-    objective = (interp.sigma - 0.2)**2 + (interp.sigstr - .7)**2
+    objective = (interp.sigma - 0.2) ** 2 + (interp.sigstr - 0.7) ** 2
 
     class Casadi(co.Options):
         exact_hessian = False
+
 
 opt3 = MyOpt3()
 
 
 adelfd = np.array(
-    [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 38.0, 40.0, 42.0, 44.0, 50.0, 55.0, 60.0]
+    [
+        0.0,
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        38.0,
+        40.0,
+        42.0,
+        44.0,
+        50.0,
+        55.0,
+        60.0,
+    ]
 )
 # flap angle correction of oswald efficiency factor
 adel6 = np.array(
-    [1.0, 0.995, 0.99, 0.98, 0.97, 0.955, 0.935, 0.90, 0.875, 0.855, 0.83, 0.80, 0.70, 0.54, 0.30]
+    [
+        1.0,
+        0.995,
+        0.99,
+        0.98,
+        0.97,
+        0.955,
+        0.935,
+        0.90,
+        0.875,
+        0.855,
+        0.83,
+        0.80,
+        0.70,
+        0.54,
+        0.30,
+    ]
 )
 # induced drag correction factors
 asigma = np.array(
-    [0.0, 0.16, 0.285, 0.375, 0.435, 0.48, 0.52, 0.55, 0.575, 0.58, 0.59, 0.60, 0.62, 0.635, 0.65]
+    [
+        0.0,
+        0.16,
+        0.285,
+        0.375,
+        0.435,
+        0.48,
+        0.52,
+        0.55,
+        0.575,
+        0.58,
+        0.59,
+        0.60,
+        0.62,
+        0.635,
+        0.65,
+    ]
 )
 
 CDIFlapInterp = co.TableLookup(
     dict(
-        flap_defl = adelfd,
+        flap_defl=adelfd,
     ),
     dict(
-        dCL_flaps_coef = asigma,
-        CDI_factor = adel6,
+        dCL_flaps_coef=asigma,
+        CDI_factor=adel6,
     ),
-    1
+    1,
 )
 
 
-flap_defl = 7.
+flap_defl = 7.0
 cdi_flap_interp = CDIFlapInterp(flap_defl=flap_defl)
 
-input_data = dict(x = np.arange(10)*0.1)
+input_data = dict(x=np.arange(10) * 0.1)
 
 MyInterp = co.TableLookup(
     input_data,
-    dict(y = (input_data["x"]-0.8)**2),
+    dict(y=(input_data["x"] - 0.8) ** 2),
 )
 
 
@@ -87,24 +137,29 @@ class MyOpt(co.OptimizationProblem):
     class Options:
         exact_hessian = False
 
+
 mysol = MyOpt().xx
 
 VDEL3_interp = co.TableLookup(
     dict(
-        flap_span_ratio = [0.0, 0.2, 0.4, 0.6, 0.7, 0.8, 0.9, 1.0],
-        taper_ratio = [0.0, 0.33, 1.0],
+        flap_span_ratio=[0.0, 0.2, 0.4, 0.6, 0.7, 0.8, 0.9, 1.0],
+        taper_ratio=[0.0, 0.33, 1.0],
     ),
-    dict(VDEL3 = np.array([
-            [0.0, 0.0, 0.0],
-            [0.4, 0.28, 0.2],
-            [0.67, 0.52, 0.4],
-            [0.86, 0.72, 0.6],
-            [0.92, 0.81, 0.7],
-            [0.96, 0.88, 0.8],
-            [0.99, 0.95, 0.9],
-            [1.0, 1.0, 1.0],
-    ])),
-    degrees = 1
+    dict(
+        VDEL3=np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [0.4, 0.28, 0.2],
+                [0.67, 0.52, 0.4],
+                [0.86, 0.72, 0.6],
+                [0.92, 0.81, 0.7],
+                [0.96, 0.88, 0.8],
+                [0.99, 0.95, 0.9],
+                [1.0, 1.0, 1.0],
+            ]
+        )
+    ),
+    degrees=1,
 )
 
 VDEL3_interp_obj = VDEL3_interp(flap_span_ratio=0.3, taper_ratio=0.2)
@@ -113,11 +168,10 @@ VDEL3_interp_obj = VDEL3_interp(flap_span_ratio=0.3, taper_ratio=0.2)
 class MyOpt2(co.OptimizationProblem):
     xx = variable()
     yy = variable()
-    objective = (VDEL3_interp(flap_span_ratio=xx, taper_ratio=yy).VDEL3 - 0.3)**2
+    objective = (VDEL3_interp(flap_span_ratio=xx, taper_ratio=yy).VDEL3 - 0.3) ** 2
 
     class Casadi(co.Options):
         exact_hessian = False
 
+
 mysol2 = MyOpt2()
-
-

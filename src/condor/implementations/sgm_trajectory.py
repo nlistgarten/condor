@@ -1,16 +1,28 @@
-from .utils import options_to_kwargs
 from enum import Enum, auto
+
+import numpy as np
+
 import condor as co
 import condor.solvers.sweeping_gradient_method as sgm
-import numpy as np
 from condor import backend
-
 from condor.backend import (
-    symbol_class, callables_to_operator, expression_to_operator,
+    callables_to_operator,
+    expression_to_operator,
+    symbol_class,
 )
 from condor.backend.operators import (
-    if_else, substitute, jacobian, concat, inf, sin, pi, mod
+    concat,
+    if_else,
+    inf,
+    jacobian,
+    mod,
+    pi,
+    sin,
+    substitute,
 )
+
+from .utils import options_to_kwargs
+
 
 def get_state_setter(field, signature, on_field=None, subs=None):
     expr = field.flatten(on_field)
@@ -26,7 +38,7 @@ def get_state_setter(field, signature, on_field=None, subs=None):
 
 
 class TrajectoryAnalysis:
-    """ Implementation for :class:`TrajectoryAnalysis` model.
+    """Implementation for :class:`TrajectoryAnalysis` model.
 
     Options
     --------
@@ -50,13 +62,13 @@ class TrajectoryAnalysis:
     """
 
     class Solver(Enum):
-        CVODE = auto() #: currently unsupported
+        CVODE = auto()  #: currently unsupported
         dopri5 = auto()
         dop853 = auto()
 
     def __init__(self, model_instance):
         model = model_instance.__class__
-        model_instance.options_dict=options_to_kwargs(model)
+        model_instance.options_dict = options_to_kwargs(model)
         self.construct(model, **model_instance.options_dict)
         self(model_instance)
 
@@ -99,7 +111,9 @@ class TrajectoryAnalysis:
 
         traj_out_names = model.trajectory_output.list_of("name")
 
-        integrand_terms = [elem.flatten_value(elem.integrand) for elem in model.trajectory_output]
+        integrand_terms = [
+            elem.flatten_value(elem.integrand) for elem in model.trajectory_output
+        ]
         self.traj_out_integrand = model.trajectory_output.flatten("integrand")
         traj_out_integrand_func = expression_to_operator(
             self.simulation_signature,
@@ -107,7 +121,9 @@ class TrajectoryAnalysis:
             f"{model.__name__}_trajectory_output_integrand",
         )
 
-        terminal_terms = [elem.flatten_value(elem.terminal_term) for elem in model.trajectory_output]
+        terminal_terms = [
+            elem.flatten_value(elem.terminal_term) for elem in model.trajectory_output
+        ]
         self.traj_out_terminal_term = model.trajectory_output.flatten("terminal_term")
         traj_out_terminal_term_func = expression_to_operator(
             self.simulation_signature,
@@ -123,19 +139,14 @@ class TrajectoryAnalysis:
         for mode in model._meta.modes:
             for act in mode.action:
                 control_subs_pairs[act.match.backend_repr].insert(
-                    -1,
-                    (mode.condition, act.backend_repr)
+                    -1, (mode.condition, act.backend_repr)
                 )
         control_sub_expression = {}
         for k, v in control_subs_pairs.items():
-            control_sub_expression[k] = substitute(
-                if_else(*v), control_sub_expression
-            )
+            control_sub_expression[k] = substitute(if_else(*v), control_sub_expression)
 
         state_equation_func = get_state_setter(
-            model.dot,
-            self.simulation_signature,
-            subs=control_sub_expression
+            model.dot, self.simulation_signature, subs=control_sub_expression
         )
 
         lamda_jac = jacobian(state_equation_func.expr, self.x).T
@@ -161,7 +172,11 @@ class TrajectoryAnalysis:
         terminating = []
 
         events = [e for e in model._meta.events]
-        if not isinstance(model.tf, (np.ndarray, float)) or not np.isinf(model.tf).any():
+        if (
+            not isinstance(model.tf, (np.ndarray, float))
+            or not np.isinf(model.tf).any()
+        ):
+
             class Terminate(ode_model.Event):
                 at_time = (model.tf,)
                 terminate = True
@@ -173,15 +188,14 @@ class TrajectoryAnalysis:
 
         for event_idx, event in enumerate(events):
             if (event.function is not np.nan) == (event.at_time is not np.nan):
-                raise ValueError(
-                    f"Event class `{event}` has set both `function` and `at_time`"
-                )
+                msg = f"Event class `{event}` has set both `function` and `at_time`"
+                raise ValueError(msg)
             if getattr(event, "function", np.nan) is not np.nan:
                 e_expr = event.function
             else:
                 at_time = event.at_time
                 if hasattr(at_time, "__len__"):
-                    if len(at_time) in [2,3]:
+                    if len(at_time) in [2, 3]:
                         at_time = slice(*tuple(at_time))
                     else:
                         at_time = at_time[0]
@@ -190,16 +204,11 @@ class TrajectoryAnalysis:
                     if at_time.step is None:
                         raise ValueError
 
-                    if at_time.start is not None:
-                        at_time_start = at_time.start
-                    else:
-                        at_time_start = 0
+                    at_time_start = 0 if at_time.start is None else at_time.start
 
                     e_expr = (
                         at_time.step
-                        * sin(
-                            pi * (model.t - at_time_start) / at_time.step
-                        )
+                        * sin(pi * (model.t - at_time_start) / at_time.step)
                         / (pi * 100)
                     )
                     # self.events(solver_res.values.t, solver_res.values.y, gs)
@@ -220,7 +229,16 @@ class TrajectoryAnalysis:
                         e_expr = e_expr * (model.t <= at_time.stop)
                         # if there is an end-time, hold constant to prevent additional
                         # zero crossings -- hopefully works even if stop is on an event
-                        # post_term = (ode_model.t >= at_time.stop) * at_time.step*casadi.sin(casadi.pi*(at_time.stop-at_time_start)/at_time.step)/casasadi.pi
+                        # post_term = (
+                        #     (ode_model.t >= at_time.stop)
+                        #     * at_time.step
+                        #     * casadi.sin(
+                        #         casadi.pi
+                        #         * (at_time.stop - at_time_start)
+                        #         / at_time.step
+                        #     )
+                        #     / casasadi.pi
+                        # )
                         post_term = (model.t >= at_time.stop) * mod(
                             at_time.stop - at_time_start, at_time.step
                         )
@@ -269,7 +287,7 @@ class TrajectoryAnalysis:
             h_expr = get_state_setter(
                 event.update,
                 self.simulation_signature,
-                on_field = model.state,
+                on_field=model.state,
                 subs=control_sub_expression,
             )
             self.h_exprs.append(h_expr)
@@ -284,7 +302,6 @@ class TrajectoryAnalysis:
                 solver_class = sgm.SolverSciPyDop853
             set_solvers.append(solver_class)
         state_solver_class, adjoint_solver_class = set_solvers
-
 
         if len(model.dynamic_output):
             self.y_expr = model.dynamic_output.flatten()
@@ -319,8 +336,6 @@ class TrajectoryAnalysis:
             solver_class=state_solver_class,
         )
         self.at_time_slices = at_time_slices
-
-
 
         self.p_state0_p_p_expr = jacobian(self.state0.expr, self.p)
 
@@ -371,8 +386,7 @@ class TrajectoryAnalysis:
         )
 
         state_integrand_jacs = [
-            jacobian(integrand_term, self.x).T
-            for integrand_term in integrand_terms
+            jacobian(integrand_term, self.x).T for integrand_term in integrand_terms
         ]
         state_integrand_jac_funcs = [
             expression_to_operator(
@@ -384,8 +398,7 @@ class TrajectoryAnalysis:
         ]
 
         param_integrand_jacs = [
-            jacobian(integrand_term, self.p).T
-            for integrand_term in integrand_terms
+            jacobian(integrand_term, self.p).T for integrand_term in integrand_terms
         ]
         param_integrand_jac_funcs = [
             expression_to_operator(
@@ -418,44 +431,43 @@ class TrajectoryAnalysis:
             dh_dx = jacobian(h_expr.expr, self.x)
             dh_dp = jacobian(h_expr.expr, self.p)
 
-            """
-            te = ode_model.t
+            # te = ode_model.t
 
-            xtem = self.x
-            xtep = h_expr(self.p, te, xtem)
+            # xtem = self.x
+            # xtep = h_expr(self.p, te, xtem)
 
-            ftem = state_equation_func(self.p, te, xtem)
-            ftep = state_equation_func(self.p, te, xtep)
-            delta_fs = ftep - ftem
-            delta_xs = xtep - xtem
+            # ftem = state_equation_func(self.p, te, xtem)
+            # ftep = state_equation_func(self.p, te, xtep)
+            # delta_fs = ftep - ftem
+            # delta_xs = xtep - xtem
 
-            lamda_tep = self.lamda
-            eyen = casadi.MX.eye(lamda_tep.shape[0])
-            lamda_tem = (( eyen + dte_dx.T @ ftem.T) @  dh_dx.T - dte_dx.T @ ftep.T )@ lamda_tep
+            # lamda_tep = self.lamda
+            # eyen = casadi.MX.eye(lamda_tep.shape[0])
+            # lamda_tem = (
+            #     (eyen + dte_dx.T @ ftem.T) @ dh_dx.T - dte_dx.T @ ftep.T
+            # ) @ lamda_tep
 
-            delta_lamdas = (lamda_tem - lamda_tep)
+            # delta_lamdas = lamda_tem - lamda_tep
 
-            # TODO update for forcing function
-            lamda_dot_tem = -state_dot_jac_func(self.p, te, xtem).T @ lamda_tem
-            lamda_dot_tep = -state_dot_jac_func(self.p, te, xtep).T @ lamda_tep
+            # # TODO update for forcing function
+            # lamda_dot_tem = -state_dot_jac_func(self.p, te, xtem).T @ lamda_tem
+            # lamda_dot_tep = -state_dot_jac_func(self.p, te, xtep).T @ lamda_tep
 
-            delta_lamda_dots = (lamda_dot_tem - lamda_dot_tep)
+            # delta_lamda_dots = lamda_dot_tem - lamda_dot_tep
 
-            jac_update = (
-                lamda_tep.T @ dh_dp
-                - lamda_tep.T @ ( ftep - dh_dx @ ftem ) @ dte_dp 
-            )
+            # jac_update = (
+            #     lamda_tep.T @ dh_dp - lamda_tep.T @ (ftep - dh_dx @ ftem) @ dte_dp
+            # )
 
-            jac_update = substitute(jac_update, control_sub_expression)
+            # jac_update = substitute(jac_update, control_sub_expression)
 
-            self.jac_updates.append(
-                casadi.Function(
-                    f"{event.__name__}_jac_update",
-                    self.adjoint_signature,
-                    [jac_update],
-                )
-            )
-            """
+            # self.jac_updates.append(
+            #     casadi.Function(
+            #         f"{event.__name__}_jac_update",
+            #         self.adjoint_signature,
+            #         [jac_update],
+            #     )
+            # )
 
             dte_dx = substitute(dte_dx, control_sub_expression)
             self.dte_dxs.append(
@@ -492,20 +504,17 @@ class TrajectoryAnalysis:
             self.dh_dps[-1].expr = dh_dp
 
         self.trajectory_analysis_sgm = sgm.TrajectoryAnalysisSGM(
-            state_system = self.state_system,
+            state_system=self.state_system,
             integrand_terms=traj_out_integrand_func,
             terminal_terms=traj_out_terminal_term_func,
-
             dte_dxs=self.dte_dxs,
             dh_dxs=self.dh_dxs,
             state_jac=state_dot_jac_func,
-
             adjoint_atol=adjoint_atol,
             adjoint_rtol=adjoint_rtol,
             adjoint_adaptive_max_step_size=adjoint_adaptive_max_step_size,
             adjoint_max_step_size=adjoint_max_step_size,
             adjoint_solver_class=adjoint_solver_class,
-
             p_x0_p_params=p_state0_p_p,
             p_dots_p_params=param_dot_jac_func,
             dh_dps=self.dh_dps,
@@ -522,15 +531,16 @@ class TrajectoryAnalysis:
         ]
 
         self.callback = callables_to_operator(
-            wrapper_funcs, self, jacobian_of=None,
-            input_symbol = self.p,
-            output_symbol = self.traj_out_expr,
+            wrapper_funcs,
+            self,
+            jacobian_of=None,
+            input_symbol=self.p,
+            output_symbol=self.traj_out_expr,
         )
         self.callback.construct()
 
         if not self.can_sgm:
             return
-
 
     def __call__(self, model_instance):
         self.callback.from_implementation = True
@@ -562,8 +572,3 @@ class TrajectoryAnalysis:
                 self.out,
             )
         )
-
-
-
-
-

@@ -1,5 +1,6 @@
-import condor as co
 import pytest
+
+import condor as co
 from condor.backend.operators import exp
 
 # TODO test from_values

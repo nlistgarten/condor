@@ -2,10 +2,12 @@
 Shim module for operators, extending the array API standard with several calculus
 operators
 """
+
 from ._get_backend import get_backend
+
 backend_mod = get_backend()
 # operators should be...
-# ~ array API 
+# ~ array API
 #   algebra and trig binary/unary ops
 #   set reduction: (f)min/max, sum??
 #   limited manipulation: concat, stack, split?, reshape?
@@ -22,37 +24,41 @@ backend_mod = get_backend()
 #    - NOT callable/expression to operator
 
 # constants
-pi = backend_mod.operators.pi #: constant pi
-inf = backend_mod.operators.inf #: constant inf
-nan = backend_mod.operators.nan #: constant nan
+pi = backend_mod.operators.pi  #: constant pi
+inf = backend_mod.operators.inf  #: constant inf
+nan = backend_mod.operators.nan  #: constant nan
 
 # calculus & symbolic
-jacobian = backend_mod.operators.jacobian #: create dense jacobian expression
-if_else = backend_mod.operators.if_else #: function for creating 
+jacobian = backend_mod.operators.jacobian  #: create dense jacobian expression
+if_else = backend_mod.operators.if_else  #: function for creating
 substitute = backend_mod.operators.substitute
 
 # creation functions
 zeros = backend_mod.operators.zeros
 eye = backend_mod.operators.eye
 ones = backend_mod.operators.ones
-diag = backend_mod.operators.diag # possibly not part of array API?
+diag = backend_mod.operators.diag  # possibly not part of array API?
 
 # "manipulation functions"
 concat = backend_mod.operators.concat
-#stack?
+# stack?
 unstack = backend_mod.operators.unstack
+
 
 # "element-wise functions"
 def wrap(f):
-    """ wrap function :attr:`f` to allow elements, symbolic, and numeric values to be
-    usable """
+    """wrap function :attr:`f` to allow elements, symbolic, and numeric values to be
+    usable"""
+
     def _(*args, **kwargs):
         new_args = [getattr(arg, "backend_repr", arg) for arg in args]
         new_kwargs = {k: getattr(v, "backend_repr", v) for k, v in kwargs.items()}
         return f(*new_args, **new_kwargs)
+
     return _
 
-min = wrap(backend_mod.operators.min) #: array API standard for min
+
+min = wrap(backend_mod.operators.min)  #: array API standard for min
 max = wrap(backend_mod.operators.max)
 mod = wrap(backend_mod.operators.mod)
 
@@ -70,4 +76,3 @@ sqrt = wrap(backend_mod.operators.sqrt)
 
 vector_norm = wrap(backend_mod.operators.vector_norm)
 solve = wrap(backend_mod.operators.solve)
-

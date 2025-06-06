@@ -1,9 +1,11 @@
-import numpy as np
-import condor as co
-import casadi as ca
+import sys
 
+import casadi as ca
+import numpy as np
+from LinCovCW import I3, I6, Z3, Z6, LinCovCW, make_burn, make_sim
+
+import condor as co
 from condor.backends.casadi.implementations import OptimizationProblem
-from LinCovCW import LinCovCW, make_burn, I3, Z3, I6, Z6, make_sim
 
 
 class Terminate(LinCovCW.Event):
@@ -11,8 +13,9 @@ class Terminate(LinCovCW.Event):
     terminate_time = parameter()
     # TODO: how to make a symbol like this just provide the backend repr? or is this
     # correct?
-    #function = t - terminate_time
-    at_time = terminate_time,
+    # function = t - terminate_time
+    at_time = (terminate_time,)
+
 
 class Measurements(LinCovCW.Event):
     rcal = parameter(shape=3)
@@ -29,30 +32,33 @@ class Measurements(LinCovCW.Event):
     update[P] = Acalhat @ P @ Acalhat.T + Khat @ Rcalhat @ Khat.T
 
     M01 = Khat @ Hcal
-    M = ca.vertcat( ca.horzcat(I6, Z6), ca.horzcat(M01, Acalhat) )
+    M = ca.vertcat(ca.horzcat(I6, Z6), ca.horzcat(M01, Acalhat))
     N = ca.vertcat(Z3, Z3, Khat)
     update[C] = M @ C @ M.T + N @ Rcal @ N.T
 
-    #update[Delta_v_disp] = Delta_v_disp# + ca.sqrt(sigma_Dv__2)
-    #update[Delta_v_mag] = Delta_v_mag# + ca.sqrt(sigma_Dv__2)
-    #update[x] = x
+    # update[Delta_v_disp] = Delta_v_disp# + ca.sqrt(sigma_Dv__2)
+    # update[Delta_v_mag] = Delta_v_mag# + ca.sqrt(sigma_Dv__2)
+    # update[x] = x
 
     meas_dt = parameter()
     meas_t_offset = parameter()
 
-    #function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
-    #function = meas_dt*ca.sin(np.pi*(t-meas_t_offset)/meas_dt)/np.pi
-    #function = t - meas_t_offset
+    # function = ca.sin(np.pi*(t-meas_t_offset)/meas_dt)
+    # function = meas_dt*ca.sin(np.pi*(t-meas_t_offset)/meas_dt)/np.pi
+    # function = t - meas_t_offset
     at_time = slice(meas_t_offset, None, meas_dt)
 
 
 def add_measurement_params(kwargs):
-    kwargs.update(dict(
-        scalhat_w=kwargs['scal_w'],
-        scalhat_v=kwargs['scal_v'],
-        rcalhat=kwargs['rcal'],
-        initial_P=kwargs['initial_C'][-6:, -6:] - kwargs['initial_C'][:6, :6],
-    ))
+    kwargs.update(
+        dict(
+            scalhat_w=kwargs["scal_w"],
+            scalhat_v=kwargs["scal_v"],
+            rcalhat=kwargs["rcal"],
+            initial_P=kwargs["initial_C"][-6:, -6:] - kwargs["initial_C"][:6, :6],
+        )
+    )
+
 
 def make_C0(pos_disp, vel_disp, nav_pos_err=None, nav_vel_err=None):
     if nav_pos_err is None:
@@ -61,7 +67,9 @@ def make_C0(pos_disp, vel_disp, nav_pos_err=None, nav_vel_err=None):
         nav_vel_err = vel_disp
     D0 = np.diag(np.r_[pos_disp, vel_disp])
     P0 = np.diag(np.r_[nav_pos_err, nav_vel_err])
-    return np.block([[D0, D0], [D0, D0+P0]])
+    return np.block([[D0, D0], [D0, D0 + P0]])
+
+
 """
 recreating Geller_RobustTrajectoryDesign
 
@@ -77,83 +85,93 @@ and can be easily added to the problem formulation in the future.
 """
 mu_earth = 3.986_004e14
 r_earth_km = 6_378.1
-alt_km = 400.
-r_orbit_m = (r_earth_km+alt_km)*1E3
+alt_km = 400.0
+r_orbit_m = (r_earth_km + alt_km) * 1e3
 
 base_kwargs = dict(
-    omega = np.sqrt(mu_earth/((r_orbit_m)**3)),
-    meas_dt = 10.,
-    meas_t_offset = 1.
+    omega=np.sqrt(mu_earth / ((r_orbit_m) ** 3)), meas_dt=10.0, meas_t_offset=1.0
 )
 
-scenario_1_target = [-200., 0., 0.]
+scenario_1_target = [-200.0, 0.0, 0.0]
 scenario_1_kwargs = dict(
     #  (0 km; −10 km; 0.2 km; 0 m∕s; 0 m∕s; 0 m∕s)
-    # The initial relative states (radial, along-track, and cross-track) are 
+    # The initial relative states (radial, along-track, and cross-track) are
     # x0 (0 km; −10 km; 0.2 km; 0 m∕s; 0 m∕s; 0 m∕s), and the desired final relative
     # states are xf (0 km;−0.2 km;0 km;0 m∕s;0 m∕s;0 m∕s)
-
     # CW frame in meters:
     # x is down-track with -x behind, +x in front
     # y is cross-track,
     # z altitude with +z below, -z above
-    initial_x=[-10_000., 200, 0., 0., 0., 0.,],
+    initial_x=[
+        -10_000.0,
+        200,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ],
 )
 
-scenario_2_target = [200., 0., 0.]
+scenario_2_target = [200.0, 0.0, 0.0]
 scenario_2_kwargs = dict(
-    #The initial relative states (radial, along-track, and cross- track) are x0
-    # (1 km; 10 km; 0.2 km; 0 m∕s; −1.7 m∕s; 0.2 m∕s, and the desired final relative 
-    # states are xf (0 km; 0.2 km; 0 km; 0 m∕s; 0 m∕s; 0 m∕s). 
-    initial_x=[10_000., 200., 1_000., 1.71, 0., 0.,],
+    # The initial relative states (radial, along-track, and cross- track) are x0
+    # (1 km; 10 km; 0.2 km; 0 m∕s; −1.7 m∕s; 0.2 m∕s, and the desired final relative
+    # states are xf (0 km; 0.2 km; 0 km; 0 m∕s; 0 m∕s; 0 m∕s).
+    initial_x=[
+        10_000.0,
+        200.0,
+        1_000.0,
+        1.71,
+        0.0,
+        0.0,
+    ],
 )
 
 low_cost_kwargs = dict(
-    scal_w=[0.]*6,
-    initial_C=make_C0([1000.]*3, [1]*3),
+    scal_w=[0.0] * 6,
+    initial_C=make_C0([1000.0] * 3, [1] * 3),
     # measurement error
-    rcal=[10.]*3,
+    rcal=[10.0] * 3,
     # control variance
-    scal_v=[0.1]*3,
+    scal_v=[0.1] * 3,
 )
 add_measurement_params(low_cost_kwargs)
 
 
 nominal_kwargs = dict(
-    scal_w=[0.]*6,
-    initial_C=make_C0([100.]*3, [0.1]*3),
+    scal_w=[0.0] * 6,
+    initial_C=make_C0([100.0] * 3, [0.1] * 3),
     # measurement error
-    rcal=[1.]*3,
+    rcal=[1.0] * 3,
     # control variance
-    scal_v=[0.01]*3,
+    scal_v=[0.01] * 3,
 )
 add_measurement_params(nominal_kwargs)
 
 
 high_cost_kwargs = dict(
-    scal_w=[0.]*6,
-    initial_C=make_C0([10.]*3, [.01]*3),
+    scal_w=[0.0] * 6,
+    initial_C=make_C0([10.0] * 3, [0.01] * 3),
     # measurement error
-    rcal=[.1]*3,
+    rcal=[0.1] * 3,
     # control variance
-    scal_v=[0.001]*3,
+    scal_v=[0.001] * 3,
 )
 add_measurement_params(high_cost_kwargs)
 
 
-
 MajorBurn = make_burn(
-    rd = LinCovCW.parameter(shape=3), # desired position
-    tig = LinCovCW.parameter(), # time ignition
-    tem = LinCovCW.parameter(), # time end maneuver
+    rd=LinCovCW.parameter(shape=3),  # desired position
+    tig=LinCovCW.parameter(),  # time ignition
+    tem=LinCovCW.parameter(),  # time end maneuver
 )
 
 # 1-burn sim
 Sim = make_sim()
 
-scenario_a_tf = 2000.
-scenario_b_tf = 12_000.
-first_tig = 0. # TODO: handle this.... 
+scenario_a_tf = 2000.0
+scenario_b_tf = 12_000.0
+first_tig = 0.0  # TODO: handle this....
 scenario_1a = [
     Sim(
         **base_kwargs,
@@ -198,14 +216,14 @@ scenario_kwargs = dict(
 scenario_target = scenario_1_target
 cost_system_kwargs = nominal_kwargs
 
-#base_kwargs['meas_t_offset'] = scenario_b_tf*2
+# base_kwargs['meas_t_offset'] = scenario_b_tf*2
 
 # generate additional burns
-for idx in range(1): 
+for _ in range(1):
     MajorBurn = make_burn(
-        rd = LinCovCW.parameter(shape=3), # desired position
-        tig = LinCovCW.parameter(), # time ignition
-        tem = LinCovCW.parameter(), # time end maneuver
+        rd=LinCovCW.parameter(shape=3),  # desired position
+        tig=LinCovCW.parameter(),  # time ignition
+        tem=LinCovCW.parameter(),  # time end maneuver
     )
 
 Sim = make_sim()
@@ -215,52 +233,60 @@ class OptimizeBurns(co.OptimizationProblem):
     disp_weighting = parameter()
     rds = []
     n_burns = len(make_burn.burns)
-    t_1 = variable(initializer=1.)
+    t_1 = variable(initializer=1.0)
     ts = [t_1]
     burn_config = dict(tig_1=t_1)
-    constraint(t_1, lower_bound=0.)
-    for burn_num, burn, next_burn in zip(range(1,n_burns+2), make_burn.burns, make_burn.burns[1:]):
-        ratio = burn_num/n_burns
-        rds.append(variable(
-            name=f"target_pos_{burn_num}",
-            shape=(3,),
-            initializer=np.array(scenario_kwargs["initial_x"][:3])*(1-ratio)+np.array(scenario_target)*ratio
-        ))
-        ts.append(variable(
-            name=f"t_{burn_num+1}",
-            initializer=scenario_kwargs['terminate_time']*ratio
-        ))
-        constraint(ts[-1]-ts[-2], lower_bound=10.)
+    constraint(t_1, lower_bound=0.0)
+    for burn_num, burn, next_burn in zip(
+        range(1, n_burns + 2), make_burn.burns, make_burn.burns[1:]
+    ):
+        ratio = burn_num / n_burns
+        rds.append(
+            variable(
+                name=f"target_pos_{burn_num}",
+                shape=(3,),
+                initializer=np.array(scenario_kwargs["initial_x"][:3]) * (1 - ratio)
+                + np.array(scenario_target) * ratio,
+            )
+        )
+        ts.append(
+            variable(
+                name=f"t_{burn_num + 1}",
+                initializer=scenario_kwargs["terminate_time"] * ratio,
+            )
+        )
+        constraint(ts[-1] - ts[-2], lower_bound=10.0)
         burn_config[LinCovCW.parameter.get(backend_repr=burn.rd).name] = rds[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=burn.tem).name] = ts[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tig).name] = ts[-1]
 
-
-    #constraint(ts[0], lower_bound=0.)
-    #for tig1, tig2 in zip(ts, ts[1:]):
+    # constraint(ts[0], lower_bound=0.)
+    # for tig1, tig2 in zip(ts, ts[1:]):
     #    constraint(tig2 - tig1, lower_bound=10.)
-    #del tig1
-    #del tig2
+    # del tig1
+    # del tig2
 
-    constraint(ts[-1], upper_bound=scenario_kwargs['terminate_time'])
-    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = scenario_target
-    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = scenario_kwargs['terminate_time']
+    constraint(ts[-1], upper_bound=scenario_kwargs["terminate_time"])
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = (
+        scenario_target
+    )
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = (
+        scenario_kwargs["terminate_time"]
+    )
     print(burn_config)
 
-    sim = Sim(
-        **base_kwargs,
-        **scenario_kwargs,
-        **cost_system_kwargs,
-        **burn_config
-    )
-    objective = sim.final_vel_mag + disp_weighting*sim.final_vel_disp
+    sim = Sim(**base_kwargs, **scenario_kwargs, **cost_system_kwargs, **burn_config)
+    objective = sim.final_vel_mag + disp_weighting * sim.final_vel_disp
     for burn_num in range(n_burns):
-        objective += getattr(sim, f"Delta_v_mag_{burn_num+1}") + disp_weighting*getattr(sim, f"Delta_v_disp_{burn_num+1}")
+        objective += getattr(
+            sim, f"Delta_v_mag_{burn_num + 1}"
+        ) + disp_weighting * getattr(sim, f"Delta_v_disp_{burn_num + 1}")
 
     class Casadi(co.Options):
-        exact_hessian=False
+        exact_hessian = False
         method = OptimizationProblem.Method.scipy_trust_constr
         scipy_trust_constr_options = dict(xtol=0.5)
+
 
 ##########
 # print basic results
@@ -275,29 +301,25 @@ print([sim.final_vel_disp + sim.Delta_v_disp_1 for sim in scenario_2a])
 print([sim.final_vel_mag + sim.Delta_v_mag_1 for sim in scenario_2a])
 
 
-import sys
 sys.exit()
-opt = OptimizeBurns(disp_weighting=0.)
+opt = OptimizeBurns(disp_weighting=0.0)
 
 burn_config = {
-    k: (getattr(opt, OptimizeBurns.variable.get(backend_repr=v).name) 
+    k: (
+        getattr(opt, OptimizeBurns.variable.get(backend_repr=v).name)
         if isinstance(v, co.backend.symbol_class)
-        else v)
+        else v
+    )
     for k, v in OptimizeBurns.burn_config.items()
 }
-#base_kwargs['meas_t_offset'] = 1.
-sim = Sim(
-    **base_kwargs,
-    **scenario_kwargs,
-    **cost_system_kwargs,
-    **burn_config
-)
+# base_kwargs['meas_t_offset'] = 1.
+sim = Sim(**base_kwargs, **scenario_kwargs, **cost_system_kwargs, **burn_config)
 n_burns = len(make_burn.burns)
 print(f"number of burns: {n_burns}")
-sum_Dv_mag = 0.
-sum_Dv_disp = 0.
-for burn_num in range(1,n_burns+1):
-    Dv_mag = getattr(sim, f"Delta_v_mag_{burn_num}") 
+sum_Dv_mag = 0.0
+sum_Dv_disp = 0.0
+for burn_num in range(1, n_burns + 1):
+    Dv_mag = getattr(sim, f"Delta_v_mag_{burn_num}")
     Dv_disp = getattr(sim, f"Delta_v_disp_{burn_num}")
     tig = getattr(sim, f"tig_{burn_num}")
     print(f"burn {burn_num} at time {tig} Dv mag={Dv_mag}  Dv_disp={Dv_disp}")
@@ -307,7 +329,6 @@ print(f"station keeping Dv mag: {sim.final_vel_mag} Dv disp: {sim.final_vel_disp
 sum_Dv_mag += sim.final_vel_mag
 sum_Dv_disp += sim.final_vel_disp
 print(f"sum Dv mag: {sum_Dv_mag} sum Dv disp: {sum_Dv_disp}")
-
 
 
 """
@@ -411,7 +432,7 @@ sum Dv mag: 1.581449624190216 sum Dv disp: 1.7926191557385818
 was running 3 opts simultaneously, I think I killed my memory. Seemed to finish pretty
 quick after that.
 
-"""
+"""  # noqa
 
 """
 analysis with "2 burn" -- I think this is actually 3 burns, because I wasn't counting
@@ -571,7 +592,7 @@ no cost on dispersion, objective is 30% worse than with free t1 from paper
  barrier_tolerance: 2.048000000000001e-09
              niter: 195
 
-"""
+"""  # noqa
 
 scenario_kwargs = dict(
     **scenario_1_kwargs,
@@ -580,58 +601,67 @@ scenario_kwargs = dict(
 
 
 MajorBurn = make_burn(
-    rd = LinCovCW.parameter(shape=3), # desired position
-    tig = LinCovCW.parameter(), # time ignition
-    tem = LinCovCW.parameter(), # time end maneuver
+    rd=LinCovCW.parameter(shape=3),  # desired position
+    tig=LinCovCW.parameter(),  # time ignition
+    tem=LinCovCW.parameter(),  # time end maneuver
 )
 Sim = make_sim()
+
 
 class Deterministic3Burn1a(co.OptimizationProblem):
     rds = []
     n_burns = len(make_burn.burns)
     burn_config = dict(tig_1=first_tig)
     ts = [first_tig]
-    for burn_num, burn, next_burn in zip(range(1,n_burns+2), make_burn.burns, make_burn.burns[1:]):
-        ratio = burn_num/(n_burns+1)
-        ts.append(variable(
-            name=f"t_{burn_num+1}",
-            initializer=scenario_kwargs['terminate_time']*ratio
-        ))
-        rds.append(variable(
-            name=f"pos_{burn_num+1}",
-            shape=(3,),
-            initializer=np.array(scenario_kwargs["initial_x"][:3])*(1-ratio)+np.array(scenario_target)*ratio
-        ))
-        constraint(ts[-1]-ts[-2], lower_bound=10.)
+    for burn_num, burn, next_burn in zip(
+        range(1, n_burns + 2), make_burn.burns, make_burn.burns[1:]
+    ):
+        ratio = burn_num / (n_burns + 1)
+        ts.append(
+            variable(
+                name=f"t_{burn_num + 1}",
+                initializer=scenario_kwargs["terminate_time"] * ratio,
+            )
+        )
+        rds.append(
+            variable(
+                name=f"pos_{burn_num + 1}",
+                shape=(3,),
+                initializer=np.array(scenario_kwargs["initial_x"][:3]) * (1 - ratio)
+                + np.array(scenario_target) * ratio,
+            )
+        )
+        constraint(ts[-1] - ts[-2], lower_bound=10.0)
         burn_config[LinCovCW.parameter.get(backend_repr=burn.tem).name] = ts[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tig).name] = ts[-1]
         burn_config[LinCovCW.parameter.get(backend_repr=burn.rd).name] = rds[-1]
-    constraint(ts[-1], upper_bound=scenario_kwargs['terminate_time'])
-    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = scenario_kwargs['terminate_time']
-    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = scenario_target
-
-    sim = Sim(
-        **base_kwargs,
-        **scenario_kwargs,
-        **cost_system_kwargs,
-        **burn_config
+    constraint(ts[-1], upper_bound=scenario_kwargs["terminate_time"])
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.tem).name] = (
+        scenario_kwargs["terminate_time"]
     )
-    objective = sim.final_vel_mag + 3*sim.final_vel_disp
+    burn_config[LinCovCW.parameter.get(backend_repr=next_burn.rd).name] = (
+        scenario_target
+    )
+
+    sim = Sim(**base_kwargs, **scenario_kwargs, **cost_system_kwargs, **burn_config)
+    objective = sim.final_vel_mag + 3 * sim.final_vel_disp
     for burn_num in range(n_burns):
-        objective += getattr(sim, f"Delta_v_mag_{burn_num+1}") + 3*getattr(sim, f"Delta_v_disp_{burn_num+1}")
+        objective += getattr(sim, f"Delta_v_mag_{burn_num + 1}") + 3 * getattr(
+            sim, f"Delta_v_disp_{burn_num + 1}"
+        )
 
     class Casadi(co.Options):
-        exact_hessian=False
-        #method = OptimizationProblem.Method.scipy_trust_constr
+        exact_hessian = False
+        # method = OptimizationProblem.Method.scipy_trust_constr
+
 
 opt2 = Deterministic3Burn1a()
 
-#opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
-#opt_sim = Sim(
+# opt = Burn1(sigma_Dv_weight=3, mag_Dv_weight=1, sigma_r_weight=0)
+# opt_sim = Sim(
 #        tig_1=opt.t1,
 #        **sim_kwargs
-#)
+# )
 
-print("\n"*3,"burn time minimization")
+print("\n" * 3, "burn time minimization")
 print(opt._stats)
-

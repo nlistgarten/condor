@@ -1,6 +1,7 @@
-import condor as co
 import numpy as np
 import pytest
+
+import condor as co
 
 
 def test_output_ref():
@@ -14,22 +15,24 @@ def test_output_ref():
 
 
 def test_placeholder_on_explicitsystem():
-    with pytest.raises(NameError):
+    with pytest.raises(NameError, match="name 'placeholder' is not defined"):
 
         class ShouldFail(co.ExplicitSystem):
             x = input()
             output.y = x**2
             z = placeholder()
 
+
 def test_reserved_word_input():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Attempting to set _meta"):
 
         class ShouldFail(co.ExplicitSystem):
             _meta = input()
             output.y = _meta**2
 
+
 def test_reserved_word_output():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Attempting to set _meta"):
 
         class ShouldFail(co.ExplicitSystem):
             x = input()
@@ -45,7 +48,7 @@ def test_ode_system_event_api():
     class MySystem(co.ODESystem):
         ts = list()
         for i in range(3):
-            ts.append(parameter(name=f"t_{i}"))
+            ts.append(parameter(name=f"t_{i}"))  # noqa: PERF401
 
         n = 2
         m = 1
@@ -86,7 +89,7 @@ def test_ode_system_event_api():
         out2 = trajectory_output(x.T @ x)
         out3 = trajectory_output(C[0, 0], C[1, 1])
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Incompatible terminal term shape"):
             # incompatible shape
             out4 = trajectory_output(C[0, 0], x)
 
@@ -110,7 +113,7 @@ def test_embedded_system():
         output.x = sys2.w
         output.y = sys2.z
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(AttributeError, match="no attribute 'v'"):
             # v is not a bound output of sys2
             output.v = sys2.v
 

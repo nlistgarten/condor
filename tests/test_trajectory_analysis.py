@@ -7,26 +7,26 @@ import condor as co
 
 def test_ct_lqr():
     # continuous-time LQR
-    dblintA = np.array([[0, 1], [0, 0]])
-    dblintB = np.array([[0], [1]])
+    dblint_a = np.array([[0, 1], [0, 0]])
+    dblint_b = np.array([[0], [1]])
 
-    DblInt = co.LTI(A=dblintA, B=dblintB, name="DblInt")
+    DblInt = co.LTI(a=dblint_a, b=dblint_b, name="DblInt")  # noqa: N806
 
     class DblIntLQR(DblInt.TrajectoryAnalysis):
         initial[x] = [1.0, 0.1]
-        Q = np.eye(2)
-        R = np.eye(1)
+        q = np.eye(2)
+        r = np.eye(1)
         tf = 32.0
         u = dynamic_output.u
-        cost = trajectory_output(integrand=(x.T @ Q @ x + u.T @ R @ u) / 2)
+        cost = trajectory_output(integrand=(x.T @ q @ x + u.T @ r @ u) / 2)
 
         class Options:
             state_rtol = 1e-8
             adjoint_rtol = 1e-8
 
     class CtOptLQR(co.OptimizationProblem):
-        K = variable(shape=DblIntLQR.K.shape)
-        sim = DblIntLQR(K)
+        k = variable(shape=DblIntLQR.k.shape)
+        sim = DblIntLQR(k)
         objective = sim.cost
 
         class Options:
@@ -35,37 +35,39 @@ def test_ct_lqr():
 
     lqr_sol = CtOptLQR()
 
-    S = linalg.solve_continuous_are(dblintA, dblintB, DblIntLQR.Q, DblIntLQR.R)
-    K = linalg.solve(DblIntLQR.R, dblintB.T @ S)
+    s = linalg.solve_continuous_are(dblint_a, dblint_b, DblIntLQR.q, DblIntLQR.r)
+    k = linalg.solve(DblIntLQR.r, dblint_b.T @ s)
 
-    lqr_are = DblIntLQR(K)
+    lqr_are = DblIntLQR(k)
 
     # causes an AttributeError, I guess becuase the Jacobian hasn't been requested?
     # jac_callback = lqr_are.implementation.callback.jac_callback
-    # jac_callback(K, [0])
+    # jac_callback(k, [0])
 
     assert lqr_sol._stats.success
     np.testing.assert_allclose(lqr_are.cost, lqr_sol.objective)
-    np.testing.assert_allclose(K, lqr_sol.K, rtol=1e-4)
+    np.testing.assert_allclose(k, lqr_sol.k, rtol=1e-4)
 
 
 @pytest.mark.skip(reason="Need to fix LTI function")
 def test_sp_lqr():
     # sampled LQR
-    dblintA = np.array([[0, 1], [0, 0]])
-    dblintB = np.array([[0], [1]])
+    dblint_a = np.array([[0, 1], [0, 0]])
+    dblint_b = np.array([[0], [1]])
     dt = 0.5
 
-    DblIntSampled = co.LTI(A=dblintA, B=dblintB, name="DblIntSampled", dt=dt)
+    DblIntSampled = co.LTI(  # noqa: N806
+        a=dblint_a, b=dblint_b, name="DblIntSampled", dt=dt
+    )
 
     class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
         initial[x] = [1.0, 0.1]
-        # initial[u] = -K@initial[x]
-        Q = np.eye(2)
-        R = np.eye(1)
+        # initial[u] = -k@initial[x]
+        q = np.eye(2)
+        r = np.eye(1)
         tf = 32.0  # 12 iters, 21 calls 1E-8 jac
         # tf = 16. # 9 iters, 20 calls, 1E-7
-        cost = trajectory_output(integrand=(x.T @ Q @ x + u.T @ R @ u) / 2)
+        cost = trajectory_output(integrand=(x.T @ q @ x + u.T @ r @ u) / 2)
 
         class Casadi(co.Options):
             adjoint_adaptive_max_step_size = False
@@ -73,8 +75,8 @@ def test_sp_lqr():
             adjoint_max_step_size = dt / 8
 
     class SampledOptLQR(co.OptimizationProblem):
-        K = variable(shape=DblIntSampledLQR.K.shape)
-        sim = DblIntSampledLQR(K)
+        k = variable(shape=DblIntSampledLQR.k.shape)
+        sim = DblIntSampledLQR(k)
         objective = sim.cost
 
         class Casadi(co.Options):
@@ -90,22 +92,22 @@ def test_sp_lqr():
     # sampled_sim = DblIntSampledLQR([0., 0.])
     # sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
 
-    Q = DblIntSampledLQR.Q
-    R = DblIntSampledLQR.R
-    A = dblintA
-    B = dblintB
+    q = DblIntSampledLQR.q
+    r = DblIntSampledLQR.r
+    a = dblint_a
+    b = dblint_b
 
-    Ad, Bd = signal.cont2discrete((A, B, None, None), dt)[:2]
-    S = linalg.solve_discrete_are(
-        Ad,
-        Bd,
-        Q,
-        R,
+    ad, bd = signal.cont2discrete((a, b, None, None), dt)[:2]
+    s = linalg.solve_discrete_are(
+        ad,
+        bd,
+        q,
+        r,
     )
-    K = linalg.solve(Bd.T @ S @ Bd + R, Bd.T @ S @ Ad)
+    k = linalg.solve(bd.T @ s @ bd + r, bd.T @ s @ ad)
 
     # sim = DblIntSampledLQR([1.00842737, 0.05634044])
-    sim = DblIntSampledLQR(K)
+    sim = DblIntSampledLQR(k)
 
     sim.implementation.callback.jac_callback(sim.implementation.callback.p, [])
     LTI_plot(sim)
@@ -116,25 +118,25 @@ def test_sp_lqr():
     # sampled_sim = DblIntSampledLQR([0., 0.])
     # sampled_sim.implementation.callback.jac_callback([0., 0.,], [0.])
 
-    sampled_sim = DblIntSampledLQR(K)
+    sampled_sim = DblIntSampledLQR(k)
     jac_cb = sampled_sim.implementation.callback.jac_callback
-    jac_cb(K, [0.0])
+    jac_cb(k, [0.0])
 
     assert lqr_sol_samp._stats.success
     print(lqr_sol_samp._stats)
     print(lqr_sol_samp.objective < sampled_sim.cost)
     print(lqr_sol_samp.objective, sampled_sim.cost)
-    print("      ARE sol:", K, "\niterative sol:", lqr_sol_samp.K)
+    print("      ARE sol:", k, "\niterative sol:", lqr_sol_samp.k)
 
 
 def test_time_switched():
     # optimal transfer time with time-based events
 
     class DblInt(co.ODESystem):
-        A = np.array([[0, 1], [0, 0]])
-        B = np.array([[0], [1]])
+        a = np.array([[0, 1], [0, 0]])
+        b = np.array([[0], [1]])
 
-        x = state(shape=A.shape[0])
+        x = state(shape=a.shape[0])
         mode = state()
         pos_at_switch = state()
 
@@ -142,7 +144,7 @@ def test_time_switched():
         t2 = parameter()
         u = modal()
 
-        dot[x] = A @ x + B * u
+        dot[x] = a @ x + b * u
 
     class Accel(DblInt.Mode):
         condition = mode == 0
@@ -165,8 +167,8 @@ def test_time_switched():
 
     class Transfer(DblInt.TrajectoryAnalysis):
         initial[x] = [-9.0, 0.0]
-        Q = np.eye(2)
-        cost = trajectory_output((x.T @ Q @ x) / 2)
+        q = np.eye(2)
+        cost = trajectory_output((x.T @ q @ x) / 2)
 
         class Casadi(co.Options):
             state_adaptive_max_step_size = 4
@@ -190,8 +192,8 @@ def test_time_switched():
 
     class AccelerateTransfer(DblInt.TrajectoryAnalysis, exclude_events=[Switch]):
         initial[x] = [-9.0, 0.0]
-        Q = np.eye(2)
-        cost = trajectory_output((x.T @ Q @ x) / 2)
+        q = np.eye(2)
+        cost = trajectory_output((x.T @ q @ x) / 2)
 
         class Casadi(co.Options):
             state_adaptive_max_step_size = 4
@@ -208,10 +210,10 @@ def test_state_switched():
     # optimal transfer time with state-based events
 
     class DblInt(co.ODESystem):
-        A = np.array([[0, 1], [0, 0]])
-        B = np.array([[0], [1]])
+        a = np.array([[0, 1], [0, 0]])
+        b = np.array([[0], [1]])
 
-        x = state(shape=A.shape[0])
+        x = state(shape=a.shape[0])
 
         mode = state()
 
@@ -220,7 +222,7 @@ def test_state_switched():
 
         u = modal()
 
-        dot[x] = A @ x + B * u
+        dot[x] = a @ x + b * u
 
     class Accel(DblInt.Mode):
         condition = mode == 0
@@ -241,7 +243,7 @@ def test_state_switched():
     class Transfer(DblInt.TrajectoryAnalysis):
         initial[x] = [-9.0, 0.0]
         xd = [1.0, 2.0]
-        Q = np.eye(2)
+        q = np.eye(2)
         cost = trajectory_output(((x - xd).T @ (x - xd)) / 2)
         tf = 20.0
 

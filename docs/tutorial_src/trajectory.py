@@ -222,7 +222,8 @@ ax.legend(["original sim", "with bounce", "gradual descent"])
 # has the form
 #
 # .. math::
-#    J = \phi\left(t_{f},x\left(t_{f}\right),p\right)+\int_{t_{0}}^{t_{f}}L\left(\tau,x\left(\tau\right),p\right)\,d\tau
+#    J = \phi\left(t_{f},x\left(t_{f}\right),p\right) +
+#        \int_{t_{0}}^{t_{f}}L\left(\tau,x\left(\tau\right),p\right)\,d\tau
 #
 # where :math:`\phi` is the terminal term, :math:`L\left(\cdot\right)` is the integrand
 # term, and :math:`x\left(t\right)` is the solution to the system of ODEs with events
@@ -325,8 +326,8 @@ ax.text(
 # :class:`OptimizationProblem`, pointing it to the method of a class to store the
 # simulation data on each call. Since it only gets information relevant to the
 # optimization problem itself, we use
-# :meth:`~condor.contrib.OptimizationProblem.from_values` to reconstruct the internals of
-# the analysis with the simulation outputs bound to the ``sim`` attribute.
+# :meth:`~condor.contrib.OptimizationProblem.from_values` to reconstruct the internals
+# of the analysis with the simulation outputs bound to the ``sim`` attribute.
 
 
 class IterStore:

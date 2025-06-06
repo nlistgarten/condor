@@ -1,26 +1,32 @@
-from .utils import options_to_kwargs
-from enum import Enum, auto
-import condor as co
 import inspect
+from enum import Enum, auto
 
-from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
-from condor.solvers.casadi_warmstart_wrapper import (
-    CasadiIterationCallback, CasadiNlpsolWarmstart, CasadiRootfinderWarmstart
-)
 import numpy as np
+from scipy.optimize import LinearConstraint, NonlinearConstraint, minimize
 
-
+import condor as co
 from condor.backend import (
-    symbol_class, expression_to_operator,
+    expression_to_operator,
+    symbol_class,
 )
 from condor.backend.operators import (
-    concat, jacobian, unstack,
+    concat,
+    jacobian,
+    unstack,
 )
+from condor.solvers.casadi_warmstart_wrapper import (
+    CasadiIterationCallback,
+    CasadiNlpsolWarmstart,
+    CasadiRootfinderWarmstart,
+)
+
+from .utils import options_to_kwargs
+
 
 class InitializerMixin:
     def __init__(self, model_instance):
         model = model_instance.__class__
-        model_instance.options_dict=options_to_kwargs(model)
+        model_instance.options_dict = options_to_kwargs(model)
         self.construct(model, **model_instance.options_dict)
         self(model_instance)
 
@@ -34,17 +40,19 @@ class InitializerMixin:
             f"{model.__name__}_initializer",
         )
 
-
     def write_initializer(self, model_instance):
         for k, v in model_instance.variable.asdict().items():
             model_var = getattr(self.model, k)
-            if np.array(model_var.warm_start).any() and not isinstance(
-                model_var.initializer, symbol_class
-            ) and not isinstance(v, symbol_class):
+            if (
+                np.array(model_var.warm_start).any()
+                and not isinstance(model_var.initializer, symbol_class)
+                and not isinstance(v, symbol_class)
+            ):
                 model_var.initializer = v
 
+
 class AlgebraicSystem(InitializerMixin):
-    """ Implementation for :class:`AlgebraicSystem` model.
+    """Implementation for :class:`AlgebraicSystem` model.
 
     Options
     --------
@@ -61,6 +69,7 @@ class AlgebraicSystem(InitializerMixin):
        flag indicating whether to raise an error if the solver fails to converge within
        specified tolerance before reaching max_iter (default False)
     """
+
     """
     exact_hessian : bool
        flag indicating whether to use second-order gradient information or broyden
@@ -69,6 +78,7 @@ class AlgebraicSystem(InitializerMixin):
     default_initializer : ???
        ???
     """
+
     def construct(
         self,
         model,
@@ -79,12 +89,14 @@ class AlgebraicSystem(InitializerMixin):
         exact_hessian=True,
         max_iter=100,
         # new options
-        re_initialize=slice(
-            None
-        ),  # slice for re-initializing at every call. will support indexing
+        # slice for re-initializing at every call. will support indexing
+        re_initialize=None,
         default_initializer=0.0,
         error_on_fail=False,
     ):
+        if re_initialize is None:
+            re_initialize = slice(None)
+
         rootfinder_options = dict(
             error_on_fail=error_on_fail, abstol=atol, abstolStep=rtol, max_iter=max_iter
         )
@@ -106,28 +118,24 @@ class AlgebraicSystem(InitializerMixin):
         InitializerMixin.construct(self, model)
 
         self.callback = CasadiRootfinderWarmstart(
-            primary_function = self.residual_func,
-            output_function = self.output_func,
-            n_variable = model.variable._count,
-            n_parameter = model.parameter._count,
-            init_var = self.initializer_func,
-            warm_start = self.warm_start,
-            method_string = "newton",
-            options = rootfinder_options,
-            model_name = model.__name__,
+            primary_function=self.residual_func,
+            output_function=self.output_func,
+            n_variable=model.variable._count,
+            n_parameter=model.parameter._count,
+            init_var=self.initializer_func,
+            warm_start=self.warm_start,
+            method_string="newton",
+            options=rootfinder_options,
+            model_name=model.__name__,
         )
 
     def __call__(self, model_instance):
         self.call_args = model_instance.parameter.flatten()
         out = self.callback(self.call_args)
-        self.var_out = self.model.variable.wrap(
-            out[: self.model.variable._count]
-        )
+        self.var_out = self.model.variable.wrap(out[: self.model.variable._count])
         model_instance.bind_field(self.var_out)
 
-        self.out_out = self.model.output.wrap(
-            out[self.model.variable._count : ]
-        )
+        self.out_out = self.model.output.wrap(out[self.model.variable._count :])
         model_instance.bind_field(self.out_out)
 
         if hasattr(self.callback, "last_r"):
@@ -141,11 +149,12 @@ class AlgebraicSystem(InitializerMixin):
 
         for k, v in model_instance.variable.asdict().items():
             model_var = getattr(self.model, k)
-            if model_var.warm_start and not isinstance(
-                model_var.initializer, symbol_class
+            if (
+                model_var.warm_start
+                and not isinstance(model_var.initializer, symbol_class)
+                and not isinstance(v, symbol_class)
             ):
-                if not isinstance(v, symbol_class):
-                    model_var.initializer = v
+                model_var.initializer = v
 
 
 class OptimizationProblem(InitializerMixin):
@@ -161,6 +170,7 @@ class OptimizationProblem(InitializerMixin):
        :class:`CasadiNlpsolImplementation` (only IPOPT) and :class:`SciPyBase`
        subclass optimization implementaitons.
     """
+
     # take an OptimizationProblem model with or without iteration spec and other Options
     # process options, create appropriate callback hooks
     # create appropriate operator --
@@ -172,7 +182,7 @@ class OptimizationProblem(InitializerMixin):
     # was there a similar library to cvxopt?
     # maybe 3 different scipy implementations with a common base class
     # single casadi nlpsol implementation
-    # 
+    #
     def make_warm_start(self, x0=None, lam_g0=None, lam_x0=None):
         if x0 is not None:
             self.x0 = x0
@@ -216,12 +226,10 @@ class OptimizationProblem(InitializerMixin):
             f"{model.__name__}_constraint",
         )
 
-
         self.lbx = model.variable.flatten("lower_bound")
         self.ubx = model.variable.flatten("upper_bound")
         self.lbg = model.constraint.flatten("lower_bound")
         self.ubg = model.constraint.flatten("upper_bound")
-
 
     def load_initializer(self, model_instance):
         if self.has_p:
@@ -260,9 +268,10 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
 
     """
+
     class Method(Enum):
         ipopt = auto()
-        snopt = auto() #: currently unsupported
+        snopt = auto()  #: currently unsupported
         qrsqp = auto()
         fatrop = auto()
 
@@ -273,10 +282,9 @@ class CasadiNlpsolImplementation(OptimizationProblem):
         Method.fatrop: "fatrop",
     }
 
-
     method_default_options = {
         Method.ipopt: dict(
-            #warm_start_init_point="no",
+            # warm_start_init_point="no",
             warm_start_init_point="yes",
             sb="yes",  # suppress banner
         ),
@@ -287,8 +295,8 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
     @property
     def default_options(self):
-        """ derived property to get a copy of :attr:`method_default_options` or an empty
-        dict """
+        """derived property to get a copy of :attr:`method_default_options` or an empty
+        dict"""
         return self.method_default_options.get(self.method, dict())
 
     def construct(
@@ -356,28 +364,26 @@ class CasadiNlpsolImplementation(OptimizationProblem):
                 print_status=False,
             )
             if self.options["print_level"] == 0:
-               self.nlp_opts["qpsol_options"] = dict(
-                   print_iter=False,
-                   print_header=False,
-                   print_info=False,
-               )
-
-
+                self.nlp_opts["qpsol_options"] = dict(
+                    print_iter=False,
+                    print_header=False,
+                    print_info=False,
+                )
 
         self.callback = CasadiNlpsolWarmstart(
-            primary_function = self.objective_func,
-            constraint_function = self.constraint_func,
-            n_variable = model.variable._count,
-            n_parameter = model.parameter._count,
-            init_var = self.initializer_func,
-            warm_start = self.warm_start,
-            lbx = self.lbx,
-            ubx = self.ubx,
-            lbg = self.lbg,
-            ubg = self.ubg,
-            method_string = CasadiNlpsolImplementation.method_strings[method],
-            options = self.nlp_opts,
-            model_name = model.__name__,
+            primary_function=self.objective_func,
+            constraint_function=self.constraint_func,
+            n_variable=model.variable._count,
+            n_parameter=model.parameter._count,
+            init_var=self.initializer_func,
+            warm_start=self.warm_start,
+            lbx=self.lbx,
+            ubx=self.ubx,
+            lbg=self.lbg,
+            ubg=self.ubg,
+            method_string=CasadiNlpsolImplementation.method_strings[method],
+            options=self.nlp_opts,
+            model_name=model.__name__,
         )
 
         self.optimizer = self.callback.optimizer
@@ -401,12 +407,12 @@ class CasadiNlpsolImplementation(OptimizationProblem):
 
         if isinstance(var_out, symbol_class):
             out = dict(
-                x = var_out,
-                p = run_p,
-                g = self.constraint_func(var_out, run_p),
-                f = self.objective_func(var_out, run_p),
-                lam_g = None,
-                lam_x = None,
+                x=var_out,
+                p=run_p,
+                g=self.constraint_func(var_out, run_p),
+                f=self.objective_func(var_out, run_p),
+                lam_g=None,
+                lam_x=None,
             )
         else:
             out = self.callback.out
@@ -429,6 +435,7 @@ class ScipyMinimizeBase(OptimizationProblem):
     **options
         keyword options are passed directly to scipy.minimize's options keyword argument
     """
+
     def construct(
         self,
         model,
@@ -461,12 +468,8 @@ class ScipyMinimizeBase(OptimizationProblem):
         return []
 
     def run_optimizer(self, model_instance):
-
         print(self.has_p)
-        if self.has_p:
-            extra_args = (self.eval_p,)
-        else:
-            extra_args = ([],)
+        extra_args = (self.eval_p,) if self.has_p else ([],)
 
         scipy_constraints = self.prepare_constraints(extra_args)
 
@@ -488,9 +491,7 @@ class ScipyMinimizeBase(OptimizationProblem):
             # options=dict(disp=True),
             options=self.options,
             callback=SciPyIterCallbackWrapper.create_or_none(
-                self.model,
-                model_instance.parameter,
-                self.iter_callback
+                self.model, model_instance.parameter, self.iter_callback
             ),
         )
 
@@ -499,8 +500,10 @@ class ScipyMinimizeBase(OptimizationProblem):
         self.x0 = min_out.x
         self.stats = model_instance._stats = min_out
 
+
 class ScipyCG(ScipyMinimizeBase):
     method_string = "CG"
+
 
 class ScipySLSQP(ScipyMinimizeBase):
     method_string = "SLSQP"
@@ -540,9 +543,7 @@ class ScipySLSQP(ScipyMinimizeBase):
             )
 
         if self.inequality_con_exprs:
-            self.inequality_con_expr = concat(
-                self.inequality_con_exprs
-            )
+            self.inequality_con_expr = concat(self.inequality_con_exprs)
             self.ineq_g_func = expression_to_operator(
                 [self.x, self.p],
                 self.inequality_con_expr,
@@ -556,14 +557,10 @@ class ScipySLSQP(ScipyMinimizeBase):
             self.con.append(
                 dict(
                     type="ineq",
-                    fun=lambda x, p: self.ineq_g_func(x, p)
-                    .toarray()
-                    .squeeze()
-                    .T,
+                    fun=lambda x, p: self.ineq_g_func(x, p).toarray().squeeze().T,
                     jac=self.ineq_g_jac_func,
                 )
             )
-
 
     def prepare_constraints(self, extra_args):
         scipy_constraints = self.con
@@ -572,26 +569,23 @@ class ScipySLSQP(ScipyMinimizeBase):
         return scipy_constraints
 
 
-
 class ScipyTrustConstr(ScipyMinimizeBase):
     method_string = "trust-constr"
 
     def construct(
         self,
         model,
-        exact_hessian=True, # only trust-constr can use hessian at all
+        exact_hessian=True,  # only trust-constr can use hessian at all
         keep_feasible=True,  # flag that goes to scipy trust constr linear constraints
-
         **options,
     ):
         super().construct(model, **options)
         self.keep_feasible = keep_feasible
-        g_split=self.g_split
+        g_split = self.g_split
         g_jacs = [jacobian(g, self.x) for g in self.g_split]
 
         nonlinear_flags = [
-            not jacobian(g_jac, self.x).nnz()
-            or not jacobian(g_expr, self.p).nnz()
+            not jacobian(g_jac, self.x).nnz() or not jacobian(g_expr, self.p).nnz()
             for g_jac, g_expr in zip(g_jacs, g_split)
             # could ignore dependence on parameters, but to be consistent with
             # ipopt specification require parameters within function not in
@@ -641,16 +635,16 @@ class ScipyTrustConstr(ScipyMinimizeBase):
             )
 
         # process linear constraints
-        linear_A_exprs = [
+        linear_a_exprs = [
             g_jac
             for g_jac, is_nonlinear in zip(g_jacs, nonlinear_flags)
             if not is_nonlinear
         ]
-        self.num_linear_g = len(linear_A_exprs)
+        self.num_linear_g = len(linear_a_exprs)
         if self.num_linear_g:
             self.linear_jac_func = expression_to_operator(
                 [self.p],
-                concat(linear_A_exprs),
+                concat(linear_a_exprs),
                 f"{model.__name__}_A",
             )
 
@@ -689,11 +683,7 @@ class ScipyTrustConstr(ScipyMinimizeBase):
                         .toarray()
                         .squeeze()
                     ),
-                    jac=(
-                        lambda *args: self.g_jac_func(
-                            *args, *extra_args
-                        ).sparse()
-                    ),
+                    jac=(lambda *args: self.g_jac_func(*args, *extra_args).sparse()),
                     lb=self.nonlinear_lb,
                     ub=self.nonlinear_ub,
                 )
@@ -702,8 +692,8 @@ class ScipyTrustConstr(ScipyMinimizeBase):
 
 
 class SciPyIterCallbackWrapper:
-    """ Wrapper for iter_callback function to use with SciPy minimize, used internally
-    """
+    """Wrapper for iter_callback function to use with SciPy minimize, used internally"""
+
     @classmethod
     def create_or_none(cls, model, parameters, callback=None):
         if callback is None:
@@ -720,15 +710,16 @@ class SciPyIterCallbackWrapper:
     def __call__(self, xk, res=None):
         variable = self.model.variable.wrap(xk)
         instance = self.model.from_values(
-            **self.parameters.asdict(),
-            **variable.asdict()
+            **self.parameters.asdict(), **variable.asdict()
         )
         callback_args = (
-            self.iter, variable, instance.objective, instance.constraint,
+            self.iter,
+            variable,
+            instance.objective,
+            instance.constraint,
         )
         if self.pass_instance:
             callback_args += (instance,)
 
         self.callback(*callback_args)
         self.iter += 1
-
