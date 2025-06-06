@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Working with trajectories" href="trajectory.html" /><link rel="prev" title="Introduction to Condor" href="sellar.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
-        <title>Polar Transformation - Condor 0.1.dev1+g243c968 documentation</title>
+        <title>Polar Transformation - Condor 0.3.1.dev66+gc55207a documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.1.dev1+g243c968 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev66+gc55207a documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -195,7 +195,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
   
-  <span class="sidebar-brand-text">Condor 0.1.dev1+g243c968 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev66+gc55207a documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -220,6 +220,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/contrib.html">Contrib Models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/fields.html">Fields and Elements</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/implementations.html">Implementations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/backend.html">Backend Modules</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
@@ -274,7 +275,8 @@ to download the full example code.</p>
 </div>
 <section class="sphx-glr-example-title" id="polar-transformation">
 <span id="sphx-glr-tutorial-polar-transform-py"></span><h1>Polar Transformation<a class="headerlink" href="#polar-transformation" title="Link to this heading">¶</a></h1>
-<p>As another example, if we were interested in transforming Cartesian coordinates to polar form:</p>
+<p>As another example, if we were interested in transforming Cartesian coordinates to
+polar form:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
 \[\begin{split}\begin{align}
@@ -286,13 +288,15 @@ p_{\theta} &amp;= \tan^{-1}\left(\frac{y}{x}\right)
 of this system as follows:</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">condor</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">co</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">condor.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">operators</span> <span class="k">as</span> <span class="n">ops</span>
+
+
 <span class="k">class</span><span class="w"> </span><span class="nc">PolarTransform</span><span class="p">(</span><span class="n">co</span><span class="o">.</span><span class="n">ExplicitSystem</span><span class="p">):</span>
     <span class="n">x</span> <span class="o">=</span> <span class="nb">input</span><span class="p">()</span>
     <span class="n">y</span> <span class="o">=</span> <span class="nb">input</span><span class="p">()</span>
 
     <span class="n">output</span><span class="o">.</span><span class="n">r</span> <span class="o">=</span> <span class="n">ops</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
-    <span class="c1">#output.theta = ops.atan2(y, x)</span>
-    <span class="n">output</span><span class="o">.</span><span class="n">theta</span> <span class="o">=</span> <span class="n">ops</span><span class="o">.</span><span class="n">atan</span><span class="p">(</span><span class="n">y</span><span class="o">/</span><span class="n">x</span><span class="p">)</span>
+    <span class="c1"># output.theta = ops.atan2(y, x)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">theta</span> <span class="o">=</span> <span class="n">ops</span><span class="o">.</span><span class="n">atan</span><span class="p">(</span><span class="n">y</span> <span class="o">/</span> <span class="n">x</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>In general, once you’ve defined any system in Condor, you can just evaulate it
@@ -468,7 +472,7 @@ over-wrriten. Since the default is true, we can inspect the initializer values,<
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=b6a1ed3c"></script>
+</div><script src="../_static/documentation_options.js?v=cc7ef148"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=5fa4622c"></script>

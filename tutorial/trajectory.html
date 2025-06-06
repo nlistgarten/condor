@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="How-To Guide" href="../howto/index.html" /><link rel="prev" title="Polar Transformation" href="polar_transform.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
-        <title>Working with trajectories - Condor 0.1.dev1+g243c968 documentation</title>
+        <title>Working with trajectories - Condor 0.3.1.dev66+gc55207a documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.1.dev1+g243c968 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev66+gc55207a documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -195,7 +195,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
   
-  <span class="sidebar-brand-text">Condor 0.1.dev1+g243c968 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev66+gc55207a documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -220,6 +220,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/contrib.html">Contrib Models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/fields.html">Fields and Elements</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../api/implementations.html">Implementations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/backend.html">Backend Modules</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
@@ -427,7 +428,7 @@ event).</p>
 <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">&quot;original sim&quot;</span><span class="p">,</span> <span class="s2">&quot;with bounce&quot;</span><span class="p">])</span>
 </pre></div>
 </div>
-<img src="../_images/sphx_glr_trajectory_003.png" srcset="../_images/sphx_glr_trajectory_003.png" alt="trajectory" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.legend.Legend object at 0x7f036a340380&gt;
+<img src="../_images/sphx_glr_trajectory_003.png" srcset="../_images/sphx_glr_trajectory_003.png" alt="trajectory" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.legend.Legend object at 0x7f768bca4c20&gt;
 </pre></div>
 </div>
 </section>
@@ -464,7 +465,7 @@ detect the switch from ascent to descent and perform a state update.</p>
 <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">&quot;original sim&quot;</span><span class="p">,</span> <span class="s2">&quot;with bounce&quot;</span><span class="p">,</span> <span class="s2">&quot;gradual descent&quot;</span><span class="p">])</span>
 </pre></div>
 </div>
-<img src="../_images/sphx_glr_trajectory_004.png" srcset="../_images/sphx_glr_trajectory_004.png" alt="trajectory" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.legend.Legend object at 0x7f0368995550&gt;
+<img src="../_images/sphx_glr_trajectory_004.png" srcset="../_images/sphx_glr_trajectory_004.png" alt="trajectory" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.legend.Legend object at 0x7f76883e7f20&gt;
 </pre></div>
 </div>
 </section>
@@ -477,7 +478,8 @@ In order to use the ODE system as part of other condor models, we must declare
 has the form</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[J = \phi\left(t_{f},x\left(t_{f}\right),p\right)+\int_{t_{0}}^{t_{f}}L\left(\tau,x\left(\tau\right),p\right)\,d\tau\]</div>
+\[J = \phi\left(t_{f},x\left(t_{f}\right),p\right) +
+    \int_{t_{0}}^{t_{f}}L\left(\tau,x\left(\tau\right),p\right)\,d\tau\]</div>
 </div>
 <p>where <span class="math notranslate nohighlight">\(\phi\)</span> is the terminal term, <span class="math notranslate nohighlight">\(L\left(\cdot\right)\)</span> is the integrand
 term, and <span class="math notranslate nohighlight">\(x\left(t\right)\)</span> is the solution to the system of ODEs with events
@@ -534,7 +536,7 @@ alpha = -0.5 deg: [214.23621474]
 <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="n">k</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;alpha&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\alpha$&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">results</span><span class="p">])</span>
 </pre></div>
 </div>
-<img src="../_images/sphx_glr_trajectory_005.png" srcset="../_images/sphx_glr_trajectory_005.png" alt="trajectory" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.legend.Legend object at 0x7f03688d5550&gt;
+<img src="../_images/sphx_glr_trajectory_005.png" srcset="../_images/sphx_glr_trajectory_005.png" alt="trajectory" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.legend.Legend object at 0x7f76841b77a0&gt;
 </pre></div>
 </div>
 </section>
@@ -578,8 +580,8 @@ and flown range.</p>
 <code class="xref py py-class docutils literal notranslate"><span class="pre">OptimizationProblem</span></code>, pointing it to the method of a class to store the
 simulation data on each call. Since it only gets information relevant to the
 optimization problem itself, we use
-<a class="reference internal" href="../api/contrib.html#condor.contrib.OptimizationProblem.from_values" title="condor.contrib.OptimizationProblem.from_values"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_values()</span></code></a> to reconstruct the internals of
-the analysis with the simulation outputs bound to the <code class="docutils literal notranslate"><span class="pre">sim</span></code> attribute.</p>
+<a class="reference internal" href="../api/contrib.html#condor.contrib.OptimizationProblem.from_values" title="condor.contrib.OptimizationProblem.from_values"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_values()</span></code></a> to reconstruct the internals
+of the analysis with the simulation outputs bound to the <code class="docutils literal notranslate"><span class="pre">sim</span></code> attribute.</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">IterStore</span><span class="p">:</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">parameter</span> <span class="o">=</span> <span class="kc">None</span>
@@ -611,7 +613,7 @@ the analysis with the simulation outputs bound to the <code class="docutils lite
 <img src="../_images/sphx_glr_trajectory_007.png" srcset="../_images/sphx_glr_trajectory_007.png" alt="max altitude iterations" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>(-3.0, 45.0)
 </pre></div>
 </div>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 28.783 seconds)</p>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 28.581 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-tutorial-trajectory-py">
 <div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
 <p><a class="reference download internal" download="" href="../_downloads/c798b650080c665ed6e5e3ce733d7166/trajectory.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">trajectory.ipynb</span></code></a></p>
@@ -699,7 +701,7 @@ the analysis with the simulation outputs bound to the <code class="docutils lite
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=b6a1ed3c"></script>
+</div><script src="../_static/documentation_options.js?v=cc7ef148"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=5fa4622c"></script>

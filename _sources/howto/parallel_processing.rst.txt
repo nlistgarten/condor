@@ -28,7 +28,7 @@ You should be able to treat models like any other function in terms of
 parallelization.  This example shows using the built-in :mod:`multiprocessing` to do
 process-based parallelization of an explicit system.
 
-.. GENERATED FROM PYTHON SOURCE LINES 11-27
+.. GENERATED FROM PYTHON SOURCE LINES 11-28
 
 .. code-block:: Python
 
@@ -40,14 +40,15 @@ process-based parallelization of an explicit system.
 
     class Model(condor.ExplicitSystem):
         x = input()
-        output.y = -x**2 + 2*x + 1
+        output.y = -(x**2) + 2 * x + 1
 
 
-    with Pool(5) as p:
-        models = p.map(Model, [1, 2, 3])
+    if __name__ == "__main__":
+        with Pool(5) as p:
+            models = p.map(Model, [1, 2, 3])
 
-    for model in models:
-        print(model.input, model.output)
+        for model in models:
+            print(model.input, model.output)
 
 
 
@@ -66,7 +67,7 @@ process-based parallelization of an explicit system.
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 0.186 seconds)
+   **Total running time of the script:** (0 minutes 0.063 seconds)
 
 
 .. _sphx_glr_download_howto_parallel_processing.py:

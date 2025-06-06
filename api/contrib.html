@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Fields and Elements" href="fields.html" /><link rel="prev" title="Condor API" href="index.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
-        <title>Contrib Models - Condor 0.1.dev1+g243c968 documentation</title>
+        <title>Contrib Models - Condor 0.3.1.dev66+gc55207a documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.1.dev1+g243c968 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev66+gc55207a documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -195,7 +195,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
   
-  <span class="sidebar-brand-text">Condor 0.1.dev1+g243c968 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev66+gc55207a documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -220,6 +220,7 @@
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Contrib Models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="fields.html">Fields and Elements</a></li>
 <li class="toctree-l2"><a class="reference internal" href="implementations.html">Implementations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="backend.html">Backend Modules</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
@@ -284,10 +285,11 @@ y_2 &amp;=&amp; f_2(x_1, x_2, \dots, x_n) \\
 y_m &amp;=&amp; f_m(x_1, x_2, \dots, x_n)
 \end{align}\end{split}\]</div>
 </div>
-<p>where each <span class="math notranslate nohighlight">\(y_i\)</span> is a name-assigned expression on the <code class="docutils literal notranslate"><span class="pre">output</span></code> field and each
-<span class="math notranslate nohighlight">\(x_i\)</span> is an element drawn from the <code class="docutils literal notranslate"><span class="pre">input</span></code> field.</p>
+<p>where each <span class="math notranslate nohighlight">\(y_i\)</span> is a name-assigned expression on the <code class="docutils literal notranslate"><span class="pre">output</span></code> field and
+each <span class="math notranslate nohighlight">\(x_i\)</span> is an element drawn from the <code class="docutils literal notranslate"><span class="pre">input</span></code> field.</p>
 <p>Each <span class="math notranslate nohighlight">\(x_i\)</span> and <span class="math notranslate nohighlight">\(y_j\)</span> may have arbitrary shape. Condor can automatically
-calculate the derivatives <span class="math notranslate nohighlight">\(\frac{dy_j}{dx_i}\)</span> as needed for parent solvers, etc.</p>
+calculate the derivatives <span class="math notranslate nohighlight">\(\frac{dy_j}{dx_i}\)</span> as needed for parent solvers,
+etc.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="condor.contrib.ExplicitSystem.input">
 <span class="sig-name descname"><span class="pre">input</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;FreeField:</span> <span class="pre">ExplicitSystem.input&gt;</span></em><a class="headerlink" href="#condor.contrib.ExplicitSystem.input" title="Link to this definition">¶</a></dt>
@@ -732,7 +734,7 @@ construction).</p>
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=b6a1ed3c"></script>
+</div><script src="../_static/documentation_options.js?v=cc7ef148"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=5fa4622c"></script>

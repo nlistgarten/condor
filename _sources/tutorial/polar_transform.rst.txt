@@ -22,9 +22,10 @@
 Polar Transformation
 =========================
 
-.. GENERATED FROM PYTHON SOURCE LINES 7-17
+.. GENERATED FROM PYTHON SOURCE LINES 7-18
 
-As another example, if we were interested in transforming Cartesian coordinates to polar form:
+As another example, if we were interested in transforming Cartesian coordinates to
+polar form:
 
 .. math::
    \begin{align}
@@ -35,20 +36,22 @@ As another example, if we were interested in transforming Cartesian coordinates 
 We can implement this with an ``ExplicitSystem`` by declaring the inputs and outputs
 of this system as follows:
 
-.. GENERATED FROM PYTHON SOURCE LINES 17-29
+.. GENERATED FROM PYTHON SOURCE LINES 18-32
 
 .. code-block:: Python
 
 
     import condor as co
     from condor.backend import operators as ops
+
+
     class PolarTransform(co.ExplicitSystem):
         x = input()
         y = input()
 
         output.r = ops.sqrt(x**2 + y**2)
-        #output.theta = ops.atan2(y, x)
-        output.theta = ops.atan(y/x)
+        # output.theta = ops.atan2(y, x)
+        output.theta = ops.atan(y / x)
 
 
 
@@ -58,12 +61,12 @@ of this system as follows:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 30-32
+.. GENERATED FROM PYTHON SOURCE LINES 33-35
 
 In general, once you've defined any system in Condor, you can just evaulate it
 numerically by passing in numbers:
 
-.. GENERATED FROM PYTHON SOURCE LINES 32-36
+.. GENERATED FROM PYTHON SOURCE LINES 35-39
 
 .. code-block:: Python
 
@@ -84,7 +87,7 @@ numerically by passing in numbers:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 37-42
+.. GENERATED FROM PYTHON SOURCE LINES 40-45
 
 The output returned by such a call is designed for inspection to the extent that we
 recommend working in an interactive session or debugger, especially when getting
@@ -92,7 +95,7 @@ accustomed to Condor features.
 
 For example, the outputs of an explicit system are accessible directly:
 
-.. GENERATED FROM PYTHON SOURCE LINES 42-45
+.. GENERATED FROM PYTHON SOURCE LINES 45-48
 
 .. code-block:: Python
 
@@ -112,11 +115,11 @@ For example, the outputs of an explicit system are accessible directly:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 46-47
+.. GENERATED FROM PYTHON SOURCE LINES 49-50
 
 They can also be retrieved collectively:
 
-.. GENERATED FROM PYTHON SOURCE LINES 47-50
+.. GENERATED FROM PYTHON SOURCE LINES 50-53
 
 .. code-block:: Python
 
@@ -136,11 +139,11 @@ They can also be retrieved collectively:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 51-52
+.. GENERATED FROM PYTHON SOURCE LINES 54-55
 
 You can of course call it again with different arguments
 
-.. GENERATED FROM PYTHON SOURCE LINES 52-56
+.. GENERATED FROM PYTHON SOURCE LINES 55-59
 
 .. code-block:: Python
 
@@ -161,7 +164,7 @@ You can of course call it again with different arguments
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 57-72
+.. GENERATED FROM PYTHON SOURCE LINES 60-75
 
 While the *binding* of the results in a datastructure is nice, the real benefit of
 constructing condor models is in calling iterative solvers. For example, we could
@@ -170,7 +173,7 @@ r\cos\theta` and :math:`y = r\sin\theta`. Or we can we use Condor to
 numerically solve this algebraic system of equations using an ``AlgebraicSystem`` by
 declaring the input radius and angle as ``parameter``\s and the solving variables for
 :math:`x` and :math:`y`. Mathematically, we are defining the system of algebraic
-equations 
+equations
 
 .. math::
    r &= p_r (x^*, y^*) \\
@@ -179,9 +182,10 @@ equations
 and letting an iterative solver find the solution :math:`x^*,y^*` satisfying both
 residual equations given parameters :math:`r` and :math:`\theta`. In Condor,
 
-.. GENERATED FROM PYTHON SOURCE LINES 72-93
+.. GENERATED FROM PYTHON SOURCE LINES 75-97
 
 .. code-block:: Python
+
 
 
     class CartesianTransform(co.AlgebraicSystem):
@@ -217,7 +221,7 @@ residual equations given parameters :math:`r` and :math:`\theta`. In Condor,
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 94-100
+.. GENERATED FROM PYTHON SOURCE LINES 98-104
 
 Note also that passing the inputs (or any intermediates) to plain numeric functions
 that can handle symbolic objects as well as pure numerical objects (float or numpy
@@ -226,7 +230,7 @@ arrays) could work for this simple example. However, since we *embedded* the
 values is directly accessible if the ``bind_embedded_models`` option is ``True``
 (which it is by default), as in:
 
-.. GENERATED FROM PYTHON SOURCE LINES 100-104
+.. GENERATED FROM PYTHON SOURCE LINES 104-108
 
 .. code-block:: Python
 
@@ -247,7 +251,7 @@ values is directly accessible if the ``bind_embedded_models`` option is ``True``
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 105-110
+.. GENERATED FROM PYTHON SOURCE LINES 109-114
 
 Note that this has multiple solutions due to the form of the algebraic relationship of
 the polar/rectangular transformation. The :class:`AlgebraicSystem` uses Newton's
@@ -255,7 +259,7 @@ method as the solver, so the solution that is found depends on the initial condi
 The :attr:`initializer` attribute on the :attr:`variable` field determines the initial
 position. For example,
 
-.. GENERATED FROM PYTHON SOURCE LINES 110-116
+.. GENERATED FROM PYTHON SOURCE LINES 114-120
 
 .. code-block:: Python
 
@@ -278,12 +282,12 @@ position. For example,
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 117-119
+.. GENERATED FROM PYTHON SOURCE LINES 121-123
 
 An additional :attr:`warm_start` attribute determines whether the initializer is
-over-wrriten. Since the default is true, we can inspect the initializer values, 
+over-wrriten. Since the default is true, we can inspect the initializer values,
 
-.. GENERATED FROM PYTHON SOURCE LINES 119-122
+.. GENERATED FROM PYTHON SOURCE LINES 123-126
 
 .. code-block:: Python
 
@@ -303,17 +307,16 @@ over-wrriten. Since the default is true, we can inspect the initializer values,
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 123-124
+.. GENERATED FROM PYTHON SOURCE LINES 127-128
 
 and re-solve with attr:`warm_start` False
 
-.. GENERATED FROM PYTHON SOURCE LINES 124-127
+.. GENERATED FROM PYTHON SOURCE LINES 128-130
 
 .. code-block:: Python
 
 
-    CartesianTransform.y.warm_start = False 
-
+    CartesianTransform.y.warm_start = False
 
 
 

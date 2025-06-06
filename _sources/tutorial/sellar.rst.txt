@@ -46,17 +46,18 @@ symbol must be defined. In an engineering memo, we might say "where :math:`y_1,y
 are the variables to solve and :math:`x \in \mathbb{R}^3` parameterizes the system of
 equations," which suggests the API for an algebraic system of equations as
 
-.. GENERATED FROM PYTHON SOURCE LINES 29-40
+.. GENERATED FROM PYTHON SOURCE LINES 29-42
 
 .. code-block:: Python
 
 
     import condor
 
+
     class Coupling(condor.AlgebraicSystem):
         x = parameter(shape=3)
-        y1 = variable(initializer=1.)
-        y2 = variable(initializer=1.)
+        y1 = variable(initializer=1.0)
+        y2 = variable(initializer=1.0)
 
         residual(y1 == x[0] ** 2 + x[1] + x[2] - 0.2 * y2)
         residual(y2 == y1**0.5 + x[0] + x[1])
@@ -68,17 +69,18 @@ equations," which suggests the API for an algebraic system of equations as
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 41-43
+
+.. GENERATED FROM PYTHON SOURCE LINES 43-45
 
 which can be evaluated by instantiating the model with numerical values for the
 parameters:
 
-.. GENERATED FROM PYTHON SOURCE LINES 43-46
+.. GENERATED FROM PYTHON SOURCE LINES 45-48
 
 .. code-block:: Python
 
 
-    coupling = Coupling([5., 2., 1])
+    coupling = Coupling([5.0, 2.0, 1])
 
 
 
@@ -87,13 +89,13 @@ parameters:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 47-50
+.. GENERATED FROM PYTHON SOURCE LINES 49-52
 
 Once the model is finished running, the model *binds* the numerical results from the
 iterative solver to the named *element* and *field* attributes on the instance. That
 is, elements of fields accessible directly:
 
-.. GENERATED FROM PYTHON SOURCE LINES 50-53
+.. GENERATED FROM PYTHON SOURCE LINES 52-55
 
 .. code-block:: Python
 
@@ -113,11 +115,11 @@ is, elements of fields accessible directly:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 54-55
+.. GENERATED FROM PYTHON SOURCE LINES 56-57
 
 Fields are bound as dataclasses
 
-.. GENERATED FROM PYTHON SOURCE LINES 55-59
+.. GENERATED FROM PYTHON SOURCE LINES 57-61
 
 .. code-block:: Python
 
@@ -138,7 +140,7 @@ Fields are bound as dataclasses
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 60-75
+.. GENERATED FROM PYTHON SOURCE LINES 62-77
 
 Models can be used recursively, building up more sophisticated models by *embedding*
 models within another. However, system encapsulation is enforced so only elements from
@@ -148,29 +150,30 @@ define the optimization as
 
 .. math::
    \begin{aligned}
-   \operatorname*{minimize}_{x \in \mathbb{R}^3} &  &  & x_{2}^{2}+x_{1}+y_{1}+e^{-y_{2}} \\
-   \text{subject to} &  &  & 3.16\le y_{1}\\
-    &  &  & y_{2}\le24.0
+   \operatorname*{minimize}_{x \in \mathbb{R}^3} & \quad x_2^2+x_1+y_1+e^{-y_{2}} \\
+   \text{subject to} & \quad 3.16 \le y_1 \\
+   & \quad y_2 \le 24.0
    \end{aligned}
 
 where :math:`y_1` and :math:`y_2` are the solution to the system of algebraic
 equations described above. In condor, we can write this as
 
-.. GENERATED FROM PYTHON SOURCE LINES 75-87
+.. GENERATED FROM PYTHON SOURCE LINES 77-91
 
 .. code-block:: Python
 
 
     from condor.backend import operators as ops
 
+
     class Sellar(condor.OptimizationProblem):
         x = variable(shape=3, lower_bound=0, upper_bound=10)
         coupling = Coupling(x)
         y1, y2 = coupling
 
-        objective = x[2]**2 + x[1] + y1 + ops.exp(-y2)
+        objective = x[2] ** 2 + x[1] + y1 + ops.exp(-y2)
         constraint(y1 >= 3.16)
-        constraint(24. >= y2)
+        constraint(y2 <= 24.0)
 
 
 
@@ -179,17 +182,18 @@ equations described above. In condor, we can write this as
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 88-90
+
+.. GENERATED FROM PYTHON SOURCE LINES 92-94
 
 As with the system of algebraic equations, we can numerically solve this optimization
 problem by providing an initial value for the variables and instantiating the model.
 
-.. GENERATED FROM PYTHON SOURCE LINES 90-94
+.. GENERATED FROM PYTHON SOURCE LINES 94-98
 
 .. code-block:: Python
 
 
-    Sellar.set_initial(x=[5,2,1])
+    Sellar.set_initial(x=[5, 2, 1])
     sellar = Sellar()
 
 
@@ -253,26 +257,26 @@ problem by providing an initial value for the variables and instantiating the mo
     Number of equality constraint Jacobian evaluations   = 0
     Number of inequality constraint Jacobian evaluations = 16
     Number of Lagrangian Hessian evaluations             = 15
-    Total seconds in IPOPT                               = 0.064
+    Total seconds in IPOPT                               = 0.063
 
     EXIT: Optimal Solution Found.
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 95-97
+.. GENERATED FROM PYTHON SOURCE LINES 99-101
 
 The resulting object will have a dot-able data structure with the bound results,
 including the embedded ``Coupling`` model:
 
-.. GENERATED FROM PYTHON SOURCE LINES 97-102
+.. GENERATED FROM PYTHON SOURCE LINES 101-106
 
 .. code-block:: Python
 
 
-    print("objective value:", sellar.objective) # scalar value
-    print(sellar.constraint) # field
-    print(sellar.coupling.y1) # embedded-model element
+    print("objective value:", sellar.objective)  # scalar value
+    print(sellar.constraint)  # field
+    print(sellar.coupling.y1)  # embedded-model element
 
 
 
@@ -289,15 +293,17 @@ including the embedded ``Coupling`` model:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 103-105
+.. GENERATED FROM PYTHON SOURCE LINES 107-111
 
 .. rubric:: References
-.. [sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based, Concurrent Subspace Optimization for Multidisciplinary System Design," 1996. https://doi.org/10.2514/6.1996-714
+.. [sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based,
+   Concurrent Subspace Optimization for Multidisciplinary System Design," 1996.
+   https://doi.org/10.2514/6.1996-714
 
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 0.159 seconds)
+   **Total running time of the script:** (0 minutes 0.158 seconds)
 
 
 .. _sphx_glr_download_tutorial_sellar.py:

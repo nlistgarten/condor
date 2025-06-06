@@ -1,0 +1,1043 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Topics" href="../topics/index.html" /><link rel="prev" title="Implementations" href="implementations.html" />
+
+    <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
+        <title>Backend Modules - Condor 0.3.1.dev66+gc55207a documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=302659d7" />
+    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=5914a474" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev66+gc55207a documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  
+  <span class="sidebar-brand-text">Condor 0.3.1.dev66+gc55207a documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorial/index.html">Tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Tutorials</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorial/sellar.html">Introduction to Condor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorial/polar_transform.html">Polar Transformation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorial/trajectory.html">Working with trajectories</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../howto/index.html">How-To Guide</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of How-To Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../howto/table_basics.html">Tabular Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../howto/parallel_processing.html">Parallel Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Condor API</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Condor API</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="contrib.html">Contrib Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fields.html">Fields and Elements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="implementations.html">Implementations</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Backend Modules</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../topics/design.html">Condor Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../topics/glossary.html">Glossary of Terms</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/api/backend.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="backend-modules">
+<h1>Backend Modules<a class="headerlink" href="#backend-modules" title="Link to this heading">¶</a></h1>
+<section id="module-condor.backend">
+<span id="backend-shim"></span><h2>Backend Shim<a class="headerlink" href="#module-condor.backend" title="Link to this heading">¶</a></h2>
+<p>Shim module for non-operators. This is moer utility-like functionality, outside the
+scope of the array API standard.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="condor.backend.symbol_class">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.</span></span><span class="sig-name descname"><span class="pre">symbol_class</span></span><a class="headerlink" href="#condor.backend.symbol_class" title="Link to this definition">¶</a></dt>
+<dd><p>class for expressions</p>
+</dd></dl>
+
+</section>
+<section id="module-condor.backend.operators">
+<span id="operators-shim"></span><h2>Operators Shim<a class="headerlink" href="#module-condor.backend.operators" title="Link to this heading">¶</a></h2>
+<p>Shim module for operators, extending the array API standard with several calculus
+operators</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="condor.backend.operators.pi">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">pi</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3.141592653589793</span></em><a class="headerlink" href="#condor.backend.operators.pi" title="Link to this definition">¶</a></dt>
+<dd><p>constant pi</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="condor.backend.operators.inf">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">inf</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">inf</span></em><a class="headerlink" href="#condor.backend.operators.inf" title="Link to this definition">¶</a></dt>
+<dd><p>constant inf</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="condor.backend.operators.nan">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">nan</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">nan</span></em><a class="headerlink" href="#condor.backend.operators.nan" title="Link to this definition">¶</a></dt>
+<dd><p>constant nan</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.jacobian">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">of</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wrt</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.jacobian" title="Link to this definition">¶</a></dt>
+<dd><p>create dense jacobian expression</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.if_else">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">if_else</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">conditions_actions</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.if_else" title="Link to this definition">¶</a></dt>
+<dd><p>function for creating</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.wrap">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">wrap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.wrap" title="Link to this definition">¶</a></dt>
+<dd><p>wrap function <code class="xref py py-attr docutils literal notranslate"><span class="pre">f</span></code> to allow elements, symbolic, and numeric values to be
+usable</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.min">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">min</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.min" title="Link to this definition">¶</a></dt>
+<dd><p>array API standard for min</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.max">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">max</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.max" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.mod">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">mod</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.mod" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.tan">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">tan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.tan" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.atan">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">atan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.atan" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.atan2">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">atan2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.atan2" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.sin">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">sin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.sin" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.cos">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">cos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.cos" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.asin">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">asin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.asin" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.acos">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">acos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.acos" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.exp">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">exp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.exp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.log">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.log" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.log10">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">log10</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.log10" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.sqrt">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">sqrt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.sqrt" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.vector_norm">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">vector_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.vector_norm" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backend.operators.solve">
+<span class="sig-prename descclassname"><span class="pre">condor.backend.operators.</span></span><span class="sig-name descname"><span class="pre">solve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backend.operators.solve" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="casadi-realization">
+<h2>CasADi Realization<a class="headerlink" href="#casadi-realization" title="Link to this heading">¶</a></h2>
+<section id="module-condor.backends.casadi">
+<span id="backend-module"></span><h3>Backend Module<a class="headerlink" href="#module-condor.backends.casadi" title="Link to this heading">¶</a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.symbols_in">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">symbols_in</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.symbols_in" title="Link to this definition">¶</a></dt>
+<dd><p>return the leaf symbols in the <code class="xref py py-attr docutils literal notranslate"><span class="pre">expression</span></code></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.is_constant">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">is_constant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">symbol</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.is_constant" title="Link to this definition">¶</a></dt>
+<dd><p>evaluate whether the <code class="xref py py-attr docutils literal notranslate"><span class="pre">symbol</span></code> is a constant (e.g., numeric)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.process_relational_element">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">process_relational_element</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">elem</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.process_relational_element" title="Link to this definition">¶</a></dt>
+<dd><p>modify an element if the backend_repr is relational</p>
+<dl class="simple">
+<dt>if backend_repr is lhs == rhs,</dt><dd><p>replace with lhs - rhs
+set upper_bound = lower_bound = 0 (if element has bounds)</p>
+</dd>
+<dt>if backend_repr is inequality, e.g., lhs &lt; mhs &lt; rhs</dt><dd><p>attach lhs to lower bound, mhs to backend_repr, and rhs to upper_bound</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="condor.backends.casadi.BackendSymbolData">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">BackendSymbolData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symmetric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diagonal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.BackendSymbolData" title="Link to this definition">¶</a></dt>
+<dd><p>Dataclass for handling backend expressions</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.BackendSymbolData.flatten_value">
+<span class="sig-name descname"><span class="pre">flatten_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.BackendSymbolData.flatten_value" title="Link to this definition">¶</a></dt>
+<dd><p>flatten a value to the appropriate representation for the backend</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.BackendSymbolData.wrap_value">
+<span class="sig-name descname"><span class="pre">wrap_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.BackendSymbolData.wrap_value" title="Link to this definition">¶</a></dt>
+<dd><p>wrap a flattened value to the appropriate shape</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.symmetric_to_unique">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">symmetric_to_unique</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symbolic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.symmetric_to_unique" title="Link to this definition">¶</a></dt>
+<dd><p>helper function for flattening a symmetric symbol</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.unique_to_symmetric">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">unique_to_symmetric</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">unique</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symbolic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.unique_to_symmetric" title="Link to this definition">¶</a></dt>
+<dd><p>helper function for wrapping a symmetric symbol</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.symbol_generator">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">symbol_generator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(1,</span> <span class="pre">1)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symmetric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diagonal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.symbol_generator" title="Link to this definition">¶</a></dt>
+<dd><p>create a symbol</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<em>str</em>)</p></li>
+<li><p><strong>shape</strong> (<em>tuple</em><em> of </em><em>ints</em>)</p></li>
+<li><p><strong>symmetric</strong> (<em>bool</em>) – flag to indicate this should be a symmetric (2-D) matrix; only store the unique
+elements</p></li>
+<li><p><strong>diagonal</strong> (<em>bool</em>) – flag to indicate this should be a (2-D) matrix with only elements on the
+diagonal</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.get_symbol_data">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">get_symbol_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">symbol</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symmetric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.get_symbol_data" title="Link to this definition">¶</a></dt>
+<dd><p>extract shape metadata from an expression</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.symbol_is">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">symbol_is</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.symbol_is" title="Link to this definition">¶</a></dt>
+<dd><p>evaluate whether two symbols are the same with idiosyncrasies for symbol class</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="condor.backends.casadi.SymbolCompatibleDict">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">SymbolCompatibleDict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.SymbolCompatibleDict" title="Link to this definition">¶</a></dt>
+<dd><p>A dict subclass that works with the backend symbol class</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.SymbolCompatibleDict.keys">
+<span class="sig-name descname"><span class="pre">keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">a</span> <span class="pre">set-like</span> <span class="pre">object</span> <span class="pre">providing</span> <span class="pre">a</span> <span class="pre">view</span> <span class="pre">on</span> <span class="pre">D's</span> <span class="pre">keys</span></span></span><a class="headerlink" href="#condor.backends.casadi.SymbolCompatibleDict.keys" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.SymbolCompatibleDict.items">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">a</span> <span class="pre">set-like</span> <span class="pre">object</span> <span class="pre">providing</span> <span class="pre">a</span> <span class="pre">view</span> <span class="pre">on</span> <span class="pre">D's</span> <span class="pre">items</span></span></span><a class="headerlink" href="#condor.backends.casadi.SymbolCompatibleDict.items" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.evalf">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">evalf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_repr2value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.evalf" title="Link to this definition">¶</a></dt>
+<dd><p>evaluate <code class="xref py py-attr docutils literal notranslate"><span class="pre">expr</span></code> with dictionary of {symbol: value}</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">CasadiFunctionCallback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapper_funcs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">implementation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jacobian_of</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_symbol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_symbol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback" title="Link to this definition">¶</a></dt>
+<dd><p>Base class for wrapping a Function with a Callback</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.construct">
+<span class="sig-name descname"><span class="pre">construct</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.construct" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">str</span> <span class="n">name</span><span class="p">,</span> <span class="nb">dict</span> <span class="n">opts</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Construct internal object.</p>
+<p>This is the step that actually construct the internal object, as the
+class
+constructor only creates a null pointer. It should be called
+from the user
+constructor.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_o5">https://github.com/casadi/casadi/wiki/L_o5</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L78">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L78</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L36-L42">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L36-L42</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.init">
+<span class="sig-name descname"><span class="pre">init</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.init" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">init</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Initialize the object.</p>
+<p>This function is called after the object construction (for the whole
+class
+hierarchy) is complete, but before the finalization step. It is
+called
+recursively for the whole class hierarchy, starting with the
+lowest level.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_o6">https://github.com/casadi/casadi/wiki/L_o6</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L88">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L88</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L88-L88">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L88-L88</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.finalize">
+<span class="sig-name descname"><span class="pre">finalize</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.finalize" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">finalize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Finalize the object.</p>
+<p>This function is called after the construction and init steps are</p>
+<p>completed, but before user functions are called. It is called
+recursively
+for the whole class hierarchy, starting with the highest
+level.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_o7">https://github.com/casadi/casadi/wiki/L_o7</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L98">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L98</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L98-L98">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L98-L98</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.get_n_in">
+<span class="sig-name descname"><span class="pre">get_n_in</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.get_n_in" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_n_in</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span>
+</pre></div>
+</div>
+<p>Get the number of inputs.</p>
+<p>This function is called during construction.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oa">https://github.com/casadi/casadi/wiki/L_oa</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L129">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L129</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L64-L66">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L64-L66</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.get_n_out">
+<span class="sig-name descname"><span class="pre">get_n_out</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.get_n_out" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_n_out</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span>
+</pre></div>
+</div>
+<p>Get the number of outputs.</p>
+<p>This function is called during construction.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_ob">https://github.com/casadi/casadi/wiki/L_ob</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L136">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L136</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L68-L70">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L68-L70</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.eval">
+<span class="sig-name descname"><span class="pre">eval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.eval" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nb">eval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="p">[</span><span class="n">DM</span><span class="p">]</span> <span class="n">arg</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">[</span><span class="n">DM</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Evaluate numerically, using temporary matrices and work vectors.</p>
+<p>This signature is not thread-safe. For guaranteed thread-safety, use
+eval_buffer</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_o8">https://github.com/casadi/casadi/wiki/L_o8</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L106">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L106</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L60-L62">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L60-L62</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.get_sparsity_in">
+<span class="sig-name descname"><span class="pre">get_sparsity_in</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.get_sparsity_in" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_sparsity_in</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">int</span> <span class="n">i</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sparsity</span>
+</pre></div>
+</div>
+<p>Get the sparsity of an input.</p>
+<p>This function is called during construction.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oc">https://github.com/casadi/casadi/wiki/L_oc</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L143">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L143</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L72-L74">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L72-L74</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.get_sparsity_out">
+<span class="sig-name descname"><span class="pre">get_sparsity_out</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.get_sparsity_out" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_sparsity_out</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">int</span> <span class="n">i</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sparsity</span>
+</pre></div>
+</div>
+<p>Get the sparsity of an output.</p>
+<p>This function is called during construction.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_od">https://github.com/casadi/casadi/wiki/L_od</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L150">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L150</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L76-L78">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L76-L78</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.has_forward">
+<span class="sig-name descname"><span class="pre">has_forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfwd</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.has_forward" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">has_forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">int</span> <span class="n">nfwd</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</pre></div>
+</div>
+<p>Return function that calculates forward derivatives.</p>
+<p>forward(nfwd) returns a cached instance if available, and calls   Function
+get_forward(casadi_int nfwd) if no cached version is available.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oi">https://github.com/casadi/casadi/wiki/L_oi</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L190">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L190</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L112-L114">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L112-L114</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.has_reverse">
+<span class="sig-name descname"><span class="pre">has_reverse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nrev</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.has_reverse" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">has_reverse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">int</span> <span class="n">nadj</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</pre></div>
+</div>
+<p>Return function that calculates adjoint derivatives.</p>
+<p>reverse(nadj) returns a cached instance if available, and calls   Function
+get_reverse(casadi_int nadj) if no cached version is available.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oj">https://github.com/casadi/casadi/wiki/L_oj</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L205">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L205</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L124-L126">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L124-L126</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.get_forward">
+<span class="sig-name descname"><span class="pre">get_forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">onames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.get_forward" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">int</span> <span class="n">nfwd</span><span class="p">,</span> <span class="nb">str</span> <span class="n">name</span><span class="p">,</span> <span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="n">inames</span><span class="p">,</span> <span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="n">onames</span><span class="p">,</span> <span class="nb">dict</span> <span class="n">opts</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Function</span>
+</pre></div>
+</div>
+<p>Return function that calculates forward derivatives.</p>
+<p>forward(nfwd) returns a cached instance if available, and calls   Function
+get_forward(casadi_int nfwd) if no cached version is available.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oi">https://github.com/casadi/casadi/wiki/L_oi</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L191">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L191</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L105-L110">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L105-L110</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.get_reverse">
+<span class="sig-name descname"><span class="pre">get_reverse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nout</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">onames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.get_reverse" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_reverse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">int</span> <span class="n">nadj</span><span class="p">,</span> <span class="nb">str</span> <span class="n">name</span><span class="p">,</span> <span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="n">inames</span><span class="p">,</span> <span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="n">onames</span><span class="p">,</span> <span class="nb">dict</span> <span class="n">opts</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Function</span>
+</pre></div>
+</div>
+<p>Return function that calculates adjoint derivatives.</p>
+<p>reverse(nadj) returns a cached instance if available, and calls   Function
+get_reverse(casadi_int nadj) if no cached version is available.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oj">https://github.com/casadi/casadi/wiki/L_oj</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L206">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L206</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L117-L122">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L117-L122</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.has_jacobian">
+<span class="sig-name descname"><span class="pre">has_jacobian</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.has_jacobian" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">has_jacobian</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</pre></div>
+</div>
+<p>Return Jacobian of all input elements with respect to all output</p>
+<p>elements.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oh">https://github.com/casadi/casadi/wiki/L_oh</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L175">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L175</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L92-L94">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L92-L94</a></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="condor.backends.casadi.CasadiFunctionCallback.get_jacobian">
+<span class="sig-name descname"><span class="pre">get_jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">onames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">opts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.CasadiFunctionCallback.get_jacobian" title="Link to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>[INTERNAL]</p>
+</div></blockquote>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_jacobian</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">str</span> <span class="n">name</span><span class="p">,</span> <span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="n">inames</span><span class="p">,</span> <span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="n">onames</span><span class="p">,</span> <span class="nb">dict</span> <span class="n">opts</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Function</span>
+</pre></div>
+</div>
+<p>Return Jacobian of all input elements with respect to all output</p>
+<p>elements.</p>
+<p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oh">https://github.com/casadi/casadi/wiki/L_oh</a></p>
+<p>Doc source:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L176">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L176</a></p>
+<p>Implementation:
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L97-L102">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L97-L102</a></p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.callables_to_operator">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">callables_to_operator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapper_funcs</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.callables_to_operator" title="Link to this definition">¶</a></dt>
+<dd><p>check if this is actually something that needs to get wrapped or if it’s a
+native op… if latter, return directly; if former, create callback.</p>
+<p>this function ultimately contains the generic API, CasadiFunctionCallback can be
+casadi specific interface</p>
+<p>to think about: default casadi jacobian operator introduces additional inputs
+(and therefore, after second derivative also introduces additional output) for
+anti-derivative output. This is required for most “solver” type outputs.
+However, probably don’t want to use casadi machinery for retaining that solver
+– would be done externally. Is there ever a time we would want to use casadi
+machinery for passing in previous solution? if so, what would the API be for
+specifying?</p>
+<p>y = fun(x)
+jac = jac_fun(x,y)
+d_jac_x, d_jac_y = hess_fun(x, y, jac)</p>
+<p>if we don’t use casadi’s mechanisms, we are technically not functional
+but maybe when it gets wrapped by the callbacks, it effectively becomes
+functional because new instances are always created when needed to prevent race
+conditions, etc?</p>
+<p>similarly, how to specify alternate types/details of derivative, like
+forward/reverse mode, matrix-vector product form, etc.</p>
+<p>by definition, since we are consuming functions and cannot arbitrarily take
+derivatives (could look at how casadi does trajectory but even if useful for our
+trajectory, may not generalize to other external solvers) so need to implement
+and declare manually. Assuming this take is right, seems somewhat reasonable to
+assume we get functions, list of callables (at least 1) that evaluates 0th+
+functions (dense jacobians, hessians, etc). Then a totally different spec track for
+jacobian-vector or vector-jacobian products. Could cap out at 2nd derivative, not
+sure what the semantics for hessian-vector vs vector-hessian products, tensor etc.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.expression_to_operator">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">expression_to_operator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_symbols</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_expressions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.expression_to_operator" title="Link to this definition">¶</a></dt>
+<dd><p>take a symbolic expression and create an operator – callable that can be used
+with jacobian, etc. operators</p>
+<p>assume “MISO” – but slightly misleading since output can be arbitrary size</p>
+</dd></dl>
+
+</section>
+<section id="module-condor.backends.casadi.operators">
+<span id="operators-module"></span><h3>Operators Module<a class="headerlink" href="#module-condor.backends.casadi.operators" title="Link to this heading">¶</a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.operators.concat">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.operators.</span></span><span class="sig-name descname"><span class="pre">concat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.operators.concat" title="Link to this definition">¶</a></dt>
+<dd><p>implement concat from array API for casadi</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.operators.jacobian">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.operators.</span></span><span class="sig-name descname"><span class="pre">jacobian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">of</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wrt</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.operators.jacobian" title="Link to this definition">¶</a></dt>
+<dd><p>jacobian of expression <cite>of</cite> with respect to symbols <cite>wrt</cite></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.operators.jac_prod">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.operators.</span></span><span class="sig-name descname"><span class="pre">jac_prod</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">of</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wrt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rev</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.operators.jac_prod" title="Link to this definition">¶</a></dt>
+<dd><p>create directional derivative</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="condor.backends.casadi.operators.if_else">
+<span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.operators.</span></span><span class="sig-name descname"><span class="pre">if_else</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">conditions_actions</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.operators.if_else" title="Link to this definition">¶</a></dt>
+<dd><p>symbolic representation of a if/else control flow</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>*conditions_actions</strong> (<em>list</em><em> of </em><em>(</em><em>condition</em><em>, </em><em>value</em><em>) </em><em>pairs</em><em>, </em><em>ending with else_value</em>)</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>The expression:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">value</span> <span class="o">=</span> <span class="n">if_else</span><span class="p">(</span>
+    <span class="p">(</span><span class="n">condition0</span><span class="p">,</span> <span class="n">value0</span><span class="p">),</span>
+    <span class="p">(</span><span class="n">codnition1</span><span class="p">,</span> <span class="n">value1</span><span class="p">),</span>
+    <span class="o">...</span>
+    <span class="n">else_value</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>is equivalent to the numerical code:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">condition0</span><span class="p">:</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">value0</span>
+<span class="k">elif</span> <span class="n">condition1</span><span class="p">:</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">value1</span>
+<span class="o">...</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">else_value</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="../topics/index.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Topics</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="implementations.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Implementations</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023, Benjamin W. L. Margolis
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Backend Modules</a><ul>
+<li><a class="reference internal" href="#module-condor.backend">Backend Shim</a><ul>
+<li><a class="reference internal" href="#condor.backend.symbol_class"><code class="docutils literal notranslate"><span class="pre">symbol_class</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-condor.backend.operators">Operators Shim</a><ul>
+<li><a class="reference internal" href="#condor.backend.operators.pi"><code class="docutils literal notranslate"><span class="pre">pi</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.inf"><code class="docutils literal notranslate"><span class="pre">inf</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.nan"><code class="docutils literal notranslate"><span class="pre">nan</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.jacobian"><code class="docutils literal notranslate"><span class="pre">jacobian()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.if_else"><code class="docutils literal notranslate"><span class="pre">if_else()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.wrap"><code class="docutils literal notranslate"><span class="pre">wrap()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.min"><code class="docutils literal notranslate"><span class="pre">min()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.max"><code class="docutils literal notranslate"><span class="pre">max()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.mod"><code class="docutils literal notranslate"><span class="pre">mod()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.tan"><code class="docutils literal notranslate"><span class="pre">tan()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.atan"><code class="docutils literal notranslate"><span class="pre">atan()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.atan2"><code class="docutils literal notranslate"><span class="pre">atan2()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.sin"><code class="docutils literal notranslate"><span class="pre">sin()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.cos"><code class="docutils literal notranslate"><span class="pre">cos()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.asin"><code class="docutils literal notranslate"><span class="pre">asin()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.acos"><code class="docutils literal notranslate"><span class="pre">acos()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.exp"><code class="docutils literal notranslate"><span class="pre">exp()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.log"><code class="docutils literal notranslate"><span class="pre">log()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.log10"><code class="docutils literal notranslate"><span class="pre">log10()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.sqrt"><code class="docutils literal notranslate"><span class="pre">sqrt()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.vector_norm"><code class="docutils literal notranslate"><span class="pre">vector_norm()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backend.operators.solve"><code class="docutils literal notranslate"><span class="pre">solve()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#casadi-realization">CasADi Realization</a><ul>
+<li><a class="reference internal" href="#module-condor.backends.casadi">Backend Module</a><ul>
+<li><a class="reference internal" href="#condor.backends.casadi.symbols_in"><code class="docutils literal notranslate"><span class="pre">symbols_in()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.is_constant"><code class="docutils literal notranslate"><span class="pre">is_constant()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.process_relational_element"><code class="docutils literal notranslate"><span class="pre">process_relational_element()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.BackendSymbolData"><code class="docutils literal notranslate"><span class="pre">BackendSymbolData</span></code></a><ul>
+<li><a class="reference internal" href="#condor.backends.casadi.BackendSymbolData.flatten_value"><code class="docutils literal notranslate"><span class="pre">BackendSymbolData.flatten_value()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.BackendSymbolData.wrap_value"><code class="docutils literal notranslate"><span class="pre">BackendSymbolData.wrap_value()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#condor.backends.casadi.symmetric_to_unique"><code class="docutils literal notranslate"><span class="pre">symmetric_to_unique()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.unique_to_symmetric"><code class="docutils literal notranslate"><span class="pre">unique_to_symmetric()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.symbol_generator"><code class="docutils literal notranslate"><span class="pre">symbol_generator()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.get_symbol_data"><code class="docutils literal notranslate"><span class="pre">get_symbol_data()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.symbol_is"><code class="docutils literal notranslate"><span class="pre">symbol_is()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.SymbolCompatibleDict"><code class="docutils literal notranslate"><span class="pre">SymbolCompatibleDict</span></code></a><ul>
+<li><a class="reference internal" href="#condor.backends.casadi.SymbolCompatibleDict.keys"><code class="docutils literal notranslate"><span class="pre">SymbolCompatibleDict.keys()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.SymbolCompatibleDict.items"><code class="docutils literal notranslate"><span class="pre">SymbolCompatibleDict.items()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#condor.backends.casadi.evalf"><code class="docutils literal notranslate"><span class="pre">evalf()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback</span></code></a><ul>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.construct"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.construct()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.init"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.init()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.finalize"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.finalize()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.get_n_in"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.get_n_in()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.get_n_out"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.get_n_out()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.eval"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.eval()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.get_sparsity_in"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.get_sparsity_in()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.get_sparsity_out"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.get_sparsity_out()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.has_forward"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.has_forward()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.has_reverse"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.has_reverse()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.get_forward"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.get_forward()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.get_reverse"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.get_reverse()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.has_jacobian"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.has_jacobian()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.CasadiFunctionCallback.get_jacobian"><code class="docutils literal notranslate"><span class="pre">CasadiFunctionCallback.get_jacobian()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#condor.backends.casadi.callables_to_operator"><code class="docutils literal notranslate"><span class="pre">callables_to_operator()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.expression_to_operator"><code class="docutils literal notranslate"><span class="pre">expression_to_operator()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-condor.backends.casadi.operators">Operators Module</a><ul>
+<li><a class="reference internal" href="#condor.backends.casadi.operators.concat"><code class="docutils literal notranslate"><span class="pre">concat()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.operators.jacobian"><code class="docutils literal notranslate"><span class="pre">jacobian()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.operators.jac_prod"><code class="docutils literal notranslate"><span class="pre">jac_prod()</span></code></a></li>
+<li><a class="reference internal" href="#condor.backends.casadi.operators.if_else"><code class="docutils literal notranslate"><span class="pre">if_else()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=cc7ef148"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=5fa4622c"></script>
+    </body>
+</html>
