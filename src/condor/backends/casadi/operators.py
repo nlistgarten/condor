@@ -1,4 +1,6 @@
 # from numpy import *
+import contextlib
+
 import numpy as np
 
 import casadi
@@ -131,13 +133,18 @@ def jac_prod(of, wrt, rev=True):
     return casadi.jtimes(of, wrt, not rev)
 
 
-def substitute(expr, subs):
+def substitute(expr, subs, try_eval=False):
     for key, val in subs.items():
         expr = casadi.substitute(expr, key, val)
-    return expr
 
-    if isinstance(expr, backend.symbol_class):
-        expr = casadi.substitute([expr], list(subs.keys()), list(subs.values()))[0]
+    if try_eval:
+        with contextlib.suppress(RuntimeError):
+            expr = casadi.evalf(expr)
+
+        if isinstance(expr, backend.symbol_class) and backend.is_constant(expr):
+            expr = expr.to_DM().toarray()
+            expr.setflags(w=1)
+            print(expr.flags)
     return expr
 
 
