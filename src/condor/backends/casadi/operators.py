@@ -133,18 +133,22 @@ def jac_prod(of, wrt, rev=True):
     return casadi.jtimes(of, wrt, not rev)
 
 
-def substitute(expr, subs, try_eval=False):
+def substitute(expr, subs):
     for key, val in subs.items():
         expr = casadi.substitute(expr, key, val)
 
-    if try_eval:
+    # if expr is the output of a single call, try to to eval it
+    if isinstance(expr, backend.symbol_class) and (
+        (
+            expr.op() == casadi.OP_GETNONZEROS
+            and expr.dep().op() == -1
+            and expr.dep().dep().is_call()
+        )
+        or (expr.op() == -1 and expr.dep().is_call())
+    ):
         with contextlib.suppress(RuntimeError):
             expr = casadi.evalf(expr)
 
-        if isinstance(expr, backend.symbol_class) and backend.is_constant(expr):
-            expr = expr.to_DM().toarray()
-            expr.setflags(w=1)
-            print(expr.flags)
     return expr
 
 
