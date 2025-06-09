@@ -139,11 +139,24 @@ class BaseCondorClassDict(dict):
             attr_val.prepare(self)
 
         if isinstance(attr_val.__class__, BaseModelType):
+            # if all input symbols are from this model, embed
+            # otherwise it's a stray reference
+            can_embed = True
+            for input_val in attr_val.input_kwargs.values():
+                if not can_embed:
+                    break
+                if isinstance(input_val, backend.symbol_class):
+                    for input_sym in backend.symbols_in(input_val):
+                        if input_sym not in self.meta.backend_repr_elements:
+                            can_embed = False
+                            break
             if getattr(attr_val, "name", ""):
-                self.meta.embedded_models[attr_val.name] = attr_val
+                if can_embed:
+                    self.meta.embedded_models[attr_val.name] = attr_val
                 super().__setitem__(attr_val.name, attr_val)
             else:
-                self.meta.embedded_models[attr_name] = attr_val
+                if can_embed:
+                    self.meta.embedded_models[attr_name] = attr_val
                 attr_val.name = attr_name
         if isinstance(attr_val, BaseElement) and not attr_val.name:
             attr_val.name = attr_name
@@ -414,7 +427,10 @@ class BaseModelType(type):
                 elif isinstance(elem_matching_backend_repr, BaseElement):
                     existing_attr = elem_matching_backend_repr.backend_repr
                     # assume cls dict assignment??
-                if existing_attr is v:  # or cls_dict[k].backend_repr is v:
+                if (existing_attr is v) or (
+                    isinstance(existing_attr, backend.symbol_class)
+                    and backend.symbol_is(existing_attr, v)
+                ):
                     # only ensure that this is marked as inherited, don't need
                     # to re-copy
                     if (inherited_attr := meta.inherited_items.get(k, None)) is None:
@@ -1410,6 +1426,7 @@ class Model(metaclass=ModelType):
         model = self.__class__
         if not model._meta.bind_embedded_models:
             return
+
         model_assignments = {}
 
         fields = [
@@ -1432,7 +1449,6 @@ class Model(metaclass=ModelType):
             embedded_model_instance,
         ) in model._meta.embedded_models.items():
             embedded_model = embedded_model_instance.__class__
-
             bound_embedded_model = embedded_model.__new__(embedded_model)
 
             bound_embedded_model.implementation = embedded_model_instance.implementation
@@ -1475,8 +1491,9 @@ class Model(metaclass=ModelType):
                         if backend.symbol_is(v, kk):
                             value_found = True
                             break
-                    embedded_model_kwargs[k] = vv
-                    if not value_found:
+                    if value_found:
+                        embedded_model_kwargs[k] = vv
+                    else:
                         symbols_in_v = backend.symbols_in(v)
                         v_kwargs = {
                             symbol: model_assignments[symbol] for symbol in symbols_in_v
@@ -1646,6 +1663,7 @@ class SubmodelMetaData(BaseModelMetaData):
     # primary only needed for submodels, maybe also subclasses?
     primary: object = None
     copy_fields: list = dc.field(default_factory=list)
+    copy_embedded_models: bool = True
     subclasses: list = dc.field(default_factory=list)
 
 
@@ -1653,7 +1671,11 @@ class SubmodelTemplateType(ModelTemplateType):
     metadata_class = SubmodelMetaData
 
     def type_kwargs(cls, meta):
-        return dict(primary=meta.primary, copy_fields=meta.copy_fields)
+        return dict(
+            primary=meta.primary,
+            copy_fields=meta.copy_fields,
+            copy_embedded_models=meta.copy_embedded_models,
+        )
 
     @classmethod
     def inherit_field(cls, field, cls_dict):
@@ -1700,15 +1722,17 @@ class SubmodelTemplateType(ModelTemplateType):
         bases,
         primary=None,
         copy_fields=None,  # defaults to False, but need to copy from base if not set
+        copy_embedded_models=None,
         **kwds,
     ):
         log.debug(
             "SubmodelTemplateType.__prepare__(model_name=%s, bases+%s, primary=%s, "
-            "copy_fields=%s, **%s)",
+            "copy_fields=%s, copy_embedded_models=%s, **%s)",
             model_name,
             bases,
             primary,
             copy_fields,
+            copy_embedded_models,
             kwds,
         )
 
@@ -1731,10 +1755,15 @@ class SubmodelTemplateType(ModelTemplateType):
 
             if copy_fields is None:
                 copy_fields = base_meta.copy_fields
+            if copy_embedded_models is None:
+                copy_embedded_models = base_meta.copy_embedded_models
+
         elif cls.creating_base_class_for_inheritance(model_name):
             # primary is allowed to be None
             if copy_fields is None:
                 copy_fields = False
+            if copy_embedded_models is None:
+                copy_embedded_models = True
         else:
             # should extended models hit here??
             if primary is None:
@@ -1742,6 +1771,8 @@ class SubmodelTemplateType(ModelTemplateType):
                 raise TypeError(msg)
             if copy_fields is None:
                 copy_fields = False
+            if copy_embedded_models is None:
+                copy_embedded_models = True
 
         # TODO: starts to distinguish between user model metadata and template
         # metadata...
@@ -1754,13 +1785,21 @@ class SubmodelTemplateType(ModelTemplateType):
             model_name=model_name,
             copy_fields=copy_fields,
             primary=primary,
+            copy_embedded_models=copy_embedded_models,
         )
         cls_dict = super().__prepare__(model_name, bases, meta=meta, **kwds)
 
         return cls_dict
 
     def __new__(
-        cls, model_name, bases, attrs, primary=None, copy_fields=None, **kwargs
+        cls,
+        model_name,
+        bases,
+        attrs,
+        primary=None,
+        copy_fields=None,
+        copy_embedded_models=None,
+        **kwargs,
     ):
         new_cls = super().__new__(cls, model_name, bases[:], attrs, **kwargs)
 
@@ -1818,6 +1857,12 @@ class SubmodelType(ModelType):
                     elem.copy_to_field(copied_field)
             # cls_dict[attr_name] = copied_field
             return
+        if isinstance(attr_val, Model):
+            if not cls_dict.meta.copy_embedded_models:
+                return
+            if cls_dict.meta.template._meta.model_name == "TrajectoryAnalysis":
+                # breakpoint()
+                pass
         cls_dict[attr_name] = attr_val
 
     @classmethod
@@ -1832,6 +1877,9 @@ class SubmodelType(ModelType):
 
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
+        if isinstance(attr_val, Model) and not cls_dict.meta.copy_embedded_models:
+            return
+
         if (
             isinstance(attr_val, Field)
             and not new_cls._meta.copy_fields

@@ -568,6 +568,7 @@ class TrajectoryAnalysis(
     model_metaclass=TrajectoryAnalysisType,
     primary=ODESystem,
     copy_fields=True,
+    copy_embedded_models=False,
 ):
     """Simulation of an :class:`ODESystem`
 
