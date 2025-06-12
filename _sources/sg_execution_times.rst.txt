@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:29.435** total execution time for 5 files **from all galleries**:
+**00:29.486** total execution time for 5 files **from all galleries**:
 
 .. container::
 
@@ -33,17 +33,17 @@ Computation times
      - Time
      - Mem (MB)
    * - :ref:`sphx_glr_tutorial_trajectory.py` (``tutorial_src/trajectory.py``)
-     - 00:28.693
+     - 00:28.752
      - 0.0
    * - :ref:`sphx_glr_howto_table_basics.py` (``howto_src/table_basics.py``)
-     - 00:00.410
-     - 0.0
-   * - :ref:`sphx_glr_howto_parallel_processing.py` (``howto_src/parallel_processing.py``)
-     - 00:00.154
+     - 00:00.430
      - 0.0
    * - :ref:`sphx_glr_tutorial_sellar.py` (``tutorial_src/sellar.py``)
-     - 00:00.153
+     - 00:00.158
+     - 0.0
+   * - :ref:`sphx_glr_howto_parallel_processing.py` (``howto_src/parallel_processing.py``)
+     - 00:00.120
      - 0.0
    * - :ref:`sphx_glr_tutorial_polar_transform.py` (``tutorial_src/polar_transform.py``)
-     - 00:00.024
+     - 00:00.026
      - 0.0
