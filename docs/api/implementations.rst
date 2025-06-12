@@ -2,10 +2,6 @@
 Implementations
 ===============
 
-.. automodule:: condor.implementations
-   :member-order: bysource
-   :members:
-
 .. automodule:: condor.implementations.simple
    :member-order: bysource
    :members:
