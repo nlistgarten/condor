@@ -459,6 +459,8 @@ class BaseModelType(type):
                 original_v = v
                 v = base._meta.backend_repr_elements.get(v, v)
                 if isinstance(v, BaseElement) and v.field_type._name == "placeholder":
+                    if (new_field := cls_dict.get("placeholder", None)) is not None:
+                        v.copy_to_field(new_field)
                     v = original_v
 
             if isinstance(v, BaseElement):
@@ -906,7 +908,6 @@ class ModelTemplateType(BaseModelType):
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
         pass_super = True
-
         if attr_name == "placeholder":
             new_cls.placeholder = attr_val
             pass_super = False
