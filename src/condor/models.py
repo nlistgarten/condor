@@ -459,9 +459,13 @@ class BaseModelType(type):
                 original_v = v
                 v = base._meta.backend_repr_elements.get(v, v)
                 if isinstance(v, BaseElement) and v.field_type._name == "placeholder":
+
                     if (new_field := cls_dict.get("placeholder", None)) is not None:
-                        v.copy_to_field(new_field)
-                    v = original_v
+                        # TODO: or just append element so it's the same backend repr?
+                        new_v = v.copy_to_field(new_field)
+                        v = new_v.backend_repr
+                    else:
+                        v = original_v
 
             if isinstance(v, BaseElement):
                 # should only be used for placeholder and placeholder-adjacent
@@ -1196,7 +1200,7 @@ class ModelType(BaseModelType):
 
     @classmethod
     def inherit_template_methods(cls, new_cls):
-        for base in new_cls._meta.template.__mro__[:-2]:
+        for base in new_cls._meta.template.__mro__[:-2][::-1]:
             for key, val in base._meta.user_set.items():
                 if isinstance(val, classmethod):
                     log.debug(
