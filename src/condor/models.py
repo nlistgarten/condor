@@ -950,28 +950,31 @@ class ModelTemplateType(BaseModelType):
             attrs.meta.user_set = attrs.meta.inherited_items
             attrs.meta.inherited_items = {}
 
-        # if (
-        #     as_template
-        #     and bases[0].user_model_metaclass is not ModelType
-        #     and model_metaclass is None
-        # ):
-        #     # use model metaclass from first base if possible
-        #     use_metaclass = bases[0].user_model_metaclass
-        #     new_cls = use_metaclass.__new__(
-        #         use_metaclass, model_name, bases, attrs, **kwargs
-        #     )
-        #     new_cls.user_model_metaclass = use_metaclass
-        # else:
-        #     new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
         new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
 
         if immediate_return:
             return new_cls
 
-        if model_metaclass is not None:
-            new_cls.user_model_metaclass = model_metaclass
-            model_metaclass.baseclass_for_inheritance = new_cls
+        if (
+            model_metaclass is None
+            and bases
+            and bases[0] not in (ModelTemplate, SubmodelTemplate)
+        ):
+            # if not over-writing model_metaclass and bases is not built-in (so it may
+            # have a real, new model metaclass) then use it
+            log.debug("prcessing for inheriting model metaclass asssigned, new")
+            set_model_metaclass = bases[0].user_model_metaclass
+        else:
+            # otherwise, just treat as input
+            set_model_metaclass = model_metaclass
             log.debug("prcessing for model metaclass asssigned, new")
+
+        if set_model_metaclass is not None:
+            new_cls.user_model_metaclass = set_model_metaclass
+
+        if model_metaclass is not None:
+            # if over-writing model metaclass, this is the clas for inheritance
+            model_metaclass.baseclass_for_inheritance = new_cls
 
         if as_template:
             impl = ModelType.get_implementation_class(new_cls)
@@ -1146,6 +1149,7 @@ class ModelType(BaseModelType):
 
         if cls.creating_base_class_for_inheritance(name):
             super_bases = bases
+            bases_mro = bases
         else:
             bases_mro = tuple()
             for base in bases:
@@ -1168,9 +1172,9 @@ class ModelType(BaseModelType):
 
         new_cls = super().__new__(cls, name, super_bases, attrs, **kwargs)
 
-        if not cls.is_user_model(bases):
+        if not cls.is_user_model(bases_mro):
             return new_cls
-        # proceeding for user models
+        # proceeding for user models, use bases_mro to support deep inheritance
 
         # update docstring
         orig_doc = attrs.get("__doc__", "")
