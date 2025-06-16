@@ -21,6 +21,9 @@ Tabular Data
 # and boundary conditions. Condor supports any number of inputs, and automatically
 # computes the derivatives :math:`\frac{dy_i}{dx_j}` as needed.
 #
+# Basic Usage
+# -----------
+#
 # Here we demonstrate the construction of a single-input, single-output table for the
 # :math:`sin` function
 
@@ -41,7 +44,11 @@ print(out.y)
 assert np.isclose(out.y, 1)
 
 # %%
-# Next, we construct a table with two inputs and a single output
+# Multiple Inputs
+# ---------------
+#
+# Next, we construct a table with two inputs and a single output. The output data should
+# have shape ``(n_x1, n_x2, ...)``
 
 Table = condor.TableLookup(
     dict(
@@ -63,6 +70,9 @@ tab_out = Table(x1=0.5, x2=0.1)
 print(tab_out.output)
 
 # %%
+# Spline Degree and Boundary Conditions
+# -------------------------------------
+#
 # Next we demonstrate specifying the degrees (and boundary conditions) for the
 # :code:`SinTable`. Note that these can be specified for each input (and boundary)
 # independently, or a single custom value can be broadcast to each input (and boundary).

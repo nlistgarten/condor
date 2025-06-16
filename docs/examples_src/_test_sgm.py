@@ -1,16 +1,17 @@
+"""
+LTI System Examples
+===================
+"""
+
 import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _sgm_test_util import LTI_plot
 
 import condor as co
 
-dblintA = np.array(
-    [
-        [0, 1],
-        [0, 0],
-    ]
-)
+dblintA = np.array([[0, 1], [0, 0]])
 dblintB = np.array([[0, 1]]).T
 
 DblInt = co.LTI(a=dblintA, b=dblintB, name="DblInt")
@@ -21,7 +22,7 @@ class DblIntLQR(DblInt.TrajectoryAnalysis):
     Q = np.eye(2)
     R = np.eye(1)
     tf = 32.0
-    cost = trajectory_output(integrand=(x.T @ Q @ x + (K @ x).T @ R @ (K @ x)) / 2)
+    cost = trajectory_output(integrand=(x.T @ Q @ x + (k @ x).T @ R @ (k @ x)) / 2)
     # cost = trajectory_output(integrand= x.T@Q@x + u.T @ R @ u)
 
     class Casadi(co.Options):
@@ -58,7 +59,7 @@ DblIntSampled = co.LTI(a=dblintA, b=dblintB, name="DblIntSampled", dt=5.0)
 
 class DblIntSampledLQR(DblIntSampled.TrajectoryAnalysis):
     initial[x] = [1.0, 0.0]
-    initial[u] = -K @ [1.0, 0.0]
+    initial[u] = -k @ [1.0, 0.0]
     Q = np.eye(2)
     R = np.eye(1)
     tf = 100.0
@@ -82,7 +83,7 @@ class DblIntDtLQR(DblIntDt.TrajectoryAnalysis):
     R = np.eye(1)
     tf = 32.0
     # cost = trajectory_output(integrand= x.T@Q@x + u.T @ R @ u)
-    cost = trajectory_output(integrand=x.T @ Q @ x + (K @ x).T @ R @ (K @ x))
+    cost = trajectory_output(integrand=x.T @ Q @ x + (k @ x).T @ R @ (k @ x))
 
     class Casadi(co.Options):
         max_step = 1.0

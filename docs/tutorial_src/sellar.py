@@ -7,7 +7,7 @@ Introduction to Condor
 # %%
 # We wanted to have an API that looks as much like a mathematical description as
 # possible with as little distraction from programming cruft as possible. For example,
-# an arbitrary system of equations like from Sellar [sellar]_,
+# an arbitrary system of equations like from Sellar [#sellar]_,
 #
 # .. math::
 #    \begin{align}
@@ -105,6 +105,7 @@ print(sellar.coupling.y1)  # embedded-model element
 
 # %%
 # .. rubric:: References
-# .. [sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based,
+#
+# .. [#sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based,
 #    Concurrent Subspace Optimization for Multidisciplinary System Design," 1996.
 #    https://doi.org/10.2514/6.1996-714

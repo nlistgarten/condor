@@ -1,9 +1,14 @@
+"""
+Discrete Time LQR
+=================
+"""
+
 from time import perf_counter
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _sgm_test_util import LTI_plot
 from scipy import linalg, signal
-from sgm_test_util import LTI_plot
 
 import condor as co
 
