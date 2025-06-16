@@ -32,6 +32,7 @@ The documentation is organized as follows:
    howto/index
    api/index
    topics/index
+   examples/index
 
 
 Indices and tables

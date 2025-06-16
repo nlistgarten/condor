@@ -2,7 +2,8 @@ import casadi as ca
 from scipy.io import loadmat
 
 import condor as co
-from condor.backends.casadi.implementations import OptimizationProblem
+
+# from condor.backends.casadi.implementations import OptimizationProblem
 
 I6 = ca.MX.eye(6)
 Z6 = ca.MX(6, 6)
@@ -242,7 +243,7 @@ class Geller2006(co.OptimizationProblem):
 
     class Casadi(co.Options):
         exact_hessian = False
-        method = OptimizationProblem.Method.scipy_trust_constr
+        # method = OptimizationProblem.Method.scipy_trust_constr
 
 
 ##############
