@@ -10,6 +10,7 @@ dist/
 .coverage
 
 # sphinx-gallery outputs
-tutorial/
-howto/
-sg_execution_times.rst
+docs/tutorial/
+docs/howto/
+docs/examples/
+docs/sg_execution_times.rst
