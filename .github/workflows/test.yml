@@ -39,3 +39,9 @@ jobs:
 
     - name: Run tests
       run: pytest --cov=src
+
+    - name: Install example dependencies
+      run: python -m pip install --group docs
+
+    - name: Run examples
+      run: sphinx-build -M html docs docs/_build
