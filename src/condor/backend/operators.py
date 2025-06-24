@@ -28,6 +28,8 @@ pi = backend_mod.operators.pi  #: constant pi
 inf = backend_mod.operators.inf  #: constant inf
 nan = backend_mod.operators.nan  #: constant nan
 
+#isnan = backend_mod.operators.isnan
+
 # calculus & symbolic
 jacobian = backend_mod.operators.jacobian  #: create dense jacobian expression
 if_else = backend_mod.operators.if_else  #: function for creating
@@ -75,4 +77,7 @@ log10 = wrap(backend_mod.operators.log10)
 sqrt = wrap(backend_mod.operators.sqrt)
 
 vector_norm = wrap(backend_mod.operators.vector_norm)
+trace = wrap(backend_mod.operators.trace)
+cross = wrap(backend_mod.operators.cross)
 solve = wrap(backend_mod.operators.solve)
+

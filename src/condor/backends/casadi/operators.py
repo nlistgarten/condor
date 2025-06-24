@@ -16,6 +16,8 @@ inf = casadi.inf
 nan = np.nan
 
 mod = casadi.fmod
+trace = casadi.trace
+cross = casadi.cross
 
 atan = casadi.atan
 atan2 = casadi.atan2

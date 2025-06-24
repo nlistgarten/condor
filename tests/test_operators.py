@@ -1,6 +1,7 @@
 import pytest
 
 import condor as co
+import numpy as np
 
 backend = co.backend
 ops = backend.operators
@@ -59,3 +60,14 @@ def test_jacobian_empty():
         x = input()
 
     ops.jacobian(TestJacobian.output.flatten(), TestJacobian.input.flatten())
+
+
+def test_cross():
+    class MyCross(co.ExplicitSystem):
+        x = input(shape=3)
+        y = input(shape=3)
+        output.z = ops.cross(x, y)
+
+    assert np.all(MyCross(x=[1., 0., 0], y=[1., 0., 0.]).z.squeeze() == [0, 0, 0])
+    assert np.all(MyCross(x=[1., 0., 0], y=[0., 1., 0.]).z.squeeze() == [0, 0, 1])
+
