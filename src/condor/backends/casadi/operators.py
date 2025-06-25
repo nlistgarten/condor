@@ -188,7 +188,7 @@ def if_else(*conditions_actions):
     """
     if len(conditions_actions) == 1:
         else_action = conditions_actions[0]
-        if isinstance(else_action, (list, tuple)):
+        if isinstance(else_action, tuple):
             msg = "if_else requires an else_action to be provided"
             raise ValueError(msg)
         return else_action
