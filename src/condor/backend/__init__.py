@@ -11,6 +11,7 @@ backend_mod = get_backend()
 # non-operators -- more utility-like, ~outside scope of array API
 symbol_class = backend_mod.symbol_class  #: class for expressions
 symbol_generator = backend_mod.symbol_generator
+symbol_like = backend_mod.symbol_like
 get_symbol_data = backend_mod.get_symbol_data
 symbol_is = backend_mod.symbol_is
 BackendSymbolData = backend_mod.BackendSymbolData

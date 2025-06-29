@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+import dataclasses as dc
 
 import numpy as np
 
@@ -147,7 +147,7 @@ def shape_to_nm(shape):
     return n, m
 
 
-@dataclass
+@dc.dataclass
 class BackendSymbolData(BackendSymbolDataMixin):
     """Dataclass for handling backend expressions"""
 
@@ -268,6 +268,17 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
         return sym
 
 
+def symbol_like(name, other):
+    shape_data = get_symbol_data(other)
+    shape_data_dict = dc.asdict(shape_data)
+    shape_data_dict.pop("size")
+
+    return symbol_generator(
+        name=name,
+        **shape_data_dict,
+    )
+
+
 def get_symbol_data(symbol, symmetric=None):
     """extract shape metadata from an expression"""
     if hasattr(symbol, "backend_repr"):
@@ -349,6 +360,13 @@ class SymbolCompatibleDict(dict):
 
     def __setitem__(self, k, v):
         return dict.__setitem__(self, WrappedSymbol(k), v)
+
+    def update(self, *args, **kwargs):
+        if len(args) == 1 and isinstance(args[0], dict):
+            for k, v in args[0].items():
+                self[k] = v
+        else:
+            super().update(*args, **kwargs)
 
     def keys(self):
         for k in dict.keys(self):
