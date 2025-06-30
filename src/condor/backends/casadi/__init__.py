@@ -190,6 +190,9 @@ class BackendSymbolData(BackendSymbolDataMixin):
         if isinstance(value, symbol_class) and value.is_constant():
             value = value.to_DM().toarray()
 
+        if isinstance(value, casadi.DM):
+            value = value.toarray().reshape(self.shape, order="F")
+
         if not isinstance(value, (np.ndarray, symbol_class)):
             value = np.array(value)
 
@@ -497,6 +500,8 @@ class CasadiFunctionCallback(casadi.Callback):
         # out = self.wrapper_func(
         #    *pass_args,
         # )
+
+        # self.implementation.model.input.wrap(args)
         out = self.wrapper_func(
             args[0],
         )
