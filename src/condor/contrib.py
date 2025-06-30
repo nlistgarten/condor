@@ -937,6 +937,8 @@ class ExternalSolverWrapper(
             condor_model_name, (ExternalSolverModel,), attrs
         )
         self.condor_model._meta.external_wrapper = self
+        self.input = self.condor_model.input
+        self.output = self.condor_model.output
 
 
 class TableLookup(ExternalSolverWrapper):
