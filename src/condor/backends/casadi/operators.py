@@ -139,6 +139,9 @@ def substitute(expr, subs):
     for key, val in subs.items():
         expr = casadi.substitute(expr, key, val)
 
+    if isinstance(expr, backend.symbol_class) and expr.is_constant():
+        expr = expr.to_DM().toarray()
+
     # if expr is the output of a single call, try to to eval it
     if isinstance(expr, backend.symbol_class) and (
         (
