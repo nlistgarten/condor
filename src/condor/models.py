@@ -196,10 +196,13 @@ class BaseCondorClassDict(dict):
         out = super().__setitem__(attr_name, attr_val)
 
         if (
-            self.user_setting
-            and hasattr(attr_val, "update_name")  # implies element?
-            and attr_val.field_type._cls_dict is self
+            self.user_setting and hasattr(attr_val, "update_name")  # implies element?
         ):
+            if hasattr(attr_val, "field_type") and (
+                attr_val.field_type._cls_dict is not self
+            ):
+                return out
+
             attr_val.update_name(attr_name)
         return out
 
