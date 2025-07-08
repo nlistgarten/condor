@@ -136,8 +136,7 @@ def jac_prod(of, wrt, rev=True):
 
 
 def substitute(expr, subs):
-    for key, val in subs.items():
-        expr = casadi.substitute(expr, key, val)
+    expr = casadi.graph_substitute(expr, subs.keys(), subs.values())
 
     if isinstance(expr, backend.symbol_class) and expr.is_constant():
         expr = expr.to_DM().toarray()
