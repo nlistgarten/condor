@@ -641,4 +641,5 @@ def expression_to_operator(input_symbols, output_expressions, name="", **kwargs)
         name,
         input_symbols,
         [output_expressions],
+        kwargs,
     )
