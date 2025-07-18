@@ -324,7 +324,7 @@ class CasadiRootfinderWarmstart(CasadiWarmstartWrapperBase, CasadiFunctionCallba
         )
         self.rootfinder = casadi.rootfinder(
             f"{name}_rootfinder",
-            "newton",
+            self.method_string,
             self.rootfinder_f_arg,
             self.options,
         )
