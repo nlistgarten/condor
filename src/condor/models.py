@@ -313,7 +313,7 @@ class BaseModelType(type):
         cls_dict = cls.prepare_create(name, bases, meta=meta, **kwds)
         if not cls_dict.meta.template:
             return cls_dict
-        cls.prepare_populate(cls_dict)
+        cls.prepare_populate(cls_dict, bases)
         cls_dict.user_setting = True
         return cls_dict
 
@@ -333,6 +333,8 @@ class BaseModelType(type):
                 model_name=name,
             )
 
+        # TODO: template should probably be first common Condor ancestor of all bases...
+        # and/or kwd settable...
         for base in bases:
             if isinstance(base, BaseModelType):
                 meta.template = base
@@ -507,7 +509,7 @@ class BaseModelType(type):
             meta.inherited_items[k] = cls_dict[k]
 
     @classmethod
-    def prepare_populate(cls, cls_dict):
+    def prepare_populate(cls, cls_dict, bases):
         """Used to pre-populate the class namespace. Since the BaseModelType calls
         this, can only customize if the metaclass args on __prepare__ make their way to
         the metaclass
@@ -527,7 +529,7 @@ class BaseModelType(type):
         # the original/generic TrajectoryAnalysis is constructed, because the
         # placeholder field is on the ModelTemplate, not the SubmodelTemplate
         processed_mro = []
-        for base in template.__mro__[:-1]:
+        for base in bases + template.__mro__[:-1]:
             # TODO verify that this is the right way to go. Go over the mro (excluding
             # object) and iterate over the user defined (not condor-machinery injected)
             # attributes to do a condor-based inheritance
@@ -900,7 +902,7 @@ class ModelTemplateType(BaseModelType):
             return super().__prepare__(model_name, bases, meta=meta, **kwargs)
 
     @classmethod
-    def prepare_populate(cls, cls_dict):
+    def prepare_populate(cls, cls_dict, bases):
         if not cls.creating_base_class_for_inheritance(cls_dict.meta.model_name):
             log.debug("injecting placeholder on %s", cls_dict.meta.model_name)
             cls_dict["placeholder"] = WithDefaultField(
@@ -909,7 +911,7 @@ class ModelTemplateType(BaseModelType):
                 model_name=cls_dict.meta.model_name,
             )
 
-        super().prepare_populate(cls_dict)
+        super().prepare_populate(cls_dict, bases)
 
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
@@ -1108,12 +1110,12 @@ class ModelType(BaseModelType):
         return super().__prepare__(model_name, bases, meta=meta, **kwargs)
 
     @classmethod
-    def prepare_populate(cls, cls_dict):
+    def prepare_populate(cls, cls_dict, bases):
         if not cls.creating_base_class_for_inheritance(cls_dict.meta.model_name):
             log.debug("injecting dynamic_link on %s", cls_dict.meta.model_name)
             cls_dict["dynamic_link"] = DynamicLink(cls_dict)
 
-        super().prepare_populate(cls_dict)
+        super().prepare_populate(cls_dict, bases)
 
     @classmethod
     def placeholder_names(cls, new_cls):
@@ -1878,13 +1880,13 @@ class SubmodelType(ModelType):
         cls_dict[attr_name] = attr_val
 
     @classmethod
-    def prepare_populate(cls, cls_dict):
+    def prepare_populate(cls, cls_dict, bases):
         if cls.baseclass_for_inheritance is not None:
             primary_dict = {**cls_dict.meta.primary._meta.inherited_items}
             primary_dict.update(cls_dict.meta.primary._meta.user_set)
             for attr_name, attr_val in primary_dict.items():
                 cls.prepare_item_from_primary(cls_dict, attr_name, attr_val)
-        super().prepare_populate(cls_dict)
+        super().prepare_populate(cls_dict, bases)
         pass
 
     @classmethod
