@@ -53,7 +53,7 @@ def test_ode_system_event_api():
         n = 2
         m = 1
         x = state(shape=n)
-        C = state(shape=(n, n))  # symmetric=True)
+        C = state(shape=(n, n), symmetric=True)
         A = np.array([[0, 1], [0, 0]])
 
         # A = parameter(n,n)
@@ -134,3 +134,15 @@ def test_algebraic_system():
     mysolution = MySolver(10, 1)
     assert mysolution.y2 == -100
     assert mysolution.y1 == 9
+
+
+def test_indexing():
+    class Sys(co.ExplicitSystem):
+        x = input(shape=(2, 3))
+        output.z = 2 * x
+        output.y = 2 * x[1, 0]
+
+    x = np.array([[1, 2, 3], [4, 5, 6]], dtype=float)
+    out = Sys(x=x)
+
+    assert out.y == 2 * x[1, 0]
