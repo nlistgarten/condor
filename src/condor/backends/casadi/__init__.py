@@ -171,6 +171,8 @@ class BackendSymbolData(BackendSymbolDataMixin):
         else:
             if not isinstance(value, (np.ndarray, symbol_class)):
                 value = np.array(value)
+            if isinstance(value, symbol_class):
+                value = value.T
             return value.reshape((-1, 1))
 
     def wrap_value(self, value):
@@ -188,10 +190,10 @@ class BackendSymbolData(BackendSymbolDataMixin):
             value = unique_to_symmetric(value, symbolic=isinstance(value, symbol_class))
 
         if isinstance(value, symbol_class) and value.is_constant():
-            value = value.to_DM().toarray()
+            value = value.to_DM()
 
         if isinstance(value, casadi.DM):
-            value = value.toarray().reshape(self.shape, order="F")
+            value = value.T.toarray().reshape(self.shape)
 
         if not isinstance(value, (np.ndarray, symbol_class)):
             value = np.array(value)
@@ -267,7 +269,8 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
         matrix_symbols = unique_to_symmetric(unique_symbols)
         return matrix_symbols
     else:
-        sym = symbol_class.sym(name, (n, m))
+        raw_sym = symbol_class.sym(name, (m, n))
+        sym = raw_sym.T
         return sym
 
 
@@ -304,11 +307,11 @@ def get_symbol_data(symbol, symmetric=None):
     diagonal = False
     if symmetric is None:
         # if unprovided, try to determine if symmetric
-        if isinstance(symbol, (symbol_class, casadi.DM)):
-            symmetric = symbol.sparsity().is_symmetric() and size > 1
+        if isinstance(symbol, (symbol_class,)):
+            symmetric = symbol_is(symbol, symbol.T) and size > 1
         else:
             symmetric = (
-                np.isclose(0, symbol - symbol.T).all()
+                np.isclose(symbol, symbol.T).all()
                 and len(shape) == 2
                 and shape[0] == shape[1]
             )
