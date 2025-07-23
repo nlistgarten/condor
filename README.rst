@@ -66,7 +66,7 @@ After the model is solved, the embedded model can be accessed directly:
    sellar = Sellar()
    print(sellar.objective) # scalar value
    print(sellar.constraint) # field
-   print(sellar.coupling.y1) # sub-model element
+   print(sellar.coupling.y1) # embedded model element
 
 NASA's Condor is a framework for mathematical modeling of engineering
 systems in Python, written for engineers with a deadline.
