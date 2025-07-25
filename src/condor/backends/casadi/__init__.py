@@ -529,23 +529,8 @@ class CasadiFunctionCallback(casadi.Callback):
         return self.placeholder_func.n_out()
 
     def eval(self, args):
-        # if self.jacobian_of:
-        #    pass_args = args[:-1]
-        # else:
-        #    pass_args = args
-        # out = self.wrapper_func(
-        #    *pass_args,
-        # )
+        out = self.wrapper_func(args[0])
 
-        # self.implementation.model.input.wrap(args)
-        out = self.wrapper_func(
-            args[0],
-        )
-        try:
-            pass
-        except Exception:
-            breakpoint()
-            pass
         if self.jacobian_of:
             if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
                 return (out,)
@@ -561,13 +546,8 @@ class CasadiFunctionCallback(casadi.Callback):
                 return (jac_out, np.zeros(self.get_sparsity_out(1).shape))
 
             return (jac_out,)
+
         return (out,)
-        # breakpoint()
-        return [casadi.vertcat(*flatten(out))] if self.get_n_out() == 1 else (out,)
-        return [out] if self.get_n_out() == 1 else out
-        # return out,
-        return (casadi.vertcat(*flatten(out)),)
-        return [out] if self.get_n_out() == 1 else out
 
     def get_sparsity_in(self, i):
         if self.jacobian_of is None or i < self.jacobian_of.get_n_in():
