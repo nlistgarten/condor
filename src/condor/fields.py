@@ -302,6 +302,10 @@ class Field:
 
     def flat_index(self, of_element):
         """Helper to get the starting index of an element"""
+        if of_element not in self:
+            msg = f"{of_element} not an element of {self}"
+            raise ValueError(msg)
+
         idx = 0
         for element in self:
             if element is of_element:
