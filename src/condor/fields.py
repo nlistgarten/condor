@@ -277,7 +277,9 @@ class Field:
         for item in self._elements:
             this_item = True
             for field_name, field_value in kwargs.items():
-                item_value = getattr(item, field_name)
+                item_value = item
+                for field_name_comp in field_name.split("__"):
+                    item_value = getattr(item_value, field_name_comp)
                 if isinstance(item_value, backend.symbol_class):
                     if not isinstance(field_value, backend.symbol_class):
                         this_item = False
@@ -937,7 +939,7 @@ class MatchedField(Field):
             if on_field is None:
                 on_field = self._matched_to
             for match_elem in on_field:
-                elem = self.get(match=match_elem)
+                elem = self.get(match__backend_repr=match_elem.backend_repr)
                 if elem:
                     dc_kwargs[match_elem.name] = elem.backend_repr
                 else:
