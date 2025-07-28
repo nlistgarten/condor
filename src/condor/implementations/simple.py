@@ -66,9 +66,9 @@ class ExternalSolverModel:
 
         wrapper_funcs = [self._wrap_user_func(self.wrapper.function)]
         if hasattr(self.wrapper, "jacobian"):
-            wrapper_funcs.append(self._wrap_user_func(self.wrapper.jacobian))
+            wrapper_funcs.append(self._wrap_user_func(self.wrapper.jacobian, der=1))
         if hasattr(self.wrapper, "hessian"):
-            wrapper_funcs.append(self._wrap_user_func(self.wrapper.hessian))
+            wrapper_funcs.append(self._wrap_user_func(self.wrapper.hessian, der=2))
 
         self.callback = callables_to_operator(
             wrapper_funcs,
@@ -84,14 +84,30 @@ class ExternalSolverModel:
         out = self.callback(use_args)
         model_instance.bind_field(self.model.output.wrap(out))
 
-    def _wrap_user_func(self, user_func):
+    def _wrap_user_func(self, user_func, der=0):
         def func(inputs):
             input_data = self.model.input.wrap(inputs)
             user_out = user_func(input_data)
+            # TODO: normalize user_out with fields (e.g., output.wrap,) but then need
+            # jacobian, hessian fields to work...
             if isinstance(user_out, dict):
-                out = np.concatenate(
-                    [np.ravel(user_out[n]) for n in self.model.output.list_of("name")]
-                )
+                # pretty sure there's a itertools way to generalize this...
+                if der == 0:
+                    out = np.concatenate(
+                        [
+                            np.ravel(user_out[n])
+                            for n in self.model.output.list_of("name")
+                        ]
+                    )
+                elif der == 1:
+                    out = np.concatenate(
+                        [
+                            np.ravel(user_out[no, ni])
+                            for no in self.model.output.list_of("name")
+                            for ni in self.model.input.list_of("name")
+                        ]
+                    )
+
             else:
                 out = user_out
             return out
