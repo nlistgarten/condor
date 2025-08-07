@@ -470,7 +470,6 @@ class ScipyMinimizeBase(OptimizationProblem):
         return []
 
     def run_optimizer(self, model_instance):
-        print(self.has_p)
         extra_args = (self.eval_p,) if self.has_p else ([],)
 
         scipy_constraints = self.prepare_constraints(extra_args)
