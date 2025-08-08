@@ -44,4 +44,4 @@ jobs:
       run: python -m pip install --group docs
 
     - name: Run examples
-      run: sphinx-build -M html docs docs/_build
+      run: python run_examples.py

@@ -20,8 +20,6 @@ class Model(condor.ExplicitSystem):
 
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
-
     with multiprocessing.Pool(5) as p:
         models = p.map(Model, [1, 2, 3])
 
