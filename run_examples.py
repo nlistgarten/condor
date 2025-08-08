@@ -4,35 +4,36 @@ import subprocess
 import sys
 from pathlib import Path
 
+
+def printfl(*args, **kwargs):
+    print(*args, **(kwargs | {"flush": True}))
+
+
 docdir = Path(__file__).parent / "docs"
-
 fails = []
-
 for srcdir in sorted(docdir.glob("*_src")):
-    print(80 * "=")
-    print(f"Running scripts in {srcdir.stem}")
-    print(80 * "=")
+    printfl(80 * "=")
+    printfl(f"Running scripts in {srcdir.stem}")
+    printfl(80 * "=")
 
     for srcfile in sorted(srcdir.glob("*.py")):
         if srcfile.name.startswith("_"):
             continue
 
         name = f"{srcdir.name}/{srcfile.name}"
-        print("\n" + 80 * "-")
-        print(f"Running {name}")
-        print(80 * "-" + "\n")
+        printfl("\n" + 80 * "-")
+        printfl(f"Running {name}")
+        printfl(80 * "-" + "\n")
 
-        proc = subprocess.run(  # noqa: S603
-            [sys.executable, srcfile], check=False, env={"MPLBACKEND": "agg"}
-        )
+        proc = subprocess.run([sys.executable, srcfile], check=False)  # noqa: S603
         if proc.returncode:
             fails.append(name)
 
 if fails:
-    print("\n\n")
-    print(80 * "=")
-    print("Failed cases:")
-    print(*fails, sep="\n")
-    print(80 * "=")
+    printfl("\n\n")
+    printfl(80 * "=")
+    printfl("Failed cases:")
+    printfl(*fails, sep="\n")
+    printfl(80 * "=")
 
     sys.exit(1)
