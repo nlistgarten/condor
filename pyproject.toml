@@ -73,6 +73,7 @@ ignore = [
     "E305", # Expected 2 blank lines afer class or function definition
     "S101", # asserts ok in doc examples
     "N802", # Non-lowercase functions ok in mathy examples
+    "N803", # Non-lowercase argument names
     "N806", # Non-lowercase variables
     "N815", # Mixed case variables
     "N816", # Mixed case variables
