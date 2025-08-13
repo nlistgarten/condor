@@ -1,8 +1,3 @@
-"""
-Configured LTI Model
-====================
-"""
-
 import numpy as np
 
 import condor

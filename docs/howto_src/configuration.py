@@ -17,10 +17,10 @@ on what the user passes in for the state and input matrices.
 # ``condor`` namespace, where you register the module's default configuration with
 # ``get_settings``. Then the module is imported via ``get_module``.
 #
-# Here is the configured model source with the name ``lti.py``:
+# Here is the configured model source with the name ``_lti.py``:
 #
-# .. literalinclude:: lti.py
-#    :caption: lti.py
+# .. literalinclude:: _lti.py
+#    :caption: File: _lti.py
 #    :linenos:
 
 # %%
@@ -34,7 +34,7 @@ import condor
 A = np.array([[0.0, 1.0], [0.0, 0.0]])
 B = np.array([[0.0], [1.0]])
 
-dblint_mod = condor.settings.get_module("lti", A=A, B=B)
+dblint_mod = condor.settings.get_module("_lti", A=A, B=B)
 
 # %%
 # The returned object is a module, so we can access the model with its declared class
@@ -61,7 +61,7 @@ plt.plot(sim.t, sim.x[0].squeeze())
 # %%
 # We can also re-use the module with a different configuration:
 
-LTI_exp = condor.settings.get_module("lti", A=np.array([[0, 1], [-2, -3]])).LTI
+LTI_exp = condor.settings.get_module("_lti", A=np.array([[0, 1], [-2, -3]])).LTI
 
 
 class Sim(LTI_exp.TrajectoryAnalysis):

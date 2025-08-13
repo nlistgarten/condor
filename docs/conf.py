@@ -54,7 +54,7 @@ sphinx_gallery_conf = {
     "ignore_pattern": "^_",
     "within_subsection_order": "FileNameSortKey",
     "download_all_examples": False,
-    "copyfile_regex": r".*\.rst",
+    "copyfile_regex": r".*\.rst|.*_lti.py",
     "reference_url": {
         "sphinx_gallery": None,
     },
