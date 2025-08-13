@@ -7,26 +7,33 @@ import condor as co
 
 def test_ct_lqr():
     # continuous-time LQR
-    dblint_a = np.array([[0, 1], [0, 0]])
-    dblint_b = np.array([[0], [1]])
 
-    DblInt = co.LTI(a=dblint_a, b=dblint_b, name="DblInt")  # noqa: N806
+    class DblInt(co.ODESystem):
+        A = np.array([[0.0, 1.0], [0.0, 0.0]])
+        B = np.array([[0.0], [1.0]])
+
+        K = parameter(shape=(1, B.shape[0]))
+
+        x = state(shape=A.shape[0])
+        dynamic_output.u = -K @ x
+
+        dot[x] = A @ x + B @ u
 
     class DblIntLQR(DblInt.TrajectoryAnalysis):
         initial[x] = [1.0, 0.1]
-        q = np.eye(2)
-        r = np.eye(1)
+        Q = np.eye(2)
+        R = np.eye(1)
         tf = 32.0
         u = dynamic_output.u
-        cost = trajectory_output(integrand=(x.T @ q @ x + u.T @ r @ u) / 2)
+        cost = trajectory_output(integrand=(x.T @ Q @ x + u.T @ R @ u) / 2)
 
         class Options:
             state_rtol = 1e-8
             adjoint_rtol = 1e-8
 
     class CtOptLQR(co.OptimizationProblem):
-        k = variable(shape=DblIntLQR.k.shape)
-        sim = DblIntLQR(k)
+        K = variable(shape=DblIntLQR.K.shape)
+        sim = DblIntLQR(K)
         objective = sim.cost
 
         class Options:
@@ -35,18 +42,14 @@ def test_ct_lqr():
 
     lqr_sol = CtOptLQR()
 
-    s = linalg.solve_continuous_are(dblint_a, dblint_b, DblIntLQR.q, DblIntLQR.r)
-    k = linalg.solve(DblIntLQR.r, dblint_b.T @ s)
+    s = linalg.solve_continuous_are(DblInt.A, DblInt.B, DblIntLQR.Q, DblIntLQR.R)
+    k = linalg.solve(DblIntLQR.R, DblInt.B.T @ s)
 
     lqr_are = DblIntLQR(k)
 
-    # causes an AttributeError, I guess becuase the Jacobian hasn't been requested?
-    # jac_callback = lqr_are.implementation.callback.jac_callback
-    # jac_callback(k, [0])
-
     assert lqr_sol._stats.success
     np.testing.assert_allclose(lqr_are.cost, lqr_sol.objective)
-    np.testing.assert_allclose(k, lqr_sol.k, rtol=1e-4)
+    np.testing.assert_allclose(k, lqr_sol.K, rtol=1e-4)
 
 
 @pytest.mark.skip(reason="Need to fix LTI function")
