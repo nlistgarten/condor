@@ -122,7 +122,7 @@ def jacobian(of, wrt):
        #jac = casadi.Function("my_jac", [flat_inp], [jac_expr])
        jac(0.)
     """
-    if of.size:
+    if of.size and wrt.size:
         return casadi.jacobian(of, wrt)
     else:
         return casadi.MX()

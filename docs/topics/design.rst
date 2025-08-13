@@ -189,6 +189,8 @@ Different field types are used for different purposes:
 
 User models then draw elements from (free) fields and define expressions for the matched and assigned fields.
 
+.. _metaprogramming-walkthrough:
+
 Metaprogramming class declaration
 ---------------------------------
 
