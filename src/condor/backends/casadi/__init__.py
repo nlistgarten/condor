@@ -371,7 +371,15 @@ class SymbolCompatibleDict(dict):
             self[k] = v
 
     def __getitem__(self, k):
-        return dict.__getitem__(self, WrappedSymbol(k))
+        try:
+            return dict.__getitem__(self, WrappedSymbol(k))
+        except KeyError as e:
+            if isinstance(k, symbol_class) and k.op() != 66:
+                raise e
+            try:
+                return dict.__getitem__(self, WrappedSymbol(k.dep()))
+            except KeyError:
+                raise KeyError from e
 
     def __setitem__(self, k, v):
         if isinstance(k, symbol_class) and k.op() == 66:
