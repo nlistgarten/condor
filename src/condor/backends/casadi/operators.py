@@ -148,6 +148,10 @@ def jac_prod(of, wrt, rev=True):
 
 
 def substitute(expr, subs):
+    subs = {
+        (k if k.op() != 66 else k.T): (v if k.op() != 66 else v.T)
+        for k, v in subs.items()
+    }
     expr = casadi.graph_substitute(expr, subs.keys(), subs.values())
 
     if isinstance(expr, backend.symbol_class) and expr.is_constant():

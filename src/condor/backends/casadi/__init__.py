@@ -374,6 +374,8 @@ class SymbolCompatibleDict(dict):
         return dict.__getitem__(self, WrappedSymbol(k))
 
     def __setitem__(self, k, v):
+        if isinstance(k, symbol_class) and k.op() == 66:
+            dict.__setitem__(self, WrappedSymbol(k.T), v)
         return dict.__setitem__(self, WrappedSymbol(k), v)
 
     def update(self, *args, **kwargs):
