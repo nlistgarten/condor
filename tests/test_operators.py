@@ -6,6 +6,8 @@ import condor as co
 backend = co.backend
 ops = backend.operators
 
+rng = np.random.default_rng(12345)
+
 
 def test_min_max():
     class TestMax(co.ExplicitSystem):
@@ -23,6 +25,28 @@ def test_min_max():
 
     assert chk2.y == 0.3
     assert chk2.z == 0.1
+
+    class Fmin(co.ExplicitSystem):
+        x = input(shape=(3, 3))
+        y = input(shape=(3, 3))
+        output.z = np.fmin(x, y)
+
+    x = rng.random((3, 3))
+    y = rng.random((3, 3))
+    out = Fmin(x, y)
+
+    assert np.all(out.z.squeeze() == np.fmin(x, y))
+
+    class Fmin(co.ExplicitSystem):
+        x = input(shape=3)
+        y = input(shape=3)
+        output.z = np.fmin(x, y)
+
+    x = rng.random(3)
+    y = rng.random(3)
+    out = Fmin(x, y)
+
+    assert np.all(out.z.squeeze() == np.fmin(x, y))
 
 
 def test_fabs_sign():
