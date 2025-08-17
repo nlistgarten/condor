@@ -36,7 +36,7 @@ class LinCovCW(co.ODESystem):
     scal_w = parameter(shape=6)
 
     x = state(shape=6)
-    C = state(shape=(12, 12))
+    C = state(shape=(12, 12), symmetric=True)
 
     initial[x] = parameter(shape=x.shape, name="initial_x")
     initial[C] = parameter(shape=C.shape, name="initial_C")
@@ -154,16 +154,6 @@ class Sim(LinCovCW.TrajectoryAnalysis):
     Mr = ca.horzcat(I3, ca.MX(3, 9))
     sigma_r__2 = ca.trace(Mr @ C @ Mr.T)
     final_pos_disp = trajectory_output(ca.sqrt(sigma_r__2))
-
-    class Casadi(co.Options):
-        # state_rtol = 1E-9
-        # state_atol = 1E-15
-        # adjoint_rtol = 1E-9
-        # adjoint_atol = 1E-15
-        # state_max_step_size = 30.
-
-        state_adaptive_max_step_size = 4  # 16
-        adjoint_adaptive_max_step_size = 4
 
 
 # %%
