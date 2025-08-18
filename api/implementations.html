@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Backend Modules" href="backend.html" /><link rel="prev" title="Fields and Elements" href="fields.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Implementations - Condor 0.3.1.dev75+g0c03927 documentation</title>
+        <title>Implementations - Condor 0.3.1.dev91+g3d1a09752 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -14,7 +14,7 @@
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
-    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=5914a474" />
+    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=fb5f36d7" />
     
     
 
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.3.1.dev75+g0c03927 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev91+g3d1a09752 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -194,7 +194,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">Condor 0.3.1.dev75+g0c03927 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev91+g3d1a09752 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -213,6 +213,7 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../howto/index.html">How-To Guide</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of How-To Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../howto/table_basics.html">Tabular Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../howto/parallel_processing.html">Parallel Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../howto/configuration.html">Configuring Models</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Condor API</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Condor API</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
@@ -225,6 +226,17 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../topics/design.html">Condor Design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../topics/glossary.html">Glossary of Terms</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../examples/index.html">Examples</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Examples</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/ct_lqr.html">Continuous Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/custom_model_template_with_metaprogramming.html">Custom Model Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/orbital_1.html">Linear Covariance Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/rosenbrock.html">Warm Starting in Iterative Solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/sp_lqr.html">Discrete Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_switched.html">Optimal Transfer With State Trigger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/templating.html">Creating Model Tempalates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/time_switch.html">Optimal Transfer With Time Trigger</a></li>
 </ul>
 </li>
 </ul>
@@ -290,12 +302,12 @@
 <dl class="field-list simple">
 <dt class="field-odd">Options<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>state_atol</strong> (<em>float</em>) – absolute tolerance for forward evalaution</p></li>
-<li><p><strong>state_rtol</strong> (<em>float</em>) – relative tolerance for forward evalaution</p></li>
-<li><p><strong>state_adaptive_max_step_size</strong> (<em>float</em>) – actually a minimum number of steps per time-defined segment for the forward
+<li><p><strong>state_atol</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>) – absolute tolerance for forward evalaution</p></li>
+<li><p><strong>state_rtol</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>) – relative tolerance for forward evalaution</p></li>
+<li><p><strong>state_adaptive_max_step_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>) – actually a minimum number of steps per time-defined segment for the forward
 evaluation</p></li>
-<li><p><strong>state_max_step_size</strong> (<em>float</em>) – maximum step size for the forward evaluation</p></li>
-<li><p><strong>state_solver</strong> (<em>TrajectoryAnalysis.Solver</em>) – enum member for solver type</p></li>
+<li><p><strong>state_max_step_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>) – maximum step size for the forward evaluation</p></li>
+<li><p><strong>state_solver</strong> (<a class="reference internal" href="#condor.implementations.sgm_trajectory.TrajectoryAnalysis.Solver" title="condor.implementations.sgm_trajectory.TrajectoryAnalysis.Solver"><code class="xref py py-class docutils literal notranslate"><span class="pre">TrajectoryAnalysis.Solver</span></code></a>) – enum member for solver type</p></li>
 <li><p><strong>adjoint_*</strong> – same as above, for the adjoint solution</p></li>
 </ul>
 </dd>
@@ -337,12 +349,12 @@ evaluation</p></li>
 <dl class="field-list simple">
 <dt class="field-odd">Options<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>atol</strong> (<em>float</em>) – absolute tolerance (default 1e-12)</p></li>
-<li><p><strong>rtol</strong> (<em>float</em>) – relative tolerance (default 1e-12)</p></li>
-<li><p><strong>warm_start</strong> (<em>bool</em>) – flag indicating whether subsequent calls should initialize the variable values to
+<li><p><strong>atol</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>) – absolute tolerance (default 1e-12)</p></li>
+<li><p><strong>rtol</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>) – relative tolerance (default 1e-12)</p></li>
+<li><p><strong>warm_start</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>) – flag indicating whether subsequent calls should initialize the variable values to
 the last-run solution (default True)</p></li>
-<li><p><strong>max_iter</strong> (<em>int</em>) – maximum number of iterations before terminating solver (default 100)</p></li>
-<li><p><strong>error_on_fail</strong> (<em>bool</em>) – flag indicating whether to raise an error if the solver fails to converge within
+<li><p><strong>max_iter</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – maximum number of iterations before terminating solver (default 100)</p></li>
+<li><p><strong>error_on_fail</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>) – flag indicating whether to raise an error if the solver fails to converge within
 specified tolerance before reaching max_iter (default False)</p></li>
 </ul>
 </dd>
@@ -361,9 +373,9 @@ specified tolerance before reaching max_iter (default False)</p></li>
 <dl class="field-list simple">
 <dt class="field-odd">Options<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>init_callback</strong> (<em>callable</em>) – callback with signature , called when an optimization problem is evalauted. Once
+<li><p><strong>init_callback</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">callable</span></code>) – callback with signature , called when an optimization problem is evalauted. Once
 when embedded or every time as a standalone.</p></li>
-<li><p><strong>iter_callback</strong> (<em>callable</em>) – callback with signature , called at each iteration of the
+<li><p><strong>iter_callback</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">callable</span></code>) – callback with signature , called at each iteration of the
 <a class="reference internal" href="#condor.implementations.iterative.CasadiNlpsolImplementation" title="condor.implementations.iterative.CasadiNlpsolImplementation"><code class="xref py py-class docutils literal notranslate"><span class="pre">CasadiNlpsolImplementation</span></code></a> (only IPOPT) and <code class="xref py py-class docutils literal notranslate"><span class="pre">SciPyBase</span></code>
 subclass optimization implementaitons.</p></li>
 </ul>
@@ -398,10 +410,10 @@ subclass optimization implementaitons.</p></li>
 <dl class="field-list simple">
 <dt class="field-odd">Options<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>method</strong> (<em>CasadiNlpsolImplementation.Method</em>) – value from method enum to specify supported methods</p></li>
-<li><p><strong>exact_hessian</strong> (<em>bool</em>) – flag to use second order gradient information; use limited Broyden update
+<li><p><strong>method</strong> (<a class="reference internal" href="#condor.implementations.iterative.CasadiNlpsolImplementation.Method" title="condor.implementations.iterative.CasadiNlpsolImplementation.Method"><code class="xref py py-class docutils literal notranslate"><span class="pre">CasadiNlpsolImplementation.Method</span></code></a>) – value from method enum to specify supported methods</p></li>
+<li><p><strong>exact_hessian</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>) – flag to use second order gradient information; use limited Broyden update
 otherwise</p></li>
-<li><p><strong>calc_lam_x</strong> (<em>bool</em>) – flag to calculate the lagrange multipliers solution, used for IPOPT to perform a
+<li><p><strong>calc_lam_x</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>) – flag to calculate the lagrange multipliers solution, used for IPOPT to perform a
 true warm start</p></li>
 <li><p><strong>**options</strong> – remaining keyword arguments are passed to casadi’s nlpsol’s constructor’s
 solver-specific options argument. See <a class="reference internal" href="#condor.implementations.iterative.CasadiNlpsolImplementation.method_default_options" title="condor.implementations.iterative.CasadiNlpsolImplementation.method_default_options"><code class="xref py py-attr docutils literal notranslate"><span class="pre">method_default_options</span></code></a> for the
@@ -674,7 +686,7 @@ models.</p>
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=c3ab47b7"></script>
+</div><script src="../_static/documentation_options.js?v=cfac8ee7"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

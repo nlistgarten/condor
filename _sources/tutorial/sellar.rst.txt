@@ -26,7 +26,7 @@ Introduction to Condor
 
 We wanted to have an API that looks as much like a mathematical description as
 possible with as little distraction from programming cruft as possible. For example,
-an arbitrary system of equations like from Sellar [sellar]_,
+an arbitrary system of equations like from Sellar [#sellar]_,
 
 .. math::
    \begin{align}
@@ -293,17 +293,18 @@ including the embedded ``Coupling`` model:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 107-111
+.. GENERATED FROM PYTHON SOURCE LINES 107-112
 
 .. rubric:: References
-.. [sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based,
+
+.. [#sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based,
    Concurrent Subspace Optimization for Multidisciplinary System Design," 1996.
    https://doi.org/10.2514/6.1996-714
 
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 0.153 seconds)
+   **Total running time of the script:** (0 minutes 0.156 seconds)
 
 
 .. _sphx_glr_download_tutorial_sellar.py:

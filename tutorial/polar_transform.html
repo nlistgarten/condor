@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Working with trajectories" href="trajectory.html" /><link rel="prev" title="Introduction to Condor" href="sellar.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Polar Transformation - Condor 0.3.1.dev75+g0c03927 documentation</title>
+        <title>Polar Transformation - Condor 0.3.1.dev91+g3d1a09752 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -14,7 +14,7 @@
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
-    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=5914a474" />
+    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=fb5f36d7" />
     
     
 
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.3.1.dev75+g0c03927 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev91+g3d1a09752 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -194,7 +194,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">Condor 0.3.1.dev75+g0c03927 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev91+g3d1a09752 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -213,6 +213,7 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../howto/index.html">How-To Guide</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of How-To Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../howto/table_basics.html">Tabular Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../howto/parallel_processing.html">Parallel Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../howto/configuration.html">Configuring Models</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">Condor API</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Condor API</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
@@ -225,6 +226,17 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../topics/design.html">Condor Design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../topics/glossary.html">Glossary of Terms</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../examples/index.html">Examples</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Examples</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/ct_lqr.html">Continuous Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/custom_model_template_with_metaprogramming.html">Custom Model Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/orbital_1.html">Linear Covariance Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/rosenbrock.html">Warm Starting in Iterative Solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/sp_lqr.html">Discrete Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_switched.html">Optimal Transfer With State Trigger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/templating.html">Creating Model Tempalates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/time_switch.html">Optimal Transfer With Time Trigger</a></li>
 </ul>
 </li>
 </ul>
@@ -311,7 +323,7 @@ numerically by passing in numbers:</p>
 recommend working in an interactive session or debugger, especially when getting
 accustomed to Condor features.</p>
 <p>For example, the outputs of an explicit system are accessible directly:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">r</span><span class="p">)</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">p</span><span class="o">.</span><span class="n">r</span></a><span class="p">)</span>
 </pre></div>
 </div>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>[5.]
@@ -359,12 +371,12 @@ residual equations given parameters <span class="math notranslate nohighlight">\
     <span class="n">p</span> <span class="o">=</span> <span class="n">PolarTransform</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">)</span>
 
     <span class="c1"># residuals to converge to 0</span>
-    <span class="n">residual</span><span class="p">(</span><span class="n">r</span> <span class="o">==</span> <span class="n">p</span><span class="o">.</span><span class="n">r</span><span class="p">)</span>
-    <span class="n">residual</span><span class="p">(</span><span class="n">theta</span> <span class="o">==</span> <span class="n">p</span><span class="o">.</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">residual</span><span class="p">(</span><span class="n">r</span> <span class="o">==</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">p</span><span class="o">.</span><span class="n">r</span></a><span class="p">)</span>
+    <span class="n">residual</span><span class="p">(</span><span class="n">theta</span> <span class="o">==</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">p</span><span class="o">.</span><span class="n">theta</span></a><span class="p">)</span>
 
 
-<span class="n">out</span> <span class="o">=</span> <span class="n">CartesianTransform</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">theta</span><span class="o">=</span><span class="n">ops</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">out</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">CartesianTransform</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">theta</span><span class="o">=</span><a href="https://docs.python.org/3/library/functions.html#float" title="builtins.float" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">ops</span><span class="o">.</span><span class="n">pi</span></a> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">out</span><span class="o">.</span><span class="n">x</span></a><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">out</span><span class="o">.</span><span class="n">y</span></a><span class="p">)</span>
 </pre></div>
 </div>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>[0.70710678] [0.70710678]
@@ -388,7 +400,7 @@ method as the solver, so the solution that is found depends on the initial condi
 The <code class="xref py py-attr docutils literal notranslate"><span class="pre">initializer</span></code> attribute on the <code class="xref py py-attr docutils literal notranslate"><span class="pre">variable</span></code> field determines the initial
 position. For example,</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">CartesianTransform</span><span class="o">.</span><span class="n">set_initial</span><span class="p">(</span><span class="n">x</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">y</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
-<span class="n">out</span> <span class="o">=</span> <span class="n">CartesianTransform</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">theta</span><span class="o">=</span><span class="n">ops</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">CartesianTransform</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">theta</span><span class="o">=</span><a href="https://docs.python.org/3/library/functions.html#float" title="builtins.float" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">ops</span><span class="o">.</span><span class="n">pi</span></a> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">variable</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -397,14 +409,14 @@ position. For example,</p>
 </div>
 <p>An additional <code class="xref py py-attr docutils literal notranslate"><span class="pre">warm_start</span></code> attribute determines whether the initializer is
 over-wrriten. Since the default is true, we can inspect the initializer values,</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">CartesianTransform</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">initializer</span><span class="p">,</span> <span class="n">CartesianTransform</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">initializer</span><span class="p">)</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">CartesianTransform</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">initializer</span></a><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">CartesianTransform</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">initializer</span></a><span class="p">)</span>
 </pre></div>
 </div>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>[-0.70710678] [-0.70710678]
 </pre></div>
 </div>
 <p>and re-solve with attr:<cite>warm_start</cite> False</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">CartesianTransform</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">warm_start</span> <span class="o">=</span> <span class="kc">False</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">CartesianTransform</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">warm_start</span></a> <span class="o">=</span> <span class="kc">False</span>
 </pre></div>
 </div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.025 seconds)</p>
@@ -471,7 +483,7 @@ over-wrriten. Since the default is true, we can inspect the initializer values,<
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=c3ab47b7"></script>
+</div><script src="../_static/documentation_options.js?v=cfac8ee7"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

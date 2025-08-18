@@ -1,0 +1,606 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Discrete Time LQR" href="sp_lqr.html" /><link rel="prev" title="Linear Covariance Analysis" href="orbital_1.html" />
+
+    <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
+        <title>Warm Starting in Iterative Solvers - Condor 0.3.1.dev91+g3d1a09752 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=fb5f36d7" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #2b2b2b;
+  --color-code-foreground: #f8f8f2;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #2b2b2b;
+  --color-code-foreground: #f8f8f2;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev91+g3d1a09752 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">Condor 0.3.1.dev91+g3d1a09752 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorial/index.html">Tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Tutorials</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorial/sellar.html">Introduction to Condor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorial/polar_transform.html">Polar Transformation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorial/trajectory.html">Working with trajectories</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../howto/index.html">How-To Guide</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of How-To Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../howto/table_basics.html">Tabular Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../howto/parallel_processing.html">Parallel Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../howto/configuration.html">Configuring Models</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">Condor API</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Condor API</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/contrib.html">Contrib Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/fields.html">Fields and Elements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/implementations.html">Implementations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/backend.html">Backend Modules</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../topics/design.html">Condor Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../topics/glossary.html">Glossary of Terms</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Examples</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Examples</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="ct_lqr.html">Continuous Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_model_template_with_metaprogramming.html">Custom Model Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="orbital_1.html">Linear Covariance Analysis</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Warm Starting in Iterative Solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sp_lqr.html">Discrete Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="state_switched.html">Optimal Transfer With State Trigger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="templating.html">Creating Model Tempalates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="time_switch.html">Optimal Transfer With Time Trigger</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/examples/rosenbrock.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-examples-rosenbrock-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="warm-starting-in-iterative-solvers">
+<span id="sphx-glr-examples-rosenbrock-py"></span><h1>Warm Starting in Iterative Solvers<a class="headerlink" href="#warm-starting-in-iterative-solvers" title="Link to this heading">¶</a></h1>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">condor</span>
+</pre></div>
+</div>
+<p>Here’s a plain Python function implementing the well-known <a class="reference external" href="https://en.wikipedia.org/wiki/Rosenbrock_function">Rosenbrock optimization
+benchmark function</a>.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">rosenbrock</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">a</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">b</span> <span class="o">*</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+
+
+<span class="c1"># TODO plot the function and maybe iteration history?</span>
+</pre></div>
+</div>
+<p>We’ll minimize this function on a circle of a given radius and track the iteration
+history with an <code class="docutils literal notranslate"><span class="pre">iter_callback</span></code> option:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><a href="https://docs.python.org/3/library/stdtypes.html#list" title="builtins.list" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">call_from_count</span></a> <span class="o">=</span> <span class="p">[]</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">RosenbrockOnCircle</span><span class="p">(</span><span class="n">condor</span><span class="o">.</span><span class="n">OptimizationProblem</span><span class="p">):</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">parameter</span><span class="p">()</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">variable</span><span class="p">(</span><span class="n">warm_start</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">variable</span><span class="p">(</span><span class="n">warm_start</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">objective</span> <span class="o">=</span> <span class="n">rosenbrock</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+    <span class="n">constraint</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span> <span class="o">==</span> <span class="n">r</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="k">class</span><span class="w"> </span><span class="nc">Options</span><span class="p">:</span>
+        <span class="n">print_level</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="nd">@staticmethod</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">iter_callback</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">objective</span><span class="p">,</span> <span class="n">constraint</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  inner </span><span class="si">{</span><span class="n">i</span><span class="si">:</span><span class="s2">2d</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">variable</span><span class="si">=}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Calling the model twice without warm starting gives the same number of iterations each
+time.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">out1</span> <span class="o">=</span> <span class="n">RosenbrockOnCircle</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>inner  0: variable=RosenbrockOnCircleVariable(x=array([0.]), y=array([0.]))
+inner  1: variable=RosenbrockOnCircleVariable(x=array([1.]), y=array([0.]))
+inner  2: variable=RosenbrockOnCircleVariable(x=array([2.5]), y=array([9.326861e-08]))
+inner  3: variable=RosenbrockOnCircleVariable(x=array([2.05]), y=array([1.34448761e-07]))
+inner  4: variable=RosenbrockOnCircleVariable(x=array([2.00060976]), y=array([4.53256906e-07]))
+inner  5: variable=RosenbrockOnCircleVariable(x=array([2.00000009]), y=array([1.3820386e-05]))
+inner  6: variable=RosenbrockOnCircleVariable(x=array([1.99999967]), y=array([0.04752835]))
+inner  7: variable=RosenbrockOnCircleVariable(x=array([1.99943558]), y=array([0.04751504]))
+inner  8: variable=RosenbrockOnCircleVariable(x=array([1.9994273]), y=array([0.04786012]))
+inner  9: variable=RosenbrockOnCircleVariable(x=array([1.99942726]), y=array([0.04786041]))
+inner 10: variable=RosenbrockOnCircleVariable(x=array([1.99942724]), y=array([0.04786129]))
+inner 11: variable=RosenbrockOnCircleVariable(x=array([1.99942718]), y=array([0.04786392]))
+inner 12: variable=RosenbrockOnCircleVariable(x=array([1.99942699]), y=array([0.0478718]))
+inner 13: variable=RosenbrockOnCircleVariable(x=array([1.99942642]), y=array([0.04789545]))
+inner 14: variable=RosenbrockOnCircleVariable(x=array([1.99942472]), y=array([0.04796642]))
+inner 15: variable=RosenbrockOnCircleVariable(x=array([1.99941961]), y=array([0.04817938]))
+inner 16: variable=RosenbrockOnCircleVariable(x=array([1.99940419]), y=array([0.04881888]))
+inner 17: variable=RosenbrockOnCircleVariable(x=array([1.99935711]), y=array([0.05074305]))
+inner 18: variable=RosenbrockOnCircleVariable(x=array([1.99920838]), y=array([0.05656664]))
+inner 19: variable=RosenbrockOnCircleVariable(x=array([1.9986923]), y=array([0.07450618]))
+inner 20: variable=RosenbrockOnCircleVariable(x=array([1.99643921]), y=array([0.13278571]))
+inner 21: variable=RosenbrockOnCircleVariable(x=array([1.9808514]), y=array([0.3543406]))
+inner 22: variable=RosenbrockOnCircleVariable(x=array([1.77659508]), y=array([1.42657635]))
+inner 23: variable=RosenbrockOnCircleVariable(x=array([1.33173001]), y=array([1.5630149]))
+inner 24: variable=RosenbrockOnCircleVariable(x=array([1.25591343]), y=array([1.55834893]))
+inner 25: variable=RosenbrockOnCircleVariable(x=array([1.24944117]), y=array([1.56171379]))
+inner 26: variable=RosenbrockOnCircleVariable(x=array([1.24939192]), y=array([1.56173616]))
+inner 27: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+</pre></div>
+</div>
+<p>Enabling warm start won’t change the number of iterations on this call, but it will on
+the next call.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">RosenbrockOnCircle</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">warm_start</span></a> <span class="o">=</span> <span class="kc">True</span>
+<a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">RosenbrockOnCircle</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">warm_start</span></a> <span class="o">=</span> <span class="kc">True</span>
+
+<span class="n">out2</span> <span class="o">=</span> <span class="n">RosenbrockOnCircle</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>inner  0: variable=RosenbrockOnCircleVariable(x=array([0.]), y=array([0.]))
+inner  1: variable=RosenbrockOnCircleVariable(x=array([1.]), y=array([0.]))
+inner  2: variable=RosenbrockOnCircleVariable(x=array([2.5]), y=array([9.326861e-08]))
+inner  3: variable=RosenbrockOnCircleVariable(x=array([2.05]), y=array([1.34448761e-07]))
+inner  4: variable=RosenbrockOnCircleVariable(x=array([2.00060976]), y=array([4.53256906e-07]))
+inner  5: variable=RosenbrockOnCircleVariable(x=array([2.00000009]), y=array([1.3820386e-05]))
+inner  6: variable=RosenbrockOnCircleVariable(x=array([1.99999967]), y=array([0.04752835]))
+inner  7: variable=RosenbrockOnCircleVariable(x=array([1.99943558]), y=array([0.04751504]))
+inner  8: variable=RosenbrockOnCircleVariable(x=array([1.9994273]), y=array([0.04786012]))
+inner  9: variable=RosenbrockOnCircleVariable(x=array([1.99942726]), y=array([0.04786041]))
+inner 10: variable=RosenbrockOnCircleVariable(x=array([1.99942724]), y=array([0.04786129]))
+inner 11: variable=RosenbrockOnCircleVariable(x=array([1.99942718]), y=array([0.04786392]))
+inner 12: variable=RosenbrockOnCircleVariable(x=array([1.99942699]), y=array([0.0478718]))
+inner 13: variable=RosenbrockOnCircleVariable(x=array([1.99942642]), y=array([0.04789545]))
+inner 14: variable=RosenbrockOnCircleVariable(x=array([1.99942472]), y=array([0.04796642]))
+inner 15: variable=RosenbrockOnCircleVariable(x=array([1.99941961]), y=array([0.04817938]))
+inner 16: variable=RosenbrockOnCircleVariable(x=array([1.99940419]), y=array([0.04881888]))
+inner 17: variable=RosenbrockOnCircleVariable(x=array([1.99935711]), y=array([0.05074305]))
+inner 18: variable=RosenbrockOnCircleVariable(x=array([1.99920838]), y=array([0.05656664]))
+inner 19: variable=RosenbrockOnCircleVariable(x=array([1.9986923]), y=array([0.07450618]))
+inner 20: variable=RosenbrockOnCircleVariable(x=array([1.99643921]), y=array([0.13278571]))
+inner 21: variable=RosenbrockOnCircleVariable(x=array([1.9808514]), y=array([0.3543406]))
+inner 22: variable=RosenbrockOnCircleVariable(x=array([1.77659508]), y=array([1.42657635]))
+inner 23: variable=RosenbrockOnCircleVariable(x=array([1.33173001]), y=array([1.5630149]))
+inner 24: variable=RosenbrockOnCircleVariable(x=array([1.25591343]), y=array([1.55834893]))
+inner 25: variable=RosenbrockOnCircleVariable(x=array([1.24944117]), y=array([1.56171379]))
+inner 26: variable=RosenbrockOnCircleVariable(x=array([1.24939192]), y=array([1.56173616]))
+inner 27: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">out3</span> <span class="o">=</span> <span class="n">RosenbrockOnCircle</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>inner  0: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+inner  1: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">use_warm_start</span></a> <span class="ow">in</span> <span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">True</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=== with warm_start =&quot;</span><span class="p">,</span> <a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">use_warm_start</span></a><span class="p">)</span>
+    <a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">RosenbrockOnCircle</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">warm_start</span></a> <span class="o">=</span> <a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">use_warm_start</span></a>
+    <a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">RosenbrockOnCircle</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">warm_start</span></a> <span class="o">=</span> <a href="https://docs.python.org/3/library/functions.html#bool" title="builtins.bool" class="sphx-glr-backref-module-builtins sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">use_warm_start</span></a>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=== Embed within optimization over disk radius&quot;</span><span class="p">)</span>
+
+    <span class="k">class</span><span class="w"> </span><span class="nc">Outer</span><span class="p">(</span><span class="n">condor</span><span class="o">.</span><span class="n">OptimizationProblem</span><span class="p">):</span>
+        <span class="c1"># r = variable(initializer=2+(5/16)+(1/64))</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">variable</span><span class="p">(</span><span class="n">initializer</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">warm_start</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="n">RosenbrockOnCircle</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="n">r</span><span class="p">)</span>
+
+        <span class="n">objective</span> <span class="o">=</span> <span class="n">rosenbrock</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">out</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+
+        <span class="k">class</span><span class="w"> </span><span class="nc">Options</span><span class="p">:</span>
+            <span class="n">print_level</span> <span class="o">=</span> <span class="mi">0</span>
+
+            <span class="c1"># with exact_hessian = False means more outer iters and also a larger</span>
+            <span class="c1"># percentage of calls correctly going through #the warm start -- I assume</span>
+            <span class="c1"># the ones where it is re-starting is because of the jacobian?,</span>
+            <span class="c1"># produces about a 16 iter difference</span>
+            <span class="n">exact_hessian</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="nd">@staticmethod</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">iter_callback</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">objective</span><span class="p">,</span> <span class="n">constraint</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;outer </span><span class="si">{</span><span class="n">i</span><span class="si">:</span><span class="s2">2d</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">variable</span><span class="si">=}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">out</span> <span class="o">=</span> <span class="n">Outer</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">out</span><span class="o">.</span><span class="n">r</span></a><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>=== with warm_start = False
+=== Embed within optimization over disk radius
+  inner  0: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+  inner  1: variable=RosenbrockOnCircleVariable(x=array([1.07968183]), y=array([1.13723067]))
+  inner  2: variable=RosenbrockOnCircleVariable(x=array([1.04114549]), y=array([1.08192418]))
+  inner  3: variable=RosenbrockOnCircleVariable(x=array([1.03973705]), y=array([1.08117964]))
+  inner  4: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner  5: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner  6: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner  7: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner  8: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+outer  0: variable=OuterVariable(r=array([1.5]))
+  inner  9: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+  inner 10: variable=RosenbrockOnCircleVariable(x=array([1.06926167]), y=array([1.11116615]))
+  inner 11: variable=RosenbrockOnCircleVariable(x=array([1.02499334]), y=array([1.04781316]))
+  inner 12: variable=RosenbrockOnCircleVariable(x=array([1.02310406]), y=array([1.04681093]))
+  inner 13: variable=RosenbrockOnCircleVariable(x=array([1.0231009]), y=array([1.04681185]))
+  inner 14: variable=RosenbrockOnCircleVariable(x=array([1.0231009]), y=array([1.04681185]))
+  inner 15: variable=RosenbrockOnCircleVariable(x=array([1.0231009]), y=array([1.04681185]))
+  inner 16: variable=RosenbrockOnCircleVariable(x=array([1.0231009]), y=array([1.04681185]))
+outer  1: variable=OuterVariable(r=array([1.46374536]))
+  inner 17: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+  inner 18: variable=RosenbrockOnCircleVariable(x=array([1.0547524]), y=array([1.07487329]))
+  inner 19: variable=RosenbrockOnCircleVariable(x=array([1.00161881]), y=array([0.99912741]))
+  inner 20: variable=RosenbrockOnCircleVariable(x=array([0.9988292]), y=array([0.99763994]))
+  inner 21: variable=RosenbrockOnCircleVariable(x=array([0.99882222]), y=array([0.99764191]))
+  inner 22: variable=RosenbrockOnCircleVariable(x=array([0.99882222]), y=array([0.99764191]))
+  inner 23: variable=RosenbrockOnCircleVariable(x=array([0.99882222]), y=array([0.99764191]))
+  inner 24: variable=RosenbrockOnCircleVariable(x=array([0.99882222]), y=array([0.99764191]))
+outer  2: variable=OuterVariable(r=array([1.41171357]))
+  inner 25: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+  inner 26: variable=RosenbrockOnCircleVariable(x=array([1.05545752]), y=array([1.07663703]))
+  inner 27: variable=RosenbrockOnCircleVariable(x=array([1.00277959]), y=array([1.00152673]))
+  inner 28: variable=RosenbrockOnCircleVariable(x=array([1.00004104]), y=array([1.00006686]))
+  inner 29: variable=RosenbrockOnCircleVariable(x=array([1.00003432]), y=array([1.00006876]))
+  inner 30: variable=RosenbrockOnCircleVariable(x=array([1.00003432]), y=array([1.00006876]))
+  inner 31: variable=RosenbrockOnCircleVariable(x=array([1.00003432]), y=array([1.00006876]))
+  inner 32: variable=RosenbrockOnCircleVariable(x=array([1.00003432]), y=array([1.00006876]))
+outer  3: variable=OuterVariable(r=array([1.41428645]))
+  inner 33: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+  inner 34: variable=RosenbrockOnCircleVariable(x=array([1.05543756]), y=array([1.0765871]))
+  inner 35: variable=RosenbrockOnCircleVariable(x=array([1.00274676]), y=array([1.00145884]))
+  inner 36: variable=RosenbrockOnCircleVariable(x=array([1.00000677]), y=array([0.9999982]))
+  inner 37: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+  inner 38: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+  inner 39: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+  inner 40: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+outer  4: variable=OuterVariable(r=array([1.41421367]))
+  inner 41: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+  inner 42: variable=RosenbrockOnCircleVariable(x=array([1.05543753]), y=array([1.07658702]))
+  inner 43: variable=RosenbrockOnCircleVariable(x=array([1.00274671]), y=array([1.00145874]))
+  inner 44: variable=RosenbrockOnCircleVariable(x=array([1.00000672]), y=array([0.9999981]))
+  inner 45: variable=RosenbrockOnCircleVariable(x=array([1.]), y=array([1.]))
+  inner 46: variable=RosenbrockOnCircleVariable(x=array([1.]), y=array([1.]))
+  inner 47: variable=RosenbrockOnCircleVariable(x=array([1.]), y=array([1.]))
+outer  5: variable=OuterVariable(r=array([1.41421356]))
+[1.41421356]
+=== with warm_start = True
+=== Embed within optimization over disk radius
+  inner  0: variable=RosenbrockOnCircleVariable(x=array([1.24939191]), y=array([1.56173616]))
+  inner  1: variable=RosenbrockOnCircleVariable(x=array([1.07968183]), y=array([1.13723067]))
+  inner  2: variable=RosenbrockOnCircleVariable(x=array([1.04114549]), y=array([1.08192418]))
+  inner  3: variable=RosenbrockOnCircleVariable(x=array([1.03973705]), y=array([1.08117964]))
+  inner  4: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner  5: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner  6: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner  7: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner  8: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+outer  0: variable=OuterVariable(r=array([1.5]))
+  inner  9: variable=RosenbrockOnCircleVariable(x=array([1.0397353]), y=array([1.08118015]))
+  inner 10: variable=RosenbrockOnCircleVariable(x=array([1.02341314]), y=array([1.04718578]))
+  inner 11: variable=RosenbrockOnCircleVariable(x=array([1.02310098]), y=array([1.04681187]))
+  inner 12: variable=RosenbrockOnCircleVariable(x=array([1.0231009]), y=array([1.04681185]))
+  inner 13: variable=RosenbrockOnCircleVariable(x=array([1.0231009]), y=array([1.04681185]))
+  inner 14: variable=RosenbrockOnCircleVariable(x=array([1.0231009]), y=array([1.04681185]))
+outer  1: variable=OuterVariable(r=array([1.46374536]))
+  inner 15: variable=RosenbrockOnCircleVariable(x=array([1.0231009]), y=array([1.04681185]))
+  inner 16: variable=RosenbrockOnCircleVariable(x=array([0.99949128]), y=array([0.99842434]))
+  inner 17: variable=RosenbrockOnCircleVariable(x=array([0.99882263]), y=array([0.99764203]))
+  inner 18: variable=RosenbrockOnCircleVariable(x=array([0.99882222]), y=array([0.99764191]))
+  inner 19: variable=RosenbrockOnCircleVariable(x=array([0.99882222]), y=array([0.99764191]))
+  inner 20: variable=RosenbrockOnCircleVariable(x=array([0.99882222]), y=array([0.99764191]))
+outer  2: variable=OuterVariable(r=array([1.41171357]))
+  inner 21: variable=RosenbrockOnCircleVariable(x=array([0.99882222]), y=array([0.99764191]))
+  inner 22: variable=RosenbrockOnCircleVariable(x=array([1.00003604]), y=array([1.00007073]))
+  inner 23: variable=RosenbrockOnCircleVariable(x=array([1.00003432]), y=array([1.00006876]))
+  inner 24: variable=RosenbrockOnCircleVariable(x=array([1.00003432]), y=array([1.00006876]))
+  inner 25: variable=RosenbrockOnCircleVariable(x=array([1.00003432]), y=array([1.00006876]))
+outer  3: variable=OuterVariable(r=array([1.41428645]))
+  inner 26: variable=RosenbrockOnCircleVariable(x=array([1.00003432]), y=array([1.00006876]))
+  inner 27: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+  inner 28: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+  inner 29: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+  inner 30: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+outer  4: variable=OuterVariable(r=array([1.41421367]))
+  inner 31: variable=RosenbrockOnCircleVariable(x=array([1.00000005]), y=array([1.0000001]))
+  inner 32: variable=RosenbrockOnCircleVariable(x=array([1.]), y=array([1.]))
+  inner 33: variable=RosenbrockOnCircleVariable(x=array([1.]), y=array([1.]))
+outer  5: variable=OuterVariable(r=array([1.41421356]))
+[1.41421356]
+</pre></div>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.207 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-rosenbrock-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/723d4855ff15fef0afdff48f86f7207f/rosenbrock.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">rosenbrock.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/35be511e6431dd2d962aab437cd2d196/rosenbrock.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">rosenbrock.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/b3c445fd2be18773faccc240482d3b07/rosenbrock.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">rosenbrock.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="sp_lqr.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Discrete Time LQR</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="orbital_1.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Linear Covariance Analysis</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023, Benjamin W. L. Margolis
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=cfac8ee7"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

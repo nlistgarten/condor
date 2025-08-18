@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Topics" href="../topics/index.html" /><link rel="prev" title="Implementations" href="implementations.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Backend Modules - Condor 0.3.1.dev75+g0c03927 documentation</title>
+        <title>Backend Modules - Condor 0.3.1.dev91+g3d1a09752 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -14,7 +14,7 @@
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
-    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=5914a474" />
+    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=fb5f36d7" />
     
     
 
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.3.1.dev75+g0c03927 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev91+g3d1a09752 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -194,7 +194,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">Condor 0.3.1.dev75+g0c03927 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev91+g3d1a09752 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -213,6 +213,7 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../howto/index.html">How-To Guide</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of How-To Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../howto/table_basics.html">Tabular Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../howto/parallel_processing.html">Parallel Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../howto/configuration.html">Configuring Models</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Condor API</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Condor API</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
@@ -225,6 +226,17 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../topics/design.html">Condor Design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../topics/glossary.html">Glossary of Terms</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../examples/index.html">Examples</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Examples</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/ct_lqr.html">Continuous Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/custom_model_template_with_metaprogramming.html">Custom Model Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/orbital_1.html">Linear Covariance Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/rosenbrock.html">Warm Starting in Iterative Solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/sp_lqr.html">Discrete Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_switched.html">Optimal Transfer With State Trigger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/templating.html">Creating Model Tempalates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/time_switch.html">Optimal Transfer With Time Trigger</a></li>
 </ul>
 </li>
 </ul>
@@ -434,7 +446,7 @@ set upper_bound = lower_bound = 0 (if element has bounds)</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="condor.backends.casadi.BackendSymbolData">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">BackendSymbolData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">symmetric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diagonal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.BackendSymbolData" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">condor.backends.casadi.</span></span><span class="sig-name descname"><span class="pre">BackendSymbolData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><span class="pre">tuple</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">symmetric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><span class="pre">bool</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">diagonal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><span class="pre">bool</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#condor.backends.casadi.BackendSymbolData" title="Link to this definition">¶</a></dt>
 <dd><p>Dataclass for handling backend expressions</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="condor.backends.casadi.BackendSymbolData.flatten_value">
@@ -469,11 +481,11 @@ set upper_bound = lower_bound = 0 (if element has bounds)</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>name</strong> (<em>str</em>)</p></li>
-<li><p><strong>shape</strong> (<em>tuple</em><em> of </em><em>ints</em>)</p></li>
-<li><p><strong>symmetric</strong> (<em>bool</em>) – flag to indicate this should be a symmetric (2-D) matrix; only store the unique
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>)</p></li>
+<li><p><strong>shape</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a> of <code class="xref py py-class docutils literal notranslate"><span class="pre">ints</span></code>)</p></li>
+<li><p><strong>symmetric</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>) – flag to indicate this should be a symmetric (2-D) matrix; only store the unique
 elements</p></li>
-<li><p><strong>diagonal</strong> (<em>bool</em>) – flag to indicate this should be a (2-D) matrix with only elements on the
+<li><p><strong>diagonal</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>) – flag to indicate this should be a (2-D) matrix with only elements on the
 diagonal</p></li>
 </ul>
 </dd>
@@ -690,9 +702,9 @@ eval_buffer</p>
 get_forward(casadi_int nfwd) if no cached version is available.</p>
 <p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oi">https://github.com/casadi/casadi/wiki/L_oi</a></p>
 <p>Doc source:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L190">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L190</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L199">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L199</a></p>
 <p>Implementation:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L112-L114">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L112-L114</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L120-L122">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L120-L122</a></p>
 </dd></dl>
 
 <dl class="py method">
@@ -709,9 +721,9 @@ get_forward(casadi_int nfwd) if no cached version is available.</p>
 get_reverse(casadi_int nadj) if no cached version is available.</p>
 <p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oj">https://github.com/casadi/casadi/wiki/L_oj</a></p>
 <p>Doc source:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L205">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L205</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L214">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L214</a></p>
 <p>Implementation:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L124-L126">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L124-L126</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L132-L134">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L132-L134</a></p>
 </dd></dl>
 
 <dl class="py method">
@@ -728,9 +740,9 @@ get_reverse(casadi_int nadj) if no cached version is available.</p>
 get_forward(casadi_int nfwd) if no cached version is available.</p>
 <p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oi">https://github.com/casadi/casadi/wiki/L_oi</a></p>
 <p>Doc source:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L191">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L191</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L200">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L200</a></p>
 <p>Implementation:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L105-L110">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L105-L110</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L113-L118">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L113-L118</a></p>
 </dd></dl>
 
 <dl class="py method">
@@ -747,9 +759,9 @@ get_forward(casadi_int nfwd) if no cached version is available.</p>
 get_reverse(casadi_int nadj) if no cached version is available.</p>
 <p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oj">https://github.com/casadi/casadi/wiki/L_oj</a></p>
 <p>Doc source:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L206">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L206</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L215">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L215</a></p>
 <p>Implementation:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L117-L122">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L117-L122</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L125-L130">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L125-L130</a></p>
 </dd></dl>
 
 <dl class="py method">
@@ -765,9 +777,9 @@ get_reverse(casadi_int nadj) if no cached version is available.</p>
 <p>elements.</p>
 <p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oh">https://github.com/casadi/casadi/wiki/L_oh</a></p>
 <p>Doc source:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L175">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L175</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L184">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L184</a></p>
 <p>Implementation:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L92-L94">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L92-L94</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L100-L102">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L100-L102</a></p>
 </dd></dl>
 
 <dl class="py method">
@@ -783,9 +795,9 @@ get_reverse(casadi_int nadj) if no cached version is available.</p>
 <p>elements.</p>
 <p>Extra doc: <a class="reference external" href="https://github.com/casadi/casadi/wiki/L_oh">https://github.com/casadi/casadi/wiki/L_oh</a></p>
 <p>Doc source:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L176">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L176</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L185">https://github.com/casadi/casadi/blob/main/casadi/core/callback.hpp#L185</a></p>
 <p>Implementation:
-<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L97-L102">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L97-L102</a></p>
+<a class="reference external" href="https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L105-L110">https://github.com/casadi/casadi/blob/main/casadi/core/callback.cpp#L105-L110</a></p>
 </dd></dl>
 
 </dd></dl>
@@ -858,7 +870,7 @@ with jacobian, etc. operators</p>
 <dd><p>symbolic representation of a if/else control flow</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>*conditions_actions</strong> (<em>list</em><em> of </em><em>(</em><em>condition</em><em>, </em><em>value</em><em>) </em><em>pairs</em><em>, </em><em>ending with else_value</em>)</p>
+<dd class="field-odd"><p><strong>*conditions_actions</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a> of <code class="xref py py-class docutils literal notranslate"><span class="pre">(condition</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">value)</span> <span class="pre">pairs</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">ending</span> <span class="pre">with</span> <span class="pre">else_value</span></code>)</p>
 </dd>
 </dl>
 <p class="rubric">Example</p>
@@ -1034,7 +1046,7 @@ with jacobian, etc. operators</p>
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=c3ab47b7"></script>
+</div><script src="../_static/documentation_options.js?v=cfac8ee7"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>

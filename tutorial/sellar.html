@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Polar Transformation" href="polar_transform.html" /><link rel="prev" title="Tutorials" href="index.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Introduction to Condor - Condor 0.3.1.dev75+g0c03927 documentation</title>
+        <title>Introduction to Condor - Condor 0.3.1.dev91+g3d1a09752 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
@@ -14,7 +14,7 @@
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
-    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=5914a474" />
+    <link rel="stylesheet" type="text/css" href="../_static/overrides.css?v=fb5f36d7" />
     
     
 
@@ -171,7 +171,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.3.1.dev75+g0c03927 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev91+g3d1a09752 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -194,7 +194,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">Condor 0.3.1.dev75+g0c03927 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev91+g3d1a09752 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -213,6 +213,7 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../howto/index.html">How-To Guide</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of How-To Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../howto/table_basics.html">Tabular Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../howto/parallel_processing.html">Parallel Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../howto/configuration.html">Configuring Models</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">Condor API</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Condor API</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
@@ -225,6 +226,17 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../topics/index.html">Topics</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Topics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../topics/design.html">Condor Design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../topics/glossary.html">Glossary of Terms</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../examples/index.html">Examples</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Examples</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/ct_lqr.html">Continuous Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/custom_model_template_with_metaprogramming.html">Custom Model Template</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/orbital_1.html">Linear Covariance Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/rosenbrock.html">Warm Starting in Iterative Solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/sp_lqr.html">Discrete Time LQR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_switched.html">Optimal Transfer With State Trigger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/templating.html">Creating Model Tempalates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/time_switch.html">Optimal Transfer With Time Trigger</a></li>
 </ul>
 </li>
 </ul>
@@ -276,7 +288,7 @@ to download the full example code.</p>
 <span id="sphx-glr-tutorial-sellar-py"></span><h1>Introduction to Condor<a class="headerlink" href="#introduction-to-condor" title="Link to this heading">¶</a></h1>
 <p>We wanted to have an API that looks as much like a mathematical description as
 possible with as little distraction from programming cruft as possible. For example,
-an arbitrary system of equations like from Sellar <a class="reference internal" href="#sellar" id="id1"><span>[sellar]</span></a>,</p>
+an arbitrary system of equations like from Sellar <a class="footnote-reference brackets" href="#sellar" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>,</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
 \[\begin{split}\begin{align}
@@ -313,7 +325,7 @@ parameters:</p>
 <p>Once the model is finished running, the model <em>binds</em> the numerical results from the
 iterative solver to the named <em>element</em> and <em>field</em> attributes on the instance. That
 is, elements of fields accessible directly:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">coupling</span><span class="o">.</span><span class="n">y1</span><span class="p">,</span> <span class="n">coupling</span><span class="o">.</span><span class="n">y2</span><span class="p">)</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">coupling</span><span class="o">.</span><span class="n">y1</span></a><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">coupling</span><span class="o">.</span><span class="n">y2</span></a><span class="p">)</span>
 </pre></div>
 </div>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>[25.58830237] [12.05848815]
@@ -420,9 +432,9 @@ EXIT: Optimal Solution Found.
 </div>
 <p>The resulting object will have a dot-able data structure with the bound results,
 including the embedded <code class="docutils literal notranslate"><span class="pre">Coupling</span></code> model:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;objective value:&quot;</span><span class="p">,</span> <span class="n">sellar</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>  <span class="c1"># scalar value</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;objective value:&quot;</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">sellar</span><span class="o">.</span><span class="n">objective</span></a><span class="p">)</span>  <span class="c1"># scalar value</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">sellar</span><span class="o">.</span><span class="n">constraint</span><span class="p">)</span>  <span class="c1"># field</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">sellar</span><span class="o">.</span><span class="n">coupling</span><span class="o">.</span><span class="n">y1</span><span class="p">)</span>  <span class="c1"># embedded-model element</span>
+<span class="nb">print</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">sellar</span><span class="o">.</span><span class="n">coupling</span><span class="o">.</span><span class="n">y1</span></a><span class="p">)</span>  <span class="c1"># embedded-model element</span>
 </pre></div>
 </div>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>objective value: 3.183393918133255
@@ -431,15 +443,15 @@ SellarConstraint(Sellar_constraint_0=array([3.16]), Sellar_constraint_1=array([3
 </pre></div>
 </div>
 <p class="rubric">References</p>
-<div role="list" class="citation-list">
-<div class="citation" id="sellar" role="doc-biblioentry">
-<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">sellar</a><span class="fn-bracket">]</span></span>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="sellar" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
 <p>Sellar, R., Batill, S., and Renaud, J., “Response Surface Based,
 Concurrent Subspace Optimization for Multidisciplinary System Design,” 1996.
 <a class="reference external" href="https://doi.org/10.2514/6.1996-714">https://doi.org/10.2514/6.1996-714</a></p>
-</div>
-</div>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.153 seconds)</p>
+</aside>
+</aside>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.156 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-tutorial-sellar-py">
 <div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
 <p><a class="reference download internal" download="" href="../_downloads/28e68f211ea6a4798582e6288ba86172/sellar.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">sellar.ipynb</span></code></a></p>
@@ -503,7 +515,7 @@ Concurrent Subspace Optimization for Multidisciplinary System Design,” 1996.
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=c3ab47b7"></script>
+</div><script src="../_static/documentation_options.js?v=cfac8ee7"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
