@@ -762,67 +762,6 @@ class Mode(
     )
 
 
-def LTI(  # noqa: N802
-    a,
-    b=None,
-    dt=0.0,
-    dt_plant=False,
-    name="LTISystem",
-):
-    attrs = ModelTemplateType.__prepare__(name, (ODESystem,))
-    attrs["a"] = a
-    state = attrs["state"]
-    x = state(shape=a.shape[0])
-    attrs["x"] = x
-    xdot = a @ x
-    if dt <= 0.0 and dt_plant:
-        raise ValueError
-
-    if b is not None:
-        attrs["b"] = b
-        k = attrs["parameter"](shape=b.T.shape)
-        attrs["k"] = k
-
-        if dt and not dt_plant:
-            # sampled control
-            u = state(shape=b.shape[1])
-            attrs["u"] = u
-            # attrs["initial"][u] = -k@x
-        else:
-            # feedback control matching system
-            u = -k @ x
-            attrs["dynamic_output"].u = u
-
-        xdot += b @ u
-
-    if not (dt_plant and dt):
-        attrs["dot"][x] = xdot
-
-    plant = ModelTemplateType(name, (ODESystem,), attrs)
-
-    if dt:
-        dt_attrs = SubmodelType.__prepare__("DT", (plant.Event,))
-        # dt_attrs["function"] = np.sin(plant.t*np.pi/dt)
-        dt_attrs["at_time"] = slice(None, None, dt)
-        if dt_plant:
-            from scipy.signal import cont2discrete
-
-            if b is None:
-                b = np.zeros((a.shape[0], 1))
-            ad, bd, *_ = cont2discrete((a, b, None, None), dt=dt)
-            dt_attrs["update"][dt_attrs["x"]] = (ad - bd @ k) @ x
-        elif b is not None:
-            dt_attrs["update"][dt_attrs["u"]] = -k @ x
-            # dt_attrs["update"][dt_attrs["x"]] = x
-        SubmodelType(
-            "DT",
-            (plant.Event,),
-            attrs=dt_attrs,
-        )
-
-    return plant
-
-
 def copy_field(new_model_name, old_field, new_field=None):
     if new_field is None:
         new_field = old_field.inherit(new_model_name, field_type_name=old_field._name)

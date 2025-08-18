@@ -23,6 +23,9 @@ The documentation is organized as follows:
   steps involved in addressing key problems and use-cases. They are more
   advanced than tutorials and assume some knowledge of how Condor works.
 
+* :doc:`Examples </examples/index>` provide demonstrations with fewer annotations, as
+  a reference for users and test of functionality in CI.
+
 .. toctree::
    :hidden:
    :maxdepth: 2
@@ -32,6 +35,7 @@ The documentation is organized as follows:
    howto/index
    api/index
    topics/index
+   examples/index
 
 
 Indices and tables

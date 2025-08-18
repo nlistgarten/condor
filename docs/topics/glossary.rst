@@ -86,6 +86,10 @@ General Object-Oriented and Metaprogramming Terms
    MRO
       the "method resolution order" which defines the order of classes to resolve an attribute definition
 
+   metaprogramming
+      the programming paradigm of treating programs as data; examples include usage of introspection functionality
+      and dynamic function or class generation
+
 
 
 

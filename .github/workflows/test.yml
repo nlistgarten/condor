@@ -39,3 +39,11 @@ jobs:
 
     - name: Run tests
       run: pytest --cov=src
+
+    - name: Install example dependencies
+      run: python -m pip install --group docs
+
+    - name: Run examples
+      env:
+        MPLBACKEND: "agg"
+      run: python run_examples.py

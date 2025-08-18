@@ -1,3 +1,8 @@
+"""
+Creating Model Tempalates
+=========================
+"""
+
 import functools
 
 import numpy as np

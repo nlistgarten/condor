@@ -9,6 +9,7 @@ Here we will provide how-to guides (recipes) for certain tasks.
 
     table_basics
     parallel_processing
+    configuration
 
 ..
    [ ]  how to learn about condor

@@ -96,7 +96,7 @@ three key components of the architecture are:
   layer then calls the solver and binds the results to the model instance.
 
 .. figure:: /images/architecture.png
-   :width: 50%
+   :width: 40%
 
 
 The Model Layer
@@ -188,6 +188,8 @@ Different field types are used for different purposes:
     used to represent assigned expressions, often outputs of models
 
 User models then draw elements from (free) fields and define expressions for the matched and assigned fields.
+
+.. _metaprogramming-walkthrough:
 
 Metaprogramming class declaration
 ---------------------------------
