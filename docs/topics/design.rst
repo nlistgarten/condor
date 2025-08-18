@@ -96,7 +96,7 @@ three key components of the architecture are:
   layer then calls the solver and binds the results to the model instance.
 
 .. figure:: /images/architecture.png
-   :width: 50%
+   :width: 40%
 
 
 The Model Layer

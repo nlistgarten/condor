@@ -59,7 +59,6 @@ sphinx_gallery_conf = {
         "sphinx_gallery": None,
     },
 }
-print(sphinx_gallery_conf["filename_pattern"])
 
 napoleon_custom_sections = [("Options", "params_style")]
 
