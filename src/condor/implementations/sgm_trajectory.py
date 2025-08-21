@@ -37,6 +37,10 @@ def get_state_setter(field, signature, on_field=None, subs=None):
     return func
 
 
+def isnan(x):
+    return isinstance(x, float) and np.isnan(x)
+
+
 class TrajectoryAnalysis:
     """Implementation for :class:`TrajectoryAnalysis` model.
 
@@ -68,6 +72,7 @@ class TrajectoryAnalysis:
 
     def __init__(self, model_instance):
         model = model_instance.__class__
+        self.model_instance = model_instance
         model_instance.options_dict = options_to_kwargs(model)
         self.construct(model, **model_instance.options_dict)
         self(model_instance)
@@ -187,10 +192,10 @@ class TrajectoryAnalysis:
         num_events = len(events)
 
         for event_idx, event in enumerate(events):
-            if (event.function is not np.nan) == (event.at_time is not np.nan):
+            if isnan(event.function) == isnan(event.at_time):
                 msg = f"Event class `{event}` has set both `function` and `at_time`"
                 raise ValueError(msg)
-            if getattr(event, "function", np.nan) is not np.nan:
+            if not isnan(getattr(event, "function", np.nan)):
                 e_expr = event.function
             else:
                 at_time = event.at_time
@@ -335,6 +340,7 @@ class TrajectoryAnalysis:
             max_step_size=state_max_step_size,
             solver_class=state_solver_class,
         )
+        self.state_system.model_instance = self.model_instance
         self.at_time_slices = at_time_slices
 
         self.p_state0_p_p_expr = jacobian(self.state0.expr, self.p)

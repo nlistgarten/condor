@@ -75,7 +75,10 @@ class SolverSciPyBase(SolverMixin):
         immediately_after_event = (
             results.e and results.e[-1].index >= len(results.t) - 1
         )
-        if not immediately_after_event and np.any(np.abs(gs_sign) > 0):
+        if not immediately_after_event and np.any(
+            np.abs(gs_sign) > 0
+            # & (np.abs(new_gs) > self.int_options["atol"]/1E3)
+        ):
             self.rootinfo = gs_sign
             store_t, store_x = self.find_root(t, x, new_gs, gs_sign)
         else:
@@ -123,6 +126,10 @@ class SolverSciPyBase(SolverMixin):
 
                 def find_function(t):
                     return g_spl(t)[g_idx]  # noqa: B023 false positive
+
+                if np.diff(np.sign(g_spl(spline_ts[-2:])[:, g_idx])) == 0:
+                    self.rootinfo[g_idx] = 0
+                    return t, x
 
                 set_t = brentq(
                     find_function,
