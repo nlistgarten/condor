@@ -19,6 +19,7 @@ mod = casadi.fmod
 trace = casadi.trace
 cross = casadi.cross
 
+
 atan = casadi.atan
 atan2 = casadi.atan2
 tan = casadi.tan
@@ -55,6 +56,12 @@ def vector_norm(x, ord=2):
         return casadi.norm_1(x)
     if ord == inf:
         return casadi.norm_inf(x)
+
+
+def sum(x, axis=None):
+    if axis is None:
+        return casadi.sum(x)
+    return casadi.sum(x, axis)
 
 
 solve = casadi.solve

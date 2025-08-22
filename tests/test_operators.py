@@ -49,6 +49,23 @@ def test_min_max():
     assert np.all(out.z.squeeze() == np.fmin(x, y))
 
 
+def test_sum():
+    class TestSum(co.ExplicitSystem):
+        x = input(shape=(10, 10))
+        output.u = ops.sum(x, axis=0)
+        output.v = ops.sum(x, axis=1)
+        output.w = ops.sum(x, axis=None)
+        output.y = ops.sum(x)
+
+    x = rng.random(100).reshape(10, 10)
+    s = TestSum(x)
+    assert np.all(np.isclose(s.u.squeeze(), np.sum(x, axis=0)))
+    assert np.all(np.isclose(s.v.squeeze(), np.sum(x, axis=1)))
+    assert np.isclose(s.w.squeeze(), np.sum(x, axis=None))
+    assert np.isclose(s.y, np.sum(x))
+    assert s.w == s.y
+
+
 def test_fabs_sign():
     class TestFabsSign(co.ExplicitSystem):
         x = input()

@@ -81,3 +81,5 @@ vector_norm = wrap(backend_mod.operators.vector_norm)
 trace = wrap(backend_mod.operators.trace)
 cross = wrap(backend_mod.operators.cross)
 solve = wrap(backend_mod.operators.solve)
+
+sum = wrap(backend_mod.operators.sum)
