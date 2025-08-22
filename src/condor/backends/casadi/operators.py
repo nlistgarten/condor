@@ -198,5 +198,8 @@ def if_else(*conditions_actions):
             raise ValueError(msg)
         return else_action
     condition, action = conditions_actions[0]
+    if hasattr(condition, "shape") and condition.shape != (1, 1):
+        msg = "if_else conditions should be a scalar"
+        raise ValueError(msg)
     remainder = if_else(*conditions_actions[1:])
     return casadi.if_else(condition, action, remainder)

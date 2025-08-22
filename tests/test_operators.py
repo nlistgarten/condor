@@ -71,6 +71,15 @@ def test_if_():
                 (catd > 3, catd),  # input design limit load factor
             )
 
+    with pytest.raises(ValueError, match="if_else conditions should be a scalar"):
+
+        class Check(co.ExplicitSystem):
+            x = input(shape=3)
+            output.y = ops.if_else(
+                (x > 0.0, 3.8),  # normal design FAR Part 23
+                0.0,
+            )
+
 
 def test_jacobian_empty():
     class TestJacobian(co.ExplicitSystem):
