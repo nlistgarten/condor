@@ -370,6 +370,14 @@ class SymbolCompatibleDict(dict):
         for k, v in args_dict.items():
             self[k] = v
 
+    def get(self, k, default):
+        out = super().get(k, None)
+        if out is None:
+            out = super().get(k.T, None)
+        if out is None:
+            return default
+        return out
+
     def __getitem__(self, k):
         try:
             return dict.__getitem__(self, WrappedSymbol(k))
