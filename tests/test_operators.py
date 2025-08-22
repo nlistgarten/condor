@@ -25,6 +25,23 @@ def test_min_max():
     assert chk2.z == 0.1
 
 
+def test_fabs_sign():
+    class TestFabsSign(co.ExplicitSystem):
+        x = input()
+        output.fabsx = ops.fabs(x)
+        output.signx = ops.sign(x)
+
+    tfs = TestFabsSign(-0.5)
+    assert tfs.fabsx == 0.5
+    assert tfs.signx == -1
+    tfs = TestFabsSign(0.125)
+    assert tfs.fabsx == 0.125
+    assert tfs.signx == 1
+    tfs = TestFabsSign(0)
+    assert tfs.fabsx == 0
+    assert tfs.signx == 0
+
+
 def test_if_():
     class Check(co.ExplicitSystem):
         catd = input()

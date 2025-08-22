@@ -8,6 +8,13 @@ from condor.backends.element_mixin import BackendSymbolDataMixin
 
 symbol_class = casadi.MX
 
+"""
+# a useful stub for getting the op codes in casadi
+for attr in casadi.__dir__():
+    if attr.startswith("OP_"):
+        print(f"{attr}: {getattr(casadi, attr)}")
+"""
+
 
 def symbols_in(expression):
     """return the leaf symbols in the :attr:`expression`"""

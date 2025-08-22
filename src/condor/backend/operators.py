@@ -44,6 +44,9 @@ concat = backend_mod.operators.concat
 # stack?
 unstack = backend_mod.operators.unstack
 
+fabs = backend_mod.operators.fabs
+sign = backend_mod.operators.sign
+
 
 # "element-wise functions"
 def wrap(f):

@@ -34,6 +34,9 @@ sqrt = casadi.sqrt
 eye = casadi.MX.eye
 ones = casadi.MX.ones
 
+fabs = casadi.fabs
+sign = casadi.sign
+
 
 def diag(v, k=0):
     if k != 0:
