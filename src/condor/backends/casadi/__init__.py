@@ -178,6 +178,8 @@ class BackendSymbolData(BackendSymbolDataMixin):
         else:
             if not isinstance(value, (np.ndarray, symbol_class)):
                 value = np.array(value)
+            if isinstance(value, symbol_class):
+                value = value.T
             return value.reshape((-1, 1))
 
     def wrap_value(self, value):
@@ -195,10 +197,10 @@ class BackendSymbolData(BackendSymbolDataMixin):
             value = unique_to_symmetric(value, symbolic=isinstance(value, symbol_class))
 
         if isinstance(value, symbol_class) and value.is_constant():
-            value = value.to_DM().toarray()
+            value = value.to_DM()
 
         if isinstance(value, casadi.DM):
-            value = value.toarray().reshape(self.shape, order="F")
+            value = value.T.toarray().reshape(self.shape)
 
         if not isinstance(value, (np.ndarray, symbol_class)):
             value = np.array(value)
@@ -274,7 +276,8 @@ def symbol_generator(name, shape=(1, 1), symmetric=False, diagonal=False):
         matrix_symbols = unique_to_symmetric(unique_symbols)
         return matrix_symbols
     else:
-        sym = symbol_class.sym(name, (n, m))
+        raw_sym = symbol_class.sym(name, (m, n))
+        sym = raw_sym.T
         return sym
 
 
@@ -311,11 +314,11 @@ def get_symbol_data(symbol, symmetric=None):
     diagonal = False
     if symmetric is None:
         # if unprovided, try to determine if symmetric
-        if isinstance(symbol, (symbol_class, casadi.DM)):
-            symmetric = symbol.sparsity().is_symmetric() and size > 1
+        if isinstance(symbol, (symbol_class,)):
+            symmetric = symbol_is(symbol, symbol.T) and size > 1
         else:
             symmetric = (
-                np.isclose(0, symbol - symbol.T).all()
+                np.isclose(symbol, symbol.T).all()
                 and len(shape) == 2
                 and shape[0] == shape[1]
             )
@@ -367,10 +370,28 @@ class SymbolCompatibleDict(dict):
         for k, v in args_dict.items():
             self[k] = v
 
+    def get(self, k, default):
+        out = super().get(k, None)
+        if out is None:
+            out = super().get(k.T, None)
+        if out is None:
+            return default
+        return out
+
     def __getitem__(self, k):
-        return dict.__getitem__(self, WrappedSymbol(k))
+        try:
+            return dict.__getitem__(self, WrappedSymbol(k))
+        except KeyError as e:
+            if isinstance(k, symbol_class) and k.op() != 66:
+                raise e
+            try:
+                return dict.__getitem__(self, WrappedSymbol(k.dep()))
+            except KeyError:
+                raise KeyError from e
 
     def __setitem__(self, k, v):
+        if isinstance(k, symbol_class) and k.op() == 66:
+            dict.__setitem__(self, WrappedSymbol(k.T), v)
         return dict.__setitem__(self, WrappedSymbol(k), v)
 
     def update(self, *args, **kwargs):

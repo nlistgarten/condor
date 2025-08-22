@@ -317,6 +317,7 @@ class Field:
             self._cls_dict.meta.backend_repr_elements[
                 self._elements[-1].backend_repr
             ] = self._elements[-1]
+
         # self._count += getattr(self._elements[-1], 'size', 1)
 
     def create_dataclass(self):
@@ -913,8 +914,13 @@ class MatchedField(Field):
                         backend_repr = value.reshape(match.shape)
                     else:
                         backend_repr = np.broadcast_to(value, match.shape)
+            if match.symmetric:
+                symbol_data.symmetric = True
             self.create_element(
-                name=None, match=match, backend_repr=backend_repr, **asdict(symbol_data)
+                name=None,
+                match=match,
+                backend_repr=backend_repr,
+                **asdict(symbol_data),
             )
 
     def __getitem__(self, key):
