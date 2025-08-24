@@ -121,6 +121,11 @@ def max(x, axis=None):
     return casadi.mmax(x)
 
 
+unsupported_jacobian_message = (
+    "jacobian of matrix expression wrt matrix variable not yet supported"
+)
+
+
 def jacobian(of, wrt):
     """jacobian of expression `of` with respect to symbols `wrt`"""
     """
@@ -144,9 +149,20 @@ def jacobian(of, wrt):
        jac(0.)
     """
     if of.size:
-        return casadi.jacobian(of, wrt)
+        transpose_in = False
+        if isinstance(wrt, backend.symbol_class) and wrt.op() == casadi.OP_TRANSPOSE:
+            transpose_in = True
+            wrt = wrt.dep()
+
+        if transpose_in and np.all(np.array(of.shape + wrt.shape) > 1):
+            raise NotImplementedError(unsupported_jacobian_message)
+
+        jac = casadi.jacobian(of, wrt)
+
+        return jac
+
     else:
-        return casadi.MX()
+        return backend.symbol_class(0, np.prod(wrt.shape))
 
 
 def jac_prod(of, wrt, rev=True):
@@ -156,7 +172,9 @@ def jac_prod(of, wrt, rev=True):
 
 def substitute(expr, subs):
     subs = {
-        (k if k.op() != 66 else k.T): (v if k.op() != 66 else v.T)
+        (k if k.op() not in (casadi.OP_RESHAPE, casadi.OP_TRANSPOSE) else k.T): (
+            v if k.op() not in (casadi.OP_RESHAPE, casadi.OP_TRANSPOSE) else v.T
+        )
         for k, v in subs.items()
     }
     expr = casadi.graph_substitute(expr, subs.keys(), subs.values())

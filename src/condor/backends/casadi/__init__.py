@@ -372,7 +372,7 @@ class SymbolCompatibleDict(dict):
 
     def get(self, k, default):
         out = super().get(k, None)
-        if out is None:
+        if out is None and isinstance(k, symbol_class):
             out = super().get(k.T, None)
         if out is None:
             return default
@@ -382,7 +382,10 @@ class SymbolCompatibleDict(dict):
         try:
             return dict.__getitem__(self, WrappedSymbol(k))
         except KeyError as e:
-            if isinstance(k, symbol_class) and k.op() != 66:
+            if isinstance(k, symbol_class) and k.op() not in (
+                casadi.OP_RESHAPE,
+                casadi.OP_TRANSPOSE,
+            ):
                 raise e
             try:
                 return dict.__getitem__(self, WrappedSymbol(k.dep()))
@@ -390,7 +393,10 @@ class SymbolCompatibleDict(dict):
                 raise KeyError from e
 
     def __setitem__(self, k, v):
-        if isinstance(k, symbol_class) and k.op() == 66:
+        if isinstance(k, symbol_class) and k.op() in (
+            casadi.OP_RESHAPE,
+            casadi.OP_TRANSPOSE,
+        ):
             dict.__setitem__(self, WrappedSymbol(k.T), v)
         return dict.__setitem__(self, WrappedSymbol(k), v)
 
