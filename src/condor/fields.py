@@ -453,6 +453,8 @@ class BaseElement(
         return new_field._elements[-1]
 
     def reshape(self, new_shape):
+        if self.shape == new_shape:
+            return self
         self.backend_repr = backend.symbol_generator(
             name=self.backend_repr.name(), shape=new_shape
         )

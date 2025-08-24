@@ -129,6 +129,31 @@ def test_jacobian_empty():
     ops.jacobian(TestJacobian.output.flatten(), TestJacobian.input.flatten())
 
 
+@pytest.mark.skip(reason="Casadi backend doesn't support matrix/matrix jacobian yet")
+def test_jacobian():
+    A = rng.random((3, 3))  # noqa: N806
+
+    class TestJacobian1(co.ExplicitSystem):
+        x = input(shape=(3, 3))
+        output.y = A @ x
+        output.z = ops.jacobian(y, x)
+        # output.w = casadi.jacobian(y, x.T)
+
+    class TestJacobian0(co.ExplicitSystem):
+        x = input(shape=3)
+        output.y = A @ x
+        output.z = ops.jacobian(y, x)
+
+    x = rng.random((3, 3))
+    jj = TestJacobian1(x)
+    js = [TestJacobian0(x[:, idx]) for idx in range(3)]
+
+    assert np.all(jj.y == ops.concat([j.y for j in js], axis=1))
+    # TODO: casadi backend is doing a kronecker product, should be able to figure this
+    # future backends might not!
+    assert np.all(np.isclose(np.kron(np.eye(3), A), jj.z))
+
+
 def test_cross():
     class MyCross(co.ExplicitSystem):
         x = input(shape=3)
