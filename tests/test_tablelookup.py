@@ -34,9 +34,11 @@ def test_table_optimization():
     tt = Table(0.5, 0.5)
     print(tt.input, tt.output)
 
-    class MyOpt3(co.OptimizationProblem):
-        xx = variable(warm_start=False)
-        yy = variable(warm_start=False)
+    class MyOpt(co.OptimizationProblem):
+        xx = variable(warm_start=False)  # , lower_bound=0., upper_bound=1.0,)
+        yy = variable(warm_start=False)  # , lower_bound=0., upper_bound=0.3,)
+        # constraint(xx, lower_bound=0.)#, upper_bound=1.0,)
+        # constraint(yy, lower_bound=0.)#, upper_bound=0.3,)
         interp = Table(xx, yy)
         objective = (interp.sigma - 0.2) ** 2 + (interp.sigstr - 0.7) ** 2
 
@@ -45,21 +47,29 @@ def test_table_optimization():
             exact_hessian = True
             print_level = 0
 
-    opt3 = MyOpt3()
+    opt0 = MyOpt()
     print("first call")
-    hessian_iters0 = opt3.implementation.callback._stats["iter_count"]
+    hessian_iters0 = opt0.implementation.callback._stats["iter_count"]
 
-    MyOpt3.Options.exact_hessian = False
+    MyOpt.Options.exact_hessian = False
 
-    opt3 = MyOpt3()
+    opt1 = MyOpt()
     print("call w/o hessian")
-    no_hessian_iters = opt3.implementation.callback._stats["iter_count"]
+    no_hessian_iters = opt1.implementation.callback._stats["iter_count"]
 
-    MyOpt3.Options.exact_hessian = True
+    MyOpt.Options.exact_hessian = True
 
-    opt3 = MyOpt3()
+    opt2 = MyOpt()
     print("with hessian again")
-    hessian_iters1 = opt3.implementation.callback._stats["iter_count"]
+    hessian_iters1 = opt2.implementation.callback._stats["iter_count"]
 
-    assert no_hessian_iters > hessian_iters0
+    assert opt0.objective < 1e-19
+    assert opt1.objective < 1e-19
+    assert np.isclose(opt0.objective, opt1.objective)
+
+    assert opt0.implementation.callback._stats["success"]
+    assert opt1.implementation.callback._stats["success"]
+    assert opt2.implementation.callback._stats["success"]
+
+    assert no_hessian_iters > 7 * hessian_iters0
     assert hessian_iters0 == hessian_iters1
