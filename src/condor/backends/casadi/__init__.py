@@ -532,6 +532,12 @@ class CasadiFunctionCallback(casadi.Callback):
         out = self.wrapper_func(args[0])
 
         if self.jacobian_of:
+            if self.jacobian_of.jacobian_of:
+                # print("hessian")
+                pass
+            else:
+                # print("jacobian")
+                pass
             if hasattr(out, "shape") and out.shape == self.get_sparsity_out(0).shape:
                 return (out,)
             if isinstance(out, tuple) and len(out) == 2:
