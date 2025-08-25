@@ -263,6 +263,8 @@ class Field:
         """Get a list of field elements where every field matches kwargs
 
         If only one, return element without list wrapper.
+
+        treat __ as a "dot" accessor, recursively
         """
         # TODO: what's the lightest-weight way to be able query? these should get called
         # very few times, so hopefully don't need to stress too much about

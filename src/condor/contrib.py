@@ -805,7 +805,7 @@ def LTI(  # noqa: N802
         # dt_attrs["function"] = np.sin(plant.t*np.pi/dt)
         dt_attrs["at_time"] = slice(None, None, dt)
         if dt_plant:
-            from scipy.signal import cont2discrete
+            from scipy.signal import cont2discrete  # noqa: PLC0415 I001
 
             if b is None:
                 b = np.zeros((a.shape[0], 1))
