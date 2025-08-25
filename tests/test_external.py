@@ -108,7 +108,6 @@ def test_external_solver_dict_io():
     assert np.all(out_jac.c_dxdb == out_jac.nsys_dxdb)
     assert np.all(out_jac.c_dyda == out_jac.nsys_dyda)
     assert np.all(out_jac.c_dydb == out_jac.nsys_dydb)
-    breakpoint()
 
 
 def test_external_solver_array_io():
