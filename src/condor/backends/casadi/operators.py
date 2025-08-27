@@ -57,6 +57,12 @@ def vector_norm(x, ord=2):
         return casadi.norm_inf(x)
 
 
+def clip(val, amax, amin):
+    val = ca.if_else(val > amax, amax, val)
+    val = ca.if_else(val < amin, amin, val)
+    return val
+
+
 solve = casadi.solve
 
 
