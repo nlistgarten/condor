@@ -251,6 +251,10 @@ class ExternalSolverModel:
                 for k, v in user_out.items():
                     return_structure[k] = v
                 out = return_structure.flatten()
+            elif der == 0 and isinstance(user_out, tuple):
+                for elem, v in zip(self.model.output, user_out):
+                    return_structure[elem.name] = v
+                out = return_structure.flatten()
             else:
                 out = user_out
 
