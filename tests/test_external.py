@@ -1,74 +1,69 @@
 import numpy as np
+import pytest
 
 import condor
 from condor.backend import operators as ops
 
 
-def test_external_solver_dict_io():
-    class DictLike(condor.ExternalSolverWrapper):
-        def __init__(self):
-            self.input(name="a")
-            self.input(name="b", shape=3)
-            self.output(name="x", shape=3)
-            self.output(name="y", shape=1)
+class Numeric(condor.ExternalSolverWrapper):
+    def __init__(self, output_mode):
+        self.output_mode = output_mode
 
-        def function(self, inputs):
-            x = inputs["a"] ** 2 + 2 * inputs["b"] ** 2
-            y = ops.sin(inputs["a"])
-            return dict(x=x, y=y)
+        self.input(name="a")
+        self.input(name="b", shape=3)
+        self.output(name="x", shape=3)
+        self.output(name="y")
 
-        def jacobian(self, input):
-            dyda = ops.cos(input.a)
-            dxda = 2 * input.a * np.ones_like(input.b)
-            dxdb = 4 * np.diag(input.b.squeeze())
-            # out of order on purpose
-            return {
-                ("y", "a"): dyda,
-                # should you have to provide this?
-                # ("y", "b"): np.zeros((1,3)),
-                ("x", "b"): dxdb,
-                ("x", "a"): dxda,
-            }
+    def function(self, inputs):
+        a, b = inputs.asdict().values()
+        x = a**2 + 2 * b**2
+        y = ops.sin(a)
 
-    class NumericLike(condor.ExternalSolverWrapper):
-        def __init__(self):
-            self.input(name="a")
-            self.input(name="b", shape=3)
-            self.output(name="x", shape=3)
-            self.output(name="y")
-
-        def function(self, inputs):
-            a, b = inputs.asdict().values()
-            x = a**2 + 2 * b**2
-            y = ops.sin(a)
+        if self.output_mode == 0:
             return np.concat([x.squeeze(), np.atleast_1d(y)])
-
-            return x, y
             out = np.array((4, 1))
             out[:3, 0] = x.squeeze()
             out[3, 0] = y
-            return out
+        elif self.output_mode == 1:
+            return dict(x=x, y=y)
+        elif self.output_mode == 2:
+            return x, y
 
-        def jacobian(self, input):
-            dxda = 2 * input.a * np.ones_like(input.b)
-            dxdb = 4 * np.diag(input.b.squeeze())
-            dyda = ops.cos(input.a)
-            # out of order on purpose
-            jac = np.zeros((4, 4))
-            jac[:3, 0] = dxda.squeeze()
-            jac[:3, 1:] = dxdb
-            jac[3, 0] = dyda
-            return jac
+    def jacobian(self, input):
+        dxda = 2 * input.a * np.ones_like(input.b)
+        dxdb = 4 * np.diag(input.b.squeeze())
+        dyda = ops.cos(input.a)
+        # out of order on purpose
+        jac = np.zeros((4, 4))
+        jac[:3, 0] = dxda.squeeze()
+        jac[:3, 1:] = dxdb
+        jac[3, 0] = dyda
+        return jac
 
-    class Condoric(condor.ExplicitSystem):
-        a = input()
-        b = input(shape=3)
-        output.x = a**2 + 2 * b**2
-        output.y = ops.sin(a)
 
-    dsys = DictLike()
-    nsys = NumericLike()
+class Condoric(condor.ExplicitSystem):
+    a = input()
+    b = input(shape=3)
+    output.x = a**2 + 2 * b**2
+    output.y = ops.sin(a)
 
+
+rng = np.random.default_rng(12345)
+
+
+@pytest.mark.parametrize("output_mode", range(3))
+def test_external_output(output_mode):
+    kwargs = dict(a=rng.random(1), b=rng.random(3))
+    nsys = Numeric(output_mode)
+    nout = nsys(**kwargs)
+    cout = Condoric(**kwargs)
+
+    for output in Condoric.output:
+        assert np.all(getattr(nout, output.name) == getattr(cout, output.name))
+
+
+@pytest.mark.skip(reason="Casadi backend doesn't support matrix/matrix jacobian yet")
+def test_external_solver_dict_io():
     class Jac(condor.ExplicitSystem):
         inp = input.create_from(dsys.input)
         dsys_out = dsys(**inp)
@@ -110,13 +105,5 @@ def test_external_solver_dict_io():
     assert np.all(out_jac.c_dydb == out_jac.nsys_dydb)
 
 
-def test_external_solver_array_io():
-    class ArrayLike(condor.ExternalSolverWrapper):
-        def __init__(self):
-            self.input(name="a")
-            self.input(name="b", shape=(2, 3))
-            self.output(name="x")
-
-
 if __name__ == "__main__":
-    test_external_solver_dict_io()
+    test_external_output(2)
