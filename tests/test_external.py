@@ -34,11 +34,27 @@ class Numeric(condor.ExternalSolverWrapper):
         dxdb = 4 * np.diag(input.b.squeeze())
         dyda = ops.cos(input.a)
         # out of order on purpose
-        jac = np.zeros((4, 4))
-        jac[:3, 0] = dxda.squeeze()
-        jac[:3, 1:] = dxdb
-        jac[3, 0] = dyda
-        return jac
+
+        if self.output_mode == 0:
+            jac = np.zeros((4, 4))
+            jac[:3, 0] = dxda.squeeze()
+            jac[:3, 1:] = dxdb
+            jac[3, 0] = dyda
+            return jac
+        if self.output_mode == 1:
+            return {
+                ("y", "a"): dyda,
+                # should you have to provide this?
+                # ("y", "b"): np.zeros((1,3)),
+                ("x", "b"): dxdb,
+                ("x", "a"): dxda,
+            }
+        if self.output_mode == 2:
+            return dict(
+                y__a=dyda,
+                x__b=dxdb,
+                x__a=dxda,
+            )
 
 
 class Condoric(condor.ExplicitSystem):
@@ -62,48 +78,44 @@ def test_external_output(output_mode):
         assert np.all(getattr(nout, output.name) == getattr(cout, output.name))
 
 
-@pytest.mark.skip(reason="Casadi backend doesn't support matrix/matrix jacobian yet")
-def test_external_solver_dict_io():
+@pytest.mark.parametrize("output_mode", range(3))
+def test_external_jacobian(output_mode):
+    kwargs = dict(a=rng.random(1), b=rng.random(3))
+    nsys = Numeric(output_mode)
+
     class Jac(condor.ExplicitSystem):
-        inp = input.create_from(dsys.input)
-        dsys_out = dsys(**inp)
-        nsys_out = nsys(**inp)
-        c_out = Condoric(**inp)
+        inp = input.create_from(nsys.input)
 
-        output.dsys_dxda = ops.jacobian(dsys_out.x, input.a)
-        output.dsys_dxdb = ops.jacobian(dsys_out.x, input.b)
-        output.dsys_dyda = ops.jacobian(dsys_out.y, input.a)
-        output.dsys_dydb = ops.jacobian(dsys_out.y, input.b)
+        nout = nsys(**inp)
+        cout = Condoric(**inp)
 
-        output.nsys_dxda = ops.jacobian(nsys_out.x, input.a)
-        output.nsys_dxdb = ops.jacobian(nsys_out.x, input.b)
-        output.nsys_dyda = ops.jacobian(nsys_out.y, input.a)
-        output.nsys_dydb = ops.jacobian(nsys_out.y, input.b)
+        for output_ in Condoric.output:
+            for input_ in input:
+                setattr(
+                    output,
+                    f"nsys_d{output_.name}_d{input_.name}",
+                    ops.jacobian(
+                        getattr(nout, output_.name),
+                        getattr(input, input_.name),
+                    ),
+                )
+                setattr(
+                    output,
+                    f"csys_d{output_.name}_d{input_.name}",
+                    ops.jacobian(
+                        getattr(cout, output_.name),
+                        getattr(input, input_.name),
+                    ),
+                )
 
-        output.c_dxda = ops.jacobian(c_out.x, input.a)
-        output.c_dxdb = ops.jacobian(c_out.x, input.b)
-        output.c_dyda = ops.jacobian(c_out.y, input.a)
-        output.c_dydb = ops.jacobian(c_out.y, input.b)
-
-    dsys_out = dsys(a=2, b=np.array([[1, 2, 3]]))
-    nsys_out = nsys(**dsys_out.input)
-
-    assert np.all(
-        dsys_out.x.squeeze() == (dsys_out.a**2 + 2 * dsys_out.b**2).squeeze()
-    )  # [1, 0]
-    assert np.all(dsys_out.y.squeeze() == np.sin(dsys_out.a).squeeze())  # [1, 0]
-
-    out_jac = Jac(**dsys_out.input)
-    assert np.all(out_jac.c_dxda == out_jac.dsys_dxda)
-    assert np.all(out_jac.c_dxdb == out_jac.dsys_dxdb)
-    assert np.all(out_jac.c_dyda == out_jac.dsys_dyda)
-    assert np.all(out_jac.c_dydb == out_jac.dsys_dydb)
-
-    assert np.all(out_jac.c_dxda == out_jac.nsys_dxda)
-    assert np.all(out_jac.c_dxdb == out_jac.nsys_dxdb)
-    assert np.all(out_jac.c_dyda == out_jac.nsys_dyda)
-    assert np.all(out_jac.c_dydb == out_jac.nsys_dydb)
+    out_jac = Jac(**kwargs)
+    for output_ in Condoric.output:
+        for input_ in Jac.input:
+            assert np.all(
+                getattr(out_jac, f"nsys_d{output_.name}_d{input_.name}")
+                == getattr(out_jac, f"csys_d{output_.name}_d{input_.name}")
+            )
 
 
 if __name__ == "__main__":
-    test_external_output(2)
+    test_external_jacobian(2)
