@@ -118,7 +118,7 @@ Here's an assortment of examples demonstrating Condor features.
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="Creating Model Tempalates">
+    <div class="sphx-glr-thumbcontainer" tooltip="Creating Model Templates">
 
 .. only:: html
 
@@ -129,7 +129,7 @@ Here's an assortment of examples demonstrating Condor features.
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Creating Model Tempalates</div>
+      <div class="sphx-glr-thumbnail-title">Creating Model Templates</div>
     </div>
 
 

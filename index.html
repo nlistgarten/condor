@@ -6,9 +6,10 @@
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Tutorials" href="tutorial/index.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Condor 0.3.1.dev91+g3d1a09752 documentation</title>
+        <title>Condor 0.3.1.dev92+ga08944e2a documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=25af2a20" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="_static/sg_gallery.css?v=d2d258e8" />
     <link rel="stylesheet" type="text/css" href="_static/sg_gallery-binder.css?v=f4aeca0c" />
     <link rel="stylesheet" type="text/css" href="_static/sg_gallery-dataframe.css?v=2082cf3c" />
@@ -171,7 +172,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="#"><div class="brand">Condor 0.3.1.dev91+g3d1a09752 documentation</div></a>
+      <a href="#"><div class="brand">Condor 0.3.1.dev92+ga08944e2a documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -183,7 +184,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <div class="visually-hidden">Toggle table of contents sidebar</div>
         <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
       </label>
@@ -194,7 +195,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="#">
   
-  <span class="sidebar-brand-text">Condor 0.3.1.dev91+g3d1a09752 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev92+ga08944e2a documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -235,7 +236,7 @@
 <li class="toctree-l2"><a class="reference internal" href="examples/rosenbrock.html">Warm Starting in Iterative Solvers</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/sp_lqr.html">Discrete Time LQR</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/state_switched.html">Optimal Transfer With State Trigger</a></li>
-<li class="toctree-l2"><a class="reference internal" href="examples/templating.html">Creating Model Tempalates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/templating.html">Creating Model Templates</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/time_switch.html">Optimal Transfer With Time Trigger</a></li>
 </ul>
 </li>
@@ -273,14 +274,90 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <div class="visually-hidden">Toggle table of contents sidebar</div>
             <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="welcome-to-condor-s-documentation">
-<h1>Welcome to Condor’s documentation!<a class="headerlink" href="#welcome-to-condor-s-documentation" title="Link to this heading">¶</a></h1>
+          <section id="condor">
+<h1>Condor<a class="headerlink" href="#condor" title="Link to this heading">¶</a></h1>
+<a class="reference external image-reference" href="https://nasa.github.io/condor"><img alt="https://github.com/nasa/simupy-flight/actions/workflows/docs.yml/badge.svg" src="https://github.com/nasa/simupy-flight/actions/workflows/docs.yml/badge.svg" />
+</a>
+<a class="reference external image-reference" href="https://github.com/nasa/condor/blob/master/LICENSE"><img alt="https://img.shields.io/badge/License-NOSA-green.svg" src="https://img.shields.io/badge/License-NOSA-green.svg" />
+</a>
+<a class="reference external image-reference" href="https://github.com/nasa/condor/releases"><img alt="https://img.shields.io/github/release/nasa/condor.svg" src="https://img.shields.io/github/release/nasa/condor.svg" />
+</a>
+<p>Condor is a new mathematical modeling framework for Python, developed at
+NASA’s Ames Research Center. Initial development began in April 2023 to
+address model implementation challenges for aircraft synthesis and
+robust orbital trajectory design. The goal is for Condor to help
+evaluate numerical models and then get out of the way.</p>
+<p>One key aspect to achieve this goal was to create an API that looked as
+much like the mathematical description as possible with as little
+distraction from programming cruft as possible. To best understand
+this approach, we can consider a simple benchmark problem which consists
+of a set of coupled algebraic expressions. This can be represented as a
+system of algebraic equations:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">condor</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">co</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Coupling</span><span class="p">(</span><span class="n">co</span><span class="o">.</span><span class="n">AlgebraicSystem</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">parameter</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">y1</span> <span class="o">=</span> <span class="n">variable</span><span class="p">(</span><span class="n">initializer</span><span class="o">=</span><span class="mf">1.</span><span class="p">)</span>
+    <span class="n">y2</span> <span class="o">=</span> <span class="n">variable</span><span class="p">(</span><span class="n">initializer</span><span class="o">=</span><span class="mf">1.</span><span class="p">)</span>
+
+    <span class="n">residual</span><span class="p">(</span><span class="n">y1</span> <span class="o">==</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.2</span> <span class="o">*</span> <span class="n">y2</span><span class="p">)</span>
+    <span class="n">residual</span><span class="p">(</span><span class="n">y2</span> <span class="o">==</span> <span class="n">y1</span><span class="o">**</span><span class="mf">0.5</span> <span class="o">+</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>This parametric model can be evaluated by providing the values for the
+parameters; the resulting object has values for its inputs and outputs
+bound, so the solved values for <code class="docutils literal notranslate"><span class="pre">y1</span></code> and <code class="docutils literal notranslate"><span class="pre">y2</span></code> can be accessed easily:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">coupling</span> <span class="o">=</span> <span class="n">Coupling</span><span class="p">([</span><span class="mf">5.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="c1"># evaluate the model numerically</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">coupling</span><span class="o">.</span><span class="n">y1</span><span class="p">,</span> <span class="n">coupling</span><span class="o">.</span><span class="n">y2</span><span class="p">)</span> <span class="c1"># individual elements are bound numerically</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">coupling</span><span class="o">.</span><span class="n">variable</span><span class="p">)</span> <span class="c1"># fields are bound as a dataclass</span>
+</pre></div>
+</div>
+<p>Models can also be seamlessly built-up, with parent models accessing any
+input or output of models embedded within them. For example, we can
+optimize this system of algebraic equations by embedding it within an
+optimization problem:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">condor.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">operators</span> <span class="k">as</span> <span class="n">ops</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Sellar</span><span class="p">(</span><span class="n">co</span><span class="o">.</span><span class="n">OptimizationProblem</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">variable</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">lower_bound</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">upper_bound</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">coupling</span> <span class="o">=</span> <span class="n">Coupling</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">y1</span><span class="p">,</span> <span class="n">y2</span> <span class="o">=</span> <span class="n">coupling</span>
+
+    <span class="n">objective</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">y1</span> <span class="o">+</span> <span class="n">ops</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">y2</span><span class="p">)</span>
+    <span class="n">constraint</span><span class="p">(</span><span class="n">y1</span> <span class="o">&gt;=</span> <span class="mf">3.16</span><span class="p">)</span>
+    <span class="n">constraint</span><span class="p">(</span><span class="mf">24.</span> <span class="o">&gt;=</span> <span class="n">y2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>After the model is solved, the embedded model can be accessed directly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Sellar</span><span class="o">.</span><span class="n">set_initial</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">sellar</span> <span class="o">=</span> <span class="n">Sellar</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sellar</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span> <span class="c1"># scalar value</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sellar</span><span class="o">.</span><span class="n">constraint</span><span class="p">)</span> <span class="c1"># field</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sellar</span><span class="o">.</span><span class="n">coupling</span><span class="o">.</span><span class="n">y1</span><span class="p">)</span> <span class="c1"># sub-model element</span>
+</pre></div>
+</div>
+<p>NASA’s Condor is a framework for mathematical modeling of engineering
+systems in Python, written for engineers with a deadline.</p>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
+<p>Condor is available on <a class="reference external" href="https://pypi.org/project/condor/">PyPI</a>, so you can
+install with pip:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>condor
+</pre></div>
+</div>
+<p>Optionally, you can include the dependencies to run the examples:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>condor<span class="o">[</span>examples<span class="o">]</span>
+</pre></div>
+</div>
+</section>
+<section id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">¶</a></h2>
 <p>The documentation is organized as follows:</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="tutorial/index.html"><span class="doc">Tutorials</span></a> have several small examples that show you the basics of translating a mathematical model into condor code, evaluating the model, and using it other scientific python tools. Start here if you’re new to condor.</p></li>
@@ -297,12 +374,13 @@ a reference for users and test of functionality in CI.</p></li>
 </div>
 </section>
 <section id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h1>
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
 <li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
 <li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
 </ul>
+</section>
 </section>
 
         </article>
@@ -338,15 +416,38 @@ a reference for users and test of functionality in CI.</p></li>
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Condor</a><ul>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#documentation">Documentation</a></li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=cfac8ee7"></script>
+</div><script src="_static/documentation_options.js?v=fdd1a314"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
     </body>
 </html>

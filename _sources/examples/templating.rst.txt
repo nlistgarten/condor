@@ -18,7 +18,7 @@
 .. _sphx_glr_examples_templating.py:
 
 
-Creating Model Tempalates
+Creating Model Templates
 =========================
 
 .. GENERATED FROM PYTHON SOURCE LINES 5-160
@@ -30,9 +30,9 @@ Creating Model Tempalates
 
  .. code-block:: none
 
-    creating wrapper with func <function Class.test at 0x7f3bb82a0c20> on <__main__.instancemethod object at 0x7f3bb8615460>
-    returning self <__main__.instancemethod object at 0x7f3bb8615460>  with <function Class.test at 0x7f3bb82a0c20> <__main__.Class object at 0x7f3bb8615a00> <class '__main__.Class'>
-    calling self <__main__.instancemethod object at 0x7f3bb8615460>  with <function Class.test at 0x7f3bb82a0c20> <__main__.Class object at 0x7f3bb8615a00> 3.0
+    creating wrapper with func <function Class.test at 0x7f5ec7731e40> on <__main__.instancemethod object at 0x7f5ec7706c00>
+    returning self <__main__.instancemethod object at 0x7f5ec7706c00>  with <function Class.test at 0x7f5ec7731e40> <__main__.Class object at 0x7f5ec7704230> <class '__main__.Class'>
+    calling self <__main__.instancemethod object at 0x7f5ec7706c00>  with <function Class.test at 0x7f5ec7731e40> <__main__.Class object at 0x7f5ec7704230> 3.0
     5.0
     <Sys: x=1.2, y=3.4> SysOutput(w=array([13.]), z=array([4.84]))
     This is Ipopt version 3.14.11, running with linear solver MUMPS 5.4.1.
@@ -253,7 +253,7 @@ Creating Model Tempalates
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 0.037 seconds)
+   **Total running time of the script:** (0 minutes 0.036 seconds)
 
 
 .. _sphx_glr_download_examples_templating.py:

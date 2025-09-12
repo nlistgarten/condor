@@ -6,9 +6,10 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Working with trajectories" href="trajectory.html" /><link rel="prev" title="Introduction to Condor" href="sellar.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Polar Transformation - Condor 0.3.1.dev91+g3d1a09752 documentation</title>
+        <title>Polar Transformation - Condor 0.3.1.dev92+ga08944e2a documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
@@ -171,7 +172,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.3.1.dev91+g3d1a09752 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev92+ga08944e2a documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -194,7 +195,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">Condor 0.3.1.dev91+g3d1a09752 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev92+ga08944e2a documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -235,7 +236,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../examples/rosenbrock.html">Warm Starting in Iterative Solvers</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../examples/sp_lqr.html">Discrete Time LQR</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../examples/state_switched.html">Optimal Transfer With State Trigger</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../examples/templating.html">Creating Model Tempalates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/templating.html">Creating Model Templates</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../examples/time_switch.html">Optimal Transfer With Time Trigger</a></li>
 </ul>
 </li>
@@ -310,7 +311,7 @@ of this system as follows:</p>
     <span class="n">output</span><span class="o">.</span><span class="n">theta</span> <span class="o">=</span> <span class="n">ops</span><span class="o">.</span><span class="n">atan</span><span class="p">(</span><span class="n">y</span> <span class="o">/</span> <span class="n">x</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>In general, once you’ve defined any system in Condor, you can just evaulate it
+<p>In general, once you’ve defined any system in Condor, you can just evaluate it
 numerically by passing in numbers:</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">p</span> <span class="o">=</span> <span class="n">PolarTransform</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
@@ -343,7 +344,7 @@ accustomed to Condor features.</p>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>{&#39;r&#39;: array([1.]), &#39;theta&#39;: array([0.])}
 </pre></div>
 </div>
-<p>While the <em>binding</em> of the results in a datastructure is nice, the real benefit of
+<p>While the <em>binding</em> of the results in a data structure is nice, the real benefit of
 constructing condor models is in calling iterative solvers. For example, we could
 perform symbolic manipulation to define  another <code class="docutils literal notranslate"><span class="pre">ExplicitSystem</span></code> with <span class="math notranslate nohighlight">\(x =
 r\cos\theta\)</span> and <span class="math notranslate nohighlight">\(y = r\sin\theta\)</span>. Or we can we use Condor to
@@ -408,7 +409,7 @@ position. For example,</p>
 </pre></div>
 </div>
 <p>An additional <code class="xref py py-attr docutils literal notranslate"><span class="pre">warm_start</span></code> attribute determines whether the initializer is
-over-wrriten. Since the default is true, we can inspect the initializer values,</p>
+over-written. Since the default is true, we can inspect the initializer values,</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">CartesianTransform</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">initializer</span></a><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">CartesianTransform</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">initializer</span></a><span class="p">)</span>
 </pre></div>
 </div>
@@ -483,10 +484,12 @@ over-wrriten. Since the default is true, we can inspect the initializer values,<
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=cfac8ee7"></script>
+</div><script src="../_static/documentation_options.js?v=fdd1a314"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     </body>
 </html>

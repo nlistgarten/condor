@@ -6,9 +6,10 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Glossary of Terms" href="glossary.html" /><link rel="prev" title="Topics" href="index.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Condor Design - Condor 0.3.1.dev91+g3d1a09752 documentation</title>
+        <title>Condor Design - Condor 0.3.1.dev92+ga08944e2a documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
@@ -171,7 +172,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Condor 0.3.1.dev91+g3d1a09752 documentation</div></a>
+      <a href="../index.html"><div class="brand">Condor 0.3.1.dev92+ga08944e2a documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -194,7 +195,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">Condor 0.3.1.dev91+g3d1a09752 documentation</span>
+  <span class="sidebar-brand-text">Condor 0.3.1.dev92+ga08944e2a documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -235,7 +236,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../examples/rosenbrock.html">Warm Starting in Iterative Solvers</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../examples/sp_lqr.html">Discrete Time LQR</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../examples/state_switched.html">Optimal Transfer With State Trigger</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../examples/templating.html">Creating Model Tempalates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/templating.html">Creating Model Templates</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../examples/time_switch.html">Optimal Transfer With Time Trigger</a></li>
 </ul>
 </li>
@@ -287,7 +288,7 @@
 NASA’s Ames Research Center. Initial development began in April 2023 to
 address model implementation challenges for aircraft synthesis and
 robust orbital trajectory design.  Condor emphasizes modern approaches
-from the scientific python community, and leverages many open-source
+from the scientific Python community, and leverages many open-source
 software packages to expedite development and ensure robust and
 efficient run-time.</p>
 <p>The goal is for Condor to help evaluate numerical models and then get
@@ -331,7 +332,7 @@ the <a class="reference internal" href="glossary.html#term-model"><span class="x
 <span class="nb">print</span><span class="p">(</span><span class="n">coupling</span><span class="o">.</span><span class="n">variable</span><span class="p">)</span> <span class="c1"># fields are bound as a dataclass</span>
 </pre></div>
 </div>
-<p>This pythonic data structure allows Condor to be integrated into larger analysis workflows
+<p>This Pythonic data structure allows Condor to be integrated into larger analysis workflows
 with as little Condor-specific coding as possible.</p>
 <p>Condor uses <a class="reference internal" href="glossary.html#term-metaprogramming"><span class="xref std std-term">metaprogramming</span></a> to to turn the class <em>declaration</em> mechanism into a
 blackboard-like environment to achieve the desired API. This approach helps us see
@@ -345,7 +346,7 @@ mathematical models in engineering analysis,</p>
 </section>
 <section id="architecture">
 <h2>Architecture<a class="headerlink" href="#architecture" title="Link to this heading">¶</a></h2>
-<p>We followed modern pythonic best-practices and patterns to settle on a multi-layered
+<p>We followed modern Pythonic best-practices and patterns to settle on a multi-layered
 architecture like the Model-View-Controller paradigm in web development. The
 three key components of the architecture are:</p>
 <ul class="simple">
@@ -357,11 +358,11 @@ Engine</em>, a symbolic-computational library which provides symbolic representa
 <em>elements</em> and <em>operations</em> with awareness for basic differential calculus. The goal
 for the backend is provide a thin wrapper with a consistent interface so the
 computational engine implementation could be swapped out. Currently, we ship with
-CasADi as the only engine, although we hope to demonstrate a backend module for an
+<a class="reference external" href="https://web.casadi.org/">CasADi</a> as the only engine, although we hope to demonstrate a backend module for an
 alternate backend in the future.</p></li>
 <li><p>The implementation layer is the glue code that operates on the model data structure,
 using the backend to form the numerical functions needed to call the third-party
-solvers which implement the nuemrical algorithms of interest. The implementation
+solvers which implement the numerical algorithms of interest. The implementation
 layer then calls the solver and binds the results to the model instance.</p></li>
 </ul>
 <figure class="align-default">
@@ -622,7 +623,7 @@ needed.</p>
 Attributes without a leading underscore can be placed into a <code class="xref py py-attr docutils literal notranslate"><span class="pre">dict</span></code> by
 <code class="xref py py-meth docutils literal notranslate"><span class="pre">condor.implementations.utils.options_to_kwargs()</span></code> to pass to the solver.
 The <code class="xref py py-attr docutils literal notranslate"><span class="pre">__implementation__</span></code> is used to specify the class to use, otherwise inheriting from the template.</p>
-<p>Due to initial coupling with the casadi computational engine, the <code class="docutils literal notranslate"><span class="pre">contrib</span></code> model implementations follow a pattern of calling</p>
+<p>Due to initial coupling with the CasADi computational engine, the <code class="docutils literal notranslate"><span class="pre">contrib</span></code> model implementations follow a pattern of calling</p>
 <ol class="arabic simple" start="2">
 <li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">construct()</span></code> to create the callables from the model fields and setup the solver</p></li>
 <li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">__call__()</span></code> to run the solver and bind the output fields</p></li>
@@ -756,10 +757,12 @@ can call the solver.</p></li>
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=cfac8ee7"></script>
+</div><script src="../_static/documentation_options.js?v=fdd1a314"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     </body>
 </html>
