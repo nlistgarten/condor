@@ -11,6 +11,8 @@ authors = [
     { name="Benjamin W. L. Margolis", email="benjamin.margolis@nasa.gov" },
     { name="Kenneth R. Lyons", email="kenneth.r.lyons@nasa.gov" },
 ]
+license = "NASA-1.3"
+license-files = ["LICENSE"]
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -24,6 +26,9 @@ dependencies = [
     "ndsplines>=0.2.0post0",
 ]
 
+[project.optional-dependencies]
+examples = ["matplotlib"]
+
 [dependency-groups]
 lint = ["ruff"]
 test = ["pytest", "pytest-cov"]
@@ -32,10 +37,19 @@ docs = [
     "sphinx-gallery",
     "matplotlib",
     "furo",
+    "sphinx-copybutton",
+]
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+    {include-group = "docs"},
 ]
 
+
 [project.urls]
+Repository = "https://github.com/nasa/condor"
 Documentation = "https://nasa.github.io/condor"
+Issues = "https://github.com/nasa/condor/issues"
 
 [tool.setuptools_scm]
 write_to = "src/condor/_version.py"
@@ -87,5 +101,14 @@ ignore = [
 profile = "black"
 
 [tool.pytest.ini_options]
+minversion = "7"
 testpaths = ["tests"]
-addopts = "--pdbcls=IPython.terminal.debugger:TerminalPdb"
+log_cli_level = "INFO"
+xfail_strict = true
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+    # "--pdbcls=IPython.terminal.debugger:TerminalPdb",
+]
+# filterwarnings = ["error"]
