@@ -23,7 +23,7 @@ bibliography: references.bib
 
 # Summary
 
-Numerical modeling is an important part of the engineering workflow, providing understanding of engineering systems without the often prohibitive cost of fabricating physical models and prototypes. Condor is a mathematical modeling framework in Python that enables the rapid deployment of models for analysis and design. Condor uses metaprogramming to provide a mathematical domain-specific language (DSL) that reduces the software development effort needed to deploy models for solving engineering analysis and design problems. It also features a modular model-solver-backend architecture, analogous to the model-view-controller (MVC) pattern in web-application development, facitilitating usage of off-the-shelf solvers.
+Numerical modeling is an important part of the engineering workflow, providing understanding of engineering systems without the often prohibitive cost of fabricating physical models and prototypes. Condor is a mathematical modeling framework in Python that enables the rapid deployment of models for analysis and design. Condor uses metaprogramming to provide a mathematical domain-specific language (DSL) that reduces the software development effort needed to deploy models for solving engineering analysis and design problems. It also features a modular model-solver-backend architecture, analogous to the model-view-controller (MVC) pattern in web-application development, facilitating usage of off-the-shelf solvers.
 
 
 # Statement of Need
