@@ -73,7 +73,7 @@ After the model is solved, the embedded model can be accessed directly:
    print(sellar.coupling.y1) # sub-model element
 
 NASA's Condor is a framework for mathematical modeling of engineering
-systems in Python, written for engineers with a deadline.
+systems in Python, written for engineers with deadlines.
 
 Installation
 ------------
