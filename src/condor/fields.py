@@ -2,12 +2,11 @@
 
 # TODO: figure out python version minimum
 
+import dataclasses as dc
 import importlib
 import logging
 import operator
 import sys
-from dataclasses import asdict as dataclass_asdict
-from dataclasses import dataclass, fields, make_dataclass
 from enum import Enum
 
 import numpy as np
@@ -66,7 +65,7 @@ class AnyTopeofModel(co....):
 
 def asdict(obj):
     return dict(
-        (field.name, getattr(obj, field.name)) for field in fields(obj) if field.init
+        (field.name, getattr(obj, field.name)) for field in dc.fields(obj) if field.init
     )
 
 
@@ -89,7 +88,7 @@ class FieldValues:
     def asdict(self):
         """call the :mod:`dataclasses` module :func:`asdict` function on this field
         datacalss"""
-        return dataclass_asdict(self)
+        return dc.asdict(self)
 
     def flatten(self):
         """turn the bound values of this field instance into a single symbol -- may be
@@ -304,15 +303,15 @@ class Field:
 
     def flat_index(self, of_element):
         """Helper to get the starting index of an element"""
-        if of_element not in self:
-            msg = f"{of_element} not an element of {self}"
-            raise ValueError(msg)
-
         idx = 0
         for element in self:
             if element is of_element:
                 break
             idx += element.size
+
+        if idx == self._count:
+            msg = f"{of_element} not an element of {self}"
+            raise ValueError(msg)
         return idx
 
     def create_element(self, **kwargs):
@@ -331,7 +330,7 @@ class Field:
         # TODO: do processing to handle different field types
         fields = [(element.name, float) for element in self._elements]
         name = self._model_name + make_class_name([self._name])
-        self._dataclass = make_dataclass(
+        self._dataclass = dc.make_dataclass(
             name,
             fields,
             bases=(FieldValues,),
@@ -393,7 +392,7 @@ def make_class_name(components):
     return "".join(word for word in separate_words.title() if not word.isspace())
 
 
-@dataclass
+@dc.dataclass
 class FrontendElementData:
     field_type: Field
     backend_repr: backend.symbol_class
@@ -420,7 +419,7 @@ def _generic_op(op, is_r=False):
     return mthd
 
 
-@dataclass
+@dc.dataclass
 class BaseElement(
     FrontendElementData,
     backend.BackendSymbolData,
@@ -594,7 +593,7 @@ class FreeAssignedField(
         return self._elements[-1].backend_repr
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class WithDefaultElement(FreeElement):
     """Element with an optional default value"""
 
@@ -658,7 +657,7 @@ class WithDefaultField(FreeField):
         return substitution_dict
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class BoundedElement(FreeElement):
     """Element with upper and lower bounds"""
 
@@ -676,7 +675,7 @@ class BoundedElement(FreeElement):
         self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class InitializedElement(BoundedElement):
     """Element with an initial value"""
 
@@ -716,7 +715,7 @@ class BoundedAssignmentField(
         return self._elements[-1].backend_repr
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class TrajectoryOutputElement(FreeElement):
     """Element with terminal and integrand terms for trajectory analysis"""
 
@@ -785,7 +784,7 @@ class DependentElement(BaseElement):
     pass
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class AssignedElement(BaseElement):
     def __hash__(self):
         return super().__hash__()
@@ -833,7 +832,7 @@ class AssignedField(Field, default_direction=Direction.output):
             # super().__setattr__(name, self._symbols[-1])
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class MatchedElementMixin:
     match: BaseElement  # match to the Element instance
 
@@ -842,7 +841,7 @@ class MatchedElementMixin:
         self.name = self.match.name
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class MatchedElement(BaseElement, MatchedElementMixin):
     """Element matched with another element of another field"""
 
