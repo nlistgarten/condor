@@ -83,3 +83,4 @@ cross = wrap(backend_mod.operators.cross)
 solve = wrap(backend_mod.operators.solve)
 
 sum = wrap(backend_mod.operators.sum)
+clip = wrap(backend_mod.operators.clip)
