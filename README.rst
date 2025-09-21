@@ -7,6 +7,8 @@ Condor
    :target: https://github.com/nasa/condor/blob/master/license.pdf
 .. image:: https://img.shields.io/github/release/nasa/condor.svg
    :target: https://github.com/nasa/condor/releases
+.. image:: https://joss.theoj.org/papers/10.21105/joss.08859/status.svg
+   :target: https://doi.org/10.21105/joss.08859
 
 
 Condor is a new mathematical modeling framework for Python, developed at
