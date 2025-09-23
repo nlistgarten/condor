@@ -1,3 +1,8 @@
+"""
+Custom Model Template
+=====================
+"""
+
 import condor as co
 
 

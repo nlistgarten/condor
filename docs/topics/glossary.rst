@@ -57,9 +57,8 @@ Condor Specific Terms
       or the ``objective`` for an optimization problem
 
     submodel
-      a model (template) for defining models that is instrinsically tied to its super model, e.g., events, modes, and trajectory
-      analysis models are submodels to the super ODE system
-
+      a model (template) for defining models that is intrinsically tied to primary model, e.g., events, modes, and trajectory
+      analysis models are submodels to the primary ODE System model
 
 
 General Object-Oriented and Metaprogramming Terms
@@ -86,6 +85,10 @@ General Object-Oriented and Metaprogramming Terms
 
    MRO
       the "method resolution order" which defines the order of classes to resolve an attribute definition
+
+   metaprogramming
+      the programming paradigm of treating programs as data; examples include usage of introspection functionality
+      and dynamic function or class generation
 
 
 

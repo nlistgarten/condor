@@ -1,14 +1,8 @@
-.. Condor documentation master file, created by
-   sphinx-quickstart on Mon Sep 18 09:55:53 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. include:: ../README.rst
+   :end-before: Contributing
 
-
-
-Welcome to Condor's documentation!
-==================================
-..
-   .. include:: ../README.rst
+Documentation
+----------------------------------
 
 The documentation is organized as follows:
 
@@ -23,6 +17,9 @@ The documentation is organized as follows:
   steps involved in addressing key problems and use-cases. They are more
   advanced than tutorials and assume some knowledge of how Condor works.
 
+* :doc:`Examples </examples/index>` provide demonstrations with fewer annotations, as
+  a reference for users and test of functionality in CI.
+
 .. toctree::
    :hidden:
    :maxdepth: 2
@@ -32,11 +29,14 @@ The documentation is organized as follows:
    howto/index
    api/index
    topics/index
+   examples/index
 
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+

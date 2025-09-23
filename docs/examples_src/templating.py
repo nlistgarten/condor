@@ -1,3 +1,8 @@
+"""
+Creating Model Templates
+=========================
+"""
+
 import functools
 
 import numpy as np

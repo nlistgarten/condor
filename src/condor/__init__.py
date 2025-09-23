@@ -8,7 +8,6 @@ if False:
 from condor._version import __version__
 from condor.conf import settings
 from condor.contrib import (
-    LTI,
     AlgebraicSystem,
     DeferredSystem,
     ExplicitSystem,
@@ -45,7 +44,6 @@ __all__ = [
     "ExternalSolverWrapper",
     "AlgebraicSystem",
     "ODESystem",
-    "LTI",
     "TableLookup",
     "OptimizationProblem",
     "AssignedField",

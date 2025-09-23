@@ -9,7 +9,7 @@ Condor is a new mathematical modeling framework for Python, developed at
 NASA's Ames Research Center. Initial development began in April 2023 to
 address model implementation challenges for aircraft synthesis and
 robust orbital trajectory design.  Condor emphasizes modern approaches
-from the scientific python community, and leverages many open-source
+from the scientific Python community, and leverages many open-source
 software packages to expedite development and ensure robust and
 efficient run-time.
 
@@ -33,7 +33,7 @@ should be writable as
      y1 == x[0] ** 2 + x[1] + x[2] - 0.2 * y2
      y2 == y1**0.5 + x[0] + x[1]
 
-Of course, in both the mathematic and programmatic description, the source of each
+Of course, in both the mathematical and programmatic description, the source of each
 symbol must be defined. In an engineering memo, we might say "where :math:`y_1,y_2`
 are the variables to solve and :math:`x \in \mathbb{R}^3` parameterizes the system of
 equations," which suggests the API for an algebraic system of equations as 
@@ -60,12 +60,12 @@ the :term:`model`,
     print(coupling.y1, coupling.y2) # individual elements are bound numerically
     print(coupling.variable) # fields are bound as a dataclass
 
-This pythonic datastructure allows Condor to be integrated into larger analysis workflows
+This Pythonic data structure allows Condor to be integrated into larger analysis workflows
 with as little Condor-specific coding as possible. 
 
-Condor uses metaprogramming to to turn the class *declaration* mechanism into a
+Condor uses :term:`metaprogramming` to to turn the class *declaration* mechanism into a
 blackboard-like environment to achieve the desired API. This approach helps us see
-these mathematical models as datastructures that can then be transformed as needed to
+these mathematical models as data structures that can then be transformed as needed to
 automate the process that is typically performed manually for defining and evaluating
 mathematical models in engineering analysis,
 
@@ -76,7 +76,7 @@ mathematical models in engineering analysis,
 Architecture
 ============
 
-We followed modern pythonic best-practices and patterns to settle on a multi-layered
+We followed modern Pythonic best-practices and patterns to settle on a multi-layered
 architecture like the Model-View-Controller paradigm in web development. The
 three key components of the architecture are:
 
@@ -88,15 +88,15 @@ three key components of the architecture are:
   *elements* and *operations* with awareness for basic differential calculus. The goal
   for the backend is provide a thin wrapper with a consistent interface so the
   computational engine implementation could be swapped out. Currently, we ship with
-  CasADi as the only engine, although we hope to demonstrate a backend module for an
+  `CasADi <https://web.casadi.org/>`__ as the only engine, although we hope to demonstrate a backend module for an
   alternate backend in the future.
 - The implementation layer is the glue code that operates on the model data structure,
   using the backend to form the numerical functions needed to call the third-party
-  solvers which implement the nuemrical algorithms of interest. The implementation
+  solvers which implement the numerical algorithms of interest. The implementation
   layer then calls the solver and binds the results to the model instance.
 
 .. figure:: /images/architecture.png
-   :width: 50%
+   :width: 40%
 
 
 The Model Layer
@@ -127,7 +127,7 @@ define the model. Condor currently ships with 5 model templates:
 +---------------------------+---------------+-----------------------+----------------------+
 
 Models can be used recursively, building up more sophisticated models by *embedding*
-models within another. However, system encapsolation is enforced so only elements from input and
+models within another. However, system encapsulation is enforced so only elements from input and
 output fields are accessible after the model has been defined. For example, we may
 wish to optimize Sellar's algebraic system of equations. Mathematically, we can define
 the optimization as
@@ -189,11 +189,13 @@ Different field types are used for different purposes:
 
 User models then draw elements from (free) fields and define expressions for the matched and assigned fields.
 
+.. _metaprogramming-walkthrough:
+
 Metaprogramming class declaration
 ---------------------------------
 
 Ionel provides `a nice overview <https://blog.ionelmc.ro/2015/02/09/understanding-python-metaclasses/#putting-it-all-together>`_ 
-of the Python3 process for class declaration and object instantiation. Relevant 
+of the Python 3 process for class declaration and object instantiation. Relevant 
 for us is the following call order. For class declaration,
 
 1. :meth:`Metaclass.__prepare__` creates a class dictionary at the entry
@@ -242,7 +244,7 @@ There are essentially two types of inheritance.
 :class:`ModelTemplate` declaration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-:class:`ModelTemplateType` is responsible for dispatching to the appropriate metaclass, and performs  more pre-processing to handle several additioanl flags:
+:class:`ModelTemplateType` is responsible for dispatching to the appropriate metaclass, and performs  more pre-processing to handle several additional flags:
 
 :attr:`as_template`
     used to define abstract base models (particularly useful to deploy :attr:`placeholder` field elements)
@@ -258,7 +260,7 @@ There are essentially two types of inheritance.
 :class:`Model` declaration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-:class:`ModelType` makes the follwoing changes to :class:`BaseModelType`\'s process:
+:class:`ModelType` makes the following changes to :class:`BaseModelType`\'s process:
 
 1. in :meth:`prepare_populate`, handles custom metadata class creation and injects :attr:`dynamic_link`
 2. in :meth:`__new__`,
@@ -267,7 +269,7 @@ There are essentially two types of inheritance.
    2. call :meth:`super().__new__` to run :class:`BaseModelType`\'s process
    3. update docstring
    4. inherit :term:`submodel` templates
-   5. :meth:`inherit_template_methods` copies class and instance methods as appropriate; unforunately since Condor inheritance must be used, which breaks standard Python inheritance, super() cannot be used directly in user methods.
+   5. :meth:`inherit_template_methods` copies class and instance methods as appropriate; unfortunately since Condor inheritance must be used, which breaks standard Python inheritance, super() cannot be used directly in user methods.
    6. :meth:`process_placeholders` collects the placeholder values and substitutes them into existing expressions
    7. :meth:`bind_model_fields` creates the dataclasses for each field
 
@@ -277,7 +279,7 @@ The last two steps are particularly useful hooks to customize behavior in a cust
 Calling and binding
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In Python, an instance of a class is creaed when the :code:`__class__` is :meth:`__call__`\ed,
+In Python, an instance of a class is created when the :code:`__class__` is :meth:`__call__`\ed,
 
 1. calls the :meth:`__new__` with any args and kwargs, which creates the :code:`self` object
 2. calls the  :meth:`__init__` with the :code:`self` object and any args and kwargs
@@ -303,7 +305,7 @@ Attributes without a leading underscore can be placed into a :attr:`dict` by
 :meth:`condor.implementations.utils.options_to_kwargs` to pass to the solver.
 The :attr:`__implementation__` is used to specify the class to use, otherwise inheriting from the template.
 
-Due to initial coupling with the casadi computational engine, the ``contrib`` model implementations follow a pattern of calling
+Due to initial coupling with the CasADi computational engine, the ``contrib`` model implementations follow a pattern of calling
 
 2. :meth:`construct` to create the callables from the model fields and setup the solver
 3. :meth:`__call__` to run the solver and bind the output fields
@@ -333,7 +335,7 @@ Using Condor for a "tool" or library
 
 
 Useful engineering analysis tools can be built as a Python library simply by
-constructing the desired model witht he :mod:`contrib` models. Since the Model is
+constructing the desired model with the :mod:`contrib` models. Since the Model is
 defined by constructing a :code:`class`, Python class variable scoping prevents the dynamic
 definition of models inside a factory function. To get around this, a "configuration" pattern 
 was defined with a :meth:`dynamic_link` helper. The Systems Analysis Office at NASA's Ames
@@ -348,123 +350,10 @@ this capability. A design process might include:
   1. Identify the data required to specify the analysis, and identify the :class:`Field` (or
      create a custom :class:`Field`) that would be appropriate for holding that data
   2. Identify (or create) what solver and implementation is needed, including a mapping
-     from the new type of Model to the an existing model or solver.
+     from the new type of Model to an existing model or solver.
   3. Implement a :meth:`process_placeholder` for processing the models data so the implementation
      can call the solver.
 
 .. rubric:: References
 .. [sellar] Sellar, R., Batill, S., and Renaud, J., "Response Surface Based, Concurrent Subspace Optimization for Multidisciplinary System Design," 1996. https://doi.org/10.2514/6.1996-714
-
-..
-    OLD
-    ====
-    The design of Condor was heavily inspired by Django. Some key design principles include:
-     - Loose coupling
-     - Do not Repeat Yourself
-     - Explicit is better than Implicit
-     - Do not reinvent the wheel
-
-    The authors followed a process that could be called "example-driven development", writing the user code they would want to work and then implementing it.
-    The goal of Condor was to automate and facilitate as many of the steps for numerical modeling as possible and to do so with an API that is as natural and expressive as possible.
-
-    .. figure:: /images/math-model-process.png
-       :width: 100%
-
-
-    Like the Model-View-Controller paradigm in web development, the Condor architecture has 3 key components:
-
-    1. The Condor model layer, which provides an API for users to write their model. Condor models are ultimately a data structure which represents the represents the user's mathematical intent for the model.
-
-    2. The Computational Engine or Computational Backend, a symbolic-computational library which provides symbolic representation of *elements* and *operations* with awareness for basic differential calculus.
-
-    3. The solvers, which implement the nuemrical algorithms of interest, and the implementaiton layer that which acts as glue code operating on the model data structure using the specific backend to form the numerical function callbacks which the solvers need.
-
-    .. figure:: /images/architecture.png
-       :width: 50%
-
-    This loosly coupled approach allows any particular realization of each layer to be replaced. The computational engines and solver layers are generally external software, which greatly reduces the burden on the Condor team.
-
-    Most users will focus on writing models using symbolic, declarative syntax that closely matches mathematical definitions.
-
-    New algorithm development only requires implementation and solver layers object-oriented declarative syntax. Use previously-written models as test cases!
-
-    Performance improvements (parallelization, compilation, etc) in back-end. Use previously-written models and algorithms to test. 
-    Each layer can be tested and documented independently (or inherited), making it easier to maintain high-quality software products.
-
-
-    The Model Layer
-    ===============
-
-    A *Model Template* is a ``class`` with a ``ModelType`` metaclass that defines the fields from which elements are drawn to define a model. Condor currently ships with 5 Model templates:
-
-    User models are defined by writing a class that inherits from one of the Model Templates. Each template defines the *fields* from which the model *elements* are drawn. Models can be used recursively, building up more complex *embedding* models within another. However, system encapsolation is enforced so only elements from input and output fields are accessible after the model has been defined. For convenience, the ``AlgebraicSystem`` provides the ``output`` field for related computations; ``OptimizationSystem`` models can add related computations to the constraint field with (the default) +/- infinity values for the bounds.
-    **TODO: should TableLookup get a similar convenience?**
-
-    Each Model Template defines available *fields* from which *elements* are drawn to build up that model.
-
-
-    +---------------------------+---------------+-----------------------+----------------------+
-    |                           |         fields                                               |
-    |                           +---------------+-----------------------+----------------------+
-    | built-in template         | input         | internal              | output               |
-    +===========================+===============+=======================+======================+
-    | TrajectoryAnalysis        | - parameter   | - state               | - trajectory_output  |
-    |                           |               | - modal.action        |                      |
-    +---------------------------+---------------+-----------------------+----------------------+
-    | OptimizationProblem       | - parameter   | - objective           | - variable           |
-    |                           |               | - constraint          |                      |
-    +---------------------------+---------------+-----------------------+----------------------+
-
-    .. list-table:: Example table
-       :header-rows: 1
-
-       * - built-in template
-         - input
-         - internal
-         - output
-       * - TrajectoryAnalysis
-         - 
-             * parameter
-         - 
-             * state
-             * dot
-             * initial
-             * modal.action
-             * event.update
-         - 
-             * trajectory_output
-       * - OptimizationProblem
-         - 
-             * parameter
-         - 
-             * objective
-             * constraint
-         - 
-             * variable
-
-
-    Models:
-     - ExplicitSystem
-     - ExternalSolverSystem
-     - TableLookup
-     - AlgebraicSystem
-     - OptimizationProblem
-     - ODESystem
-
-    Metaprogramming is sometimes called "a solution looking for a problem" with advise to avoid using it. While there are some neat syntax sugar that can be implemented in either meta-programming or by other means, meta-programming is the ideal way to implement a domain specific language (DSL) since it provides enough hooks to modify the behavior sufficiently while keeping that modified syntax enclosed to a specific work area (the class definition).
-
-    Inside a model declaration, the syntax has minimal boilerplate and allows for expressive mathematical declarations using any operations appropriate for the computational backend's, including calculus operations and the evaluation of other Condor models.
-
-
-    Modeling Patterns
-    ===================
-
-    During the first 18 months of Condor's usage, several patterns have emerge; 
-
-    For many optimizations, it is useful to create an analysis model, an ``ExplicitSystem`` that assembles all of the sub-models needed for the analysis to create a input field for the larger model. This analysis model is often useful to store 
-    ** is this actually useful to say? And the next one should just get implemented
-
-
-
-
 
