@@ -145,21 +145,9 @@ def jacobian(of, wrt):
        #jac = casadi.Function("my_jac", [flat_inp], [jac_expr])
        jac(0.)
     """
-    if of.size:
-        transpose_in = False
-        if isinstance(wrt, backend.symbol_class) and wrt.op() == casadi.OP_TRANSPOSE:
-            transpose_in = True
-            wrt = wrt.dep()
-
-        if transpose_in and np.all(np.array(of.shape + wrt.shape) > 1):
-            raise NotImplementedError(unsupported_jacobian_message)
-
-        jac = casadi.jacobian(of, wrt)
-
-        return jac
-
-    else:
-        return backend.symbol_class(0, np.prod(wrt.shape))
+    if of.size and wrt.size:
+        return casadi.jacobian(of, wrt)
+    return backend.symbol_class(0, np.prod(wrt.shape))
 
 
 def jac_prod(of, wrt, rev=True):
