@@ -149,8 +149,20 @@ def jacobian(of, wrt):
        jac(0.)
     """
     if of.size and wrt.size:
-        return casadi.jacobian(of, wrt)
-    return backend.symbol_class(0, np.prod(wrt.shape))
+        transpose_in = False
+        if isinstance(wrt, backend.symbol_class) and wrt.op() == casadi.OP_TRANSPOSE:
+            transpose_in = True
+            wrt = wrt.dep()
+
+        if transpose_in and np.all(np.array(of.shape + wrt.shape) > 1):
+            raise NotImplementedError(unsupported_jacobian_message)
+
+        jac = casadi.jacobian(of, wrt)
+
+        return jac
+
+    else:
+        return backend.symbol_class(0, np.prod(wrt.shape))
 
 
 def jac_prod(of, wrt, rev=True):
@@ -159,12 +171,18 @@ def jac_prod(of, wrt, rev=True):
 
 
 def substitute(expr, subs):
-    subs = {
-        (k if k.op() not in (casadi.OP_RESHAPE, casadi.OP_TRANSPOSE) else k.T): (
-            v if k.op() not in (casadi.OP_RESHAPE, casadi.OP_TRANSPOSE) else v.T
-        )
-        for k, v in subs.items()
-    }
+    in_subs = subs
+    subs = {}
+    for k, v in in_subs.items():
+        use_k = k.T if k.op() in (casadi.OP_RESHAPE, casadi.OP_TRANSPOSE) else k
+        use_v = np.atleast_2d(v) if isinstance(v, np.ndarray) else v
+        if use_k.shape != (1, 1) and use_k.shape == v.shape[::-1]:
+            use_v = use_v.T
+        subs[use_k] = use_v
+        if getattr(use_k, "shape", (1, 1)) != getattr(use_v, "shape", (1, 1)):
+            msg = f"did not find compatible shape, currently have {use_k} --> {use_v}"
+            raise ValueError(msg)
+
     expr = casadi.graph_substitute(expr, subs.keys(), subs.values())
 
     if isinstance(expr, backend.symbol_class) and expr.is_constant():
