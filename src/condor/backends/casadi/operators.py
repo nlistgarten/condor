@@ -176,7 +176,10 @@ def substitute(expr, subs):
         if use_k.shape != (1, 1) and use_k.shape == v.shape[::-1]:
             use_v = use_v.T
         subs[use_k] = use_v
-        if getattr(use_k, "shape", (1, 1)) != getattr(use_v, "shape", (1, 1)):
+        if (
+            getattr(use_k, "shape", (1, 1)) != getattr(subs[use_k], "shape", (1, 1))
+            and use_v.shape
+        ):
             msg = f"did not find compatible shape, currently have {use_k} --> {use_v}"
             raise ValueError(msg)
 
