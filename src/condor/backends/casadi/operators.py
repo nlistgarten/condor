@@ -65,8 +65,8 @@ def sum(x, axis=None):
 
 
 def clip(val, amax, amin):
-    val = ca.if_else(val > amax, amax, val)
-    val = ca.if_else(val < amin, amin, val)
+    val = casadi.if_else(val > amax, amax, val)
+    val = casadi.if_else(val < amin, amin, val)
     return val
 
 
