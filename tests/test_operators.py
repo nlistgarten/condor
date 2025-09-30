@@ -83,6 +83,20 @@ def test_fabs_sign():
     assert tfs.signx == 0
 
 
+def test_floor_ceil():
+    class TestFloorCeil(co.ExplicitSystem):
+        x = input()
+        output.floorx = ops.floor(x)
+        output.ceilx = ops.ceil(x)
+
+    tfc = TestFloorCeil(3.1)
+    assert tfc.floorx == 3
+    assert tfc.ceilx == 4
+    tfc = TestFloorCeil(4.9)
+    assert tfc.floorx == 4
+    assert tfc.ceilx == 5
+
+
 def test_if_():
     class Check(co.ExplicitSystem):
         catd = input()

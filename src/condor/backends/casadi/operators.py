@@ -32,6 +32,9 @@ log = casadi.log
 log10 = casadi.log10
 sqrt = casadi.sqrt
 
+floor = casadi.floor
+ceil = casadi.ceil
+
 eye = casadi.MX.eye
 ones = casadi.MX.ones
 

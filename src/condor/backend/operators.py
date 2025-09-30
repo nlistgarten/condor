@@ -77,6 +77,9 @@ log = wrap(backend_mod.operators.log)
 log10 = wrap(backend_mod.operators.log10)
 sqrt = wrap(backend_mod.operators.sqrt)
 
+floor = wrap(backend_mod.operators.floor)
+ceil = wrap(backend_mod.operators.ceil)
+
 vector_norm = wrap(backend_mod.operators.vector_norm)
 trace = wrap(backend_mod.operators.trace)
 cross = wrap(backend_mod.operators.cross)
