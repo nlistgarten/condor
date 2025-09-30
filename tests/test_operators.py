@@ -170,9 +170,9 @@ def test_clip():
         minx = input()
         output.y = ops.clip(x, maxx, minx)
 
-    assert TestClip(7, 10, 5).y[0] == 7 # no clipping
-    assert TestClip(2, 10, 5).y[0] == 5 # too low
-    assert TestClip(20, 10, 5).y[0] == 10 # too high
+    assert TestClip(7, 10, 5).y[0] == 7 #  no clipping
+    assert TestClip(2, 10, 5).y[0] == 5 #  too low
+    assert TestClip(20, 10, 5).y[0] == 10  # too high
 
     class TestClip(co.ExplicitSystem):
         x = input(shape=3)
