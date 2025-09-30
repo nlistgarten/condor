@@ -100,6 +100,8 @@ class AlgebraicSystem(InitializerMixin):
         rootfinder_options = dict(
             error_on_fail=error_on_fail, abstol=atol, abstolStep=rtol, max_iter=max_iter
         )
+
+        method_string = "newton" if exact_hessian else "fast_newton"
         self.x = model.variable.flatten()
         self.g0 = model.residual.flatten()
         self.g1 = model.output.flatten()
@@ -124,7 +126,7 @@ class AlgebraicSystem(InitializerMixin):
             n_parameter=model.parameter._count,
             init_var=self.initializer_func,
             warm_start=self.warm_start,
-            method_string="newton",
+            method_string=method_string,
             options=rootfinder_options,
             model_name=model.__name__,
         )

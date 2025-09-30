@@ -44,6 +44,9 @@ concat = backend_mod.operators.concat
 # stack?
 unstack = backend_mod.operators.unstack
 
+fabs = backend_mod.operators.fabs
+sign = backend_mod.operators.sign
+
 
 # "element-wise functions"
 def wrap(f):
@@ -75,4 +78,9 @@ log10 = wrap(backend_mod.operators.log10)
 sqrt = wrap(backend_mod.operators.sqrt)
 
 vector_norm = wrap(backend_mod.operators.vector_norm)
+trace = wrap(backend_mod.operators.trace)
+cross = wrap(backend_mod.operators.cross)
 solve = wrap(backend_mod.operators.solve)
+
+sum = wrap(backend_mod.operators.sum)
+clip = wrap(backend_mod.operators.clip)

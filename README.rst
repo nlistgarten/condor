@@ -4,9 +4,11 @@ Condor
 .. image:: https://github.com/nasa/simupy-flight/actions/workflows/docs.yml/badge.svg
    :target: https://nasa.github.io/condor
 .. image:: https://img.shields.io/badge/License-NOSA-green.svg
-   :target: https://github.com/nasa/condor/blob/master/LICENSE
+   :target: https://github.com/nasa/condor/blob/main/LICENSE
 .. image:: https://img.shields.io/github/release/nasa/condor.svg
    :target: https://github.com/nasa/condor/releases
+.. image:: https://joss.theoj.org/papers/10.21105/joss.08859/status.svg
+   :target: https://doi.org/10.21105/joss.08859
 
 
 Condor is a new mathematical modeling framework for Python, developed at
@@ -70,7 +72,7 @@ After the model is solved, the embedded model can be accessed directly:
    sellar = Sellar()
    print(sellar.objective) # scalar value
    print(sellar.constraint) # field
-   print(sellar.coupling.y1) # sub-model element
+   print(sellar.coupling.y1) # embedded model element
 
 NASA's Condor is a framework for mathematical modeling of engineering
 systems in Python, written for engineers with deadlines.
@@ -145,7 +147,7 @@ License
 -------
 
 This software is released under the `NASA Open Source Agreement Version 1.3
-<https://github.com/nasa/condor/raw/main/license.pdf>`_.
+<https://github.com/nasa/condor/blob/main/LICENSE>`_.
 
 Notices
 -------

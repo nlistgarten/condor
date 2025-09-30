@@ -2,12 +2,11 @@
 
 # TODO: figure out python version minimum
 
+import dataclasses as dc
 import importlib
 import logging
 import operator
 import sys
-from dataclasses import asdict as dataclass_asdict
-from dataclasses import dataclass, fields, make_dataclass
 from enum import Enum
 
 import numpy as np
@@ -66,7 +65,7 @@ class AnyTopeofModel(co....):
 
 def asdict(obj):
     return dict(
-        (field.name, getattr(obj, field.name)) for field in fields(obj) if field.init
+        (field.name, getattr(obj, field.name)) for field in dc.fields(obj) if field.init
     )
 
 
@@ -89,7 +88,7 @@ class FieldValues:
     def asdict(self):
         """call the :mod:`dataclasses` module :func:`asdict` function on this field
         datacalss"""
-        return dataclass_asdict(self)
+        return dc.asdict(self)
 
     def flatten(self):
         """turn the bound values of this field instance into a single symbol -- may be
@@ -263,6 +262,8 @@ class Field:
         """Get a list of field elements where every field matches kwargs
 
         If only one, return element without list wrapper.
+
+        treat __ as a "dot" accessor, recursively
         """
         # TODO: what's the lightest-weight way to be able query? these should get called
         # very few times, so hopefully don't need to stress too much about
@@ -277,7 +278,9 @@ class Field:
         for item in self._elements:
             this_item = True
             for field_name, field_value in kwargs.items():
-                item_value = getattr(item, field_name)
+                item_value = item
+                for field_name_comp in field_name.split("__"):
+                    item_value = getattr(item_value, field_name_comp)
                 if isinstance(item_value, backend.symbol_class):
                     if not isinstance(field_value, backend.symbol_class):
                         this_item = False
@@ -305,6 +308,10 @@ class Field:
             if element is of_element:
                 break
             idx += element.size
+
+        if idx == self._count:
+            msg = f"{of_element} not an element of {self}"
+            raise ValueError(msg)
         return idx
 
     def create_element(self, **kwargs):
@@ -315,6 +322,7 @@ class Field:
             self._cls_dict.meta.backend_repr_elements[
                 self._elements[-1].backend_repr
             ] = self._elements[-1]
+
         # self._count += getattr(self._elements[-1], 'size', 1)
 
     def create_dataclass(self):
@@ -322,7 +330,7 @@ class Field:
         # TODO: do processing to handle different field types
         fields = [(element.name, float) for element in self._elements]
         name = self._model_name + make_class_name([self._name])
-        self._dataclass = make_dataclass(
+        self._dataclass = dc.make_dataclass(
             name,
             fields,
             bases=(FieldValues,),
@@ -341,11 +349,13 @@ class Field:
         dataclass"""
         return self.get(name=with_name).backend_repr
 
-    def dataclass_of(self, attr="backend_repr"):
+    def dataclass_of(self, attr="backend_repr", default=None):
         """construct a dataclass of the field where values are the attr of each
         element
         """
-        return self._dataclass(**{elem.name: getattr(elem, attr) for elem in self})
+        return self._dataclass(
+            **{elem.name: getattr(elem, attr, default) for elem in self}
+        )
 
     def flatten(self, attr="backend_repr"):
         """flatten the values into a single 1D array"""
@@ -382,7 +392,7 @@ def make_class_name(components):
     return "".join(word for word in separate_words.title() if not word.isspace())
 
 
-@dataclass
+@dc.dataclass
 class FrontendElementData:
     field_type: Field
     backend_repr: backend.symbol_class
@@ -409,7 +419,7 @@ def _generic_op(op, is_r=False):
     return mthd
 
 
-@dataclass
+@dc.dataclass
 class BaseElement(
     FrontendElementData,
     backend.BackendSymbolData,
@@ -448,6 +458,8 @@ class BaseElement(
         return new_field._elements[-1]
 
     def reshape(self, new_shape):
+        if self.shape == new_shape:
+            return self
         self.backend_repr = backend.symbol_generator(
             name=self.backend_repr.name(), shape=new_shape
         )
@@ -581,7 +593,7 @@ class FreeAssignedField(
         return self._elements[-1].backend_repr
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class WithDefaultElement(FreeElement):
     """Element with an optional default value"""
 
@@ -645,7 +657,7 @@ class WithDefaultField(FreeField):
         return substitution_dict
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class BoundedElement(FreeElement):
     """Element with upper and lower bounds"""
 
@@ -663,7 +675,7 @@ class BoundedElement(FreeElement):
         self.lower_bound = np.broadcast_to(self.lower_bound, self.shape)
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class InitializedElement(BoundedElement):
     """Element with an initial value"""
 
@@ -703,7 +715,7 @@ class BoundedAssignmentField(
         return self._elements[-1].backend_repr
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class TrajectoryOutputElement(FreeElement):
     """Element with terminal and integrand terms for trajectory analysis"""
 
@@ -772,7 +784,7 @@ class DependentElement(BaseElement):
     pass
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class AssignedElement(BaseElement):
     def __hash__(self):
         return super().__hash__()
@@ -820,7 +832,7 @@ class AssignedField(Field, default_direction=Direction.output):
             # super().__setattr__(name, self._symbols[-1])
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class MatchedElementMixin:
     match: BaseElement  # match to the Element instance
 
@@ -829,7 +841,7 @@ class MatchedElementMixin:
         self.name = self.match.name
 
 
-@dataclass(repr=False)
+@dc.dataclass(repr=False)
 class MatchedElement(BaseElement, MatchedElementMixin):
     """Element matched with another element of another field"""
 
@@ -909,8 +921,13 @@ class MatchedField(Field):
                         backend_repr = value.reshape(match.shape)
                     else:
                         backend_repr = np.broadcast_to(value, match.shape)
+            if match.symmetric:
+                symbol_data.symmetric = True
             self.create_element(
-                name=None, match=match, backend_repr=backend_repr, **asdict(symbol_data)
+                name=None,
+                match=match,
+                backend_repr=backend_repr,
+                **asdict(symbol_data),
             )
 
     def __getitem__(self, key):
@@ -935,7 +952,7 @@ class MatchedField(Field):
             if on_field is None:
                 on_field = self._matched_to
             for match_elem in on_field:
-                elem = self.get(match=match_elem)
+                elem = self.get(match__backend_repr=match_elem.backend_repr)
                 if elem:
                     dc_kwargs[match_elem.name] = elem.backend_repr
                 else:

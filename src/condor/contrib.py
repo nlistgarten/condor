@@ -876,6 +876,8 @@ class ExternalSolverWrapper(
             condor_model_name, (ExternalSolverModel,), attrs
         )
         self.condor_model._meta.external_wrapper = self
+        self.input = self.condor_model.input
+        self.output = self.condor_model.output
 
 
 class TableLookup(ExternalSolverWrapper):
@@ -941,12 +943,14 @@ class TableLookup(ExternalSolverWrapper):
         )
         raise ValueError
 
-    def function(self, xx):
+    def function(self, inputs):
         """evaluate the table-interpolating spline at :attr:`xx`"""
+        xx = inputs.flatten()
         return self.interpolant(np.array(xx).reshape(-1))[0, :]  # .T
 
-    def jacobian(self, xx):
+    def jacobian(self, inputs):
         """evaluate the dense jacobian at :attr:`xx`"""
+        xx = inputs.flatten()
         array_vals = [
             interp(np.array(xx).reshape(-1))[0, :] for interp in self.jac_interps
         ]
@@ -959,8 +963,9 @@ class TableLookup(ExternalSolverWrapper):
         return_val = np.stack(array_vals, axis=1)
         return return_val
 
-    def hessian(self, xx):
+    def hessian(self, inputs):
         """evaluate the dense hessian at :attr:`xx`"""
+        xx = inputs.flatten()
         array_vals = np.stack(
             [
                 np.stack(

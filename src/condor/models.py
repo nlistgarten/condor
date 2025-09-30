@@ -78,6 +78,18 @@ class BaseModelMetaData:
         return new_meta
 
 
+class AnnotationsDict(dict):
+    def __init__(self, *args, cls_dict, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cls_dict = cls_dict
+
+    def __setitem__(self, attr_name, attr_val):
+        if isinstance(attr_val, AssignedField):
+            setattr(attr_val, attr_name, self.cls_dict[attr_name])
+
+        super().__setitem__(attr_name, attr_val)
+
+
 # appears in __new__ as attrs
 class BaseCondorClassDict(dict):
     def __init__(
@@ -109,6 +121,10 @@ class BaseCondorClassDict(dict):
         return super().__getitem__(*args, **kwargs)
 
     def __setitem__(self, attr_name, attr_val):
+        if attr_name == "__annotations__" and len(attr_val) == 0:
+            super().__setitem__(attr_name, AnnotationsDict(cls_dict=self))
+            return
+
         if (
             self.meta.template is not None
             and attr_name in type(self.meta.template).reserved_words
@@ -196,10 +212,13 @@ class BaseCondorClassDict(dict):
         out = super().__setitem__(attr_name, attr_val)
 
         if (
-            self.user_setting
-            and hasattr(attr_val, "update_name")  # implies element?
-            and attr_val.field_type._cls_dict is self
+            self.user_setting and hasattr(attr_val, "update_name")  # implies element?
         ):
+            if hasattr(attr_val, "field_type") and (
+                attr_val.field_type._cls_dict is not self
+            ):
+                return out
+
             attr_val.update_name(attr_name)
         return out
 
@@ -310,7 +329,7 @@ class BaseModelType(type):
         cls_dict = cls.prepare_create(name, bases, meta=meta, **kwds)
         if not cls_dict.meta.template:
             return cls_dict
-        cls.prepare_populate(cls_dict)
+        cls.prepare_populate(cls_dict, bases)
         cls_dict.user_setting = True
         return cls_dict
 
@@ -330,6 +349,8 @@ class BaseModelType(type):
                 model_name=name,
             )
 
+        # TODO: template should probably be first common Condor ancestor of all bases...
+        # and/or kwd settable...
         for base in bases:
             if isinstance(base, BaseModelType):
                 meta.template = base
@@ -459,7 +480,12 @@ class BaseModelType(type):
                 original_v = v
                 v = base._meta.backend_repr_elements.get(v, v)
                 if isinstance(v, BaseElement) and v.field_type._name == "placeholder":
-                    v = original_v
+                    if (new_field := cls_dict.get("placeholder", None)) is not None:
+                        # TODO: or just append element so it's the same backend repr?
+                        new_v = v.copy_to_field(new_field)
+                        v = new_v.backend_repr
+                    else:
+                        v = original_v
 
             if isinstance(v, BaseElement):
                 # should only be used for placeholder and placeholder-adjacent
@@ -499,7 +525,7 @@ class BaseModelType(type):
             meta.inherited_items[k] = cls_dict[k]
 
     @classmethod
-    def prepare_populate(cls, cls_dict):
+    def prepare_populate(cls, cls_dict, bases):
         """Used to pre-populate the class namespace. Since the BaseModelType calls
         this, can only customize if the metaclass args on __prepare__ make their way to
         the metaclass
@@ -519,7 +545,7 @@ class BaseModelType(type):
         # the original/generic TrajectoryAnalysis is constructed, because the
         # placeholder field is on the ModelTemplate, not the SubmodelTemplate
         processed_mro = []
-        for base in template.__mro__[:-1]:
+        for base in bases + template.__mro__[:-1]:
             # TODO verify that this is the right way to go. Go over the mro (excluding
             # object) and iterate over the user defined (not condor-machinery injected)
             # attributes to do a condor-based inheritance
@@ -892,7 +918,7 @@ class ModelTemplateType(BaseModelType):
             return super().__prepare__(model_name, bases, meta=meta, **kwargs)
 
     @classmethod
-    def prepare_populate(cls, cls_dict):
+    def prepare_populate(cls, cls_dict, bases):
         if not cls.creating_base_class_for_inheritance(cls_dict.meta.model_name):
             log.debug("injecting placeholder on %s", cls_dict.meta.model_name)
             cls_dict["placeholder"] = WithDefaultField(
@@ -901,12 +927,11 @@ class ModelTemplateType(BaseModelType):
                 model_name=cls_dict.meta.model_name,
             )
 
-        super().prepare_populate(cls_dict)
+        super().prepare_populate(cls_dict, bases)
 
     @classmethod
     def process_condor_attr(cls, attr_name, attr_val, new_cls):
         pass_super = True
-
         if attr_name == "placeholder":
             new_cls.placeholder = attr_val
             pass_super = False
@@ -946,28 +971,31 @@ class ModelTemplateType(BaseModelType):
             attrs.meta.user_set = attrs.meta.inherited_items
             attrs.meta.inherited_items = {}
 
-        # if (
-        #     as_template
-        #     and bases[0].user_model_metaclass is not ModelType
-        #     and model_metaclass is None
-        # ):
-        #     # use model metaclass from first base if possible
-        #     use_metaclass = bases[0].user_model_metaclass
-        #     new_cls = use_metaclass.__new__(
-        #         use_metaclass, model_name, bases, attrs, **kwargs
-        #     )
-        #     new_cls.user_model_metaclass = use_metaclass
-        # else:
-        #     new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
         new_cls = super().__new__(cls, model_name, bases, attrs, **kwargs)
 
         if immediate_return:
             return new_cls
 
-        if model_metaclass is not None:
-            new_cls.user_model_metaclass = model_metaclass
-            model_metaclass.baseclass_for_inheritance = new_cls
+        if (
+            model_metaclass is None
+            and bases
+            and bases[0] not in (ModelTemplate, SubmodelTemplate)
+        ):
+            # if not over-writing model_metaclass and bases is not built-in (so it may
+            # have a real, new model metaclass) then use it
+            log.debug("prcessing for inheriting model metaclass asssigned, new")
+            set_model_metaclass = bases[0].user_model_metaclass
+        else:
+            # otherwise, just treat as input
+            set_model_metaclass = model_metaclass
             log.debug("prcessing for model metaclass asssigned, new")
+
+        if set_model_metaclass is not None:
+            new_cls.user_model_metaclass = set_model_metaclass
+
+        if model_metaclass is not None:
+            # if over-writing model metaclass, this is the clas for inheritance
+            model_metaclass.baseclass_for_inheritance = new_cls
 
         if as_template:
             impl = ModelType.get_implementation_class(new_cls)
@@ -1098,12 +1126,12 @@ class ModelType(BaseModelType):
         return super().__prepare__(model_name, bases, meta=meta, **kwargs)
 
     @classmethod
-    def prepare_populate(cls, cls_dict):
+    def prepare_populate(cls, cls_dict, bases):
         if not cls.creating_base_class_for_inheritance(cls_dict.meta.model_name):
             log.debug("injecting dynamic_link on %s", cls_dict.meta.model_name)
             cls_dict["dynamic_link"] = DynamicLink(cls_dict)
 
-        super().prepare_populate(cls_dict)
+        super().prepare_populate(cls_dict, bases)
 
     @classmethod
     def placeholder_names(cls, new_cls):
@@ -1142,6 +1170,7 @@ class ModelType(BaseModelType):
 
         if cls.creating_base_class_for_inheritance(name):
             super_bases = bases
+            bases_mro = bases
         else:
             bases_mro = tuple()
             for base in bases:
@@ -1164,9 +1193,9 @@ class ModelType(BaseModelType):
 
         new_cls = super().__new__(cls, name, super_bases, attrs, **kwargs)
 
-        if not cls.is_user_model(bases):
+        if not cls.is_user_model(bases_mro):
             return new_cls
-        # proceeding for user models
+        # proceeding for user models, use bases_mro to support deep inheritance
 
         # update docstring
         orig_doc = attrs.get("__doc__", "")
@@ -1195,8 +1224,9 @@ class ModelType(BaseModelType):
 
     @classmethod
     def inherit_template_methods(cls, new_cls):
-        for base in new_cls._meta.template.__mro__[:-2]:
+        for base in new_cls._meta.template.__mro__[:-2][::-1]:
             for key, val in base._meta.user_set.items():
+                # should
                 if isinstance(val, classmethod):
                     log.debug(
                         "inheriting classmethod %s=%s from %s to %s",
@@ -1866,13 +1896,13 @@ class SubmodelType(ModelType):
         cls_dict[attr_name] = attr_val
 
     @classmethod
-    def prepare_populate(cls, cls_dict):
+    def prepare_populate(cls, cls_dict, bases):
         if cls.baseclass_for_inheritance is not None:
             primary_dict = {**cls_dict.meta.primary._meta.inherited_items}
             primary_dict.update(cls_dict.meta.primary._meta.user_set)
             for attr_name, attr_val in primary_dict.items():
                 cls.prepare_item_from_primary(cls_dict, attr_name, attr_val)
-        super().prepare_populate(cls_dict)
+        super().prepare_populate(cls_dict, bases)
         pass
 
     @classmethod
