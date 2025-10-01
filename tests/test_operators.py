@@ -163,6 +163,7 @@ def test_cross():
     assert np.all(MyCross(x=[1.0, 0.0, 0], y=[1.0, 0.0, 0.0]).z.squeeze() == [0, 0, 0])
     assert np.all(MyCross(x=[1.0, 0.0, 0], y=[0.0, 1.0, 0.0]).z.squeeze() == [0, 0, 1])
 
+
 def test_clip():
     class TestClip(co.ExplicitSystem):
         x = input()
@@ -170,8 +171,8 @@ def test_clip():
         minx = input()
         output.y = ops.clip(x, maxx, minx)
 
-    assert TestClip(7, 10, 5).y[0] == 7 #  no clipping
-    assert TestClip(2, 10, 5).y[0] == 5 #  too low
+    assert TestClip(7, 10, 5).y[0] == 7  #  no clipping
+    assert TestClip(2, 10, 5).y[0] == 5  #  too low
     assert TestClip(20, 10, 5).y[0] == 10  # too high
 
     class TestClip(co.ExplicitSystem):
