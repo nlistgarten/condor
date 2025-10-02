@@ -22,7 +22,7 @@ classifiers = [
 dependencies = [
     "numpy",
     "scipy",
-    "casadi>=3.7.0",
+    "casadi>=3.7.2",
     "ndsplines>=0.2.0post0",
 ]
 
