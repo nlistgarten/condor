@@ -31,6 +31,34 @@ class SolverMixin:
 
 
 class SolverSciPyBase(SolverMixin):
+    """Baseclass for using :class:`scipy.integrate.ode` with advanced features.
+
+    Wraps standard scipy integrator class with functionality for  event handling,
+    multiple-segment time generators, and adaptive minumum number of steps.
+    Options are generally a pass through to the underlying integrator (e.g.,
+    :class:`scipy.integrate.ode`, ``dopri5`` or ``dop853`` currently). This
+    implementation performs an event function zero-crossing check at each time-step;
+    when an event function zero-crossing is detected, a rootfinding and event update
+    operation is performed. Special options on the ``sweeping_gradient_method``
+    solver which are described below.
+
+    Options
+    --------
+
+    adaptive_min_steps : int
+        minimum number of steps per time-defined segment
+    max_step_size : float
+        maximum step size for the forward evaluation, normalized name to scipy's
+        max_step
+    rootfinder : callable
+        Interval root-finder function. Defaults to :func:`scipy.optimize.brentq`, and
+        must take the equivalent positional arguments, ``f``, ``a``, and ``b``, and
+        return ``x0``, where ``a <= x0 <= b`` and ``f(x0)`` is the zero.
+
+        Keyword arguments with a ``rootfinder_`` prefix are passed to the rootfinder
+        method during the rootfinding step.
+    """
+
     SOLVER_NAME = None
 
     def __init__(
@@ -38,12 +66,14 @@ class SolverSciPyBase(SolverMixin):
         system,
         atol=1e-12,
         rtol=1e-6,
-        adaptive_max_step=0.0,
+        adaptive_min_steps=0,
+        rootfinder=brentq,
         max_step_size=0.0,
         nsteps=10_000.0,
+        **kwargs,
     ):
         self.system = system
-        self.adaptive_max_step = adaptive_max_step
+        self.adaptive_min_steps = adaptive_min_steps
         self.solver = scipy_ode(
             system.dots,
         )
@@ -52,8 +82,16 @@ class SolverSciPyBase(SolverMixin):
             atol=atol,
             rtol=rtol,
             max_step=max_step_size,
-            nsteps=500_000,
+            nsteps=nsteps,
         )
+        self.rootfinder = rootfinder
+        self.root_options = {}
+        for k, v in kwargs.items():
+            if k.startswith("rootfinder_"):
+                self.root_options[k.replace("rootfinder_", "")] = v
+            else:
+                self.int_options[k] = v
+
         self.solver.set_integrator(**self.int_options)
         self.solver.set_solout(self.solout)
 
@@ -131,10 +169,8 @@ class SolverSciPyBase(SolverMixin):
                     self.rootinfo[g_idx] = 0
                     return t, x
 
-                set_t = brentq(
-                    find_function,
-                    spline_ts[-2],
-                    spline_ts[-1],
+                set_t = self.rootfinder(
+                    find_function, spline_ts[-2], spline_ts[-1], **self.root_options
                 )
             else:
                 set_t = spline_ts[-1]
@@ -181,9 +217,9 @@ class SolverSciPyBase(SolverMixin):
             # if next_t < 0:
             #    breakpoint()
 
-            if self.adaptive_max_step:
+            if self.adaptive_min_steps:
                 self.int_options.update(
-                    dict(max_step=np.abs(next_t - last_t) / self.adaptive_max_step)
+                    dict(max_step=np.abs(next_t - last_t) / self.adaptive_min_steps)
                 )
 
                 self.solver.set_integrator(**self.int_options)
@@ -269,10 +305,14 @@ class SolverSciPyBase(SolverMixin):
 
 
 class SolverSciPyDopri5(SolverSciPyBase):
+    """:class:`SolverSciPyBase` for the ``dopri5`` method"""
+
     SOLVER_NAME = "dopri5"
 
 
 class SolverSciPyDop853(SolverSciPyBase):
+    """:class:`SolverSciPyBase` for the ``dop853`` method"""
+
     SOLVER_NAME = "dop853"
 
 
@@ -282,11 +322,11 @@ class SolverCVODE(SolverMixin):
         system,
         atol=1e-12,
         rtol=1e-6,
-        adaptive_max_step=0.0,
+        adaptive_min_steps=0.0,
         max_step_size=0.0,
     ):
         self.system = system
-        self.adaptive_max_step = adaptive_max_step
+        self.adaptive_min_steps = adaptive_min_steps
         self.solver = CVODE(
             self.dots,
             jacfn=self.jac,
@@ -366,9 +406,9 @@ class SolverCVODE(SolverMixin):
                 # breakpoint()
                 pass
 
-            if self.adaptive_max_step:
+            if self.adaptive_min_steps:
                 solver.set_options(
-                    max_step_size=np.abs(next_t - last_t) / self.adaptive_max_step
+                    max_step_size=np.abs(next_t - last_t) / self.adaptive_min_steps
                 )
             solver.init_step(last_t, last_x)
             solver.set_options(tstop=next_t)
@@ -498,15 +538,11 @@ class System:
         num_events,
         terminating,
         dynamic_output=None,
-        atol=1e-12,
-        rtol=1e-6,
-        adaptive_max_step=0.0,
-        max_step_size=0.0,
-        solver_class=SolverSciPyDopri5,
+        **solver_options,
     ):
         """
-        if adaptive_max_step, treat max_step_size as the fraction of the next simulation
-        span. Otherwise, use as absolute value.
+        if adaptive_min_steps, treat max_step_size as the fraction of the next
+        simulation span. Otherwise, use as absolute value.
         """
 
         # simulation must be terminated with event so must provide everything
@@ -548,20 +584,13 @@ class System:
         self.dim_state = dim_state
         self.num_events = len(updates)
         self.make_solver(
-            atol=atol,
-            rtol=rtol,
-            adaptive_max_step=adaptive_max_step,
-            max_step_size=max_step_size,
-            solver_class=solver_class,
+            **solver_options,
         )
 
-    def make_solver(self, atol, rtol, adaptive_max_step, max_step_size, solver_class):
+    def make_solver(self, solver_class, **solver_options):
         self.system_solver = solver_class(  # SolverSciPy( #SolverCVODE(
             system=self,
-            atol=atol,
-            rtol=rtol,
-            adaptive_max_step=adaptive_max_step,
-            max_step_size=max_step_size,
+            **solver_options,
         )
 
     def initial_state(self):
@@ -829,11 +858,7 @@ class AdjointSystem(System):
         state_jac,
         dte_dxs,
         dh_dxs,
-        solver_class=SolverSciPyDopri5,
-        atol=1e-12,
-        rtol=1e-6,
-        adaptive_max_step=False,
-        max_step_size=0.0,
+        **solver_options,
     ):
         """
         to support caching jacobians,
@@ -850,13 +875,7 @@ class AdjointSystem(System):
         self.dynamic_output = None
         # self.adjoint_updates = adjoint_updates
 
-        self.make_solver(
-            atol=atol,
-            rtol=rtol,
-            adaptive_max_step=adaptive_max_step,
-            max_step_size=max_step_size,
-            solver_class=solver_class,
-        )
+        self.make_solver(**solver_options)
 
     def events(self, t, lamda):
         return np.array(
@@ -1212,11 +1231,6 @@ class TrajectoryAnalysisSGM:
         state_jac=None,
         # for adjoint system, can provide here if state_system doesn't have
         # adjoint system solver options
-        adjoint_solver_class=SolverSciPyDopri5,
-        adjoint_atol=1e-12,
-        adjoint_rtol=1e-6,
-        adjoint_adaptive_max_step_size=False,
-        adjoint_max_step_size=0.0,
         cache_size=1,
         # to construct SweepingGradientMethod
         p_x0_p_params=None,
@@ -1227,6 +1241,7 @@ class TrajectoryAnalysisSGM:
         p_terminal_terms_p_params=None,
         p_integrand_terms_p_state=None,
         p_terminal_terms_p_state=None,
+        **adjoint_options,
     ):
         if cache_size > 1:
             raise NotImplementedError
@@ -1245,14 +1260,7 @@ class TrajectoryAnalysisSGM:
             state_jac = state_system._jac
 
         self.adjoint_system = AdjointSystem(
-            state_jac=state_jac,
-            dte_dxs=dte_dxs,
-            dh_dxs=dh_dxs,
-            atol=adjoint_atol,
-            rtol=adjoint_rtol,
-            adaptive_max_step=adjoint_adaptive_max_step_size,
-            max_step_size=adjoint_max_step_size,
-            solver_class=adjoint_solver_class,
+            state_jac=state_jac, dte_dxs=dte_dxs, dh_dxs=dh_dxs, **adjoint_options
         )
 
         self.sweeping_gradient_method = SweepingGradientMethod(

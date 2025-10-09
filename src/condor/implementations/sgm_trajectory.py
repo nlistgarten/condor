@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum
 
 import numpy as np
 
@@ -42,33 +42,18 @@ def isnan(x):
 
 
 class TrajectoryAnalysis:
-    """Implementation for :class:`TrajectoryAnalysis` model.
+    """Implementation for :class:`~condor.contrib.TrajectoryAnalysis` model.
 
-    Options
-    --------
-    state_atol : float
-        absolute tolerance for forward evalaution
-    state_rtol : float
-        relative tolerance for forward evalaution
-    state_adaptive_max_step_size : float
-        actually a minimum number of steps per time-defined segment for the forward
-        evaluation
-    state_max_step_size : float
-        maximum step size for the forward evaluation
-    state_solver : TrajectoryAnalysis.Solver
-        enum member for solver type
-
-    adjoint_*
-        same as above, for the adjoint solution
-
-
-
+    All Options may be prefixed with ``state_`` or ``adjoint_`` to apply only to the
+    forward or reverse solvers, respectively. Without either prefix, the option will be
+    passed to both solvers. For additional details on the Solver options, see the
+    :class:`~condor.solvers.sweeping_gradient_method` solvers.
     """
 
     class Solver(Enum):
-        CVODE = auto()  #: currently unsupported
-        dopri5 = auto()
-        dop853 = auto()
+        CVODE = sgm.SolverCVODE  #: currently unsupported
+        dopri5 = sgm.SolverSciPyDopri5
+        dop853 = sgm.SolverSciPyDop853
 
     def __init__(self, model_instance):
         model = model_instance.__class__
@@ -80,21 +65,22 @@ class TrajectoryAnalysis:
     def construct(
         self,
         model,
-        state_atol=1e-12,
-        state_rtol=1e-6,
-        state_adaptive_max_step_size=0.0,
-        state_max_step_size=0,
-        # TODO add options for scipy solver name (dopri5 or dop853) and settings for the
-        # rootfinder, including choosing between brentq and newton
-        adjoint_atol=1e-12,
-        adjoint_rtol=1e-6,
-        adjoint_adaptive_max_step_size=4.0,
-        adjoint_max_step_size=0,
-        state_solver=Solver.dopri5,
-        adjoint_solver=Solver.dopri5,
-        # lmm_type=ADAMS or BDF, possibly also linsolver, etc? for CVODE?
-        # other options for scipy.ode + event rootfinder?
+        state_solver=None,
+        adjoint_solver=None,
+        solver=Solver.dopri5,
+        **kwargs,
     ):
+        state_options = {}
+        adjoint_options = {}
+        for k, v in kwargs.items():
+            if k.startswith("state_"):
+                state_options[k.replace("state_", "")] = v
+            elif k.startswith("adjoint_"):
+                adjoint_options[k.replace("adjoint_", "")] = v
+            else:
+                state_options[k] = v
+                adjoint_options[k] = v
+
         self.model = model
         self.ode_model = ode_model = model._meta.primary
 
@@ -297,16 +283,12 @@ class TrajectoryAnalysis:
             )
             self.h_exprs.append(h_expr)
 
-        set_solvers = []
-        for solver in [state_solver, adjoint_solver]:
-            if solver is TrajectoryAnalysis.Solver.CVODE:
-                solver_class = sgm.SolverCVODE
-            elif solver is TrajectoryAnalysis.Solver.dopri5:
-                solver_class = sgm.SolverSciPyDopri5
-            elif solver is TrajectoryAnalysis.Solver.dop853:
-                solver_class = sgm.SolverSciPyDop853
-            set_solvers.append(solver_class)
-        state_solver_class, adjoint_solver_class = set_solvers
+        if state_solver is None:
+            state_solver = solver
+        if adjoint_solver is None:
+            adjoint_solver = solver
+        state_options["solver_class"] = state_solver.value
+        adjoint_options["solver_class"] = adjoint_solver.value
 
         if len(model.dynamic_output):
             self.y_expr = model.dynamic_output.flatten()
@@ -334,11 +316,7 @@ class TrajectoryAnalysis:
             num_events=num_events,
             terminating=terminating,
             dynamic_output=self.dynamic_output_func,
-            atol=state_atol,
-            rtol=state_rtol,
-            adaptive_max_step=state_adaptive_max_step_size,
-            max_step_size=state_max_step_size,
-            solver_class=state_solver_class,
+            **state_options,
         )
         self.state_system.model_instance = self.model_instance
         self.at_time_slices = at_time_slices
@@ -516,11 +494,6 @@ class TrajectoryAnalysis:
             dte_dxs=self.dte_dxs,
             dh_dxs=self.dh_dxs,
             state_jac=state_dot_jac_func,
-            adjoint_atol=adjoint_atol,
-            adjoint_rtol=adjoint_rtol,
-            adjoint_adaptive_max_step_size=adjoint_adaptive_max_step_size,
-            adjoint_max_step_size=adjoint_max_step_size,
-            adjoint_solver_class=adjoint_solver_class,
             p_x0_p_params=p_state0_p_p,
             p_dots_p_params=param_dot_jac_func,
             dh_dps=self.dh_dps,
@@ -529,6 +502,7 @@ class TrajectoryAnalysis:
             p_integrand_terms_p_params=param_integrand_jac_funcs,
             p_terminal_terms_p_state=self.lamdaF_funcs,
             p_integrand_terms_p_state=state_integrand_jac_funcs,
+            **adjoint_options,
         )
 
         wrapper_funcs = [
