@@ -154,7 +154,7 @@ class TrajectoryAnalysis:
 
         if isinstance(model.t0, BaseElement):
             t0 = model.t0.backend_repr
-        elif isinstance(model.t0, (backend.symbol_class, float)):
+        elif isinstance(model.t0, (backend.symbol_class, float, np.ndarray)):
             t0 = model.t0
         else:
             unexpcted_t0 = "unexpected value for t0"
