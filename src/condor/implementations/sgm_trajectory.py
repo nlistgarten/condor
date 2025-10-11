@@ -20,6 +20,7 @@ from condor.backend.operators import (
     sin,
     substitute,
 )
+from condor.fields import BaseElement
 
 from .utils import options_to_kwargs
 
@@ -149,12 +150,20 @@ class TrajectoryAnalysis:
 
         self.e_exprs = []
         self.h_exprs = []
+
+        if isinstance(model.t0, BaseElement):
+            t0 = model.t0.backend_repr
+        elif isinstance(model.t0, (backend.symbol_class, float)):
+            t0 = model.t0
+        else:
+            unexpcted_t0 = "unexpected value for t0"
+            raise ValueError(unexpcted_t0)
         at_time_slices = [
             sgm.NextTimeFromSlice(
                 expression_to_operator(
                     [self.p],
                     # TODO in future allow t0 to occur at arbitrary times
-                    [0.0, 0.0, inf],
+                    concat([t0, t0, inf]),
                     f"{ode_model.__name__}_at_times_t0",
                 )
             )
@@ -532,6 +541,9 @@ class TrajectoryAnalysis:
             res = self.trajectory_analysis_sgm.res
             model_instance._res = res
             model_instance.t = np.array(res.t)
+            if self.model.state._count == 1:
+                # numpy doesn't want to concatenate a list of 0-dim arrays
+                res.x = [np.atleast_1d(x) for x in res.x]
             model_instance.bind_field(
                 self.model.state.wrap(
                     np.array(res.x).T,

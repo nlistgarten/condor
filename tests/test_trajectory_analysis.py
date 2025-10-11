@@ -3,6 +3,32 @@ import pytest
 from scipy import linalg
 
 import condor as co
+from condor.backend import operators as ops
+
+
+def test_t0():
+    class TimeDependent(co.ODESystem):
+        sint = state()
+        dot[sint] = ops.cos(t)
+
+    class Sim(TimeDependent.TrajectoryAnalysis):
+        t0 = parameter()
+        tf = ops.pi
+        initial[sint] = parameter(name="initial_sint")
+
+        class Options:
+            atol = 1e-15
+            rtol = 1e-15
+
+    sim0 = Sim(t0=0, initial_sint=0)
+    sim1 = Sim(t0=ops.pi / 2, initial_sint=1)
+    assert np.isclose(sim0.sint[-1], sim1.sint[-1])
+
+    assert sim0.t0 == sim0.t[0]
+    assert sim0.tf == sim0.t[-1]
+
+    assert sim1.t0 == sim1.t[0]
+    assert sim1.tf == sim1.t[-1]
 
 
 def test_ct_lqr():
