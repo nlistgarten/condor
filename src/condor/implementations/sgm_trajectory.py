@@ -19,6 +19,7 @@ from condor.backend.operators import (
     pi,
     sin,
     substitute,
+    unstack,
 )
 from condor.fields import BaseElement
 
@@ -347,28 +348,54 @@ class TrajectoryAnalysis:
         ]
         # TODO: is there something more pythonic than repeated, very similar list
         # comprehensions?
-        self.lamdaFs = [
-            jacobian(terminal_term, self.x) for terminal_term in terminal_terms
-        ]
-        self.lamdaF_funcs = [
-            expression_to_operator(
-                self.simulation_signature,
-                lamdaF,
-                f"{model.__name__}_{traj_name}_lamdaF",
-            )
-            for lamdaF, traj_name in zip(self.lamdaFs, traj_out_names)
-        ]
-        self.gradFs = [
-            jacobian(terminal_term, self.p) for terminal_term in terminal_terms
-        ]
-        self.gradF_funcs = [
-            expression_to_operator(
-                self.simulation_signature,
-                gradF,
-                f"{model.__name__}_{traj_name}_gradF",
-            )
-            for gradF, traj_name in zip(self.gradFs, traj_out_names)
-        ]
+
+        self.lamdaFs = []
+        self.lamdaF_funcs = []
+        self.gradFs = []
+        self.gradF_funcs = []
+
+        for terminal_term_stacked, out_name in zip(terminal_terms, traj_out_names):
+            for idx, terminal_term in enumerate(unstack(terminal_term_stacked)):
+                self.lamdaFs.append(jacobian(terminal_term, self.x))
+                self.lamdaF_funcs.append(
+                    expression_to_operator(
+                        self.simulation_signature,
+                        self.lamdaFs[-1],
+                        f"{model.__name__}_{out_name}_{idx}_lamdaF",
+                    )
+                )
+                self.gradFs.append(jacobian(terminal_term, self.p))
+                self.gradF_funcs.append(
+                    expression_to_operator(
+                        self.simulation_signature,
+                        self.gradFs[-1],
+                        f"{model.__name__}_{out_name}_{idx}_gradF",
+                    )
+                )
+
+        state_integrand_jacs = []
+        state_integrand_jac_funcs = []
+        param_integrand_jacs = []
+        param_integrand_jac_funcs = []
+        for integrand_term_stacked, out_name in zip(integrand_terms, traj_out_names):
+            for idx, integrand_term in enumerate(unstack(integrand_term_stacked)):
+                term_label = f"{out_name}_{idx}"
+                state_integrand_jacs.append(jacobian(integrand_term, self.x).T)
+                state_integrand_jac_funcs.append(
+                    expression_to_operator(
+                        self.simulation_signature,
+                        state_integrand_jacs[-1],
+                        f"{model.__name__}_state_integrand_jac_{term_label}",
+                    )
+                )
+                param_integrand_jacs.append(jacobian(integrand_term, self.p).T)
+                param_integrand_jac_funcs.append(
+                    expression_to_operator(
+                        self.simulation_signature,
+                        param_integrand_jacs[-1],
+                        f"{model.__name__}_param_integrand_jac_{term_label}",
+                    )
+                )
 
         grad_jac = jacobian(state_equation_func.expr, self.p)
 
@@ -378,29 +405,6 @@ class TrajectoryAnalysis:
             f"{model.__name__}_param_jacobian",
         )
 
-        state_integrand_jacs = [
-            jacobian(integrand_term, self.x).T for integrand_term in integrand_terms
-        ]
-        state_integrand_jac_funcs = [
-            expression_to_operator(
-                self.simulation_signature,
-                ijac_expr,
-                f"{model.__name__}_state_integrand_jac_{ijac_expr_idx}",
-            )
-            for ijac_expr_idx, ijac_expr in enumerate(state_integrand_jacs)
-        ]
-
-        param_integrand_jacs = [
-            jacobian(integrand_term, self.p).T for integrand_term in integrand_terms
-        ]
-        param_integrand_jac_funcs = [
-            expression_to_operator(
-                self.simulation_signature,
-                ijac_expr,
-                f"{model.__name__}_param_integrand_jac_{ijac_expr_idx}",
-            )
-            for ijac_expr_idx, ijac_expr in enumerate(param_integrand_jacs)
-        ]
         # TODO figure out how to combine (and possibly reverse direction) to reduce
         # number of calls, since this is potentially most expensive call with inner
         # loop solvers,

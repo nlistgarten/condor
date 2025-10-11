@@ -31,6 +31,35 @@ def test_t0():
     assert sim1.tf == sim1.t[-1]
 
 
+def test_vector_output():
+    class DblInt(co.ODESystem):
+        pos = state(shape=2)
+        vel = state(shape=2)
+        Kp = parameter(shape=(2, 2))
+        Kv = parameter(shape=(2, 2))
+        dot[pos] = vel
+        dot[vel] = Kp @ pos + Kv @ vel
+        initial[pos] = parameter(shape=2, name="initial_pos")
+        initial[vel] = parameter(shape=2, name="initial_vel")
+
+    class Transfer(DblInt.TrajectoryAnalysis):
+        final_pos = trajectory_output(pos)
+        tf = 100.0
+
+    class TestEval(co.ExplicitSystem):
+        initial_pos = input(shape=2)
+        initial_vel = input(shape=2)
+        Kp = input(shape=(2, 2))
+        Kv = input(shape=(2, 2))
+
+        sim_out = Transfer(**input)
+
+        output.final_pos = sim_out.final_pos
+        output.final_pos_jac = ops.jacobian(final_pos, sim_out.parameter.flatten())
+
+    TestEval(initial_pos=[1, 2], initial_vel=[1, 3], Kp=np.eye(2), Kv=np.eye(2))
+
+
 def test_ct_lqr():
     # continuous-time LQR
 
