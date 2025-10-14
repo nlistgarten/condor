@@ -50,6 +50,8 @@ class SolverSciPyBase(SolverMixin):
     max_step_size : float
         maximum step size for the forward evaluation, normalized name to scipy's
         max_step
+    separate_events : bool
+        Coincident events get stored separately in the ODE result object
     rootfinder : callable
         Interval root-finder function. Defaults to :func:`scipy.optimize.brentq`, and
         must take the equivalent positional arguments, ``f``, ``a``, and ``b``, and
@@ -69,11 +71,13 @@ class SolverSciPyBase(SolverMixin):
         adaptive_min_steps=0,
         rootfinder=brentq,
         max_step_size=0.0,
+        separate_events=False,
         nsteps=10_000.0,
         **kwargs,
     ):
         self.system = system
         self.adaptive_min_steps = adaptive_min_steps
+        self.separate_events = separate_events
         self.solver = scipy_ode(
             system.dots,
         )
@@ -261,12 +265,28 @@ class SolverSciPyBase(SolverMixin):
                     rootsfound = (gs == min_e).astype(int)
 
                 idx = len(results.t)
-                results.e.append(Root(idx, rootsfound))
-                next_x = system.update(
-                    results.t[-1],
-                    results.x[-1],
-                    rootsfound,
-                )
+
+                if self.separate_events:
+                    for num_processed_events, g_idx in enumerate(
+                        np.where(rootsfound)[0]
+                    ):
+                        send_rootsfound = np.zeros_like(rootsfound)
+                        send_rootsfound[g_idx] = rootsfound[g_idx]
+                        next_x = system.update(
+                            results.t[-1], results.x[-1], send_rootsfound
+                        )
+                        if num_processed_events:
+                            self.store_result(results.t[-1], next_x)
+
+                    results.e.append(Root(len(results.t), rootsfound))
+                else:
+                    results.e.append(Root(idx, rootsfound))
+                    next_x = system.update(
+                        results.t[-1],
+                        results.x[-1],
+                        rootsfound,
+                    )
+
                 terminate = np.any(rootsfound[system.terminating] != 0)
 
                 last_t = results.t[-1]
