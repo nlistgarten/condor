@@ -52,6 +52,8 @@ class SolverSciPyBase(SolverMixin):
         max_step
     separate_events : bool
         Coincident events get stored separately in the ODE result object
+    reset_step_after_event : bool
+        After an event occurs, reset the step size to the first_step
     rootfinder : callable
         Interval root-finder function. Defaults to :func:`scipy.optimize.brentq`, and
         must take the equivalent positional arguments, ``f``, ``a``, and ``b``, and
@@ -69,6 +71,7 @@ class SolverSciPyBase(SolverMixin):
         atol=1e-12,
         rtol=1e-6,
         adaptive_min_steps=0,
+        reset_step_after_event=True,
         rootfinder=brentq,
         max_step_size=0.0,
         separate_events=False,
@@ -78,6 +81,7 @@ class SolverSciPyBase(SolverMixin):
         self.system = system
         self.adaptive_min_steps = adaptive_min_steps
         self.separate_events = separate_events
+        self.reset_step_after_event = reset_step_after_event
         self.solver = scipy_ode(
             system.dots,
         )
@@ -226,8 +230,10 @@ class SolverSciPyBase(SolverMixin):
                     dict(max_step=np.abs(next_t - last_t) / self.adaptive_min_steps)
                 )
 
+            if self.adaptive_min_steps or not self.reset_step_after_event:
                 self.solver.set_integrator(**self.int_options)
                 self.solver.set_solout(self.solout)
+
             solver.set_initial_value(
                 last_x,
                 last_t,
@@ -265,6 +271,11 @@ class SolverSciPyBase(SolverMixin):
                     rootsfound = (gs == min_e).astype(int)
 
                 idx = len(results.t)
+
+                if not self.reset_step_after_event:
+                    self.int_options["first_step"] = float(
+                        np.abs(results.t[-1] - results.t[-2])
+                    )
 
                 if self.separate_events:
                     for num_processed_events, g_idx in enumerate(
