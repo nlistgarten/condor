@@ -34,6 +34,7 @@ from condor.models import (
     SubmodelType,
     check_attr_name,
 )
+from condor.solvers.sweeping_gradient_method import Result, ResultInterpolant, Root
 
 log = logging.getLogger(__name__)
 
@@ -604,6 +605,88 @@ class TrajectoryAnalysis(
         x0 = cls._meta.initial_condition_function(p)
         self.bind_field(cls.state.wrap(x0))
         return self
+
+    def resample(self, dt, do_output=True, include_events=True, max_deg=3):
+        """Re-sample the trajectory, attaching the"""
+        model = self.__class__
+        if dt <= 0.0:
+            self.t = np.array(self._res.t)
+            self.bind_field(model.state.wrap(np.array(self._res.x).T))
+            if do_output:
+                self.bind_field(model.dynamic_output.wrap(np.array(self._res.y).T))
+            return self._res
+        t_grid = np.arange(self._res.t[0], self._res.t[-1], dt)
+        t_size = t_grid.size
+        if include_events:
+            t_size += 2 * len(self._res.e) - 1
+            es = []
+        elif t_grid[-1] + dt == self._res.t[-1]:
+            t_size += 1
+
+        if not include_events:
+            es = None
+        # self.t = np.empty((t_size,))
+        self.t = np.ones((t_size,)) * -1
+        self.t[: t_grid.size] = t_grid
+        if t_grid[-1] + dt == self._res.t[-1]:
+            self.t[t_grid.size] = t_grid[-1] + dt
+
+        state_interp = ResultInterpolant(self._res, max_deg=max_deg)
+        xs = np.empty((t_size, model.state._count))
+        do_output = do_output and model.dynamic_output._count
+        if do_output:
+            dynamic_output = self.implementation.StateSystem.dynamic_output
+            p = self._res.p
+            ys = np.empty((t_size, model.dynamic_output._count))
+        else:
+            ys = None
+
+        idx0 = 0
+
+        for x_interp_segment in state_interp:
+            t_select = np.where(
+                (self.t >= x_interp_segment.t0) & (self.t <= x_interp_segment.t1)
+            )
+            idx0 = t_select[0][0]
+            idx1 = t_select[0][-1] + 1
+
+            if include_events:
+                self.t[idx0 + 1 :] = self.t[idx0:-1]
+                xs[idx0, :] = self._res.x[x_interp_segment.idx0]
+                if do_output:
+                    ys[idx0, :] = self._res.y[x_interp_segment.idx0]
+                es.append(Root(idx0, None))
+                idx0 += 1
+                idx1 += 1
+                # TODO figure out how to get root info
+
+            ts_to_call = self.t[idx0:idx1]
+            xs[idx0:idx1] = x_interp_segment(ts_to_call)
+            if do_output:
+                for idx, t, x in zip(range(idx0, idx1), ts_to_call, xs[idx0:idx1]):
+                    ys[idx, None] = dynamic_output(p, t, x).T
+
+            if include_events:
+                self.t[idx1 + 1 :] = self.t[idx1:-1]
+                self.t[idx1 : idx1 + 2] = self._res.t[x_interp_segment.idx1]
+                xs[idx1, :] = self._res.x[x_interp_segment.idx1]
+                if do_output:
+                    ys[idx1, :] = self._res.y[x_interp_segment.idx1]
+
+        if include_events:
+            xs[idx1 + 1, :] = self._res.x[x_interp_segment.idx1]
+            if do_output:
+                ys[idx1 + 1, :] = self._res.y[x_interp_segment.idx1]
+            es.append(Root(idx1, None))
+
+        self.bind_field(model.state.wrap(xs.T))
+
+        if do_output:
+            self.bind_field(model.dynamic_output.wrap(ys.T))
+
+        return Result(
+            t=self.t, x=xs, y=ys, e=es, p=self._res.p, system=self._res.system
+        )
 
     @classmethod
     def point_analysis(cls, t, *args, **kwargs):
