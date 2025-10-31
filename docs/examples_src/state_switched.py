@@ -94,6 +94,19 @@ print(opt._stats)
 # %%
 
 LTI_plot(opt.sim)
+assert np.array(opt.sim._res.x).shape[-1] == opt.sim.state._values.shape[-1]
+orig_fig = plt.figure(1)
+
+opt.sim.resample(0.125)
+LTI_plot(opt.sim)
+assert np.array(opt.sim._res.x).shape[-1] == opt.sim.state._values.shape[-1]
+opt.sim.resample(0.125, include_events=False)
+LTI_plot(opt.sim)
+assert np.array(opt.sim._res.x).shape[-1] == opt.sim.state._values.shape[-1]
+last_fig = plt.figure(5)
+for orig_ax, last_ax in zip(orig_fig.get_axes(), last_fig.get_axes()):
+    last_ax.set_xlim(orig_ax.get_xlim())
+    last_ax.set_ylim(orig_ax.get_ylim())
 
 # %%
 

@@ -548,11 +548,13 @@ class TrajectoryAnalysis:
             if self.model.state._count == 1:
                 # numpy doesn't want to concatenate a list of 0-dim arrays
                 res.x = [np.atleast_1d(x) for x in res.x]
+            xx = np.array(res.x)
             model_instance.bind_field(
                 self.model.state.wrap(
-                    np.array(res.x).T,
+                    xx.T,
                 )
             )
+            model_instance.state._values = xx
             if self.dynamic_output_func:
                 yy = np.empty((model_instance.t.size, self.model.dynamic_output._count))
                 for idx, (t, x) in enumerate(zip(res.t, res.x)):
@@ -562,6 +564,7 @@ class TrajectoryAnalysis:
                         yy.T,
                     )
                 )
+                model_instance.dynamic_output._values = yy
 
         model_instance.bind_field(
             self.model.trajectory_output.wrap(

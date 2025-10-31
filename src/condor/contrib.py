@@ -680,9 +680,11 @@ class TrajectoryAnalysis(
             es.append(Root(idx1, None))
 
         self.bind_field(model.state.wrap(xs.T))
+        self.state._values = xs
 
         if do_output:
             self.bind_field(model.dynamic_output.wrap(ys.T))
+            self.dynamic_output._values = ys
 
         return Result(
             t=self.t, x=xs, y=ys, e=es, p=self._res.p, system=self._res.system
